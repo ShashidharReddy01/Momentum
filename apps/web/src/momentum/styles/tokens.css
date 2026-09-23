@@ -5,6 +5,12 @@
   /* Surfaces (cool neutral) */
   --canvas: oklch(0.985 0.002 260); /* app background */
   --sidebar: oklch(0.972 0.003 260);
+  --sidebar-ink: var(--ink);
+  --sidebar-muted: var(--muted);
+  --sidebar-hover: var(--surface-2);
+  --sidebar-active: var(--surface-2);
+  --sidebar-line: var(--hair-soft);
+  --topbar: var(--canvas);
   --surface: oklch(1 0 0); /* cards, panes, rows, popovers */
   --surface-2: oklch(0.965 0.003 260); /* hover rows, inputs */
   --hairline: oklch(0.905 0.004 260);

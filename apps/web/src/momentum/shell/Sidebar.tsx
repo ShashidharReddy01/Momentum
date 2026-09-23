@@ -20,13 +20,14 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/DropdownMenu';
 import { Icon } from '@/components/ui/Icon';
 import { useLogout, useMe } from '@/features/auth';
 import { cn } from '@/lib/cn';
-import { useUi } from '@/stores/ui';
+import { PALETTES, useUi } from '@/stores/ui';
 
 const NAV = [
   { to: '/', label: 'Home', icon: Home, end: true },
@@ -40,7 +41,7 @@ export function Sidebar() {
     <nav
       aria-label="Main"
       className={cn(
-        'flex h-dvh flex-col border-r border-hair-soft bg-sidebar transition-[width] duration-150',
+        'flex h-dvh flex-col border-r border-sidebar-line bg-sidebar text-sidebar-ink transition-[width] duration-150',
         collapsed ? 'w-0 overflow-hidden border-r-0' : 'w-[var(--sidebar-w)]',
       )}
     >
@@ -68,14 +69,14 @@ export function Sidebar() {
         </li>
       </ul>
       <SidebarSection title="Favorites">
-        <p className="px-3 text-xs text-muted-2">Star a project to pin it here.</p>
+        <p className="px-4 text-xs text-sidebar-muted">Star a project to pin it here.</p>
       </SidebarSection>
       <SidebarSection title="Teams">
-        <p className="flex items-center gap-2 px-3 text-xs text-muted-2">
+        <p className="flex items-center gap-2 px-4 text-xs text-sidebar-muted">
           <Icon icon={Users} size={14} /> Teams arrive in Phase 1.
         </p>
       </SidebarSection>
-      <div className="mt-auto border-t border-hair-soft p-2">
+      <div className="mt-auto border-t border-sidebar-line p-2">
         <UserMenu />
       </div>
     </nav>
@@ -89,8 +90,8 @@ function NavItem({ to, end, children }: { to: string; end?: boolean; children: R
       end={end}
       className={({ isActive }) =>
         cn(
-          'flex h-8 items-center gap-2.5 rounded-md px-2.5 text-sm text-ink-2 hover:bg-surface-2 hover:text-ink',
-          isActive && 'bg-surface-2 font-medium text-ink',
+          'flex h-8 items-center gap-2.5 rounded-md px-2.5 text-sm text-sidebar-ink/85 hover:bg-sidebar-hover hover:text-sidebar-ink',
+          isActive && 'bg-sidebar-active font-medium text-sidebar-ink',
         )
       }
     >
@@ -102,7 +103,7 @@ function NavItem({ to, end, children }: { to: string; end?: boolean; children: R
 function SidebarSection({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="mt-5">
-      <h2 className="section-label px-4 pb-1">{title}</h2>
+      <h2 className="section-label px-4 pb-1 !text-sidebar-muted">{title}</h2>
       {children}
     </section>
   );
@@ -112,7 +113,7 @@ function CreateMenu() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" className="w-full justify-start">
+        <Button variant="sidebar" className="w-full justify-start">
           <Icon icon={Plus} /> Create
         </Button>
       </DropdownMenuTrigger>
@@ -133,6 +134,8 @@ function UserMenu() {
   const logout = useLogout();
   const theme = useUi((s) => s.theme);
   const toggleTheme = useUi((s) => s.toggleTheme);
+  const palette = useUi((s) => s.palette);
+  const setPalette = useUi((s) => s.setPalette);
   const user = me.data?.user;
   if (!user) return null;
   return (
@@ -140,21 +143,33 @@ function UserMenu() {
       <DropdownMenuTrigger asChild>
         <button
           type="button"
-          className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left hover:bg-surface-2"
+          className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left hover:bg-sidebar-hover"
           aria-label="Account menu"
         >
           <Avatar name={user.name} src={user.avatar_url} size={26} />
           <span className="min-w-0 flex-1">
             <span className="block truncate text-sm font-medium">{user.name}</span>
-            <span className="block truncate text-xs text-muted">{me.data?.workspace.name}</span>
+            <span className="block truncate text-xs text-sidebar-muted">{me.data?.workspace.name}</span>
           </span>
-          <Icon icon={ChevronsUpDown} size={14} className="text-muted" />
+          <Icon icon={ChevronsUpDown} size={14} className="text-sidebar-muted" />
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent side="top" className="w-[var(--radix-dropdown-menu-trigger-width)]">
         <DropdownMenuItem onSelect={toggleTheme}>
           <Icon icon={theme === 'dark' ? Sun : Moon} /> {theme === 'dark' ? 'Light theme' : 'Dark theme'}
         </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuLabel>Color palette</DropdownMenuLabel>
+        {PALETTES.map((p) => (
+          <DropdownMenuItem
+            key={p}
+            onSelect={() => setPalette(p)}
+            hint={p === palette ? 'current' : undefined}
+          >
+            <span aria-hidden className="h-3 w-3 rounded-full" style={{ background: `var(--swatch-${p})` }} />
+            <span className="capitalize">{p}</span>
+          </DropdownMenuItem>
+        ))}
         <DropdownMenuSeparator />
         <DropdownMenuItem onSelect={() => logout.mutate()}>
           <Icon icon={LogOut} /> Sign out

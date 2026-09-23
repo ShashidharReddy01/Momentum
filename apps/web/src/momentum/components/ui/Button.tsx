@@ -16,6 +16,8 @@ export const buttonVariants = cva(
         ghost: 'border border-hairline bg-surface text-ink hover:bg-surface-2',
         text: 'text-ink-2 hover:bg-surface-2 hover:text-ink',
         danger: 'bg-crit text-surface hover:opacity-90',
+        /** Buttons placed on the (colored) sidebar. */
+        sidebar: 'bg-sidebar-hover text-sidebar-ink hover:bg-sidebar-active',
       },
       size: {
         sm: 'h-7 px-2.5 text-[13px]',

@@ -21,7 +21,7 @@ export function TopBar() {
     .filter((c): c is string => Boolean(c));
 
   return (
-    <header className="flex h-[var(--topbar-h)] shrink-0 items-center gap-3 border-b border-hair-soft bg-canvas px-3">
+    <header className="flex h-[var(--topbar-h)] shrink-0 items-center gap-3 border-b border-hair-soft bg-topbar px-3">
       <IconButton icon={PanelLeft} label="Toggle sidebar" shortcut="mod+\" onClick={toggleSidebar} />
       <nav aria-label="Breadcrumb" className="min-w-0 flex-1">
         <ol className="flex items-center gap-1.5 text-sm">
