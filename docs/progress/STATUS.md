@@ -4,7 +4,7 @@
 
 ## Current focus
 - **Phase:** 0: Foundations. **Complete** except the items noted below
-- **Next slice:** S1.2.2 Tasks: create, edit title, complete
+- **Next slice:** S1.2.3 Assignee and dates
 - **Model:** **Opus 5.5** for all of Phase 1 (and Phases 3, 5), per product owner decision; see `docs/process/model-guide.md`
 - **Blockers:** the GitHub repo `shashidharreddy01/momentum` must be created and connected so the code can be pushed
 
@@ -42,7 +42,7 @@
 
 ### Phase 1: Core tasks MVP
 - [x] S1.1.1 Teams (+ undo registry, `POST /undo`, `GET /users`, PeoplePicker, InlineText, undo toasts) · [x] S1.1.2 Projects (+ favorites, sections table, fractional ordering, breadcrumbs) · [x] S1.1.3 Project members and roles (Share dialog, role matrix, last-admin guard)
-- [x] S1.2.1 Sections (drag + menu reorder, collapse, undo; task move/delete hooks for S1.2.2) · [ ] S1.2.2 Tasks · [ ] S1.2.3 Assignee and dates · [ ] S1.2.4 DnD, multi-select, bulk · [ ] S1.2.5 Filter/sort/group · [ ] S1.2.6 List performance
+- [x] S1.2.1 Sections (drag + menu reorder, collapse, undo; task move/delete hooks for S1.2.2) · [x] S1.2.2 Tasks (queued rapid entry, paste-to-batch, complete fade + Show completed, undo keeps position; section delete moves tasks) · [ ] S1.2.3 Assignee and dates · [ ] S1.2.4 DnD, multi-select, bulk · [ ] S1.2.5 Filter/sort/group · [ ] S1.2.6 List performance
 - [ ] S1.3.1 Pane · [ ] S1.3.2 Subtasks · [ ] S1.3.3 Followers
 - [ ] S1.4.1 Comments · [ ] S1.4.2 Activity feed · [ ] S1.4.3 Undo
 - [ ] S1.5.1 My Tasks · [ ] S1.5.2 Home
@@ -62,6 +62,9 @@ Tracked in their phase files; copy the slice list here at each phase kickoff.
 | 2026-09-23 | Visual style changed to neutral + one blue accent, Inter only; tokens renamed to `canvas`/`sidebar`/`surface`/`surface-2`/`accent` (ADR-0005 amendment) | The inherited editorial style read as generic AI design; cheap to fix before Phase 1 |
 | 2026-09-23 | Ordering jitter suffix 2 → 3 chars | 2 chars collided too often under concurrent inserts (flaky test) |
 | 2026-09-23 | Final themes: Light = Paper (cream + ink accent), Dark = Graphite (charcoal + lime); palette picker removed (ADR-0005 amendment 2) | Blue/white rejected by the product owner; chosen from five options shown on the real UI |
+
+## Notes for S1.2.6 (performance)
+- List view renders all rows (no virtualization yet). S1.2.6 must virtualize and measure with the 2,000-task seed.
 
 ## Phase retros
 ### Phase 0 (2026-09-23)

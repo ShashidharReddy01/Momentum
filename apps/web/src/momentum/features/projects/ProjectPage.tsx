@@ -21,7 +21,7 @@ import { cn } from '@/lib/cn';
 import { useCrumbs } from '@/lib/crumbs';
 import { useProject, useProjectLifecycle, useToggleFavorite, useUpdateProject } from './queries';
 import { ShareDialog } from './ShareDialog';
-import { SectionList } from '@/features/sections';
+import { ProjectTasksView } from '@/features/tasks';
 
 const VIEWS = [
   { key: 'list', label: 'List' },
@@ -169,13 +169,7 @@ export function ProjectPage() {
         </div>
       ) : null}
       <div className="flex-1 overflow-auto px-8 py-5">
-        {view === 'list' ? (
-          <SectionList
-            projectId={p.id}
-            canEdit={canEdit && !p.archived_at}
-            renderBody={() => <p className="py-1 text-sm text-muted-2">No tasks yet</p>}
-          />
-        ) : null}
+        {view === 'list' ? <ProjectTasksView projectId={p.id} canEdit={canEdit && !p.archived_at} /> : null}
       </div>
     </div>
   );

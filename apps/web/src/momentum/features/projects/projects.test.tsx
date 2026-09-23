@@ -6,6 +6,7 @@ import { MomentumApp } from '@/MomentumApp';
 import { authHandlers } from '@/mocks/handlers';
 import { projectHandlers } from '@/mocks/projects';
 import { sectionHandlers } from '@/mocks/sections';
+import { taskHandlers } from '@/mocks/tasks';
 import { teamHandlers } from '@/mocks/teams';
 
 const server = setupServer();
@@ -23,6 +24,7 @@ describe('Projects', () => {
       ...teamHandlers(),
       ...projectHandlers('', () => 'Design'),
       ...sectionHandlers('', { 'project-1': ['To do'] }),
+      ...taskHandlers(),
     );
     window.history.replaceState(null, '', '/');
     render(<MomentumApp />);

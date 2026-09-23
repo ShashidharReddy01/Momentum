@@ -76,7 +76,7 @@ function Root({ children }: { children: ReactNode }) {
     <div ref={setEl} className="momentum-root" data-momentum data-theme={theme}>
       <PortalContext.Provider value={el}>
         {children}
-        <Toaster position="bottom-left" theme={theme} toastOptions={{ className: 'momentum-toast' }} />
+        <Toaster position="bottom-center" theme={theme} toastOptions={{ className: 'momentum-toast' }} />
       </PortalContext.Provider>
     </div>
   );

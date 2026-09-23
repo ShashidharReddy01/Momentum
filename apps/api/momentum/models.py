@@ -6,6 +6,7 @@ from momentum.core.events import OutboxEvent
 from momentum.core.idempotency import IdempotencyKey
 from momentum.domain.projects.models import Favorite, Project, ProjectMember
 from momentum.domain.sections.models import Section
+from momentum.domain.tasks.models import Follower, Task, TaskProject
 from momentum.domain.teams.models import Team, TeamMember
 from momentum.domain.users.models import ApiToken, User, UserIdentity
 from momentum.domain.workspace.models import Workspace
@@ -16,11 +17,14 @@ __all__ = [
     "Activity",
     "ApiToken",
     "Favorite",
+    "Follower",
     "IdempotencyKey",
     "OutboxEvent",
     "Project",
     "ProjectMember",
     "Section",
+    "Task",
+    "TaskProject",
     "Team",
     "TeamMember",
     "User",

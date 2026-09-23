@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from momentum.core.context import Ctx
 from momentum.core.errors import Forbidden, NotFound
 from momentum.domain.projects.models import Project, ProjectMember
+from momentum.domain.tasks.models import Follower, Task, TaskProject
 from momentum.domain.teams.models import Team, TeamMember
 
 ProjectRole = Literal["admin", "editor", "commenter", "viewer"]
@@ -120,3 +121,50 @@ async def get_visible_project(
 def require_project_role(role: str, needed: str, what: str = "do this") -> None:
     if ROLE_RANK[role] < ROLE_RANK[needed]:
         raise Forbidden(f"You need {needed} access to {what}")
+
+
+# ---------------- tasks ----------------
+
+
+async def get_visible_task(
+    session: AsyncSession, ctx: Ctx, task_id: uuid.UUID, *, include_deleted: bool = False
+) -> tuple[Task, TaskProject | None, str]:
+    """Load a task the caller can see with its (primary) placement and the caller's role.
+
+    Visible through any visible project (role = project role); otherwise assignees get editor
+    access and creators/followers get commenter access (auth-and-permissions.md §6).
+    """
+    task = await session.get(Task, task_id)
+    if (
+        task is None
+        or task.workspace_id != ctx.workspace_id
+        or (task.deleted_at is not None and not include_deleted)
+    ):
+        raise NotFound("Task not found")
+    placements = (
+        (await session.execute(select(TaskProject).where(TaskProject.task_id == task.id)))
+        .scalars()
+        .all()
+    )
+    best: tuple[TaskProject | None, str | None] = (placements[0] if placements else None, None)
+    for pl in placements:
+        project = await session.get(Project, pl.project_id)
+        if project is None or project.deleted_at is not None:
+            continue
+        role = await project_role(session, ctx, project)
+        if role is not None and (best[1] is None or ROLE_RANK[role] > ROLE_RANK[best[1]]):
+            best = (pl, role)
+    if best[1] is not None:
+        return task, best[0], best[1]
+    if ctx.actor.id is not None and task.assignee_id == ctx.actor.id:
+        return task, best[0], "editor"
+    is_follower = (
+        await session.execute(
+            select(Follower.user_id).where(
+                Follower.task_id == task.id, Follower.user_id == ctx.actor.id
+            )
+        )
+    ).first() is not None
+    if is_follower or (ctx.actor.id is not None and task.created_by == ctx.actor.id):
+        return task, best[0], "commenter"
+    raise NotFound("Task not found")

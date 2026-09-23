@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import random
+import uuid
+from datetime import UTC, date, datetime, timedelta
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -9,8 +13,10 @@ from momentum.core.ordering import keys_between
 from momentum.core.settings import Settings
 from momentum.domain.projects.models import Project, ProjectMember
 from momentum.domain.sections.models import Section
+from momentum.domain.tasks.models import Follower, Task, TaskProject
 from momentum.domain.teams.models import Team, TeamMember
 from momentum.domain.users.models import User
+from momentum.domain.workspace.models import Workspace
 from momentum.domain.workspace.service import ensure_default_workspace
 
 SEED_DOMAIN = "acme-demo.test"
@@ -48,7 +54,9 @@ async def seed(session: AsyncSession, settings: Settings) -> dict[str, int]:
     await session.flush()
     teams_created = await _seed_teams(session, ws.id)
     projects_created = await _seed_projects(session, ws.id)
+    tasks_created = await _seed_tasks(session, ws)
     return {
+        "tasks_created": tasks_created,
         "users_created": created,
         "teams_created": teams_created,
         "projects_created": projects_created,
@@ -172,5 +180,113 @@ async def _seed_teams(session: AsyncSession, workspace_id: object) -> int:
             if m in users:
                 session.add(TeamMember(team_id=team.id, user_id=users[m].id, role="member"))
         created += 1
+    await session.flush()
+    return created
+
+
+SEED_TASKS: dict[str, list[str]] = {
+    "Website Revamp": [
+        "Audit current site analytics",
+        "Collect competitor pricing pages",
+        "Draft new information architecture",
+        "Write homepage hero copy",
+        "Design pricing page mockups",
+        "Review mockups with Ana",
+        "Set up staging environment",
+        "Migrate blog posts",
+        "Accessibility audit",
+        "Performance budget for landing pages",
+        "Update footer links",
+        "Plan launch announcement",
+    ],
+    "Mobile App v2": [
+        "Define v2 scope",
+        "Offline mode spike",
+        "Push notification settings",
+        "Crash reporting setup",
+        "Beta tester recruitment",
+        "App store screenshots",
+    ],
+    "Q4 Launch Campaign": [
+        "Campaign brief",
+        "Budget approval",
+        "Landing page copy",
+        "Email sequence (3 emails)",
+        "Social calendar",
+        "Press list",
+        "Webinar outline",
+        "Customer quotes",
+    ],
+    "Vendor Onboarding": [
+        "Security questionnaire: Acme Cloud",
+        "Contract review: DataCo",
+        "Tax forms: PrintHub",
+        "Kickoff call: Acme Cloud",
+        "Access provisioning: DataCo",
+    ],
+}
+
+
+async def _seed_tasks(session: AsyncSession, ws: Workspace) -> int:
+    rng = random.Random(42)  # noqa: S311 - deterministic synthetic data, not security
+    users = list((await session.execute(select(User).where(User.workspace_id == ws.id))).scalars())
+    today = date.today()
+    created = 0
+    for project_name, titles in SEED_TASKS.items():
+        project = (
+            await session.execute(
+                select(Project).where(Project.workspace_id == ws.id, Project.name == project_name)
+            )
+        ).scalar_one_or_none()
+        if project is None:
+            continue
+        has_tasks = await session.execute(
+            select(TaskProject.task_id).where(TaskProject.project_id == project.id).limit(1)
+        )
+        if has_tasks.first() is not None:
+            continue
+        sections = list(
+            (
+                await session.execute(
+                    select(Section)
+                    .where(Section.project_id == project.id)
+                    .order_by(Section.position)
+                )
+            ).scalars()
+        )
+        per_section: dict[uuid.UUID, list[str]] = {s.id: [] for s in sections}
+        for i, title in enumerate(titles):
+            per_section[
+                sections[min(i * len(sections) // len(titles), len(sections) - 1)].id
+            ].append(title)
+        for section in sections:
+            names = per_section[section.id]
+            for title, pos in zip(names, keys_between(None, None, len(names)), strict=True):
+                ws.task_seq += 1
+                assignee = rng.choice(users) if rng.random() < 0.8 else None
+                due = today + timedelta(days=rng.randint(-5, 21)) if rng.random() < 0.7 else None
+                done = section is sections[-1] and rng.random() < 0.6
+                task = Task(
+                    workspace_id=ws.id,
+                    number=ws.task_seq,
+                    title=title,
+                    assignee_id=assignee.id if assignee else None,
+                    due_on=due,
+                    completed_at=datetime.now(UTC) - timedelta(days=rng.randint(0, 6))
+                    if done
+                    else None,
+                    created_by=project.owner_id,
+                    created_via="import",
+                )
+                session.add(task)
+                await session.flush()
+                session.add(
+                    TaskProject(
+                        task_id=task.id, project_id=project.id, section_id=section.id, position=pos
+                    )
+                )
+                for uid in {project.owner_id, task.assignee_id} - {None}:
+                    session.add(Follower(task_id=task.id, user_id=uid))
+                created += 1
     await session.flush()
     return created

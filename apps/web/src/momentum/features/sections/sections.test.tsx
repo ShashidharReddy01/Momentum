@@ -6,6 +6,7 @@ import { MomentumApp } from '@/MomentumApp';
 import { authHandlers } from '@/mocks/handlers';
 import { projectHandlers } from '@/mocks/projects';
 import { sectionHandlers } from '@/mocks/sections';
+import { taskHandlers } from '@/mocks/tasks';
 import { teamHandlers } from '@/mocks/teams';
 
 const server = setupServer();
@@ -22,6 +23,7 @@ function boot(role = 'admin') {
     ...teamHandlers(),
     ...projectHandlers('', undefined, [{ name: 'Website Revamp', my_role: role }]),
     ...sectionHandlers('', { 'seed-1': ['Backlog', 'In progress', 'Done'] }),
+    ...taskHandlers(),
   );
   window.history.replaceState(null, '', '/projects/seed-1');
   render(<MomentumApp />);
@@ -57,9 +59,9 @@ describe('Sections', () => {
 
     // collapse hides the body
     const done = screen.getByRole('region', { name: 'Section Done' });
-    expect(within(done).getByText('No tasks yet')).toBeInTheDocument();
+    expect(within(done).getByRole('button', { name: /Add task/ })).toBeInTheDocument();
     await user.click(within(done).getByRole('button', { name: 'Collapse Done' }));
-    expect(within(done).queryByText('No tasks yet')).not.toBeInTheDocument();
+    expect(within(done).queryByRole('button', { name: /Add task/ })).not.toBeInTheDocument();
 
     // delete
     await user.click(screen.getByRole('button', { name: 'Actions for section Archive' }));

@@ -51,7 +51,7 @@ ignore = ["S101", "B008", "RUF012", "UP046"]  # UP046: keep Generic[T] (pydantic
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S", "B"]
-"migrations/**" = ["E501"]
+"momentum/migrations/**" = ["E501"]
 
 [tool.mypy]
 strict = true

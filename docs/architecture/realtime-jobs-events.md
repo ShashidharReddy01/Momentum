@@ -38,6 +38,7 @@ Event payloads share an envelope:
 | `task.updated` | 1 | `changes`, `version` |
 | `task.completed` / `task.uncompleted` | 1 | `completed_by` |
 | `task.deleted` / `task.restored` | 1 | |
+| (channels for task events) | 1 | `task:<id>`, `project:<id>` of its placement, `user:<assignee>` |
 | `task.moved` | 1 | project_id, from/to section, position |
 | `task.added_to_project` / `task.removed_from_project` | 2 | project_id, section_id |
 | `task.assigned` | 1 | old/new assignee |

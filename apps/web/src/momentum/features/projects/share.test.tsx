@@ -6,6 +6,7 @@ import { MomentumApp } from '@/MomentumApp';
 import { authHandlers } from '@/mocks/handlers';
 import { projectHandlers } from '@/mocks/projects';
 import { sectionHandlers } from '@/mocks/sections';
+import { taskHandlers } from '@/mocks/tasks';
 import { teamHandlers } from '@/mocks/teams';
 
 const server = setupServer();
@@ -22,6 +23,7 @@ function boot(path: string, seed: Parameters<typeof projectHandlers>[2]) {
     ...teamHandlers(),
     ...projectHandlers('', undefined, seed),
     ...sectionHandlers('', { 'seed-1': ['To do'] }),
+    ...taskHandlers(),
   );
   window.history.replaceState(null, '', path);
   render(<MomentumApp />);

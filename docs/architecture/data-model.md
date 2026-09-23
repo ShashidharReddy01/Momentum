@@ -127,7 +127,7 @@ id, workspace_id, project_id, name, position, version, timestamps, deleted_at. I
 **Indexes:** (workspace_id, number) unique; (assignee_id, completed_at, due_on); (parent_id, parent_position); GIN(search_tsv); GIN(title gin_trgm_ops).
 
 ### `task_projects` (multi-homing)
-task_id, project_id, section_id, position, added_at, added_by. pk (task_id, project_id). Index (project_id, section_id, position).
+task_id, project_id, section_id, position (fractional, `COLLATE "C"`), added_at, added_by. pk (task_id, project_id). Index (project_id, section_id, position). Completed tasks keep their position, so undoing a completion restores the exact place.
 
 ### `task_dependencies`
 task_id (the blocked task), depends_on_id (the blocker), created_by, created_at. pk (task_id, depends_on_id). Check task_id <> depends_on_id. The service prevents cycles.
