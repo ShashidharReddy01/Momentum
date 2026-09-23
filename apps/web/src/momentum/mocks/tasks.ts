@@ -9,10 +9,10 @@ type T = {
   project_id: string;
   section_id: string;
   position: string;
-  assignee_id: null;
-  start_on: null;
-  due_on: null;
-  due_at: null;
+  assignee_id: string | null;
+  start_on: string | null;
+  due_on: string | null;
+  due_at: string | null;
   completed_at: string | null;
   parent_id: null;
   priority: null;

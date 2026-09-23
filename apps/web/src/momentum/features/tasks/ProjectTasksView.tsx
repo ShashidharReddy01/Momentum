@@ -4,8 +4,10 @@ import { ErrorState } from '@/components/common/States';
 import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { useMe } from '@/features/auth';
+import { usePeople, type Person } from '@/features/people';
 import { SectionList, type Section } from '@/features/sections';
-import { useProjectTasks, useTaskMutations, type Task } from './queries';
+import { useProjectTasks, useTaskMutations, type Task, type TaskPatch } from './queries';
 import { DraftRow, TaskRow } from './TaskRow';
 
 type Draft = { sectionId: string; afterId: string | null; key: number };
@@ -21,6 +23,9 @@ export function ProjectTasksView({ projectId, canEdit }: { projectId: string; ca
   const [draft, setDraft] = useState<Draft | null>(null);
   const [fading, setFading] = useState<Set<string>>(new Set());
   const draftKey = useRef(0);
+  const meId = useMe().data?.user.id;
+  const people = usePeople().data;
+  const peopleById = useMemo(() => new Map<string, Person>((people ?? []).map((p) => [p.id, p])), [people]);
 
   const bySection = useMemo(() => {
     const map = new Map<string, Task[]>();
@@ -66,6 +71,10 @@ export function ProjectTasksView({ projectId, canEdit }: { projectId: string; ca
   const onRename = useCallback((t: Task, title: string) => m.rename.mutate({ id: t.id, title }), [m.rename]);
   const onEnter = useCallback((t: Task) => canEdit && openDraft(t.section_id!, t.id), [canEdit, openDraft]);
   const onDelete = useCallback((t: Task) => m.remove.mutate(t.id), [m.remove]);
+  const onUpdate = useCallback(
+    (t: Task, patch: TaskPatch, message?: string) => m.update.mutate({ id: t.id, patch, message }),
+    [m.update],
+  );
 
   if (open.isPending) {
     return (
@@ -114,6 +123,9 @@ export function ProjectTasksView({ projectId, canEdit }: { projectId: string; ca
               task={t}
               canEdit={canEdit}
               fading={fading.has(t.id)}
+              assignee={t.assignee_id ? peopleById.get(t.assignee_id) : undefined}
+              meId={meId}
+              onUpdate={onUpdate}
               onToggle={onToggle}
               onRename={onRename}
               onEnter={onEnter}
@@ -149,6 +161,16 @@ export function ProjectTasksView({ projectId, canEdit }: { projectId: string; ca
         >
           <Icon icon={CheckCircle2} /> {showCompleted ? 'Hide completed' : 'Show completed'}
         </Button>
+      </div>
+      <div
+        aria-hidden
+        className="flex h-8 items-center gap-2.5 border-b border-hairline pr-2 pl-11 text-xs text-muted"
+      >
+        <span className="flex-1 pl-[30px]">Task name</span>
+        <span className="w-14" />
+        <span className="w-36 px-1.5">Assignee</span>
+        <span className="w-32 px-1.5">Due date</span>
+        <span className="w-7" />
       </div>
       <SectionList projectId={projectId} canEdit={canEdit} renderBody={renderBody} />
     </div>

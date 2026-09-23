@@ -3,14 +3,15 @@
 > Updated by the AI at the end of every slice and every session. The human confirms "done" after trying the slice.
 
 ## Current focus
-- **Phase:** 0: Foundations. **Complete** except the items noted below
-- **Next slice:** S1.2.3 Assignee and dates
+- **Phase:** 1: Core tasks MVP (in progress)
+- **Next slice:** S1.2.4 Drag and drop, multi-select, bulk actions
 - **Model:** **Opus 5.5** for all of Phase 1 (and Phases 3, 5), per product owner decision; see `docs/process/model-guide.md`
-- **Blockers:** the GitHub repo `shashidharreddy01/momentum` must be created and connected so the code can be pushed
+- **Blockers:** none
 
 ## Handoff notes (latest session: 2026-09-23, Phase 1)
 - Phase 1 kickoff written (`docs/roadmap/phase-1-kickoff.md`). Project/team access rules live in `momentum/domain/access.py`.
-- Build container: Postgres must be restarted at session start (`su postgres -c "pg_ctl -D /home/user/.pgdata -o '-p 5432 -k /tmp' start"`).
+- Build container: Postgres must be restarted at session start (`su postgres -c "/usr/lib/postgresql/16/bin/pg_ctl -D /home/user/.pgdata -o '-p 5432 -k /tmp' -l /tmp/pg.log start"`). The web app uses **pnpm** (npm fails on the pnpm lockfile).
+- S1.2.3: dates are parsed in the **browser's** timezone (chrono-node, `lib/dates.ts`); the server derives `due_on` from `due_at` in the user's stored timezone only when the client omits it (the UI always sends both). Rows are focusable: `A` / `M` / `D` / `Enter`. Row focus is basic; S1.2.4 adds roving focus (↑/↓) and selection.
 
 ## Handoff notes (Phase 0)
 - Built in a cloud container: native Postgres 16 + pgvector 0.6 (no Docker there). Docker Compose is provided for local machines.
@@ -42,7 +43,7 @@
 
 ### Phase 1: Core tasks MVP
 - [x] S1.1.1 Teams (+ undo registry, `POST /undo`, `GET /users`, PeoplePicker, InlineText, undo toasts) · [x] S1.1.2 Projects (+ favorites, sections table, fractional ordering, breadcrumbs) · [x] S1.1.3 Project members and roles (Share dialog, role matrix, last-admin guard)
-- [x] S1.2.1 Sections (drag + menu reorder, collapse, undo; task move/delete hooks for S1.2.2) · [x] S1.2.2 Tasks (queued rapid entry, paste-to-batch, complete fade + Show completed, undo keeps position; section delete moves tasks) · [ ] S1.2.3 Assignee and dates · [ ] S1.2.4 DnD, multi-select, bulk · [ ] S1.2.5 Filter/sort/group · [ ] S1.2.6 List performance
+- [x] S1.2.1 Sections (drag + menu reorder, collapse, undo; task move/delete hooks for S1.2.2) · [x] S1.2.2 Tasks (queued rapid entry, paste-to-batch, complete fade + Show completed, undo keeps position; section delete moves tasks) · [x] S1.2.3 Assignee and dates (AssigneePicker, DatePicker with NL input + calendar, DueText tones, A/M/D, `task.assigned`, assignee auto-follows) · [ ] S1.2.4 DnD, multi-select, bulk · [ ] S1.2.5 Filter/sort/group · [ ] S1.2.6 List performance
 - [ ] S1.3.1 Pane · [ ] S1.3.2 Subtasks · [ ] S1.3.3 Followers
 - [ ] S1.4.1 Comments · [ ] S1.4.2 Activity feed · [ ] S1.4.3 Undo
 - [ ] S1.5.1 My Tasks · [ ] S1.5.2 Home
@@ -58,6 +59,7 @@ Tracked in their phase files; copy the slice list here at each phase kickoff.
 | 2026-09-23 | App wiring moved to `momentum/api/` (deps, runtime, system) | Keeps `core` free of outer-layer imports (import-linter) |
 | 2026-09-23 | Queue names prefixed `momentum_`; NOTIFY channel `<schema>_events` | Coexist with a host that also uses Procrastinate/NOTIFY |
 | 2026-09-23 | Base path handled by React Router `basename` (no custom link wrapper) | Simpler; tested |
+| 2026-09-23 | S1.2.3: natural-language dates parse in the browser's timezone (not `users.timezone`) | The person typing sees their own clock; `users.timezone` is used server-side for derived dates and later for notifications/digests |
 | 2026-09-23 | Added `docs/integrations/asana-import.md` and root `INTEGRATION_GUIDE.md` | Asana data migration spec; guide for plugging into another project |
 | 2026-09-23 | Visual style changed to neutral + one blue accent, Inter only; tokens renamed to `canvas`/`sidebar`/`surface`/`surface-2`/`accent` (ADR-0005 amendment) | The inherited editorial style read as generic AI design; cheap to fix before Phase 1 |
 | 2026-09-23 | Ordering jitter suffix 2 → 3 chars | 2 chars collided too often under concurrent inserts (flaky test) |

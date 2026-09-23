@@ -1,6 +1,16 @@
-import { MoreHorizontal, Trash2 } from 'lucide-react';
-import { memo, useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { CalendarDays, MoreHorizontal, Trash2, UserRound } from 'lucide-react';
+import {
+  forwardRef,
+  memo,
+  useEffect,
+  useRef,
+  useState,
+  type ComponentProps,
+  type KeyboardEvent,
+} from 'react';
 import { CompleteCheck } from '@/components/common/CompleteCheck';
+import { DueText } from '@/components/common/DueText';
+import { Avatar } from '@/components/ui/Avatar';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -10,12 +20,21 @@ import {
 import { Icon } from '@/components/ui/Icon';
 import { IconButton } from '@/components/ui/IconButton';
 import { cn } from '@/lib/cn';
-import { isTemp, type Task } from './queries';
+import { formatDue } from '@/lib/dates';
+import type { Person } from '@/features/people';
+import { AssigneePicker } from './AssigneePicker';
+import { DatePicker } from './DatePicker';
+import { isTemp, type Task, type TaskPatch } from './queries';
+
+type Picker = 'assignee' | 'due' | null;
 
 export interface TaskRowProps {
   task: Task;
   canEdit: boolean;
   fading?: boolean;
+  assignee?: Person;
+  meId?: string;
+  onUpdate: (task: Task, patch: TaskPatch, message?: string) => void;
   onToggle: (task: Task) => void;
   onRename: (task: Task, title: string) => void;
   onEnter: (task: Task) => void;
@@ -26,12 +45,17 @@ export const TaskRow = memo(function TaskRow({
   task,
   canEdit,
   fading,
+  assignee,
+  meId,
+  onUpdate,
   onToggle,
   onRename,
   onEnter,
   onDelete,
 }: TaskRowProps) {
   const [editing, setEditing] = useState(false);
+  const [picker, setPicker] = useState<Picker>(null);
+  const row = useRef<HTMLDivElement>(null);
   const [draft, setDraft] = useState(task.title);
   const input = useRef<HTMLInputElement>(null);
   const done = !!task.completed_at;
@@ -61,13 +85,39 @@ export const TaskRow = memo(function TaskRow({
     }
   };
 
+  const assign = (id: string | null, name?: string) =>
+    onUpdate(task, { assignee_id: id }, id ? `Assigned to ${name ?? 'you'}` : 'Unassigned');
+  const closePicker = (open: boolean) => {
+    if (!open) {
+      setPicker(null);
+      requestAnimationFrame(() => row.current?.focus());
+    }
+  };
+  // Row shortcuts (ux-specs §keyboard): A assign, M assign to me, D due date
+  const onRowKey = (e: KeyboardEvent<HTMLDivElement>) => {
+    if (e.target !== e.currentTarget || !canEdit || e.metaKey || e.ctrlKey || e.altKey) return;
+    const k = e.key.toLowerCase();
+    if (k === 'a') setPicker('assignee');
+    else if (k === 'd') setPicker('due');
+    else if (k === 'm' && meId && task.assignee_id !== meId) assign(meId);
+    else if (e.key === 'Enter') setEditing(true);
+    else return;
+    e.preventDefault();
+  };
+
   return (
+    // Rows are keyboard targets (A/M/D/Enter); S1.2.4 adds roving focus + selection.
+    // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions
     <div
+      ref={row}
       role="listitem"
       aria-label={task.title}
       data-task-id={task.id}
+      // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex
+      tabIndex={0}
+      onKeyDown={onRowKey}
       className={cn(
-        'group/row flex h-9 items-center gap-2.5 border-b border-hair-soft px-2 transition-opacity duration-300 hover:bg-surface-2',
+        'group/row flex h-9 items-center gap-2.5 border-b border-hair-soft px-2 transition-opacity duration-300 outline-none hover:bg-surface-2 focus-visible:bg-surface-2 focus-visible:shadow-[inset_2px_0_0_var(--focus)]',
         (done || fading) && 'text-muted',
         fading && 'opacity-60',
       )}
@@ -102,9 +152,57 @@ export const TaskRow = memo(function TaskRow({
           {task.title}
         </button>
       )}
-      <span className="font-mono text-[11px] text-muted-2 opacity-0 group-hover/row:opacity-100">
+      <span className="w-14 shrink-0 text-right font-mono text-[11px] text-muted-2 opacity-0 group-hover/row:opacity-100">
         {isTemp(task.id) ? '…' : task.key}
       </span>
+      <AssigneePicker
+        open={picker === 'assignee'}
+        onOpenChange={(o) => (o ? setPicker('assignee') : closePicker(false))}
+        assigneeId={task.assignee_id}
+        onChange={(u) => assign(u?.id ?? null, u?.id === meId ? 'you' : u?.name)}
+      >
+        <Cell
+          disabled={!canEdit}
+          className="w-36"
+          aria-label={assignee ? `Assignee: ${assignee.name}` : 'Assign'}
+          aria-keyshortcuts="A"
+        >
+          {assignee ? (
+            <>
+              <Avatar name={assignee.name} src={assignee.avatar_url} size={20} />
+              <span className="truncate text-[12.5px] text-ink-2">{assignee.name.split(' ')[0]}</span>
+            </>
+          ) : (
+            <Placeholder icon={UserRound} show={canEdit} />
+          )}
+        </Cell>
+      </AssigneePicker>
+      <DatePicker
+        open={picker === 'due'}
+        onOpenChange={(o) => (o ? setPicker('due') : closePicker(false))}
+        dueOn={task.due_on}
+        dueAt={task.due_at}
+        onChange={(v) =>
+          onUpdate(
+            task,
+            v ? { due_on: v.date, due_at: v.at } : { due_on: null, due_at: null },
+            v ? `Due date set: ${formatDue(v.date, v.at)}` : 'Due date removed',
+          )
+        }
+      >
+        <Cell
+          disabled={!canEdit}
+          className="w-32"
+          aria-label={task.due_on ? `Due ${formatDue(task.due_on, task.due_at)}` : 'Set due date'}
+          aria-keyshortcuts="D"
+        >
+          {task.due_on ? (
+            <DueText dueOn={task.due_on} dueAt={task.due_at} startOn={task.start_on} done={done} />
+          ) : (
+            <Placeholder icon={CalendarDays} show={canEdit} />
+          )}
+        </Cell>
+      </DatePicker>
       {canEdit ? (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -127,6 +225,35 @@ export const TaskRow = memo(function TaskRow({
     </div>
   );
 });
+
+/** A clickable list cell that opens a picker; forwards the Radix trigger props. */
+const Cell = forwardRef<HTMLButtonElement, ComponentProps<'button'>>(function Cell(
+  { className, children, ...props },
+  ref,
+) {
+  return (
+    <button
+      ref={ref}
+      type="button"
+      tabIndex={-1}
+      className={cn(
+        'flex h-7 shrink-0 items-center gap-1.5 rounded-md px-1.5 text-left hover:bg-surface disabled:pointer-events-none data-[state=open]:bg-surface',
+        className,
+      )}
+      {...props}
+    >
+      {children}
+    </button>
+  );
+});
+
+function Placeholder({ icon, show }: { icon: typeof UserRound; show: boolean }) {
+  return show ? (
+    <span className="flex h-5 w-5 items-center justify-center rounded-full border border-dashed border-muted-2 text-muted-2 opacity-0 group-hover/row:opacity-100 group-focus-visible/row:opacity-100">
+      <Icon icon={icon} size={12} />
+    </span>
+  ) : null;
+}
 
 export function DraftRow({
   onSubmit,

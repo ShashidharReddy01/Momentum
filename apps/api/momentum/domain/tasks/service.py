@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from momentum.core.activity import Diff, record_activity
+from momentum.core.activity import Diff, jsonable_diff, record_activity
 from momentum.core.context import Ctx
 from momentum.core.errors import NotFound, ValidationFailed
 from momentum.core.events import emit
@@ -24,6 +25,7 @@ from momentum.domain.access import (
 from momentum.domain.sections.models import Section
 from momentum.domain.sections.service import list_sections, on_section_delete, on_section_restore
 from momentum.domain.tasks.models import Follower, Task, TaskProject
+from momentum.domain.users.models import User
 from momentum.domain.workspace.models import Workspace
 
 COMPLETED_PAGE = 100
@@ -105,6 +107,38 @@ async def _neighbors(
         i = ids.index(before_id)
         return items[i - 1].position if i > 0 else None, items[i].position
     return (items[-1].position if items else None), None
+
+
+def _as_uuid(v: Any) -> uuid.UUID | None:
+    return None if v is None else v if isinstance(v, uuid.UUID) else uuid.UUID(str(v))
+
+
+def _as_date(v: Any) -> date | None:
+    if v is None or (isinstance(v, date) and not isinstance(v, datetime)):
+        return v
+    return date.fromisoformat(str(v))
+
+
+def _as_datetime(v: Any) -> datetime | None:
+    if v is None:
+        return None
+    dt = v if isinstance(v, datetime) else datetime.fromisoformat(str(v))
+    if dt.tzinfo is None:
+        raise ValidationFailed("Due time needs a timezone", code="naive_datetime")
+    return dt.astimezone(UTC)
+
+
+def _local_date(dt: datetime, tz: str) -> date:
+    try:
+        return dt.astimezone(ZoneInfo(tz)).date()
+    except (KeyError, ValueError):
+        return dt.astimezone(UTC).date()
+
+
+async def _require_assignable(session: AsyncSession, ctx: Ctx, user_id: uuid.UUID) -> None:
+    user = await session.get(User, user_id)
+    if user is None or user.workspace_id != ctx.workspace_id or user.status == "disabled":
+        raise ValidationFailed("That person can't be assigned", code="invalid_assignee")
 
 
 async def _follow(session: AsyncSession, task_id: uuid.UUID, user_id: uuid.UUID | None) -> None:
@@ -272,8 +306,19 @@ async def update_task(
         if title != task.title:
             changes["title"] = (task.title, title)
             task.title = title
+    if "assignee_id" in patch:
+        assignee = _as_uuid(patch["assignee_id"])
+        if assignee != task.assignee_id:
+            if assignee is not None:
+                await _require_assignable(session, ctx, assignee)
+                await _follow(session, task.id, assignee)
+            changes["assignee_id"] = (task.assignee_id, assignee)
+    _apply_dates(task, patch, ctx, changes)
     if not changes:
         return Mutation(task, version=task.version)
+    previous_assignee = task.assignee_id
+    for field, (_, new) in changes.items():
+        setattr(task, field, new)
     task.version += 1
     act = await record_activity(
         session,
@@ -298,13 +343,51 @@ async def update_task(
         entity_type="task",
         entity_id=task.id,
         data={
-            "changes": {k: [str(o), str(n)] for k, (o, n) in changes.items()},
+            "changes": jsonable_diff(changes),
             "version": task.version,
         },
         channels=channels(task, placement),
         activity_id=act.id,
     )
+    if "assignee_id" in changes:
+        await emit(
+            session,
+            ctx,
+            type="task.assigned",
+            entity_type="task",
+            entity_id=task.id,
+            data={
+                "assignee_id": str(task.assignee_id) if task.assignee_id else None,
+                "previous_assignee_id": str(previous_assignee) if previous_assignee else None,
+            },
+            channels=channels(task, placement)
+            + ([f"user:{previous_assignee}"] if previous_assignee else []),
+            activity_id=act.id,
+        )
     return Mutation(task, act.id, version=task.version)
+
+
+def _apply_dates(task: Task, patch: dict[str, Any], ctx: Ctx, changes: Diff) -> None:
+    """Resolve start_on/due_on/due_at from a partial patch and record what changes.
+
+    Rules: due_at without due_on derives due_on in the actor's timezone; clearing due_on
+    clears due_at; start_on must not be after due_on."""
+    if not {"start_on", "due_on", "due_at"} & patch.keys():
+        return
+    start = _as_date(patch["start_on"]) if "start_on" in patch else task.start_on
+    due = _as_date(patch["due_on"]) if "due_on" in patch else task.due_on
+    due_at = _as_datetime(patch["due_at"]) if "due_at" in patch else task.due_at
+    if "due_at" in patch and due_at is not None and "due_on" not in patch:
+        due = _local_date(due_at, ctx.actor.timezone)
+    if due is None:
+        due_at = None
+    if start is not None and due is not None and start > due:
+        raise ValidationFailed(
+            "Start date must be on or before the due date", code="dates_out_of_order"
+        )
+    for field, new in (("start_on", start), ("due_on", due), ("due_at", due_at)):
+        if new != getattr(task, field):
+            changes[field] = (getattr(task, field), new)
 
 
 async def set_completed(

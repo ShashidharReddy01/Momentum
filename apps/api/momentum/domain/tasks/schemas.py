@@ -48,3 +48,11 @@ class TaskPatchIn(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
     title: str | None = Field(default=None, min_length=1, max_length=500)
+    assignee_id: uuid.UUID | None = None
+    start_on: date | None = None
+    due_on: date | None = None
+    due_at: datetime | None = Field(
+        default=None,
+        description="Due time (timezone-aware). Setting it without due_on derives due_on in the "
+        "actor's timezone; clearing due_on clears due_at.",
+    )

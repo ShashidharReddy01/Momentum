@@ -111,7 +111,7 @@ id, workspace_id, project_id, name, position, version, timestamps, deleted_at. I
 | assignee_id | uuid null fk users | |
 | start_on | date null | |
 | due_on | date null | |
-| due_at | timestamptz null | When a time is set (due_on also set) |
+| due_at | timestamptz null | When a time is set (due_on also set). Stored in UTC; `due_at` without `due_on` derives `due_on` in the actor's timezone; clearing `due_on` clears `due_at` |
 | completed_at | timestamptz null | |
 | completed_by | uuid null | |
 | parent_id | uuid null fk tasks | Subtask |

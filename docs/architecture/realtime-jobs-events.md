@@ -41,7 +41,7 @@ Event payloads share an envelope:
 | (channels for task events) | 1 | `task:<id>`, `project:<id>` of its placement, `user:<assignee>` |
 | `task.moved` | 1 | project_id, from/to section, position |
 | `task.added_to_project` / `task.removed_from_project` | 2 | project_id, section_id |
-| `task.assigned` | 1 | old/new assignee |
+| `task.assigned` | 1 | `assignee_id`, `previous_assignee_id` (also sent to `user:<previous>`); emitted alongside `task.updated` |
 | `task.dependency_added` / `task.dependency_removed` | 2 | depends_on_id |
 | `subtask.reordered` | 1 | parent_id |
 | `team.created` / `team.updated` / `team.deleted` / `team.restored` | 1 | `changes`, `version` (updated) |

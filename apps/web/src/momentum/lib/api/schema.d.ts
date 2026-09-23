@@ -874,6 +874,17 @@ export interface components {
          * @description Partial update: only fields present are changed (null clears a nullable field).
          */
         TaskPatchIn: {
+            /** Assignee Id */
+            assignee_id?: string | null;
+            /**
+             * Due At
+             * @description Due time (timezone-aware). Setting it without due_on derives due_on in the actor's timezone; clearing due_on clears due_at.
+             */
+            due_at?: string | null;
+            /** Due On */
+            due_on?: string | null;
+            /** Start On */
+            start_on?: string | null;
             /** Title */
             title?: string | null;
         };

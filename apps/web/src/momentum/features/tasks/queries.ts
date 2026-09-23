@@ -6,6 +6,11 @@ import { useUndoToast } from '@/lib/undo';
 import { useApi } from '@/providers/api';
 
 export type Task = components['schemas']['TaskOut'];
+/** Field edits from the list (title has its own `rename`). */
+export type TaskPatch = Pick<
+  components['schemas']['TaskPatchIn'],
+  'assignee_id' | 'start_on' | 'due_on' | 'due_at'
+>;
 
 export const taskKeys = {
   all: ['tasks'] as const,
@@ -139,6 +144,29 @@ export function useTaskMutations(projectId: string) {
     },
   });
 
+  /** Assignee/date edits: optimistic, with an undo toast when `message` is given. */
+  const update = useMutation({
+    mutationFn: async (v: { id: string; patch: TaskPatch; message?: string }) =>
+      (
+        await api.PATCH('/api/v1/tasks/{task_id}', {
+          params: { path: { task_id: (await resolveId(v.id))! } },
+          body: v.patch,
+        })
+      ).data!,
+    onMutate: (v) => patchTask(qc, projectId, v.id, (t) => ({ ...t, ...v.patch })),
+    onSuccess: (res, v) => {
+      patchTask(qc, projectId, v.id, () => res.data);
+      if (v.message)
+        undoToast(v.message, res.meta, () =>
+          qc.invalidateQueries({ queryKey: ['projects', projectId, 'tasks'] }),
+        );
+    },
+    onError: (e) => {
+      toastError(e, "Couldn't update the task");
+      void qc.invalidateQueries({ queryKey: key });
+    },
+  });
+
   const setCompleted = useMutation({
     mutationFn: async (v: { id: string; completed: boolean }) => {
       const path = { task_id: (await resolveId(v.id))! };
@@ -181,5 +209,5 @@ export function useTaskMutations(projectId: string) {
     },
   });
 
-  return { create, createMany, rename, setCompleted, remove };
+  return { create, createMany, rename, update, setCompleted, remove };
 }
