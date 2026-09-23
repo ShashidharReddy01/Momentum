@@ -9,9 +9,10 @@ from starlette.responses import JSONResponse
 from momentum.api.deps import CtxDep, RuntimeDep, UowDep
 from momentum.api.schemas import ListOut
 from momentum.core.errors import NotFound
+from momentum.domain.access import get_visible_project
 from momentum.domain.users import service
 from momentum.domain.users.models import User
-from momentum.domain.users.schemas import MeOut, UserOut, WorkspaceOut
+from momentum.domain.users.schemas import MeOut, ProjectViewPrefs, UserOut, WorkspaceOut
 from momentum.domain.workspace.service import ensure_default_workspace
 
 router = APIRouter(tags=["users"])
@@ -34,6 +35,35 @@ async def list_users(
     async with uow.transaction() as session:
         users = await service.list_users(session, ctx, q=q, limit=limit)
         return ListOut(data=[UserOut.model_validate(u) for u in users])
+
+
+@router.get(
+    "/me/prefs/views/{project_id}",
+    response_model=ProjectViewPrefs,
+    summary="My saved list view for a project (defaults if none)",
+)
+async def get_view_prefs(project_id: uuid.UUID, ctx: CtxDep, uow: UowDep) -> ProjectViewPrefs:
+    async with uow.transaction() as session:
+        await get_visible_project(session, ctx, project_id)
+        stored = await service.get_view_prefs(session, ctx, project_id)
+    try:
+        return ProjectViewPrefs.model_validate(stored or {})
+    except ValueError:
+        return ProjectViewPrefs()  # stored by an older version: fall back to defaults
+
+
+@router.put(
+    "/me/prefs/views/{project_id}",
+    response_model=ProjectViewPrefs,
+    summary="Save my list view for a project",
+)
+async def put_view_prefs(
+    project_id: uuid.UUID, body: ProjectViewPrefs, ctx: CtxDep, uow: UowDep
+) -> ProjectViewPrefs:
+    async with uow.transaction() as session:
+        await get_visible_project(session, ctx, project_id)
+        await service.set_view_prefs(session, ctx, project_id, body.model_dump())
+    return body
 
 
 class LogoutOut(BaseModel):

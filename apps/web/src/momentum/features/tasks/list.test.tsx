@@ -60,7 +60,7 @@ describe('List selection and keyboard', () => {
     expect(screen.getByRole('toolbar', { name: '3 tasks selected' })).toBeInTheDocument();
     await user.keyboard('{Escape}');
     expect(selectedTitles()).toEqual([]);
-    expect(screen.queryByRole('toolbar')).toBeNull();
+    expect(screen.queryByRole('toolbar', { name: /tasks selected/ })).toBeNull();
   });
 
   it('⌘-click toggles, Shift-click selects a range, a plain click resets', async () => {

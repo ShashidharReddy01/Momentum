@@ -169,7 +169,9 @@ export function ProjectPage() {
         </div>
       ) : null}
       <div className="flex-1 overflow-auto px-8 py-5">
-        {view === 'list' ? <ProjectTasksView projectId={p.id} canEdit={canEdit && !p.archived_at} /> : null}
+        {view === 'list' ? (
+          <ProjectTasksView key={p.id} projectId={p.id} canEdit={canEdit && !p.archived_at} />
+        ) : null}
       </div>
     </div>
   );

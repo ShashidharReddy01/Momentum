@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import json
 import uuid
+from typing import Any
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from momentum.core.context import Ctx
@@ -50,3 +52,26 @@ async def list_users(
         )
     result = await session.execute(query.order_by(func.lower(User.name)).limit(min(limit, 200)))
     return list(result.scalars())
+
+
+async def get_view_prefs(
+    session: AsyncSession, ctx: Ctx, project_id: uuid.UUID
+) -> dict[str, Any] | None:
+    user = await session.get(User, ctx.actor.id)
+    views = (user.prefs or {}).get("views", {}) if user else {}
+    value = views.get(str(project_id))
+    return value if isinstance(value, dict) else None
+
+
+async def set_view_prefs(
+    session: AsyncSession, ctx: Ctx, project_id: uuid.UUID, prefs: dict[str, Any]
+) -> None:
+    """Store one project's view prefs atomically (concurrent saves for other projects are kept)."""
+    await session.execute(
+        text(
+            "UPDATE users SET prefs = jsonb_set(coalesce(prefs, '{}'::jsonb), '{views}', "
+            "coalesce(prefs->'views', '{}'::jsonb) "
+            "|| jsonb_build_object(cast(:pid as text), cast(:value as jsonb))) WHERE id = :uid"
+        ),
+        {"pid": str(project_id), "value": json.dumps(prefs), "uid": ctx.actor.id},
+    )

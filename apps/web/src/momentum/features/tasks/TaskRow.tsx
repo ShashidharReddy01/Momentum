@@ -39,6 +39,8 @@ export interface TaskRowProps {
   assignee?: Person;
   meId?: string;
   selected?: boolean;
+  /** Whether the row can be dragged (off while sorted or grouped). */
+  draggable?: boolean;
   /** Part of the set being dragged (dimmed). */
   dragging?: boolean;
   dropIndicator?: DropPlacement | null;
@@ -59,6 +61,7 @@ export const TaskRow = memo(function TaskRow({
   assignee,
   meId,
   selected = false,
+  draggable = true,
   dragging = false,
   dropIndicator = null,
   onSelectClick,
@@ -75,7 +78,7 @@ export const TaskRow = memo(function TaskRow({
   const drag = useDraggable({
     id: task.id,
     data: { kind: 'task', sectionId: task.section_id },
-    disabled: !canEdit || editing || picker !== null || isTemp(task.id),
+    disabled: !canEdit || !draggable || editing || picker !== null || isTemp(task.id),
   });
   const drop = useDroppable({
     id: `row:${task.id}`,

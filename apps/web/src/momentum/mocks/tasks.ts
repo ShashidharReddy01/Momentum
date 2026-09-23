@@ -84,7 +84,24 @@ export function taskHandlers(
     return moving;
   };
 
+  const prefs = new Map<string, unknown>();
   return [
+    http.get(`*${base}/api/v1/me/prefs/views/:pid`, ({ params }) =>
+      HttpResponse.json(
+        prefs.get(String(params.pid)) ?? {
+          assignees: [],
+          due: 'any',
+          show_completed: false,
+          sort: 'manual',
+          group: 'section',
+        },
+      ),
+    ),
+    http.put(`*${base}/api/v1/me/prefs/views/:pid`, async ({ params, request }) => {
+      const body = await request.json();
+      prefs.set(String(params.pid), body);
+      return HttpResponse.json(body);
+    }),
     http.get(`*${base}/api/v1/projects/:pid/tasks`, ({ params, request }) => {
       const completed = new URL(request.url).searchParams.get('completed') === 'true';
       const data = tasks

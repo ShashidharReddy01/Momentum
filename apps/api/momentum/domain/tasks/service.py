@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from typing import Any, Literal
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import select, update
+from sqlalchemy import ColumnElement, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from momentum.core.activity import Activity, Diff, jsonable_diff, record_activity
@@ -189,6 +189,33 @@ async def _follow(session: AsyncSession, task_id: uuid.UUID, user_id: uuid.UUID 
 # ---------- reads ----------
 
 
+DueFilter = Literal["any", "overdue", "today", "this_week", "next_week", "no_date"]
+TaskSort = Literal["manual", "due", "assignee", "created", "title"]
+
+
+def today_for(ctx: Ctx) -> date:
+    try:
+        return datetime.now(ZoneInfo(ctx.actor.timezone)).date()
+    except (KeyError, ValueError):
+        return datetime.now(UTC).date()
+
+
+def due_clause(due: DueFilter, today: date) -> ColumnElement[bool] | None:
+    """SQL condition for a due bucket (weeks start on Monday, in the actor's timezone)."""
+    week_end = today + timedelta(days=6 - today.weekday())
+    if due == "overdue":
+        return Task.due_on < today
+    if due == "today":
+        return Task.due_on == today
+    if due == "this_week":
+        return Task.due_on.between(today, week_end)
+    if due == "next_week":
+        return Task.due_on.between(week_end + timedelta(days=1), week_end + timedelta(days=7))
+    if due == "no_date":
+        return Task.due_on.is_(None)
+    return None
+
+
 async def list_project_tasks(
     session: AsyncSession,
     ctx: Ctx,
@@ -196,9 +223,15 @@ async def list_project_tasks(
     *,
     completed: bool = False,
     before: datetime | None = None,
+    assignees: list[str] | None = None,
+    due: DueFilter = "any",
+    sort: TaskSort = "manual",
 ) -> list[tuple[Task, TaskProject]]:
-    """Top-level tasks of a project. Incomplete tasks: all of them, in section/position order.
-    Completed tasks: newest first, paged by ``before`` (completed_at cursor)."""
+    """Top-level tasks of a project. Incomplete tasks: all of them, in section order, then by
+    ``sort`` within a section (manual = drag order). Completed tasks: newest first, paged by
+    ``before`` (completed_at cursor); ``sort`` does not apply to them.
+
+    ``assignees`` holds user ids, ``"me"`` and/or ``"none"`` (unassigned); several are OR-ed."""
     await get_visible_project(session, ctx, project_id)
     query = (
         select(Task, TaskProject)
@@ -211,16 +244,42 @@ async def list_project_tasks(
             Section.deleted_at.is_(None),
         )
     )
+    if assignees:
+        ids = {ctx.actor.id if a == "me" else _as_uuid(a) for a in assignees if a != "none"}
+        conds: list[ColumnElement[bool]] = []
+        if ids - {None}:
+            conds.append(Task.assignee_id.in_([i for i in ids if i is not None]))
+        if "none" in assignees:
+            conds.append(Task.assignee_id.is_(None))
+        query = query.where(or_(*conds)) if conds else query
+    clause = due_clause(due, today_for(ctx))
+    if clause is not None:
+        query = query.where(clause)
     if completed:
         query = query.where(Task.completed_at.is_not(None))
         if before is not None:
             query = query.where(Task.completed_at < before)
-        query = query.order_by(Task.completed_at.desc()).limit(COMPLETED_PAGE)
-    else:
-        query = query.where(Task.completed_at.is_(None)).order_by(
-            Section.position, TaskProject.position, Task.id
-        )
-    return [(t, p) for t, p in (await session.execute(query)).all()]
+        return [
+            (t, p)
+            for t, p in (
+                await session.execute(
+                    query.order_by(Task.completed_at.desc()).limit(COMPLETED_PAGE)
+                )
+            ).all()
+        ]
+    query = query.where(Task.completed_at.is_(None))
+    keys: list[Any] = [Section.position]
+    if sort == "due":
+        keys += [Task.due_on.asc().nulls_last(), Task.due_at.asc().nulls_last()]
+    elif sort == "assignee":
+        query = query.outerjoin(User, User.id == Task.assignee_id)
+        keys += [func.lower(User.name).asc().nulls_last()]
+    elif sort == "created":
+        keys += [Task.created_at]
+    elif sort == "title":
+        keys += [func.lower(Task.title)]
+    keys += [TaskProject.position, Task.id]
+    return [(t, p) for t, p in (await session.execute(query.order_by(*keys))).all()]
 
 
 async def get_task(

@@ -5,7 +5,7 @@ import {
   type DragMoveEvent,
   type DragStartEvent,
 } from '@dnd-kit/core';
-import { CheckCircle2, Plus } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { ErrorState } from '@/components/common/States';
 import { Button } from '@/components/ui/Button';
@@ -17,7 +17,8 @@ import { SectionList, useCollapsed, useSections, type ItemDnd, type Section } fr
 import { cn } from '@/lib/cn';
 import { formatDue } from '@/lib/dates';
 import { BulkBar, type BulkPicker } from './BulkBar';
-import { useProjectTasks, useTaskMutations, type Task, type TaskPatch } from './queries';
+import { ListToolbar } from './ListToolbar';
+import { isTemp, useProjectTasks, useTaskMutations, type Task, type TaskPatch } from './queries';
 import {
   clickRow,
   dropNeighbors,
@@ -31,6 +32,16 @@ import {
   type Selection,
 } from './selection';
 import { DraftRow, TaskRow } from './TaskRow';
+import { useListView } from './useListView';
+import {
+  filterCount,
+  groupTasks,
+  isManualOrder,
+  matches,
+  sortTasks,
+  todayLocal,
+  type ListView,
+} from './view';
 
 type Draft = { sectionId: string; afterId: string | null; key: number };
 type DropTarget = { sectionId: string; anchorId: string | null; placement: DropPlacement };
@@ -41,7 +52,9 @@ const plural = (n: number, one: string) => `${n} ${one}${n === 1 ? '' : 's'}`;
 /** The project list view: sections with their tasks; inline create/edit/complete, selection,
  * keyboard navigation, drag and drop (multi), and bulk actions. */
 export function ProjectTasksView({ projectId, canEdit }: { projectId: string; canEdit: boolean }) {
-  const [showCompleted, setShowCompleted] = useState(false);
+  const { view, setView: applyView, ready: viewReady } = useListView(projectId);
+  const showCompleted = view.show_completed;
+  const manual = isManualOrder(view);
   const open = useProjectTasks(projectId);
   const done = useProjectTasks(projectId, true, showCompleted);
   const sections = useSections(projectId).data;
@@ -58,31 +71,57 @@ export function ProjectTasksView({ projectId, canEdit }: { projectId: string; ca
   const meId = useMe().data?.user.id;
   const people = usePeople().data;
   const peopleById = useMemo(() => new Map<string, Person>((people ?? []).map((p) => [p.id, p])), [people]);
+  // Rows edited or created here stay visible even if they stop matching the filters,
+  // until the view changes (so a row never vanishes under the cursor).
+  const [sticky, setSticky] = useState<ReadonlySet<string>>(new Set());
+  const keep = useCallback((ids: string[]) => setSticky((s) => new Set([...s, ...ids])), []);
+  const setView = useCallback(
+    (v: ListView) => {
+      setSticky(new Set());
+      applyView(v);
+    },
+    [applyView],
+  );
 
+  const nameOf = useCallback((id: string) => peopleById.get(id)?.name, [peopleById]);
   const bySection = useMemo(() => {
+    const today = todayLocal();
+    const shown = (t: Task) => isTemp(t.id) || sticky.has(t.id) || matches(t, view, meId, today);
     const map = new Map<string, Task[]>();
-    const visible = (open.data ?? []).filter((t) => !t.completed_at || fading.has(t.id) || showCompleted);
+    const visible = (open.data ?? []).filter(
+      (t) => (!t.completed_at || fading.has(t.id) || showCompleted) && shown(t),
+    );
     for (const t of visible) map.set(t.section_id!, [...(map.get(t.section_id!) ?? []), t]);
     if (showCompleted) {
       const ids = new Set(visible.map((t) => t.id));
       for (const t of done.data ?? []) {
-        if (ids.has(t.id) || !t.section_id) continue;
+        if (ids.has(t.id) || !t.section_id || !shown(t)) continue;
         const list = map.get(t.section_id) ?? [];
         // merge by position; temp rows (no position) keep their place
         const i = list.findIndex((x) => x.position && t.position && x.position > t.position);
         map.set(t.section_id, i < 0 ? [...list, t] : [...list.slice(0, i), t, ...list.slice(i)]);
       }
     }
+    if (view.sort !== 'manual') for (const [k, list] of map) map.set(k, sortTasks(list, view.sort, nameOf));
     return map;
-  }, [open.data, done.data, fading, showCompleted]);
+  }, [open.data, done.data, fading, showCompleted, view, meId, sticky, nameOf]);
+
+  // Non-section groupings (assignee / due) regroup the same filtered, sorted rows.
+  const groups = useMemo(() => {
+    if (view.group === 'section') return null;
+    const all = (sections ?? []).flatMap((s) => bySection.get(s.id) ?? []);
+    return groupTasks(sortTasks(all, view.sort, nameOf), view.group, nameOf, meId, todayLocal());
+  }, [view.group, view.sort, sections, bySection, nameOf, meId]);
 
   // Visible rows in display order (collapsed sections excluded): the basis for ranges and arrows.
   const order = useMemo(
     () =>
-      (sections ?? [])
-        .filter((s) => !collapsed.has(s.id))
-        .flatMap((s) => (bySection.get(s.id) ?? []).map((t) => t.id)),
-    [sections, collapsed, bySection],
+      groups
+        ? groups.flatMap((g) => g.tasks.map((t) => t.id))
+        : (sections ?? [])
+            .filter((s) => !collapsed.has(s.id))
+            .flatMap((s) => (bySection.get(s.id) ?? []).map((t) => t.id)),
+    [groups, sections, collapsed, bySection],
   );
   const selection = useMemo(() => prune(rawSelection, order), [rawSelection, order]);
   const taskById = useMemo(() => {
@@ -139,8 +178,11 @@ export function ProjectTasksView({ projectId, canEdit }: { projectId: string; ca
   const onEnter = useCallback((t: Task) => canEdit && openDraft(t.section_id!, t.id), [canEdit, openDraft]);
   const onDelete = useCallback((t: Task) => m.remove.mutate(t.id), [m.remove]);
   const onUpdate = useCallback(
-    (t: Task, patch: TaskPatch, message?: string) => m.update.mutate({ id: t.id, patch, message }),
-    [m.update],
+    (t: Task, patch: TaskPatch, message?: string) => {
+      keep([t.id]);
+      m.update.mutate({ id: t.id, patch, message });
+    },
+    [m.update, keep],
   );
   const onSelectClick = useCallback(
     (t: Task, mods: Modifiers) =>
@@ -211,8 +253,10 @@ export function ProjectTasksView({ projectId, canEdit }: { projectId: string; ca
   };
 
   const bulkIds = targets(selection, order);
-  const bulkUpdate = (patch: TaskPatch, message: string) =>
+  const bulkUpdate = (patch: TaskPatch, message: string) => {
+    keep(bulkIds);
     m.bulk.mutate({ ids: bulkIds, action: 'update', patch, message });
+  };
   const bulkComplete = (ids: string[]) => {
     const incomplete = ids.filter((id) => !taskById.get(id)?.completed_at);
     if (!incomplete.length) {
@@ -260,7 +304,7 @@ export function ProjectTasksView({ projectId, canEdit }: { projectId: string; ca
     const k = e.key;
     let next: Selection | null = null;
     if ((k === 'ArrowDown' || k === 'ArrowUp') && mod) {
-      if (canEdit) nudge(k === 'ArrowDown' ? 1 : -1);
+      if (canEdit && manual) nudge(k === 'ArrowDown' ? 1 : -1);
     } else if (k === 'ArrowDown' || (k === 'j' && !mod)) next = step(selection, 1, e.shiftKey, order);
     else if (k === 'ArrowUp' || (k === 'k' && !mod)) next = step(selection, -1, e.shiftKey, order);
     else if (k === 'Escape' && selection.selected.size) next = { ...selection, selected: new Set() };
@@ -362,7 +406,7 @@ export function ProjectTasksView({ projectId, canEdit }: { projectId: string; ca
   };
   const draggingIds = useMemo(() => new Set(drag?.ids ?? []), [drag]);
 
-  if (open.isPending) {
+  if (open.isPending || !viewReady) {
     return (
       <div className="flex flex-col gap-2">
         {Array.from({ length: 6 }, (_, i) => (
@@ -373,6 +417,27 @@ export function ProjectTasksView({ projectId, canEdit }: { projectId: string; ca
   }
   if (open.isError) return <ErrorState error={open.error} onRetry={() => void open.refetch()} />;
 
+  const renderRow = (t: Task) => (
+    <TaskRow
+      task={t}
+      canEdit={canEdit}
+      draggable={manual}
+      fading={fading.has(t.id)}
+      assignee={t.assignee_id ? peopleById.get(t.assignee_id) : undefined}
+      meId={meId}
+      selected={selection.selected.has(t.id)}
+      dragging={draggingIds.has(t.id)}
+      dropIndicator={dropTarget?.anchorId === t.id ? dropTarget.placement : null}
+      onSelectClick={onSelectClick}
+      onFocusRow={onFocusRow}
+      onUpdate={onUpdate}
+      onToggle={onToggle}
+      onRename={onRename}
+      onEnter={onEnter}
+      onDelete={onDelete}
+    />
+  );
+
   const renderBody = (section: Section) => {
     const tasks = bySection.get(section.id) ?? [];
     const draftHere = draft && draft.sectionId === section.id ? draft : null;
@@ -380,7 +445,9 @@ export function ProjectTasksView({ projectId, canEdit }: { projectId: string; ca
       <DraftRow
         key={`draft-${draftHere.key}`}
         onSubmit={(title) => {
-          const id = m.create({ title, sectionId: section.id, afterId: draftHere.afterId });
+          const id = m.create({ title, sectionId: section.id, afterId: draftHere.afterId }, (real) =>
+            keep([real]),
+          );
           openDraft(section.id, id);
         }}
         onPasteLines={(lines) => {
@@ -405,23 +472,7 @@ export function ProjectTasksView({ projectId, canEdit }: { projectId: string; ca
         {draftIndex === 0 ? draftRow : null}
         {tasks.map((t, i) => (
           <div key={t.id}>
-            <TaskRow
-              task={t}
-              canEdit={canEdit}
-              fading={fading.has(t.id)}
-              assignee={t.assignee_id ? peopleById.get(t.assignee_id) : undefined}
-              meId={meId}
-              selected={selection.selected.has(t.id)}
-              dragging={draggingIds.has(t.id)}
-              dropIndicator={dropTarget?.anchorId === t.id ? dropTarget.placement : null}
-              onSelectClick={onSelectClick}
-              onFocusRow={onFocusRow}
-              onUpdate={onUpdate}
-              onToggle={onToggle}
-              onRename={onRename}
-              onEnter={onEnter}
-              onDelete={onDelete}
-            />
+            {renderRow(t)}
             {draftIndex === i + 1 ? draftRow : null}
           </div>
         ))}
@@ -451,16 +502,19 @@ export function ProjectTasksView({ projectId, canEdit }: { projectId: string; ca
     // Keyboard handling is delegated from the rows (each row is focusable).
     // eslint-disable-next-line jsx-a11y/no-static-element-interactions
     <div ref={container} onKeyDownCapture={onKeyDownCapture} onKeyDown={onKeyDown}>
-      <div className="mb-3 flex items-center justify-end">
-        <Button
-          size="sm"
-          variant="text"
-          aria-pressed={showCompleted}
-          onClick={() => setShowCompleted(!showCompleted)}
-        >
-          <Icon icon={CheckCircle2} /> {showCompleted ? 'Hide completed' : 'Show completed'}
-        </Button>
-      </div>
+      <ListToolbar view={view} onChange={setView} />
+      {!manual && canEdit ? (
+        <p className="mb-2 text-xs text-muted">
+          Drag to reorder is off while the list is sorted or grouped.{' '}
+          <button
+            type="button"
+            className="underline underline-offset-2 hover:text-ink"
+            onClick={() => setView({ ...view, sort: 'manual', group: 'section' })}
+          >
+            Back to drag order
+          </button>
+        </p>
+      ) : null}
       <div
         aria-hidden
         className="flex h-8 items-center gap-2.5 border-b border-hairline pr-2 pl-11 text-xs text-muted"
@@ -471,14 +525,43 @@ export function ProjectTasksView({ projectId, canEdit }: { projectId: string; ca
         <span className="w-32 px-1.5">Due date</span>
         <span className="w-7" />
       </div>
-      <SectionList
-        projectId={projectId}
-        canEdit={canEdit}
-        renderBody={renderBody}
-        collapsed={collapsed}
-        onToggleCollapsed={toggle}
-        itemDnd={canEdit ? itemDnd : undefined}
-      />
+      {order.length === 0 && filterCount(view) > 0 ? (
+        <div className="py-10 text-center text-sm text-muted">
+          <p>No tasks match these filters.</p>
+          <Button
+            size="sm"
+            variant="text"
+            className="mt-1"
+            onClick={() => setView({ ...view, assignees: [], due: 'any' })}
+          >
+            Clear filters
+          </Button>
+        </div>
+      ) : null}
+      {groups ? (
+        groups.map((g) => (
+          <section key={g.id} aria-label={`Group ${g.name}`} className="mb-2">
+            <h2 className="flex h-9 items-center gap-2 pl-6 text-[15px] font-semibold">
+              {g.name}
+              <span className="tabular text-xs font-normal text-muted">{g.tasks.length}</span>
+            </h2>
+            <div role="list" aria-label={`Tasks in ${g.name}`} className="pb-3 pl-11">
+              {g.tasks.map((t) => (
+                <div key={t.id}>{renderRow(t)}</div>
+              ))}
+            </div>
+          </section>
+        ))
+      ) : (
+        <SectionList
+          projectId={projectId}
+          canEdit={canEdit}
+          renderBody={renderBody}
+          collapsed={collapsed}
+          onToggleCollapsed={toggle}
+          itemDnd={canEdit && manual ? itemDnd : undefined}
+        />
+      )}
       {canEdit && selection.selected.size > 1 ? (
         <BulkBar
           count={count}

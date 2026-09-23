@@ -128,7 +128,10 @@ export function useTaskMutations(projectId: string) {
   const resolveId = async (id: string | null | undefined) =>
     id && isTemp(id) ? ((await pending.current.get(id)) ?? null) : (id ?? null);
 
-  const create = (v: { title: string; sectionId: string; afterId: string | null }): string => {
+  const create = (
+    v: { title: string; sectionId: string; afterId: string | null },
+    onCreated?: (realId: string) => void,
+  ): string => {
     const id = tempId();
     const optimistic: Task = {
       id,
@@ -158,6 +161,7 @@ export function useTaskMutations(projectId: string) {
       });
       const real = res.data!.data;
       qc.setQueryData<Task[]>(key, (old) => old?.map((t) => (t.id === id ? real : t)));
+      onCreated?.(real.id);
       return real.id;
     })();
     pending.current.set(id, promise);

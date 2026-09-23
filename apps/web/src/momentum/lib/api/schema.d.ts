@@ -124,6 +124,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/prefs/views/{project_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** My saved list view for a project (defaults if none) */
+        get: operations["get_view_prefs_api_v1_me_prefs_views__project_id__get"];
+        /** Save my list view for a project */
+        put: operations["put_view_prefs_api_v1_me_prefs_views__project_id__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects": {
         parameters: {
             query?: never;
@@ -788,6 +806,37 @@ export interface components {
             /** Privacy */
             privacy?: ("team" | "private") | null;
         };
+        /**
+         * ProjectViewPrefs
+         * @description How one user last viewed a project's list (restored on revisit).
+         */
+        ProjectViewPrefs: {
+            /** Assignees */
+            assignees?: string[];
+            /**
+             * Due
+             * @default any
+             * @enum {string}
+             */
+            due: "any" | "overdue" | "today" | "this_week" | "next_week" | "no_date";
+            /**
+             * Group
+             * @default section
+             * @enum {string}
+             */
+            group: "section" | "assignee" | "due";
+            /**
+             * Show Completed
+             * @default false
+             */
+            show_completed: boolean;
+            /**
+             * Sort
+             * @default manual
+             * @enum {string}
+             */
+            sort: "manual" | "due" | "assignee" | "created" | "title";
+        };
         /** SectionBrief */
         SectionBrief: {
             /**
@@ -1326,6 +1375,72 @@ export interface operations {
             };
         };
     };
+    get_view_prefs_api_v1_me_prefs_views__project_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectViewPrefs"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_view_prefs_api_v1_me_prefs_views__project_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProjectViewPrefs"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectViewPrefs"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_projects_api_v1_projects_get: {
         parameters: {
             query?: {
@@ -1694,6 +1809,10 @@ export interface operations {
                 completed?: boolean;
                 /** @description Completed-at cursor */
                 before?: string | null;
+                /** @description User ids, "me" or "none" (unassigned); several are OR-ed */
+                assignee?: string[];
+                due?: "any" | "overdue" | "today" | "this_week" | "next_week" | "no_date";
+                sort?: "manual" | "due" | "assignee" | "created" | "title";
             };
             header?: never;
             path: {

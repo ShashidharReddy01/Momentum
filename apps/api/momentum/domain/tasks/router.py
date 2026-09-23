@@ -7,6 +7,7 @@ from fastapi import APIRouter, Header, Query, status
 
 from momentum.api.deps import CtxDep, UowDep
 from momentum.api.schemas import ListOut, MutationMeta, MutationOut, OkOut
+from momentum.core.errors import ValidationFailed
 from momentum.core.ids import task_key
 from momentum.domain.tasks import service
 from momentum.domain.tasks.models import Task, TaskProject
@@ -55,10 +56,30 @@ async def list_tasks(
     uow: UowDep,
     completed: bool = Query(default=False),
     before: datetime | None = Query(default=None, description="Completed-at cursor"),
+    assignee: list[str] = Query(
+        default=[],
+        max_length=50,
+        description='User ids, "me" or "none" (unassigned); several are OR-ed',
+    ),
+    due: service.DueFilter = Query(default="any"),
+    sort: service.TaskSort = Query(default="manual"),
 ) -> ListOut[TaskOut]:
+    for a in assignee:
+        if a not in ("me", "none"):
+            try:
+                uuid.UUID(a)
+            except ValueError:
+                raise ValidationFailed(f"Invalid assignee filter: {a[:40]}") from None
     async with uow.transaction() as s:
         rows = await service.list_project_tasks(
-            s, ctx, project_id, completed=completed, before=before
+            s,
+            ctx,
+            project_id,
+            completed=completed,
+            before=before,
+            assignees=assignee,
+            due=due,
+            sort=sort,
         )
         return ListOut(data=[task_out(t, p) for t, p in rows])
 
