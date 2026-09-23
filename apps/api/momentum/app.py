@@ -1,0 +1,145 @@
+"""Application factory (standalone) and mount helper (embedded in a host app).
+
+See docs/architecture/embedding-and-portability.md.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import contextlib
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+
+from fastapi import APIRouter, FastAPI
+
+from momentum.api.runtime import MomentumRuntime
+from momentum.api.system import VERSION, config_router, health_router
+from momentum.auth.base import HostPrincipalResolver
+from momentum.auth.factory import build_auth_provider
+from momentum.core.db import create_engine, create_session_factory
+from momentum.core.http import (
+    CsrfMiddleware,
+    RequestIdMiddleware,
+    install_error_handlers,
+)
+from momentum.core.settings import Settings
+from momentum.core.telemetry import configure_logging, get_logger
+
+API_PREFIX = "/api/v1"
+CSRF_EXEMPT = ("/api/v1/public/", "/webhooks/")
+
+
+def _api_router(settings: Settings) -> APIRouter:
+    from momentum.domain.users.router import dev_router
+    from momentum.domain.users.router import router as users_router
+
+    api = APIRouter(prefix=API_PREFIX)
+    api.include_router(config_router)
+    api.include_router(users_router)
+    if settings.is_dev_auth:
+        api.include_router(dev_router)
+    return api
+
+
+def create_app(
+    settings: Settings | None = None,
+    *,
+    resolve_principal: HostPrincipalResolver | None = None,
+) -> FastAPI:
+    """Build the Momentum ASGI app. Nothing is connected until the lifespan starts."""
+    settings = settings or Settings()
+    configure_logging(settings)
+    log = get_logger("app")
+
+    @asynccontextmanager
+    async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        engine = create_engine(settings)
+        runtime = MomentumRuntime(
+            settings=settings,
+            engine=engine,
+            session_factory=create_session_factory(engine),
+            auth=build_auth_provider(settings, resolve_principal),
+        )
+        app.state.momentum = runtime
+        if settings.db_auto_migrate:
+            from momentum.migrations_runner import upgrade_head
+
+            await asyncio.to_thread(upgrade_head, settings)
+        worker_task: asyncio.Task[None] | None = None
+        job_app = None
+        if settings.worker_mode == "embedded":
+            from momentum.jobs.app import QUEUES, build_job_app
+
+            job_app = build_job_app(settings)
+            await job_app.open_async()
+            worker_task = asyncio.create_task(
+                job_app.run_worker_async(
+                    queues=QUEUES,
+                    concurrency=settings.worker_concurrency,
+                    install_signal_handlers=False,
+                )
+            )
+            runtime.extras["job_app"] = job_app
+        log.info("momentum_started", env=settings.env, auth=settings.auth_mode, version=VERSION)
+        try:
+            yield
+        finally:
+            if worker_task is not None:
+                worker_task.cancel()
+                with contextlib.suppress(asyncio.CancelledError, Exception):
+                    await worker_task
+            if job_app is not None:
+                await job_app.close_async()
+            await engine.dispose()
+
+    app = FastAPI(
+        title="Momentum",
+        version=VERSION,
+        lifespan=lifespan,
+        openapi_url=f"{API_PREFIX}/openapi.json",
+        docs_url=f"{API_PREFIX}/docs",
+        redoc_url=None,
+    )
+    app.add_middleware(CsrfMiddleware, api_prefix=API_PREFIX, exempt_prefixes=CSRF_EXEMPT)
+    app.add_middleware(RequestIdMiddleware)
+    install_error_handlers(app)
+    app.include_router(health_router)
+    app.include_router(_api_router(settings))
+
+    if settings.serve_spa:
+        from momentum.web.spa import mount_spa, resolve_spa_dir
+
+        spa_dir = resolve_spa_dir(settings)
+        if spa_dir is not None:
+            mount_spa(app, spa_dir)
+    return app
+
+
+def mount_momentum(
+    host_app: FastAPI,
+    *,
+    settings: Settings,
+    resolve_principal: HostPrincipalResolver | None = None,
+) -> FastAPI:
+    """Mount Momentum under ``settings.base_path`` in a host FastAPI app.
+
+    Momentum runs as a sub-application with its own lifespan, middleware and error handlers,
+    so the host's configuration is untouched. The host must run the sub-app lifespan; with
+    Starlette this happens via ``host_app.router.lifespan_context`` composition, which
+    :func:`momentum_lifespan` provides.
+    """
+    if not settings.base_path:
+        raise ValueError("mount_momentum requires settings.base_path (e.g. '/momentum')")
+    sub = create_app(
+        settings.model_copy(update={"serve_spa": False}), resolve_principal=resolve_principal
+    )
+    host_app.mount(settings.base_path, sub)
+    host_app.state.momentum_subapp = sub
+    return sub
+
+
+@asynccontextmanager
+async def momentum_lifespan(sub_app: FastAPI) -> AsyncIterator[None]:
+    """Run a mounted Momentum sub-app's lifespan from the host's lifespan."""
+    async with sub_app.router.lifespan_context(sub_app):
+        yield

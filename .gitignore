@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+# Node
+node_modules/
+apps/web/dist/
+apps/web/test-results/
+apps/web/playwright-report/
+*.tsbuildinfo
+# App
+.env
+.data/
+apps/api/momentum/web/static/
+infra/litellm/config.yaml
+# OS/editor
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json

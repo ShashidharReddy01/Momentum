@@ -1,0 +1,24 @@
+# Momentum
+
+**Keep work moving.** Momentum is an AI-native work management app with an Asana-style layout: teams, projects, sections, tasks, and list/board/timeline views. It adds **Mo**, an assistant built into every screen, and **agents** that work as teammates.
+
+- Backend: Python 3.12 · FastAPI · SQLAlchemy 2 (async) · PostgreSQL 16 + pgvector · Procrastinate (Postgres job queue)
+- Frontend: React 19 · TypeScript · Vite · React Router 7 · TanStack Query · Tailwind v4 + Radix/shadcn primitives · Momentum design system
+- AI: OpenAI-compatible gateway (LiteLLM) → Claude models on AWS Bedrock; Cohere Embed v3 for semantic search
+- Target runtime (final phase): Azure App Service + Easy Auth (Entra ID) + Azure Database for PostgreSQL + Blob Storage
+- Designed to be **lifted and shifted** to another environment and **embedded** into another project
+
+## Quickstart (local)
+
+```bash
+cp .env.example .env          # defaults work for local dev (AUTH_MODE=dev, LLM_MODE=mock)
+make dev                      # postgres + api (http://localhost:8000) + web (http://localhost:5173)
+make seed                     # synthetic workspace "Acme Demo" with sample users/projects
+make check                    # the quality gate
+```
+
+Open http://localhost:5173 and pick a seeded user on the dev login screen.
+
+## Documentation
+
+Start at [`docs/README.md`](docs/README.md). AI contributors start at [`CLAUDE.md`](CLAUDE.md).
