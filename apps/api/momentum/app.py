@@ -33,6 +33,7 @@ CSRF_EXEMPT = ("/api/v1/public/", "/webhooks/")
 def _api_router(settings: Settings) -> APIRouter:
     from momentum.api.undo import router as undo_router
     from momentum.domain.comments.router import router as comments_router
+    from momentum.domain.home.router import router as home_router
     from momentum.domain.mytasks.router import router as mytasks_router
     from momentum.domain.projects.router import favorites_router
     from momentum.domain.projects.router import router as projects_router
@@ -52,6 +53,7 @@ def _api_router(settings: Settings) -> APIRouter:
     api.include_router(tasks_router)
     api.include_router(comments_router)
     api.include_router(mytasks_router)
+    api.include_router(home_router)
     api.include_router(undo_router)
     if settings.is_dev_auth:
         api.include_router(dev_router)

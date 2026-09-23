@@ -61,7 +61,12 @@ async def _visible_mine(session: AsyncSession, ctx: Ctx, *, completed: bool) -> 
         )
     else:
         query = query.where(Task.completed_at.is_(None))
-    tasks = list((await session.execute(query)).scalars())
+    return await without_hidden(session, list((await session.execute(query)).scalars()))
+
+
+async def without_hidden(session: AsyncSession, tasks: list[Task]) -> list[Task]:
+    """Drop tasks that are gone for now: under a deleted parent, or only in deleted projects
+    (both can be restored, so callers keep any per-user state for them)."""
     roots: dict[uuid.UUID, uuid.UUID] = {}
     for t in tasks:
         if t.parent_id is None:
@@ -70,21 +75,18 @@ async def _visible_mine(session: AsyncSession, ctx: Ctx, *, completed: bool) -> 
         chain = await task_ancestors(session, t)
         if not any(a.deleted_at is not None for a in chain):
             roots[t.id] = chain[-1].id if chain else t.id
-    # tasks that only live in deleted projects are gone for now (back if the project is restored)
+    if not roots:
+        return []
     placed = select(TaskProject.task_id).where(TaskProject.task_id.in_(set(roots.values())))
-    any_placement = set((await session.execute(placed)).scalars()) if roots else set()
-    live = (
-        set(
-            (
-                await session.execute(
-                    placed.join(Project, Project.id == TaskProject.project_id).where(
-                        Project.deleted_at.is_(None)
-                    )
+    any_placement = set((await session.execute(placed)).scalars())
+    live = set(
+        (
+            await session.execute(
+                placed.join(Project, Project.id == TaskProject.project_id).where(
+                    Project.deleted_at.is_(None)
                 )
-            ).scalars()
-        )
-        if roots
-        else set()
+            )
+        ).scalars()
     )
     return [
         t

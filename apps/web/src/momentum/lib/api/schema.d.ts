@@ -142,6 +142,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/home": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Home page data in one round trip */
+        get: operations["get_home_api_v1_home_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me": {
         parameters: {
             query?: never;
@@ -893,6 +910,54 @@ export interface components {
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /** HomeCounts */
+        HomeCounts: {
+            /** Due Today */
+            due_today: number;
+            /** Open */
+            open: number;
+            /** Overdue */
+            overdue: number;
+        };
+        /** HomeOut */
+        HomeOut: {
+            counts: components["schemas"]["HomeCounts"];
+            /** Has Projects */
+            has_projects: boolean;
+            /** Priorities */
+            priorities: components["schemas"]["MyTaskOut"][];
+            /** Recent Projects */
+            recent_projects: components["schemas"]["HomeProjectOut"][];
+            /** Waiting */
+            waiting: components["schemas"]["MyTaskOut"][];
+            /** Waiting Total */
+            waiting_total: number;
+        };
+        /** HomeProjectOut */
+        HomeProjectOut: {
+            /** Color */
+            color: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Last Active At */
+            last_active_at: string | null;
+            /** Name */
+            name: string;
+            /** Open Count */
+            open_count: number;
+            /** Overdue Count */
+            overdue_count: number;
+            /**
+             * Team Id
+             * Format: uuid
+             */
+            team_id: string;
+            /** Team Name */
+            team_name: string;
         };
         /** ListMeta */
         ListMeta: {
@@ -2078,6 +2143,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_home_api_v1_home_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HomeOut"];
                 };
             };
         };

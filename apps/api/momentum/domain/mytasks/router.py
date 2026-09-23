@@ -21,7 +21,9 @@ from momentum.domain.tasks.schemas import ProjectRef
 router = APIRouter(prefix="/me", tags=["my tasks"])
 
 
-async def _out(s: AsyncSession, rows: list[tuple[Task, MyTaskPlacement | None]]) -> list[MyTaskOut]:
+async def my_task_rows(
+    s: AsyncSession, rows: list[tuple[Task, MyTaskPlacement | None]]
+) -> list[MyTaskOut]:
     # project of each task (subtasks: of their top-level task), a few queries for the whole list
     roots: dict[uuid.UUID, uuid.UUID] = {}
     for t, _ in rows:
@@ -67,7 +69,7 @@ async def my_tasks(
 ) -> ListOut[MyTaskOut]:
     async with uow.transaction() as s:
         rows = await service.list_my_tasks(s, ctx, completed=completed)
-        return ListOut(data=await _out(s, rows))
+        return ListOut(data=await my_task_rows(s, rows))
 
 
 @router.post(
