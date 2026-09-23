@@ -145,3 +145,54 @@ export function useToggleFavorite() {
     onSettled: () => qc.invalidateQueries({ queryKey: projectKeys.all }),
   });
 }
+
+export type ProjectRoleName = 'admin' | 'editor' | 'commenter' | 'viewer';
+
+export function useProjectMembers(projectId: string) {
+  const api = useApi();
+  const invalidate = useInvalidate();
+  const undoToast = useUndoToast();
+  const path = { project_id: projectId };
+  const add = useMutation({
+    mutationFn: async (v: { userId: string; role: ProjectRoleName }) =>
+      (
+        await api.POST('/api/v1/projects/{project_id}/members', {
+          params: { path },
+          body: { user_id: v.userId, role: v.role },
+        })
+      ).data!,
+    onSuccess: (res) => {
+      undoToast('Shared', res.meta);
+      void invalidate();
+    },
+    onError: (e) => toastError(e),
+  });
+  const setRole = useMutation({
+    mutationFn: async (v: { userId: string; role: ProjectRoleName }) =>
+      (
+        await api.PATCH('/api/v1/projects/{project_id}/members/{user_id}', {
+          params: { path: { ...path, user_id: v.userId } },
+          body: { role: v.role },
+        })
+      ).data!,
+    onSuccess: (res) => {
+      undoToast('Role changed', res.meta);
+      void invalidate();
+    },
+    onError: (e) => toastError(e),
+  });
+  const remove = useMutation({
+    mutationFn: async (userId: string) =>
+      (
+        await api.DELETE('/api/v1/projects/{project_id}/members/{user_id}', {
+          params: { path: { ...path, user_id: userId } },
+        })
+      ).data!,
+    onSuccess: (res) => {
+      undoToast('Removed from project', res.meta);
+      void invalidate();
+    },
+    onError: (e) => toastError(e),
+  });
+  return { add, setRole, remove };
+}

@@ -1,6 +1,14 @@
 import { http, HttpResponse } from 'msw';
 import { ravi } from './fixtures';
 
+const ana = {
+  ...ravi,
+  id: '01a0ccaf-8f68-77d2-a888-584ea1e80eb1',
+  email: 'ana@acme-demo.test',
+  name: 'Ana Souza',
+};
+const people = [ravi, ana];
+
 type P = {
   id: string;
   team_id: string;
@@ -18,12 +26,32 @@ type P = {
 };
 
 /** In-memory projects + favorites API (synthetic data) for flow tests. */
-export function projectHandlers(base = '', teamName = (id: string) => `Team ${id}`) {
-  const projects: P[] = [];
+export function projectHandlers(base = '', teamName = (id: string) => `Team ${id}`, seed: Partial<P>[] = []) {
+  const projects: P[] = seed.map((x, i) => ({
+    id: `seed-${i + 1}`,
+    team_id: 'team-x',
+    team_name: 'Product',
+    name: `Seed ${i + 1}`,
+    color: null,
+    privacy: 'team',
+    default_view: 'list',
+    status: null,
+    archived_at: null,
+    owner_id: ravi.id,
+    my_role: 'admin',
+    is_favorite: false,
+    version: 1,
+    ...x,
+  }));
+  const members = new Map<string, { user: typeof ravi; role: string }[]>();
+  const membersOf = (id: string) => {
+    if (!members.has(id)) members.set(id, [{ user: ravi, role: 'admin' }]);
+    return members.get(id)!;
+  };
   const meta = { activity_id: '01a0ccaf-0000-7000-8000-00000000b001', batch_id: null, version: 1 };
   const detail = (p: P) => ({
     ...p,
-    members: [{ user: ravi, role: 'admin' }],
+    members: membersOf(p.id),
     sections: [{ id: `${p.id}-s1`, name: 'To do', position: 'V' }],
   });
   const find = (id: unknown) => projects.find((p) => p.id === id);
@@ -75,6 +103,16 @@ export function projectHandlers(base = '', teamName = (id: string) => `Team ${id
       const p = find(params.id)!;
       p.archived_at = null;
       return HttpResponse.json({ data: p, meta });
+    }),
+    http.post(`*${base}/api/v1/projects/:id/members`, async ({ params, request }) => {
+      const b = (await request.json()) as { user_id: string; role: string };
+      membersOf(String(params.id)).push({ user: people.find((u) => u.id === b.user_id)!, role: b.role });
+      return HttpResponse.json({ data: { ok: true }, meta }, { status: 201 });
+    }),
+    http.patch(`*${base}/api/v1/projects/:id/members/:uid`, async ({ params, request }) => {
+      const m = membersOf(String(params.id)).find((x) => x.user.id === params.uid)!;
+      m.role = ((await request.json()) as { role: string }).role;
+      return HttpResponse.json({ data: { ok: true }, meta });
     }),
     http.get(`*${base}/api/v1/favorites`, () =>
       HttpResponse.json({

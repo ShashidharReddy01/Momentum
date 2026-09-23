@@ -178,6 +178,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/{project_id}/members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Share: add a member with a role */
+        post: operations["add_member_api_v1_projects__project_id__members_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}/members/{user_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove a member (or leave) */
+        delete: operations["remove_member_api_v1_projects__project_id__members__user_id__delete"];
+        options?: never;
+        head?: never;
+        /** Change a member's role */
+        patch: operations["set_member_role_api_v1_projects__project_id__members__user_id__patch"];
+        trace?: never;
+    };
     "/api/v1/projects/{project_id}/unarchive": {
         parameters: {
             query?: never;
@@ -477,11 +512,33 @@ export interface components {
             /** Version */
             version: number;
         };
+        /** ProjectMemberIn */
+        ProjectMemberIn: {
+            /**
+             * Role
+             * @default editor
+             * @enum {string}
+             */
+            role: "admin" | "editor" | "commenter" | "viewer";
+            /**
+             * User Id
+             * Format: uuid
+             */
+            user_id: string;
+        };
         /** ProjectMemberOut */
         ProjectMemberOut: {
             /** Role */
             role: string;
             user: components["schemas"]["UserOut"];
+        };
+        /** ProjectMemberPatchIn */
+        ProjectMemberPatchIn: {
+            /**
+             * Role
+             * @enum {string}
+             */
+            role: "admin" | "editor" | "commenter" | "viewer";
         };
         /** ProjectOut */
         ProjectOut: {
@@ -1075,6 +1132,109 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MutationOut_ProjectOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_member_api_v1_projects__project_id__members_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProjectMemberIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationOut_OkOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_member_api_v1_projects__project_id__members__user_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationOut_OkOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_member_role_api_v1_projects__project_id__members__user_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProjectMemberPatchIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationOut_OkOut_"];
                 };
             };
             /** @description Validation Error */

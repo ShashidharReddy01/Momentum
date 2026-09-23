@@ -66,3 +66,17 @@ class FavoriteIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
     after_id: uuid.UUID | None = None
     before_id: uuid.UUID | None = None
+
+
+ProjectRoleName = Literal["admin", "editor", "commenter", "viewer"]
+
+
+class ProjectMemberIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    user_id: uuid.UUID
+    role: ProjectRoleName = "editor"
+
+
+class ProjectMemberPatchIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    role: ProjectRoleName

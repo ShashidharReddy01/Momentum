@@ -1,4 +1,5 @@
 import { Archive, ArchiveRestore, Lock, MoreHorizontal, Star, Trash2, Users } from 'lucide-react';
+import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { InlineText } from '@/components/common/InlineText';
 import { ErrorState } from '@/components/common/States';
@@ -19,6 +20,7 @@ import { colorVar } from '@/features/teams';
 import { cn } from '@/lib/cn';
 import { useCrumbs } from '@/lib/crumbs';
 import { useProject, useProjectLifecycle, useToggleFavorite, useUpdateProject } from './queries';
+import { ShareDialog } from './ShareDialog';
 
 const VIEWS = [
   { key: 'list', label: 'List' },
@@ -35,6 +37,7 @@ export function ProjectPage() {
   const { archive, remove } = useProjectLifecycle(projectId);
   const favorite = useToggleFavorite();
   const navigate = useNavigate();
+  const [share, setShare] = useState(false);
   useCrumbs(project.data ? [project.data.team_name, project.data.name] : null);
 
   if (project.isPending) {
@@ -93,13 +96,9 @@ export function ProjectPage() {
                 />
               ))}
             </div>
-            <Tooltip
-              content={`${p.privacy === 'team' ? `Everyone in ${p.team_name} can see this project` : 'Private'}`}
-            >
-              <Button size="sm" disabled>
-                <Icon icon={Users} /> Share
-              </Button>
-            </Tooltip>
+            <Button size="sm" onClick={() => setShare(true)}>
+              <Icon icon={p.privacy === 'private' ? Lock : Users} /> Share
+            </Button>
             {isAdmin ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -162,6 +161,12 @@ export function ProjectPage() {
         </div>
       ) : null}
 
+      <ShareDialog project={p} open={share} onOpenChange={setShare} />
+      {p.my_role === 'viewer' || p.my_role === 'commenter' ? (
+        <div role="status" className="bg-info-tint px-8 py-1.5 text-xs text-ink-2">
+          You have {p.my_role} access to this project.
+        </div>
+      ) : null}
       <div className="flex-1 overflow-auto px-8 py-5">
         {p.sections.map((s) => (
           <section key={s.id} className="mb-5">

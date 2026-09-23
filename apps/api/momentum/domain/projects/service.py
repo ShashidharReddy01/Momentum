@@ -281,6 +281,130 @@ async def delete_project(
     return Mutation(project, act.id, version=project.version)
 
 
+# ---------- members ----------
+
+
+async def _explicit_admins(session: AsyncSession, project_id: uuid.UUID) -> int:
+    return int(
+        (
+            await session.execute(
+                select(func.count())
+                .select_from(ProjectMember)
+                .where(ProjectMember.project_id == project_id, ProjectMember.role == "admin")
+            )
+        ).scalar_one()
+    )
+
+
+async def add_member(
+    session: AsyncSession, ctx: Ctx, project_id: uuid.UUID, user_id: uuid.UUID, role: str
+) -> Mutation[ProjectMember]:
+    project, my_role = await get_visible_project(session, ctx, project_id)
+    require_project_role(my_role, "admin", "share this project")
+    user = await session.get(User, user_id)
+    if user is None or user.workspace_id != ctx.workspace_id or user.status == "disabled":
+        raise NotFound("User not found")
+    if await session.get(ProjectMember, (project_id, user_id)) is not None:
+        raise Conflict("Already a member of this project", code="duplicate")
+    member = ProjectMember(project_id=project_id, user_id=user_id, role=role)
+    session.add(member)
+    act = await record_activity(
+        session,
+        ctx,
+        entity_type="project",
+        entity_id=project_id,
+        verb="project.member_added",
+        changes={"member": (None, f"{user_id}:{role}")},
+        undo=undo_op("projects.remove_member", project_id=project_id, user_id=user_id),
+    )
+    await emit(
+        session,
+        ctx,
+        type="project.member_added",
+        entity_type="project",
+        entity_id=project_id,
+        data={"user_id": str(user_id), "role": role},
+        channels=[*_channels(project_id), f"user:{user_id}"],
+        activity_id=act.id,
+    )
+    await session.flush()
+    return Mutation(member, act.id, version=project.version)
+
+
+async def set_member_role(
+    session: AsyncSession, ctx: Ctx, project_id: uuid.UUID, user_id: uuid.UUID, role: str
+) -> Mutation[ProjectMember]:
+    _, my_role = await get_visible_project(session, ctx, project_id)
+    require_project_role(my_role, "admin", "change roles")
+    member = await session.get(ProjectMember, (project_id, user_id))
+    if member is None:
+        raise NotFound("Not a member of this project")
+    if member.role == role:
+        return Mutation(member)
+    if member.role == "admin" and await _explicit_admins(session, project_id) <= 1:
+        raise Conflict("A project needs at least one admin", code="last_admin")
+    old = member.role
+    member.role = role
+    act = await record_activity(
+        session,
+        ctx,
+        entity_type="project",
+        entity_id=project_id,
+        verb="project.member_role_changed",
+        changes={"role": (old, role)},
+        undo=undo_op("projects.set_role", project_id=project_id, user_id=user_id, role=old),
+    )
+    await emit(
+        session,
+        ctx,
+        type="project.member_updated",
+        entity_type="project",
+        entity_id=project_id,
+        data={"user_id": str(user_id), "role": role},
+        channels=[*_channels(project_id), f"user:{user_id}"],
+        activity_id=act.id,
+    )
+    return Mutation(member, act.id)
+
+
+async def remove_member(
+    session: AsyncSession, ctx: Ctx, project_id: uuid.UUID, user_id: uuid.UUID
+) -> Mutation[ProjectMember]:
+    _, my_role = await get_visible_project(session, ctx, project_id)
+    if user_id != ctx.actor.id:
+        require_project_role(my_role, "admin", "remove members")
+    member = await session.get(ProjectMember, (project_id, user_id))
+    if member is None:
+        raise NotFound("Not a member of this project")
+    if member.role == "admin" and await _explicit_admins(session, project_id) <= 1:
+        raise Conflict(
+            "A project needs at least one admin. Make someone else admin first.", code="last_admin"
+        )
+    role = member.role
+    await session.delete(member)
+    act = await record_activity(
+        session,
+        ctx,
+        entity_type="project",
+        entity_id=project_id,
+        verb="project.member_removed",
+        changes={"member": (f"{user_id}:{role}", None)},
+        undo=undo_op("projects.add_member", project_id=project_id, user_id=user_id, role=role),
+    )
+    await emit(
+        session,
+        ctx,
+        type="project.member_removed",
+        entity_type="project",
+        entity_id=project_id,
+        data={"user_id": str(user_id)},
+        channels=[*_channels(project_id), f"user:{user_id}"],
+        activity_id=act.id,
+    )
+    await session.flush()
+    return Mutation(member, act.id)
+
+
 # ---------- favorites ----------
 
 
@@ -393,6 +517,30 @@ async def _undo_create(session: AsyncSession, ctx: Ctx, args: dict[str, Any]) ->
         entity_id=project.id,
         channels=[*_channels(project.id), f"team:{project.team_id}"],
     )
+
+
+@undo_handler("projects.remove_member")
+async def _undo_add_member(session: AsyncSession, ctx: Ctx, args: dict[str, Any]) -> None:
+    member = await session.get(ProjectMember, (_pid(args), uuid.UUID(str(args["user_id"]))))
+    if member is not None:
+        if member.role == "admin" and await _explicit_admins(session, member.project_id) <= 1:
+            raise UndoConflict("A project needs at least one admin")
+        await session.delete(member)
+
+
+@undo_handler("projects.add_member")
+async def _undo_remove_member(session: AsyncSession, ctx: Ctx, args: dict[str, Any]) -> None:
+    key = (_pid(args), uuid.UUID(str(args["user_id"])))
+    if await session.get(ProjectMember, key) is None:
+        session.add(ProjectMember(project_id=key[0], user_id=key[1], role=str(args["role"])))
+
+
+@undo_handler("projects.set_role")
+async def _undo_set_role(session: AsyncSession, ctx: Ctx, args: dict[str, Any]) -> None:
+    member = await session.get(ProjectMember, (_pid(args), uuid.UUID(str(args["user_id"]))))
+    if member is None:
+        raise UndoConflict("That person is no longer in the project")
+    member.role = str(args["role"])
 
 
 async def team_name(session: AsyncSession, team_id: uuid.UUID) -> str:

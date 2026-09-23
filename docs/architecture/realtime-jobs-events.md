@@ -47,7 +47,7 @@ Event payloads share an envelope:
 | `team.member_added` / `team.member_updated` / `team.member_removed` | 1 | `user_id`, `role` (channels also `user:<id>`) |
 | `section.created` / `section.updated` / `section.moved` / `section.deleted` | 1 | |
 | `project.created` / `project.updated` / `project.archived` / `project.unarchived` / `project.deleted` / `project.restored` | 1 | `changes`, `version` (updated); channels `project:<id>` + `team:<id>` |
-| `project.member_added` / `project.member_removed` | 1 | user_id, role |
+| `project.member_added` / `project.member_updated` / `project.member_removed` | 1 | user_id, role (channels also `user:<id>`) |
 | `comment.created` / `comment.updated` / `comment.deleted` | 1 | comment summary, mentions |
 | `reaction.added` / `reaction.removed` | 1 | |
 | `field_value.changed` | 2 | field_id, old/new |

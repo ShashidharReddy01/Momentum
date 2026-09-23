@@ -55,7 +55,7 @@ def key_between(a: str | None, b: str | None, *, jitter: bool = True) -> str:
     key = _midpoint(lo, b)
     if not jitter:
         return key
-    suffix = "".join(secrets.choice(DIGITS[1:]) for _ in range(2))
+    suffix = "".join(secrets.choice(DIGITS[1:]) for _ in range(3))
     base = key
     # If base is a prefix of b, appending could overshoot b: move base toward a until it isn't.
     while b is not None and b.startswith(base):

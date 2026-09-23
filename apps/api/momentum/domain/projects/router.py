@@ -16,7 +16,9 @@ from momentum.domain.projects.schemas import (
     FavoriteIn,
     ProjectCreateIn,
     ProjectDetailOut,
+    ProjectMemberIn,
     ProjectMemberOut,
+    ProjectMemberPatchIn,
     ProjectOut,
     ProjectPatchIn,
     SectionBrief,
@@ -181,3 +183,47 @@ async def delete_favorite(project_id: uuid.UUID, ctx: CtxDep, uow: UowDep) -> Ok
     async with uow.transaction() as s:
         await service.unset_favorite(s, ctx, project_id)
     return OkOut()
+
+
+@router.post(
+    "/{project_id}/members",
+    response_model=MutationOut[OkOut],
+    status_code=status.HTTP_201_CREATED,
+    summary="Share: add a member with a role",
+)
+async def add_member(
+    project_id: uuid.UUID, body: ProjectMemberIn, ctx: CtxDep, uow: UowDep
+) -> MutationOut[OkOut]:
+    async with uow.transaction() as s:
+        m = await service.add_member(s, ctx, project_id, body.user_id, body.role)
+    return MutationOut(data=OkOut(), meta=MutationMeta(activity_id=m.activity_id))
+
+
+@router.patch(
+    "/{project_id}/members/{user_id}",
+    response_model=MutationOut[OkOut],
+    summary="Change a member's role",
+)
+async def set_member_role(
+    project_id: uuid.UUID,
+    user_id: uuid.UUID,
+    body: ProjectMemberPatchIn,
+    ctx: CtxDep,
+    uow: UowDep,
+) -> MutationOut[OkOut]:
+    async with uow.transaction() as s:
+        m = await service.set_member_role(s, ctx, project_id, user_id, body.role)
+    return MutationOut(data=OkOut(), meta=MutationMeta(activity_id=m.activity_id))
+
+
+@router.delete(
+    "/{project_id}/members/{user_id}",
+    response_model=MutationOut[OkOut],
+    summary="Remove a member (or leave)",
+)
+async def remove_member(
+    project_id: uuid.UUID, user_id: uuid.UUID, ctx: CtxDep, uow: UowDep
+) -> MutationOut[OkOut]:
+    async with uow.transaction() as s:
+        m = await service.remove_member(s, ctx, project_id, user_id)
+    return MutationOut(data=OkOut(), meta=MutationMeta(activity_id=m.activity_id))
