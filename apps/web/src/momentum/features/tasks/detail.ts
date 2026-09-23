@@ -17,7 +17,7 @@ export function useTaskDetail(taskId: string | null) {
   });
 }
 
-const isTaskList = (key: readonly unknown[]) => key[0] === 'projects' && key[2] === 'tasks';
+export const isTaskList = (key: readonly unknown[]) => key[0] === 'projects' && key[2] === 'tasks';
 
 /**
  * Apply a task change everywhere it's cached (the open pane and any project list), so the list and

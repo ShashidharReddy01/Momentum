@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/Button';
 import { UNAUTHENTICATED_EVENT } from '@/lib/api/client';
 import { isUnauthenticated } from '@/lib/api/errors';
 import { useMomentumConfig } from '@/lib/config';
+import { ReconnectingBanner, RealtimeProvider } from '@/lib/realtime';
 import { useMe } from './queries';
 
 /** Blocks the app until the user is known; redirects to the provider's login when needed. */
@@ -33,10 +34,10 @@ export function AuthGate({ children }: { children: ReactNode }) {
     return <ErrorState error={me.error} onRetry={() => void me.refetch()} />;
   }
   return (
-    <>
-      {expired ? <SessionExpiredBanner loginUrl={config.auth.login_url} /> : null}
+    <RealtimeProvider>
+      {expired ? <SessionExpiredBanner loginUrl={config.auth.login_url} /> : <ReconnectingBanner />}
       {children}
-    </>
+    </RealtimeProvider>
   );
 }
 

@@ -83,7 +83,7 @@ async def replay(
     )
     if len(rows) > REPLAY_LIMIT:
         return None
-    return [to_message(row) for row in rows]
+    return [to_message(row, channel) for row in rows]
 
 
 async def _build_ctx(rt: MomentumRuntime, websocket: WebSocket) -> Ctx | None:

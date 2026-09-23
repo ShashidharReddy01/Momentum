@@ -10,7 +10,7 @@ export function configFixture(overrides: Partial<RuntimeConfig> = {}): RuntimeCo
     api_base: `${base}/api/v1`,
     ai_enabled: true,
     auth: { mode: 'dev', login_url: `${base}/dev/login?return_to=/`, dev_login: true },
-    features: { realtime: true },
+    features: { realtime: false },
     ...overrides,
   };
 }

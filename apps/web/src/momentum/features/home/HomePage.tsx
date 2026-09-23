@@ -15,6 +15,7 @@ import { NewProjectDialog } from '@/features/projects';
 import { TaskNavProvider, TaskPane, useTaskNav } from '@/features/tasks';
 import { colorVar } from '@/features/teams';
 import { cn } from '@/lib/cn';
+import { applyUserChannelEvent, useChannel } from '@/lib/realtime';
 import { homeKey, useCompleteFromHome, useHome, type HomeProject, type HomeTask } from './queries';
 
 function greeting(date: Date): string {
@@ -39,6 +40,8 @@ export function HomePage() {
 function HomeBody() {
   const nav = useTaskNav()!;
   const qc = useQueryClient();
+  const meId = useMe().data?.user.id;
+  useChannel(meId ? `user:${meId}` : null, (event) => applyUserChannelEvent(qc, event));
   const wasOpen = useRef(false);
   // edits made in the pane show on Home once it closes
   useEffect(() => {

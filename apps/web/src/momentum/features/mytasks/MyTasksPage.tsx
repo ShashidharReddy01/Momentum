@@ -14,6 +14,7 @@ import {
 } from '@dnd-kit/core';
 import { CheckCircle2, ChevronDown, ChevronRight, ListChecks } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { EmptyState, ErrorState } from '@/components/common/States';
 import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
@@ -34,6 +35,7 @@ import {
 } from '@/features/tasks';
 import { cn } from '@/lib/cn';
 import { formatDue } from '@/lib/dates';
+import { applyUserChannelEvent, useChannel } from '@/lib/realtime';
 import { BUCKETS, useMyTaskMutations, useMyTasks, type Bucket, type MyTask } from './queries';
 
 type Drop = { bucket: Bucket; anchorId: string | null; placement: DropPlacement };
@@ -82,6 +84,8 @@ function MyTasksList() {
   const m = useMyTaskMutations();
   const nav = useTaskNav();
   const meId = useMe().data?.user.id;
+  const qc = useQueryClient();
+  useChannel(meId ? `user:${meId}` : null, (event) => applyUserChannelEvent(qc, event));
   const container = useRef<HTMLDivElement>(null);
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(() => {
     try {

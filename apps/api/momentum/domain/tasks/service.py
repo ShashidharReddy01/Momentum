@@ -35,7 +35,12 @@ COMPLETED_PAGE = 100
 
 
 def channels(task: Task, placement: TaskProject | None) -> list[str]:
+    """Realtime channels for one of this task's own events. Always includes the parent's
+    channel too (if it has one), so a subtask's pane list, subtask_count and
+    completed_subtask_count badge stay live wherever the parent is open."""
     out = [f"task:{task.id}"]
+    if task.parent_id is not None:
+        out.append(f"task:{task.parent_id}")
     if placement is not None:
         out.append(f"project:{placement.project_id}")
     if task.assignee_id is not None:
@@ -930,7 +935,7 @@ async def create_subtask(
         entity_type="task",
         entity_id=task.id,
         data={"parent_id": str(parent.id), "position": position},
-        channels=[*channels(task, placement), f"task:{parent.id}"],
+        channels=channels(task, placement),
         activity_id=act.id,
     )
     await session.flush()
@@ -981,7 +986,7 @@ async def move_subtask(
         entity_type="task",
         entity_id=task.id,
         data={"parent_id": str(task.parent_id), "position": key},
-        channels=[*channels(task, placement), f"task:{task.parent_id}"],
+        channels=channels(task, placement),
         activity_id=act.id,
     )
     return Mutation(task, act.id, version=task.version)

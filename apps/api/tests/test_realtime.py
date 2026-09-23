@@ -95,6 +95,7 @@ async def test_two_processes_see_a_task_update_within_a_second(
     assert event["event"] == "task.updated"
     assert event["entity_id"] == task["id"]
     assert event["data"]["changes"]["title"] == ["Realtime me", "Realtime me, updated"]
+    assert event["activity_id"]  # lets the actor's own tab recognize and skip its own echo
 
 
 async def test_subscribe_is_permission_checked(app_factory: AppFactory, as_user: Clients) -> None:
@@ -148,6 +149,93 @@ async def test_unauthenticated_connection_is_closed(app_factory: AppFactory) -> 
 
     code = await in_thread(run)
     assert code == 4401
+
+
+async def test_subtask_events_reach_a_subscriber_of_the_parent_channel(
+    app_factory: AppFactory, as_user: Clients
+) -> None:
+    """channels() always includes the parent's channel — the pane's subtask list, its
+    subtask_count and its completed_subtask_count badge all stay live off one subscription."""
+    ravi = await as_user("ravi")
+    pid = (await ravi.get("/api/v1/projects")).json()["data"][0]["id"]
+    parent = (await ravi.post(f"/api/v1/projects/{pid}/tasks", json={"title": "Parent"})).json()[
+        "data"
+    ]
+    app = await _realtime_app(app_factory)
+    subscribed = threading.Event()
+
+    def watch() -> list[dict[str, Any]]:
+        with TestClient(app) as client:
+            _login(client, _user_id(client, "ravi"))
+            with client.websocket_connect("/ws") as ws:
+                ws.receive_json()
+                ws.send_json({"op": "subscribe", "channel": f"task:{parent['id']}"})
+                sub = _drain(ws, until=lambda m: m["type"] in ("subscribed", "denied"))
+                assert sub["type"] == "subscribed"
+                subscribed.set()
+                created = _drain(
+                    ws, until=lambda m: m["type"] == "event" and m["event"] == "task.created"
+                )
+                renamed = _drain(
+                    ws, until=lambda m: m["type"] == "event" and m["event"] == "task.updated"
+                )
+                completed = _drain(
+                    ws, until=lambda m: m["type"] == "event" and m["event"] == "task.completed"
+                )
+                return [created, renamed, completed]
+
+    watch_future = asyncio.ensure_future(in_thread(watch))
+    await asyncio.to_thread(subscribed.wait, 5)
+
+    child = (
+        await ravi.post(f"/api/v1/tasks/{parent['id']}/subtasks", json={"title": "Child"})
+    ).json()["data"]
+    await ravi.patch(f"/api/v1/tasks/{child['id']}", json={"title": "Child, renamed"})
+    await ravi.post(f"/api/v1/tasks/{child['id']}/complete")
+
+    created, renamed, completed = await asyncio.wait_for(watch_future, timeout=5)
+    assert created["entity_id"] == child["id"] and created["data"]["parent_id"] == parent["id"]
+    assert renamed["entity_id"] == child["id"]
+    assert completed["entity_id"] == child["id"]
+
+
+async def test_one_connection_subscribed_to_two_matching_channels_gets_both_labeled(
+    app_factory: AppFactory, as_user: Clients
+) -> None:
+    """A task update matches both `project:<id>` and `task:<id>` — a connection subscribed to
+    both gets it twice, each delivery labeled with which channel it was for (see
+    dispatch.py's to_message docstring), so the frontend can route each correctly."""
+    ravi = await as_user("ravi")
+    pid = (await ravi.get("/api/v1/projects")).json()["data"][0]["id"]
+    task = (await ravi.post(f"/api/v1/projects/{pid}/tasks", json={"title": "Dual"})).json()["data"]
+    app = await _realtime_app(app_factory)
+    subscribed = threading.Event()
+
+    def watch() -> list[dict[str, Any]]:
+        with TestClient(app) as client:
+            _login(client, _user_id(client, "ravi"))
+            with client.websocket_connect("/ws") as ws:
+                ws.receive_json()
+                for channel in (f"project:{pid}", f"task:{task['id']}"):
+                    ws.send_json({"op": "subscribe", "channel": channel})
+                    sub = _drain(ws, until=lambda m: m["type"] == "subscribed")
+                    assert sub["channel"] == channel
+                subscribed.set()
+                events = []
+                while len(events) < 2:
+                    msg = ws.receive_json()
+                    if msg["type"] == "event":
+                        events.append(msg)
+                return events
+
+    watch_future = asyncio.ensure_future(in_thread(watch))
+    await asyncio.to_thread(subscribed.wait, 5)
+    await ravi.patch(f"/api/v1/tasks/{task['id']}", json={"title": "Dual, renamed"})
+
+    events = await asyncio.wait_for(watch_future, timeout=5)
+    channels = sorted(e["channel"] for e in events)
+    assert channels == sorted([f"project:{pid}", f"task:{task['id']}"])
+    assert all(e["id"] == events[0]["id"] for e in events)  # same underlying event
 
 
 async def test_replay_delivers_backlog_in_order_on_reconnect(

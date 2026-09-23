@@ -99,8 +99,13 @@ test it; what shipped:
 - Server → client:
   - `{"type":"hello","connection_id":"…"}` right after accept.
   - `{"type":"subscribed","channel":"…"}` once a subscribe (and any backlog) is done.
-  - `{"type":"event","id":…,"event":"task.updated","entity_type":…,"entity_id":…,"data":…,"actor":…,"request_id":…}`
-    — the outbox envelope, flattened; sent both for backlog and for live events.
+  - `{"type":"event","id":…,"event":"task.updated","entity_type":…,"entity_id":…,"channel":…,"data":…,"actor":…,"request_id":…,"activity_id":…}`
+    — the outbox envelope, flattened; sent both for backlog and for live events. `channel`
+    says which of the connection's subscriptions this particular delivery is for (one
+    change can match more than one — e.g. a subtask's own channel and its parent's — and
+    then arrives once per match, each labeled, rather than the client having to guess).
+    `activity_id` lets the actor's own tab recognize its own echo and skip re-applying it
+    (see §4's frontend client, `lib/realtime/mine.ts`).
   - `{"type":"resync","channel":"…"}` when a requested backlog is over 500 events (the
     client should refetch that channel's data instead of trusting a giant replay).
   - `{"type":"ping"}` every 25s from the **server**, expecting `{"op":"pong"}` within
@@ -118,12 +123,32 @@ test it; what shipped:
 - Multi-instance: every instance runs its own listener + Hub and dispatches independently
   to its own local connections (see §1) — no sticky sessions needed.
 
-## 4. Frontend handling
+## 4. Frontend handling — implemented (S2.1.2), see `apps/web/src/momentum/lib/realtime/`
 
-`handlers.ts` maps event types to TanStack Query cache updates:
-- Entity events patch the cached entity when `version` is newer, otherwise ignore.
-- Collection-affecting events (created/moved/deleted) invalidate the relevant list queries (`['project', id, 'tasks']`).
-- Events whose `actor.id` is the current user and that were optimistically applied are reconciled (not double-applied) using `activity_id`.
+- `client.ts` (`RealtimeClient`): one websocket per mounted app (`RealtimeProvider`, mounted
+  inside `AuthGate` once the user is known), reconnect with backoff+jitter, ref-counted
+  per-channel subscriptions shared across every `useChannel` call, replay-since-last-seen-id
+  on reconnect, a channel's cursor is dropped on `resync`/`overflow` so the next reconnect
+  starts live instead of retrying a doomed huge replay.
+- `useChannel(channel, onEvent)`: subscribes while mounted. Wired into `ProjectTasksView`
+  (`project:<id>`), `TaskPane`/`TaskPage` (`task:<id>`), `MyTasksPage` and `HomePage`
+  (`user:<me.id>`).
+- `handlers.ts` (`applyRealtimeEvent`, `applyUserChannelEvent`): reconciles the TanStack
+  Query cache. Prefers in-place patches (`syncTask`/`dropTask`, the same helpers Phase 1's
+  own mutations already use — no flicker, no round trip) over `invalidateQueries`, which is
+  used only where there's no cheaper way to know the new state (a subtask count, which list
+  page a completed task moved to, the activity feed).
+- `mine.ts`: the actor's own mutation's `onSuccess` already reconciled the cache — `lib/undo.ts`
+  marks its `activity_id` as "mine" (for free, since almost every mutation already reports
+  one to the undo stack), and the realtime handler skips an event carrying that same id.
+  Verified in a real two-browser-tab, real-backend test: the actor's own edit produces zero
+  extra network requests. Known gap: bulk operations (`POST /tasks/bulk`, multi-move) don't
+  expose per-row activity ids to the frontend yet, only a shared `batch_id`, so their own
+  echoes aren't suppressed — harmless (one redundant, already-correct refetch), not silent.
+- `ReconnectingBanner`: shown only once a connection that was open is lost mid-session, never
+  on first load and never when realtime is off (`features.realtime: false`, e.g. a host whose
+  proxy doesn't forward websocket upgrades — see INTEGRATION_GUIDE.md §6.6) — the app then
+  behaves exactly as it did in Phase 1 (refetch on window focus).
 
 ## 5. Jobs (Procrastinate)
 

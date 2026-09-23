@@ -12,6 +12,7 @@ import {
   X,
 } from 'lucide-react';
 import { lazy, Suspense, useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router';
 import { toast } from 'sonner';
 import { DueText } from '@/components/common/DueText';
@@ -34,6 +35,7 @@ import { isNotFound } from '@/lib/api/errors';
 import { cn } from '@/lib/cn';
 import { useMomentumConfig } from '@/lib/config';
 import { formatDay, formatDue } from '@/lib/dates';
+import { applyRealtimeEvent, useChannel } from '@/lib/realtime';
 import { AssigneePicker } from '../AssigneePicker';
 import { DatePicker } from '../DatePicker';
 import { useTaskDetail, useTaskDetailMutations, type TaskDetail } from '../detail';
@@ -67,6 +69,8 @@ export function TaskPane({
   /** Whether the viewer may edit (from the project they're looking at). */
   canEditHint?: boolean;
 }) {
+  const qc = useQueryClient();
+  useChannel(`task:${taskId}`, (event) => applyRealtimeEvent(qc, event));
   const detail = useTaskDetail(taskId);
   const root = useRef<HTMLElement>(null);
 

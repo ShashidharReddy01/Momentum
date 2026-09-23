@@ -20,16 +20,26 @@ from momentum.realtime.hub import Hub
 BATCH = 500
 
 
-def to_message(row: OutboxEvent) -> dict[str, Any]:
+def to_message(row: OutboxEvent, channel: str) -> dict[str, Any]:
+    """One row can be published to several channels at once (e.g. a subtask event goes to
+    both its own `task:<id>` and its parent's); `channel` says which one this particular
+    delivery is for, so a connection subscribed to more than one matching channel — and
+    so receiving this row more than once — can tell the deliveries apart (or the frontend
+    dedupe by `id` and just take the first, since either is the same event)."""
     return {
         "type": "event",
         "id": row.id,
         "event": row.type,
         "entity_type": row.entity_type,
         "entity_id": str(row.entity_id),
+        "channel": channel,
         "data": row.payload.get("data", {}),
         "actor": row.payload.get("actor"),
         "request_id": row.payload.get("request_id"),
+        # lets the actor's own tab recognize its own echo (it already reconciled the cache
+        # from the mutation's own response, which carries the same activity_id) and skip
+        # re-invalidating for it — see apps/web/.../lib/realtime/mine.ts
+        "activity_id": str(row.activity_id) if row.activity_id else None,
     }
 
 
@@ -51,9 +61,8 @@ async def dispatch_pending(session: AsyncSession, hub: Hub, *, after_id: int) ->
         return after_id
     last_id = after_id
     for row in rows:
-        message = to_message(row)
         for channel in row.payload.get("channels") or ():
-            hub.publish(channel, message)
+            hub.publish(channel, to_message(row, channel))
         last_id = row.id
     await session.execute(
         update(OutboxEvent)

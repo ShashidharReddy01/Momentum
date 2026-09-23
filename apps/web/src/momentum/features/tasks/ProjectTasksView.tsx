@@ -7,6 +7,7 @@ import {
 } from '@dnd-kit/core';
 import { Plus } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { ErrorState } from '@/components/common/States';
 import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
@@ -16,6 +17,7 @@ import { usePeople, type Person } from '@/features/people';
 import { SectionList, useCollapsed, useSections, type ItemDnd, type Section } from '@/features/sections';
 import { cn } from '@/lib/cn';
 import { formatDue } from '@/lib/dates';
+import { applyRealtimeEvent, useChannel } from '@/lib/realtime';
 import { BulkBar, type BulkPicker } from './BulkBar';
 import { ListToolbar } from './ListToolbar';
 import { isTemp, useProjectTasks, useTaskMutations, type Task, type TaskPatch } from './queries';
@@ -55,6 +57,8 @@ const plural = (n: number, one: string) => `${n} ${one}${n === 1 ? '' : 's'}`;
 /** The project list view: sections with their tasks; inline create/edit/complete, selection,
  * keyboard navigation, drag and drop (multi), and bulk actions. */
 export function ProjectTasksView({ projectId, canEdit }: { projectId: string; canEdit: boolean }) {
+  const qc = useQueryClient();
+  useChannel(`project:${projectId}`, (event) => applyRealtimeEvent(qc, event, { projectId }));
   const { view, setView: applyView, ready: viewReady } = useListView(projectId);
   const showCompleted = view.show_completed;
   const manual = isManualOrder(view);

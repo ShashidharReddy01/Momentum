@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import type { MomentumClient } from '@/lib/api/client';
 import { useApi } from '@/providers/api';
 import { isTypingTarget } from './keyboard';
+import { markMine } from './realtime/mine';
 import { toastError } from './toast';
 
 export interface UndoMeta {
@@ -40,6 +41,9 @@ export class UndoStack {
       onUndone,
     };
     this.entries = [...this.entries.filter((e) => e.key !== entry.key), entry].slice(-MAX_ENTRIES);
+    // this mutation's own realtime echo shouldn't trigger a redundant refetch — its onSuccess
+    // (which is what called us) already applied the change
+    markMine(meta?.activity_id);
     return entry;
   }
   remove(key: string) {

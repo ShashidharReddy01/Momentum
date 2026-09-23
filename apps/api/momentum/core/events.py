@@ -80,7 +80,10 @@ async def emit(
         return None
     payload = {
         "actor": {"id": str(ctx.actor.id) if ctx.actor.id else None, "kind": ctx.actor_kind},
-        "channels": channels or [],
+        # order-preserving de-dup: a caller building its channel list from more than one
+        # source (e.g. both the new and old parent of a moved subtask) can repeat one by
+        # accident, and a repeat would otherwise deliver the same event twice to one socket
+        "channels": list(dict.fromkeys(channels or [])),
         "data": data or {},
         "request_id": ctx.request_id,
     }
