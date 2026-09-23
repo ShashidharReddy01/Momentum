@@ -4,7 +4,7 @@
 
 ## Current focus
 - **Phase:** 0: Foundations. **Complete** except the items noted below
-- **Next slice:** S1.1.2 Projects
+- **Next slice:** S1.1.3 Project members and roles
 - **Model:** **Opus 5.5** for all of Phase 1 (and Phases 3, 5), per product owner decision; see `docs/process/model-guide.md`
 - **Blockers:** the GitHub repo `shashidharreddy01/momentum` must be created and connected so the code can be pushed
 
@@ -41,7 +41,7 @@
 - [x] S0.3.2 Layout shell + routing + command palette skeleton
 
 ### Phase 1: Core tasks MVP
-- [x] S1.1.1 Teams (+ undo registry, `POST /undo`, `GET /users`, PeoplePicker, InlineText, undo toasts) · [ ] S1.1.2 Projects · [ ] S1.1.3 Project members and roles
+- [x] S1.1.1 Teams (+ undo registry, `POST /undo`, `GET /users`, PeoplePicker, InlineText, undo toasts) · [x] S1.1.2 Projects (+ favorites, sections table, fractional ordering, breadcrumbs) · [ ] S1.1.3 Project members and roles
 - [ ] S1.2.1 Sections · [ ] S1.2.2 Tasks · [ ] S1.2.3 Assignee and dates · [ ] S1.2.4 DnD, multi-select, bulk · [ ] S1.2.5 Filter/sort/group · [ ] S1.2.6 List performance
 - [ ] S1.3.1 Pane · [ ] S1.3.2 Subtasks · [ ] S1.3.3 Followers
 - [ ] S1.4.1 Comments · [ ] S1.4.2 Activity feed · [ ] S1.4.3 Undo

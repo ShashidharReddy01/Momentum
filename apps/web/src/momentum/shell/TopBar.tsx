@@ -16,9 +16,11 @@ export function TopBar() {
   const setPaletteOpen = useUi((s) => s.setPaletteOpen);
   const askMoOpen = useUi((s) => s.askMoOpen);
   const setAskMoOpen = useUi((s) => s.setAskMoOpen);
-  const crumbs = useMatches()
+  const override = useUi((s) => s.crumbs);
+  const routeCrumbs = useMatches()
     .map((m) => (m.handle as RouteHandle | undefined)?.crumb)
     .filter((c): c is string => Boolean(c));
+  const crumbs = override ?? routeCrumbs;
 
   return (
     <header className="flex h-[var(--topbar-h)] shrink-0 items-center gap-3 border-b border-hair-soft bg-topbar px-3">

@@ -1,6 +1,10 @@
 import { useState, type ReactNode } from 'react';
 import {
+  ChevronDown,
+  ChevronRight,
   ChevronsUpDown,
+  Lock,
+  Star,
   FolderPlus,
   Home,
   Inbox,
@@ -26,6 +30,7 @@ import {
 import { Icon } from '@/components/ui/Icon';
 import { IconButton } from '@/components/ui/IconButton';
 import { useLogout, useMe } from '@/features/auth';
+import { NewProjectDialog, useFavorites, useProjects, type Project } from '@/features/projects';
 import { colorVar, NewTeamDialog, useTeams } from '@/features/teams';
 import { cn } from '@/lib/cn';
 import { useUi } from '@/stores/ui';
@@ -39,6 +44,7 @@ const NAV = [
 export function Sidebar() {
   const collapsed = useUi((s) => s.sidebarCollapsed);
   const [newTeam, setNewTeam] = useState(false);
+  const [newProject, setNewProject] = useState(false);
   return (
     <nav
       aria-label="Main"
@@ -52,7 +58,7 @@ export function Sidebar() {
         <span className="text-[15px] font-semibold tracking-tight">Momentum</span>
       </div>
       <div className="px-3 pb-2">
-        <CreateMenu onNewTeam={() => setNewTeam(true)} />
+        <CreateMenu onNewTeam={() => setNewTeam(true)} onNewProject={() => setNewProject(true)} />
       </div>
       <ul className="flex flex-col gap-0.5 px-2">
         {NAV.map((n) => (
@@ -70,14 +76,13 @@ export function Sidebar() {
           </NavItem>
         </li>
       </ul>
-      <SidebarSection title="Favorites">
-        <p className="px-4 text-xs text-sidebar-muted">Star a project to pin it here.</p>
-      </SidebarSection>
+      <FavoritesSection />
       <TeamsSection onNewTeam={() => setNewTeam(true)} />
       <div className="mt-auto border-t border-sidebar-line p-2">
         <UserMenu />
       </div>
       <NewTeamDialog open={newTeam} onOpenChange={setNewTeam} />
+      <NewProjectDialog open={newProject} onOpenChange={setNewProject} />
     </nav>
   );
 }
@@ -121,6 +126,9 @@ function SidebarSection({
 
 function TeamsSection({ onNewTeam }: { onNewTeam: () => void }) {
   const teams = useTeams();
+  const projects = useProjects();
+  const byTeam = new Map<string, Project[]>();
+  for (const p of projects.data ?? []) byTeam.set(p.team_id, [...(byTeam.get(p.team_id) ?? []), p]);
   return (
     <SidebarSection
       title="Teams"
@@ -141,16 +149,13 @@ function TeamsSection({ onNewTeam }: { onNewTeam: () => void }) {
       ) : (
         <ul className="flex flex-col gap-0.5 px-2">
           {teams.data?.map((t) => (
-            <li key={t.id}>
-              <NavItem to={`/teams/${t.id}`}>
-                <span
-                  aria-hidden
-                  className="h-2.5 w-2.5 shrink-0 rounded-full"
-                  style={{ background: colorVar(t.color) }}
-                />
-                <span className="truncate">{t.name}</span>
-              </NavItem>
-            </li>
+            <TeamTree
+              key={t.id}
+              teamId={t.id}
+              name={t.name}
+              color={t.color}
+              projects={byTeam.get(t.id) ?? []}
+            />
           ))}
         </ul>
       )}
@@ -158,7 +163,7 @@ function TeamsSection({ onNewTeam }: { onNewTeam: () => void }) {
   );
 }
 
-function CreateMenu({ onNewTeam }: { onNewTeam: () => void }) {
+function CreateMenu({ onNewTeam, onNewProject }: { onNewTeam: () => void; onNewProject: () => void }) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -170,7 +175,7 @@ function CreateMenu({ onNewTeam }: { onNewTeam: () => void }) {
         <DropdownMenuItem disabled hint="Phase 1" shortcut="q">
           <Icon icon={ListChecks} /> Task
         </DropdownMenuItem>
-        <DropdownMenuItem disabled hint="Next slice">
+        <DropdownMenuItem onSelect={onNewProject}>
           <Icon icon={FolderPlus} /> Project
         </DropdownMenuItem>
         <DropdownMenuItem onSelect={onNewTeam}>
@@ -215,5 +220,88 @@ function UserMenu() {
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
+  );
+}
+
+function ProjectLink({ p }: { p: Project }) {
+  return (
+    <NavItem to={`/projects/${p.id}`}>
+      <span
+        aria-hidden
+        className="h-2.5 w-2.5 shrink-0 rounded-[3px]"
+        style={{ background: colorVar(p.color) }}
+      />
+      <span className="truncate">{p.name}</span>
+      {p.privacy === 'private' ? <Icon icon={Lock} size={12} className="ml-auto text-sidebar-muted" /> : null}
+    </NavItem>
+  );
+}
+
+function TeamTree({
+  teamId,
+  name,
+  color,
+  projects,
+}: {
+  teamId: string;
+  name: string;
+  color: string | null | undefined;
+  projects: Project[];
+}) {
+  const [open, setOpen] = useState(true);
+  return (
+    <li>
+      <div className="group flex items-center">
+        <button
+          type="button"
+          aria-label={open ? `Collapse ${name}` : `Expand ${name}`}
+          aria-expanded={open}
+          onClick={() => setOpen(!open)}
+          className="grid h-8 w-5 shrink-0 place-items-center rounded text-sidebar-muted hover:text-sidebar-ink"
+        >
+          <Icon icon={open ? ChevronDown : ChevronRight} size={13} />
+        </button>
+        <div className="min-w-0 flex-1">
+          <NavItem to={`/teams/${teamId}`}>
+            <span
+              aria-hidden
+              className="h-2.5 w-2.5 shrink-0 rounded-full"
+              style={{ background: colorVar(color) }}
+            />
+            <span className="truncate">{name}</span>
+          </NavItem>
+        </div>
+      </div>
+      {open && projects.length > 0 ? (
+        <ul className="ml-5 flex flex-col gap-0.5">
+          {projects.map((p) => (
+            <li key={p.id}>
+              <ProjectLink p={p} />
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </li>
+  );
+}
+
+function FavoritesSection() {
+  const favorites = useFavorites();
+  return (
+    <SidebarSection title="Favorites">
+      {(favorites.data ?? []).length === 0 ? (
+        <p className="flex items-center gap-2 px-4 text-xs text-sidebar-muted">
+          <Icon icon={Star} size={13} /> Star a project to pin it here.
+        </p>
+      ) : (
+        <ul className="flex flex-col gap-0.5 px-2">
+          {favorites.data?.map((p) => (
+            <li key={p.id}>
+              <ProjectLink p={p} />
+            </li>
+          ))}
+        </ul>
+      )}
+    </SidebarSection>
   );
 }

@@ -1,5 +1,17 @@
-import { Crown, LogOut, MoreHorizontal, Trash2, UserMinus, UserPlus, Users } from 'lucide-react';
-import { useParams, useNavigate } from 'react-router';
+import {
+  Archive,
+  Crown,
+  FolderPlus,
+  Lock,
+  LogOut,
+  MoreHorizontal,
+  Trash2,
+  UserMinus,
+  UserPlus,
+  Users,
+} from 'lucide-react';
+import { useState } from 'react';
+import { Link, useParams, useNavigate } from 'react-router';
 import { InlineText } from '@/components/common/InlineText';
 import { EmptyState, ErrorState } from '@/components/common/States';
 import { Avatar } from '@/components/ui/Avatar';
@@ -16,6 +28,8 @@ import { IconButton } from '@/components/ui/IconButton';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useMe } from '@/features/auth';
 import { PeoplePicker } from '@/features/people';
+import { NewProjectDialog, useProjects } from '@/features/projects';
+import { useCrumbs } from '@/lib/crumbs';
 import { colorVar } from './ColorPicker';
 import { useDeleteTeam, useTeam, useTeamMembers, useUpdateTeam } from './queries';
 
@@ -27,6 +41,11 @@ export function TeamPage() {
   const del = useDeleteTeam(teamId);
   const members = useTeamMembers(teamId);
   const navigate = useNavigate();
+  const [newProject, setNewProject] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
+  const projects = useProjects({ teamId });
+  const archived = useProjects({ teamId, archived: true });
+  useCrumbs(team.data ? ['Teams', team.data.name] : null);
 
   if (team.isPending) {
     return (
@@ -160,13 +179,76 @@ export function TeamPage() {
       </section>
 
       <section className="mt-8">
-        <h2 className="text-[15px] font-semibold">Projects</h2>
-        <div className="mt-3 rounded-lg border border-dashed border-hairline">
-          <EmptyState icon={Users} title="No projects yet">
-            Projects arrive in the next slice.
-          </EmptyState>
+        <div className="flex items-center justify-between">
+          <h2 className="text-[15px] font-semibold">
+            Projects <span className="font-normal text-muted">{projects.data?.length ?? ''}</span>
+          </h2>
+          {t.my_role || me.data?.user.role === 'admin' ? (
+            <Button size="sm" onClick={() => setNewProject(true)}>
+              <Icon icon={FolderPlus} /> New project
+            </Button>
+          ) : null}
         </div>
+        {(projects.data ?? []).length === 0 ? (
+          <div className="mt-3 rounded-lg border border-dashed border-hairline">
+            <EmptyState icon={Users} title="No projects yet">
+              Create the first project for this team.
+            </EmptyState>
+          </div>
+        ) : (
+          <ul className="mt-3 divide-y divide-hair-soft rounded-lg border border-hairline bg-surface">
+            {projects.data?.map((p) => (
+              <li key={p.id}>
+                <Link
+                  to={`/projects/${p.id}`}
+                  className="flex items-center gap-3 px-3 py-2.5 hover:bg-surface-2"
+                >
+                  <span
+                    aria-hidden
+                    className="h-3 w-3 rounded-[4px]"
+                    style={{ background: colorVar(p.color) }}
+                  />
+                  <span className="flex-1 text-sm font-medium">{p.name}</span>
+                  {p.privacy === 'private' ? <Icon icon={Lock} size={13} className="text-muted" /> : null}
+                  <span className="text-xs capitalize text-muted">{p.my_role}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+        {(archived.data ?? []).length > 0 ? (
+          <div className="mt-3">
+            <Button
+              size="sm"
+              variant="text"
+              onClick={() => setShowArchived(!showArchived)}
+              aria-expanded={showArchived}
+            >
+              <Icon icon={Archive} /> Archived ({archived.data?.length})
+            </Button>
+            {showArchived ? (
+              <ul className="mt-2 divide-y divide-hair-soft rounded-lg border border-hairline bg-surface">
+                {archived.data?.map((p) => (
+                  <li key={p.id}>
+                    <Link
+                      to={`/projects/${p.id}`}
+                      className="flex items-center gap-3 px-3 py-2 text-sm text-muted hover:bg-surface-2"
+                    >
+                      <span
+                        aria-hidden
+                        className="h-3 w-3 rounded-[4px] opacity-60"
+                        style={{ background: colorVar(p.color) }}
+                      />
+                      {p.name}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </div>
+        ) : null}
       </section>
+      <NewProjectDialog open={newProject} onOpenChange={setNewProject} teamId={teamId} />
     </div>
   );
 }

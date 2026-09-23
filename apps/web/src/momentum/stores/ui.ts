@@ -10,6 +10,9 @@ export interface UiState {
   askMoOpen: boolean;
   paletteOpen: boolean;
   shortcutsOpen: boolean;
+  /** Breadcrumb override set by pages that know entity names (cleared on unmount). */
+  crumbs: string[] | null;
+  setCrumbs: (c: string[] | null) => void;
   setTheme: (t: Theme) => void;
   toggleTheme: () => void;
   toggleSidebar: () => void;
@@ -52,6 +55,8 @@ export function createUiStore(storageKey = 'momentum.ui'): StoreApi<UiState> {
         askMoOpen: false,
         paletteOpen: false,
         shortcutsOpen: false,
+        crumbs: null,
+        setCrumbs: (crumbs) => set({ crumbs }),
         setTheme: (theme) => set({ theme }),
         toggleTheme: () => set({ theme: get().theme === 'dark' ? 'light' : 'dark' }),
         toggleSidebar: () => set({ sidebarCollapsed: !get().sidebarCollapsed }),

@@ -3,6 +3,7 @@ import type { RouteObject } from 'react-router';
 import { AuthGate, DevLoginPage } from '@/features/auth';
 import { HomePage } from '@/features/home';
 import { NotFoundPage, Placeholder } from '@/features/placeholders';
+import { ProjectPage } from '@/features/projects';
 import { TeamPage } from '@/features/teams';
 import type { RuntimeConfig } from '@/lib/config';
 import { Layout } from '@/shell/Layout';
@@ -32,6 +33,7 @@ export function buildRoutes(config: RuntimeConfig): RouteObject[] {
           handle: { crumb: 'My Tasks' },
         },
         { path: 'teams/:teamId', element: <TeamPage />, handle: { crumb: 'Team' } },
+        { path: 'projects/:projectId/:view?', element: <ProjectPage />, handle: { crumb: 'Project' } },
         {
           path: 'inbox',
           element: <Placeholder icon={Inbox} title="Inbox" phase={2} />,

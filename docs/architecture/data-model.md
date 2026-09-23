@@ -90,7 +90,7 @@ team_id, user_id, role check in (`lead`,`member`), pk (team_id, user_id).
 project_id, user_id, role check in (`admin`,`editor`,`commenter`,`viewer`), pk (project_id, user_id).
 
 ### `favorites`
-user_id, entity_type (`project`,`portfolio`,`goal`,`dashboard`), entity_id, position. pk (user_id, entity_type, entity_id).
+user_id, entity_type (`project`,`portfolio`,`goal`,`dashboard`), entity_id, position (fractional key, `COLLATE "C"`), created_at. pk (user_id, entity_type, entity_id). Index (user_id, position).
 
 ### `sections`
 id, workspace_id, project_id, name, position, version, timestamps, deleted_at. Index (project_id, position).

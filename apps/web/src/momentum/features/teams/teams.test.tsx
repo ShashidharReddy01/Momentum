@@ -4,6 +4,7 @@ import { setupServer } from 'msw/node';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { MomentumApp } from '@/MomentumApp';
 import { authHandlers } from '@/mocks/handlers';
+import { projectHandlers } from '@/mocks/projects';
 import { teamHandlers } from '@/mocks/teams';
 
 const server = setupServer();
@@ -16,7 +17,7 @@ afterAll(() => server.close());
 
 describe('Teams', () => {
   it('creates a team from the sidebar, opens its page, renames it and adds a member', async () => {
-    server.use(...authHandlers({ loggedIn: true }).handlers, ...teamHandlers());
+    server.use(...authHandlers({ loggedIn: true }).handlers, ...teamHandlers(), ...projectHandlers());
     window.history.replaceState(null, '', '/');
     render(<MomentumApp />);
     const user = userEvent.setup();
