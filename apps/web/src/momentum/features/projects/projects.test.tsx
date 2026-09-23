@@ -5,6 +5,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { MomentumApp } from '@/MomentumApp';
 import { authHandlers } from '@/mocks/handlers';
 import { projectHandlers } from '@/mocks/projects';
+import { sectionHandlers } from '@/mocks/sections';
 import { teamHandlers } from '@/mocks/teams';
 
 const server = setupServer();
@@ -21,6 +22,7 @@ describe('Projects', () => {
       ...authHandlers({ loggedIn: true }).handlers,
       ...teamHandlers(),
       ...projectHandlers('', () => 'Design'),
+      ...sectionHandlers('', { 'project-1': ['To do'] }),
     );
     window.history.replaceState(null, '', '/');
     render(<MomentumApp />);
@@ -42,7 +44,7 @@ describe('Projects', () => {
 
     expect(await screen.findByRole('button', { name: /Project name: Pricing Page/ })).toBeInTheDocument();
     expect(window.location.pathname).toBe('/projects/project-1');
-    expect(screen.getByRole('heading', { name: 'To do' })).toBeInTheDocument();
+    expect(await screen.findByRole('region', { name: 'Section To do' })).toBeInTheDocument();
     expect(screen.getByLabelText('Private project')).toBeInTheDocument();
     // breadcrumb shows team › project
     const crumbs = screen.getByRole('navigation', { name: 'Breadcrumb' });

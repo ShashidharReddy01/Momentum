@@ -5,6 +5,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { MomentumApp } from '@/MomentumApp';
 import { authHandlers } from '@/mocks/handlers';
 import { projectHandlers } from '@/mocks/projects';
+import { sectionHandlers } from '@/mocks/sections';
 import { teamHandlers } from '@/mocks/teams';
 
 const server = setupServer();
@@ -20,6 +21,7 @@ function boot(path: string, seed: Parameters<typeof projectHandlers>[2]) {
     ...authHandlers({ loggedIn: true }).handlers,
     ...teamHandlers(),
     ...projectHandlers('', undefined, seed),
+    ...sectionHandlers('', { 'seed-1': ['To do'] }),
   );
   window.history.replaceState(null, '', path);
   render(<MomentumApp />);

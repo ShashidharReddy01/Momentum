@@ -21,6 +21,7 @@ import { cn } from '@/lib/cn';
 import { useCrumbs } from '@/lib/crumbs';
 import { useProject, useProjectLifecycle, useToggleFavorite, useUpdateProject } from './queries';
 import { ShareDialog } from './ShareDialog';
+import { SectionList } from '@/features/sections';
 
 const VIEWS = [
   { key: 'list', label: 'List' },
@@ -168,14 +169,13 @@ export function ProjectPage() {
         </div>
       ) : null}
       <div className="flex-1 overflow-auto px-8 py-5">
-        {p.sections.map((s) => (
-          <section key={s.id} className="mb-5">
-            <h2 className="text-[15px] font-semibold">{s.name}</h2>
-            <p className="mt-2 rounded-md border border-dashed border-hairline px-3 py-2 text-sm text-muted">
-              Tasks arrive in the next slices (S1.2.x).
-            </p>
-          </section>
-        ))}
+        {view === 'list' ? (
+          <SectionList
+            projectId={p.id}
+            canEdit={canEdit && !p.archived_at}
+            renderBody={() => <p className="py-1 text-sm text-muted-2">No tasks yet</p>}
+          />
+        ) : null}
       </div>
     </div>
   );

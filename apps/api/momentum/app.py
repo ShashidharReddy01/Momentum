@@ -33,6 +33,7 @@ def _api_router(settings: Settings) -> APIRouter:
     from momentum.api.undo import router as undo_router
     from momentum.domain.projects.router import favorites_router
     from momentum.domain.projects.router import router as projects_router
+    from momentum.domain.sections.router import router as sections_router
     from momentum.domain.teams.router import router as teams_router
     from momentum.domain.users.router import dev_router
     from momentum.domain.users.router import router as users_router
@@ -43,6 +44,7 @@ def _api_router(settings: Settings) -> APIRouter:
     api.include_router(teams_router)
     api.include_router(projects_router)
     api.include_router(favorites_router)
+    api.include_router(sections_router)
     api.include_router(undo_router)
     if settings.is_dev_auth:
         api.include_router(dev_router)

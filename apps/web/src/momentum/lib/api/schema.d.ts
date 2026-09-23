@@ -213,6 +213,24 @@ export interface paths {
         patch: operations["set_member_role_api_v1_projects__project_id__members__user_id__patch"];
         trace?: never;
     };
+    "/api/v1/projects/{project_id}/sections": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Sections of a project, in order */
+        get: operations["list_sections_api_v1_projects__project_id__sections_get"];
+        put?: never;
+        /** Add a section */
+        post: operations["create_section_api_v1_projects__project_id__sections_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/{project_id}/unarchive": {
         parameters: {
             query?: never;
@@ -224,6 +242,41 @@ export interface paths {
         put?: never;
         /** Unarchive */
         post: operations["unarchive_api_v1_projects__project_id__unarchive_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sections/{section_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete a section (tasks moved or deleted) */
+        delete: operations["delete_section_api_v1_sections__section_id__delete"];
+        options?: never;
+        head?: never;
+        /** Rename a section */
+        patch: operations["rename_section_api_v1_sections__section_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/sections/{section_id}/move": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Move a section before/after another */
+        post: operations["move_section_api_v1_sections__section_id__move_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -389,6 +442,13 @@ export interface components {
             /** @default {} */
             meta: components["schemas"]["ListMeta"];
         };
+        /** ListOut[SectionOut] */
+        ListOut_SectionOut_: {
+            /** Data */
+            data: components["schemas"]["SectionOut"][];
+            /** @default {} */
+            meta: components["schemas"]["ListMeta"];
+        };
         /** ListOut[TeamOut] */
         ListOut_TeamOut_: {
             /** Data */
@@ -435,6 +495,11 @@ export interface components {
         /** MutationOut[ProjectOut] */
         MutationOut_ProjectOut_: {
             data: components["schemas"]["ProjectOut"];
+            meta: components["schemas"]["MutationMeta"];
+        };
+        /** MutationOut[SectionOut] */
+        MutationOut_SectionOut_: {
+            data: components["schemas"]["SectionOut"];
             meta: components["schemas"]["MutationMeta"];
         };
         /** MutationOut[TeamDetailOut] */
@@ -595,6 +660,46 @@ export interface components {
             name: string;
             /** Position */
             position: string;
+        };
+        /** SectionCreateIn */
+        SectionCreateIn: {
+            /** After Id */
+            after_id?: string | null;
+            /** Before Id */
+            before_id?: string | null;
+            /** Name */
+            name: string;
+        };
+        /** SectionMoveIn */
+        SectionMoveIn: {
+            /** After Id */
+            after_id?: string | null;
+            /** Before Id */
+            before_id?: string | null;
+        };
+        /** SectionOut */
+        SectionOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Position */
+            position: string;
+            /**
+             * Project Id
+             * Format: uuid
+             */
+            project_id: string;
+            /** Version */
+            version: number;
+        };
+        /** SectionPatchIn */
+        SectionPatchIn: {
+            /** Name */
+            name: string;
         };
         /** TeamCreateIn */
         TeamCreateIn: {
@@ -1248,6 +1353,72 @@ export interface operations {
             };
         };
     };
+    list_sections_api_v1_projects__project_id__sections_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListOut_SectionOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_section_api_v1_projects__project_id__sections_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SectionCreateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationOut_SectionOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     unarchive_api_v1_projects__project_id__unarchive_post: {
         parameters: {
             query?: never;
@@ -1266,6 +1437,110 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MutationOut_ProjectOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_section_api_v1_sections__section_id__delete: {
+        parameters: {
+            query?: {
+                tasks?: "move_to" | "delete";
+                target_section_id?: string | null;
+            };
+            header?: never;
+            path: {
+                section_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationOut_OkOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    rename_section_api_v1_sections__section_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                section_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SectionPatchIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationOut_SectionOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    move_section_api_v1_sections__section_id__move_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                section_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SectionMoveIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationOut_SectionOut_"];
                 };
             };
             /** @description Validation Error */

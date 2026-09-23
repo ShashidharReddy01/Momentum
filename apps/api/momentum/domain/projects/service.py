@@ -99,7 +99,7 @@ async def project_sections(session: AsyncSession, project_id: uuid.UUID) -> list
     rows = await session.execute(
         select(Section)
         .where(Section.project_id == project_id, Section.deleted_at.is_(None))
-        .order_by(Section.position)
+        .order_by(Section.position, Section.id)
     )
     return list(rows.scalars())
 

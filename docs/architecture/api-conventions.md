@@ -22,6 +22,7 @@ POST   /api/v1/tasks/{id}/move            # {project_id, section_id, before_id?,
 POST   /api/v1/tasks/bulk                 # {ids, patch} or {ids, op}
 DELETE /api/v1/tasks/{id}                 # soft delete
 POST   /api/v1/undo                       # {activity_id} or {batch_id}
+POST   /api/v1/sections/{id}/move         # {after_id?, before_id?}: same neighbor contract for every ordered list
 ```
 
 - `PATCH` bodies are partial. Only fields present are changed. Send `null` explicitly to clear a field.
