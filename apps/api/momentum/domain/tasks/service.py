@@ -7,7 +7,7 @@ from datetime import UTC, date, datetime, timedelta
 from typing import Any, Literal
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import ColumnElement, func, or_, select, update
+from sqlalchemy import ColumnElement, delete, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from momentum.core.activity import Activity, Diff, jsonable_diff, record_activity
@@ -19,9 +19,11 @@ from momentum.core.ordering import even_keys, key_between, keys_between, needs_r
 from momentum.core.richtext import doc_hash, plain_text, preview, sanitize_doc
 from momentum.core.undo import UndoConflict, undo_handler, undo_op
 from momentum.domain.access import (
+    MAX_TASK_DEPTH,
     get_visible_project,
     get_visible_task,
     require_project_role,
+    task_ancestors,
 )
 from momentum.domain.sections.models import Section
 from momentum.domain.sections.service import list_sections, on_section_delete, on_section_restore
@@ -777,6 +779,252 @@ async def bulk(
     return Mutation(out, batch_id=batch_id)
 
 
+# ---------- subtasks ----------
+
+
+async def _children(
+    session: AsyncSession, parent_id: uuid.UUID, *, include_deleted: bool = False
+) -> list[Task]:
+    query = select(Task).where(Task.parent_id == parent_id)
+    if not include_deleted:
+        query = query.where(Task.deleted_at.is_(None))
+    rows = await session.execute(query.order_by(Task.parent_position, Task.id))
+    return list(rows.scalars())
+
+
+async def _child_keys(
+    session: AsyncSession,
+    parent_id: uuid.UUID,
+    n: int,
+    *,
+    after_id: uuid.UUID | None = None,
+    before_id: uuid.UUID | None = None,
+    exclude: set[uuid.UUID] | None = None,
+) -> list[str]:
+    """Order keys among a task's subtasks (same rules as sections; rebalances if keys get long)."""
+    skip = exclude or set()
+    for attempt in range(2):
+        items = [t for t in await _children(session, parent_id) if t.id not in skip]
+        ids = [t.id for t in items]
+        a: str | None
+        b: str | None
+        if after_id is not None:
+            if after_id not in ids:
+                raise NotFound("Neighbor subtask not found")
+            i = ids.index(after_id)
+            a, b = (
+                items[i].parent_position,
+                items[i + 1].parent_position if i + 1 < len(items) else None,
+            )
+        elif before_id is not None:
+            if before_id not in ids:
+                raise NotFound("Neighbor subtask not found")
+            i = ids.index(before_id)
+            a, b = items[i - 1].parent_position if i > 0 else None, items[i].parent_position
+        else:
+            a, b = (items[-1].parent_position if items else None), None
+        keys = [key_between(a, b)] if n == 1 else keys_between(a, b, n)
+        if attempt == 1 or not any(needs_rebalance(k) for k in keys):
+            return keys
+        everyone = await _children(session, parent_id, include_deleted=True)
+        for child, key in zip(everyone, even_keys(len(everyone)), strict=True):
+            child.parent_position = key
+        await session.flush()
+    raise AssertionError("unreachable")
+
+
+async def subtask_counts(
+    session: AsyncSession, task_ids: list[uuid.UUID]
+) -> dict[uuid.UUID, tuple[int, int]]:
+    """(total, completed) visible subtasks per task, in one query."""
+    if not task_ids:
+        return {}
+    rows = await session.execute(
+        select(Task.parent_id, func.count(), func.count(Task.completed_at))
+        .where(Task.parent_id.in_(task_ids), Task.deleted_at.is_(None))
+        .group_by(Task.parent_id)
+    )
+    return {pid: (int(total), int(done)) for pid, total, done in rows.all() if pid is not None}
+
+
+async def list_subtasks(session: AsyncSession, ctx: Ctx, parent_id: uuid.UUID) -> list[Task]:
+    await get_visible_task(session, ctx, parent_id)
+    return await _children(session, parent_id)
+
+
+async def create_subtask(
+    session: AsyncSession,
+    ctx: Ctx,
+    parent_id: uuid.UUID,
+    title: str,
+    *,
+    after_id: uuid.UUID | None = None,
+    before_id: uuid.UUID | None = None,
+    batch_id: uuid.UUID | None = None,
+) -> Mutation[Task]:
+    parent, placement, role = await get_visible_task(session, ctx, parent_id)
+    require_project_role(role, "editor", "add subtasks")
+    if len(await task_ancestors(session, parent)) + 1 >= MAX_TASK_DEPTH:
+        raise ValidationFailed(
+            f"Subtasks can be nested {MAX_TASK_DEPTH} levels deep", code="too_deep"
+        )
+    title = " ".join(title.split())
+    if not title:
+        raise ValidationFailed("Task name can't be empty")
+    (position,) = await _child_keys(session, parent.id, 1, after_id=after_id, before_id=before_id)
+    task = Task(
+        workspace_id=ctx.workspace_id,
+        number=await _next_number(session, ctx.workspace_id),
+        title=title,
+        parent_id=parent.id,
+        parent_position=position,
+        created_by=ctx.actor.id,
+        created_via=ctx.via,
+    )
+    session.add(task)
+    await session.flush()
+    await _follow(session, task.id, ctx.actor.id)
+    act = await record_activity(
+        session,
+        ctx,
+        entity_type="task",
+        entity_id=task.id,
+        verb="task.created",
+        changes={"title": (None, title), "parent_id": (None, parent.id)},
+        undo=undo_op("tasks.delete", task_id=task.id),
+        batch_id=batch_id,
+    )
+    await emit(
+        session,
+        ctx,
+        type="task.created",
+        entity_type="task",
+        entity_id=task.id,
+        data={"parent_id": str(parent.id), "position": position},
+        channels=[*channels(task, placement), f"task:{parent.id}"],
+        activity_id=act.id,
+    )
+    await session.flush()
+    return Mutation(task, act.id, batch_id=batch_id, version=task.version)
+
+
+async def move_subtask(
+    session: AsyncSession,
+    ctx: Ctx,
+    task_id: uuid.UUID,
+    *,
+    after_id: uuid.UUID | None = None,
+    before_id: uuid.UUID | None = None,
+) -> Mutation[Task]:
+    """Reorder a subtask among its siblings."""
+    task, placement, role = await get_visible_task(session, ctx, task_id)
+    require_project_role(role, "editor", "move this subtask")
+    if task.parent_id is None:
+        raise ValidationFailed("Not a subtask", code="not_a_subtask")
+    if task_id in (after_id, before_id):
+        raise ValidationFailed("A task can't be moved next to itself", code="invalid_anchor")
+    old = task.parent_position
+    (key,) = await _child_keys(
+        session, task.parent_id, 1, after_id=after_id, before_id=before_id, exclude={task.id}
+    )
+    task.parent_position = key
+    act = await record_activity(
+        session,
+        ctx,
+        entity_type="task",
+        entity_id=task.id,
+        verb="task.moved",
+        changes={"parent_position": (old, key)},
+        undo=undo_op(
+            "tasks.parent_back",
+            task_id=task.id,
+            parent_id=task.parent_id,
+            parent_position=old,
+            expect_parent_id=task.parent_id,
+            expect_position=key,
+            placement=None,
+        ),
+    )
+    await emit(
+        session,
+        ctx,
+        type="task.moved",
+        entity_type="task",
+        entity_id=task.id,
+        data={"parent_id": str(task.parent_id), "position": key},
+        channels=[*channels(task, placement), f"task:{task.parent_id}"],
+        activity_id=act.id,
+    )
+    return Mutation(task, act.id, version=task.version)
+
+
+async def outdent_subtask(
+    session: AsyncSession, ctx: Ctx, task_id: uuid.UUID
+) -> Mutation[tuple[Task, TaskProject | None]]:
+    """Move a subtask up one level: under its grandparent, or (for a direct subtask of a
+    top-level task) into the parent's section as a top-level task right after the parent."""
+    task, placement, role = await get_visible_task(session, ctx, task_id)
+    require_project_role(role, "editor", "move this subtask")
+    if task.parent_id is None:
+        raise ValidationFailed("Not a subtask", code="not_a_subtask")
+    parent = await session.get(Task, task.parent_id)
+    assert parent is not None
+    old_parent, old_position = task.parent_id, task.parent_position
+    new_placement: TaskProject | None = None
+    if parent.parent_id is not None:
+        (key,) = await _child_keys(session, parent.parent_id, 1, after_id=parent.id)
+        task.parent_id, task.parent_position = parent.parent_id, key
+        expect: dict[str, Any] = {"expect_parent_id": parent.parent_id, "expect_position": key}
+    else:
+        parent_pl = (
+            await session.execute(select(TaskProject).where(TaskProject.task_id == parent.id))
+        ).scalar_one_or_none()
+        if parent_pl is None:
+            raise ValidationFailed("The parent task isn't in a project", code="not_movable")
+        (key,) = await _keys_for(
+            session, parent_pl.project_id, parent_pl.section_id, 1, after_id=parent.id
+        )
+        task.parent_id, task.parent_position = None, None
+        new_placement = TaskProject(
+            task_id=task.id,
+            project_id=parent_pl.project_id,
+            section_id=parent_pl.section_id,
+            position=key,
+            added_by=ctx.actor.id,
+        )
+        session.add(new_placement)
+        expect = {"expect_parent_id": None, "expect_position": key}
+    task.version += 1
+    act = await record_activity(
+        session,
+        ctx,
+        entity_type="task",
+        entity_id=task.id,
+        verb="task.moved",
+        changes={"parent_id": (old_parent, task.parent_id)},
+        undo=undo_op(
+            "tasks.parent_back",
+            task_id=task.id,
+            parent_id=old_parent,
+            parent_position=old_position,
+            placement=str(new_placement.project_id) if new_placement else None,
+            **expect,
+        ),
+    )
+    await emit(
+        session,
+        ctx,
+        type="task.moved",
+        entity_type="task",
+        entity_id=task.id,
+        data={"parent_id": str(task.parent_id) if task.parent_id else None},
+        channels=[*channels(task, new_placement or placement), f"task:{old_parent}"],
+        activity_id=act.id,
+    )
+    await session.flush()
+    return Mutation((task, new_placement or placement), act.id, version=task.version)
+
+
 # ---------- section hooks ----------
 
 
@@ -870,6 +1118,40 @@ async def _undo_move(session: AsyncSession, ctx: Ctx, args: dict[str, Any]) -> N
         entity_id=task.id,
         data={"section_id": str(section.id), "position": placement.position},
         channels=channels(task, placement),
+    )
+
+
+@undo_handler("tasks.parent_back")
+async def _undo_parent_change(session: AsyncSession, ctx: Ctx, args: dict[str, Any]) -> None:
+    """Undo a subtask reorder or outdent (only if it hasn't moved again since)."""
+    task, _, role = await get_visible_task(session, ctx, _tid(args))
+    require_project_role(role, "editor", "move this subtask")
+    expect_parent = _as_uuid(args.get("expect_parent_id"))
+    if expect_parent is not None:
+        current_pos = task.parent_position
+    else:
+        own = (
+            await session.execute(select(TaskProject).where(TaskProject.task_id == task.id))
+        ).scalar_one_or_none()
+        current_pos = own.position if own else None
+    if task.parent_id != expect_parent or current_pos != args.get("expect_position"):
+        raise UndoConflict("This task was moved again since")
+    parent = await session.get(Task, _as_uuid(args["parent_id"]))
+    if parent is None or parent.deleted_at is not None:
+        raise UndoConflict("The original parent task no longer exists")
+    if args.get("placement"):
+        await session.execute(delete(TaskProject).where(TaskProject.task_id == task.id))
+        task.version += 1
+    task.parent_id = parent.id
+    task.parent_position = str(args["parent_position"])
+    await emit(
+        session,
+        ctx,
+        type="task.moved",
+        entity_type="task",
+        entity_id=task.id,
+        data={"parent_id": str(parent.id), "position": task.parent_position},
+        channels=[f"task:{task.id}", f"task:{parent.id}"],
     )
 
 

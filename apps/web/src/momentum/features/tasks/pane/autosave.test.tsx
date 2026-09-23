@@ -35,6 +35,8 @@ function task(description: unknown = null): TaskDetail {
     priority: null,
     version: 1,
     created_at: '2026-09-01T00:00:00Z',
+    subtask_count: 0,
+    completed_subtask_count: 0,
     description: description as TaskDetail['description'],
     description_hash: mockHash(description),
     project: null,

@@ -2,6 +2,7 @@ import type { JSONContent } from '@tiptap/react';
 import {
   CalendarDays,
   Check,
+  CornerLeftUp,
   CircleCheck,
   Copy,
   Maximize2,
@@ -36,6 +37,7 @@ import { formatDay, formatDue } from '@/lib/dates';
 import { AssigneePicker } from '../AssigneePicker';
 import { DatePicker } from '../DatePicker';
 import { useTaskDetail, useTaskDetailMutations, type TaskDetail } from '../detail';
+import { SubtaskList } from '../SubtaskList';
 import { useDescriptionAutosave, type SaveState } from './useDescriptionAutosave';
 
 const EDITABLE = 'input, textarea, [contenteditable="true"]';
@@ -50,12 +52,15 @@ export function TaskPane({
   mode = 'pane',
   onClose,
   onStep,
+  onOpenTask,
   canEditHint,
 }: {
   taskId: string;
   mode?: 'pane' | 'page';
   onClose?: () => void;
   onStep?: (dir: 1 | -1) => void;
+  /** Open another task in the same place (a subtask or the parent). */
+  onOpenTask?: (id: string) => void;
   /** Whether the viewer may edit (from the project they're looking at). */
   canEditHint?: boolean;
 }) {
@@ -119,6 +124,7 @@ export function TaskPane({
           task={detail.data}
           mode={mode}
           onClose={onClose}
+          onOpenTask={onOpenTask}
           canEdit={canEditHint ?? true}
         />
       )}
@@ -130,11 +136,13 @@ function PaneBody({
   task,
   mode,
   onClose,
+  onOpenTask,
   canEdit,
 }: {
   task: TaskDetail;
   mode: 'pane' | 'page';
   onClose?: () => void;
+  onOpenTask?: (id: string) => void;
   canEdit: boolean;
 }) {
   const m = useTaskDetailMutations(task.id);
@@ -210,6 +218,16 @@ function PaneBody({
       </div>
 
       <div className="min-h-0 flex-1 overflow-auto px-6 py-5">
+        {task.parent ? (
+          <button
+            type="button"
+            onClick={() => onOpenTask?.(task.parent!.id)}
+            className="mb-1 flex max-w-full items-center gap-1 truncate rounded px-2 text-xs text-muted hover:text-ink"
+          >
+            <Icon icon={CornerLeftUp} size={13} /> Subtask of{' '}
+            <span className="truncate font-medium">{task.parent.name}</span>
+          </button>
+        ) : null}
         <TitleField task={task} canEdit={canEdit} onSave={(title) => m.update.mutate({ patch: { title } })} />
 
         <dl className="mt-4 grid grid-cols-[112px_1fr] items-center gap-x-3 gap-y-1 text-sm">
@@ -318,6 +336,13 @@ function PaneBody({
         </dl>
 
         <Description task={task} canEdit={canEdit} />
+
+        <SubtaskList
+          key={task.id}
+          parentId={task.id}
+          canEdit={canEdit}
+          onOpen={onOpenTask ? (sub) => onOpenTask(sub.id) : undefined}
+        />
 
         <p className="mt-8 border-t border-hair-soft pt-3 text-xs text-muted">
           Created by {nameOf(task.created_by) ?? 'someone'} · {formatDay(task.created_at.slice(0, 10))}

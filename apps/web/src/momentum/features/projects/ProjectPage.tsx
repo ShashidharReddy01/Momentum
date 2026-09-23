@@ -186,7 +186,13 @@ function ProjectBody({ view, projectId, canEdit }: { view: string; projectId: st
         ) : null}
       </div>
       {nav.openId ? (
-        <TaskPane taskId={nav.openId} onClose={nav.close} onStep={nav.step} canEditHint={canEdit} />
+        <TaskPane
+          taskId={nav.openId}
+          onClose={nav.close}
+          onStep={nav.step}
+          onOpenTask={(id) => nav.open(id)}
+          canEditHint={canEdit}
+        />
       ) : null}
     </div>
   );

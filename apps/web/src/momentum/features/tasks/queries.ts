@@ -153,6 +153,8 @@ export function useTaskMutations(projectId: string) {
       priority: null,
       version: 1,
       created_at: new Date().toISOString(),
+      subtask_count: 0,
+      completed_subtask_count: 0,
     };
     qc.setQueryData<Task[]>(key, (old) => insertAfter(old ?? [], optimistic, v.afterId));
     const promise = (async () => {

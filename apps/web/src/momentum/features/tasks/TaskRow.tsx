@@ -52,6 +52,9 @@ export interface TaskRowProps {
   isOpen?: boolean;
   /** Open (or toggle) the details pane. */
   onOpen?: (task: Task) => void;
+  /** Subtasks shown inline under the row. */
+  expanded?: boolean;
+  onToggleExpand?: (task: Task) => void;
   onFocusRow?: (task: Task) => void;
   onUpdate: (task: Task, patch: TaskPatch, message?: string) => void;
   onToggle: (task: Task) => void;
@@ -120,6 +123,8 @@ const RowBody = memo(function RowBody({
   onFocusRow,
   isOpen = false,
   onOpen,
+  expanded = false,
+  onToggleExpand,
   onUpdate,
   onToggle,
   onRename,
@@ -339,6 +344,17 @@ const RowBody = memo(function RowBody({
             {task.title}
           </button>
         )}
+        {task.subtask_count ? (
+          <button
+            type="button"
+            aria-expanded={onToggleExpand ? expanded : undefined}
+            aria-label={`${task.completed_subtask_count} of ${task.subtask_count} subtasks done${onToggleExpand ? (expanded ? ', hide' : ', show') : ''}`}
+            onClick={() => (onToggleExpand ? onToggleExpand(task) : onOpen?.(task))}
+            className="tabular ml-2 flex h-6 shrink-0 items-center gap-0.5 rounded px-1 text-xs text-muted hover:bg-surface hover:text-ink"
+          >
+            ↳ {task.completed_subtask_count}/{task.subtask_count}
+          </button>
+        ) : null}
       </div>
       <span className="w-14 shrink-0 text-right font-mono text-[11px] text-muted-2 opacity-0 group-hover/row:opacity-100 @max-3xl:hidden">
         {isTemp(task.id) ? '…' : task.key}
@@ -430,12 +446,24 @@ export function DraftRow({
   onSubmit,
   onPasteLines,
   onCancel,
+  onTab,
+  onShiftTab,
+  placeholder = 'Write a task name',
+  initialValue = '',
 }: {
   onSubmit: (title: string) => void;
   onPasteLines: (lines: string[]) => void;
   onCancel: () => void;
+  /** Tab: make this new row a subtask of the task above (list). */
+  onTab?: (title: string) => void;
+  /** Shift+Tab: turn a new subtask row back into a task row. */
+  onShiftTab?: (title: string) => void;
+  placeholder?: string;
+  initialValue?: string;
 }) {
-  const [value, setValue] = useState('');
+  const [value, setValue] = useState(initialValue);
+  // Tab/Shift+Tab hand the row over to another list: don't treat the blur as "submit".
+  const handedOver = useRef(false);
   return (
     <div
       role="listitem"
@@ -445,13 +473,14 @@ export function DraftRow({
       <CompleteCheck checked={false} disabled label="New task" onChange={() => {}} />
       <input
         aria-label="New task name"
-        placeholder="Write a task name"
+        placeholder={placeholder}
         value={value}
         maxLength={500}
         // eslint-disable-next-line jsx-a11y/no-autofocus -- the user just asked for a new task row
         autoFocus
         onChange={(e) => setValue(e.target.value)}
         onBlur={() => {
+          if (handedOver.current) return;
           if (value.trim()) onSubmit(value.trim());
           onCancel();
         }}
@@ -473,6 +502,14 @@ export function DraftRow({
             if (!title) return onCancel();
             setValue('');
             onSubmit(title);
+          } else if (e.key === 'Tab' && !e.shiftKey && onTab) {
+            e.preventDefault();
+            handedOver.current = true;
+            onTab(value.trim());
+          } else if (e.key === 'Tab' && e.shiftKey && onShiftTab) {
+            e.preventDefault();
+            handedOver.current = true;
+            onShiftTab(value.trim());
           } else if (e.key === 'Escape') {
             e.preventDefault();
             onCancel();

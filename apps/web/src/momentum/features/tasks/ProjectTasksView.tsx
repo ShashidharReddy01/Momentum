@@ -34,7 +34,8 @@ import {
 import { DraftRow, TaskRow } from './TaskRow';
 import { useTaskNav } from './pane/nav';
 import { useListView } from './useListView';
-import { VirtualRows } from './VirtualRows';
+import { SubtaskList } from './SubtaskList';
+import { VIRTUALIZE_OVER, VirtualRows } from './VirtualRows';
 import {
   filterCount,
   groupTasks,
@@ -45,7 +46,7 @@ import {
   type ListView,
 } from './view';
 
-type Draft = { sectionId: string; afterId: string | null; key: number };
+type Draft = { sectionId: string; afterId: string | null; key: number; title?: string };
 type DropTarget = { sectionId: string; anchorId: string | null; placement: DropPlacement };
 const FADE_MS = 1500;
 const CONFIRM_PASTE_OVER = 5;
@@ -68,6 +69,21 @@ export function ProjectTasksView({ projectId, canEdit }: { projectId: string; ca
   const [drag, setDrag] = useState<{ ids: string[]; active: Task } | null>(null);
   const [dropTarget, setDropTarget] = useState<DropTarget | null>(null);
   const [bulkPicker, setBulkPicker] = useState<BulkPicker>(null);
+  // Subtasks shown inline under rows, and a pending "new subtask" row (Tab from a new task row).
+  const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set());
+  const [subDraft, setSubDraft] = useState<{ parentId: string; title: string; sectionId: string } | null>(
+    null,
+  );
+  const toggleExpand = useCallback(
+    (t: Task) =>
+      setExpanded((s) => {
+        const n = new Set(s);
+        if (n.has(t.id)) n.delete(t.id);
+        else n.add(t.id);
+        return n;
+      }),
+    [],
+  );
   const draftKey = useRef(0);
   const container = useRef<HTMLDivElement>(null);
   const meId = useMe().data?.user.id;
@@ -173,9 +189,9 @@ export function ProjectTasksView({ projectId, canEdit }: { projectId: string; ca
     el?.scrollIntoView?.({ block: 'nearest' });
   }, []);
 
-  const openDraft = useCallback((sectionId: string, afterId: string | null) => {
+  const openDraft = useCallback((sectionId: string, afterId: string | null, title?: string) => {
     draftKey.current += 1;
-    setDraft({ sectionId, afterId, key: draftKey.current });
+    setDraft({ sectionId, afterId, key: draftKey.current, title });
   }, []);
 
   const fade = useCallback((ids: string[]) => {
@@ -447,27 +463,49 @@ export function ProjectTasksView({ projectId, canEdit }: { projectId: string; ca
   }
   if (open.isError) return <ErrorState error={open.error} onRetry={() => void open.refetch()} />;
 
-  const renderRow = (t: Task) => (
-    <TaskRow
-      task={t}
-      canEdit={canEdit}
-      draggable={manual}
-      fading={fading.has(t.id)}
-      assignee={t.assignee_id ? peopleById.get(t.assignee_id) : undefined}
-      meId={meId}
-      selected={selection.selected.has(t.id)}
-      dragging={draggingIds.has(t.id)}
-      dropIndicator={dropTarget?.anchorId === t.id ? dropTarget.placement : null}
-      onSelectClick={onSelectClick}
-      onFocusRow={onFocusRow}
-      isOpen={openId === t.id}
-      onOpen={nav ? onOpen : undefined}
-      onUpdate={onUpdate}
-      onToggle={onToggle}
-      onRename={onRename}
-      onEnter={onEnter}
-      onDelete={onDelete}
-    />
+  const renderRow = (t: Task, canExpand = false) => (
+    <>
+      <TaskRow
+        task={t}
+        canEdit={canEdit}
+        draggable={manual}
+        fading={fading.has(t.id)}
+        assignee={t.assignee_id ? peopleById.get(t.assignee_id) : undefined}
+        meId={meId}
+        selected={selection.selected.has(t.id)}
+        dragging={draggingIds.has(t.id)}
+        dropIndicator={dropTarget?.anchorId === t.id ? dropTarget.placement : null}
+        onSelectClick={onSelectClick}
+        onFocusRow={onFocusRow}
+        isOpen={openId === t.id}
+        onOpen={nav ? onOpen : undefined}
+        expanded={canExpand && expanded.has(t.id)}
+        onToggleExpand={canExpand ? toggleExpand : undefined}
+        onUpdate={onUpdate}
+        onToggle={onToggle}
+        onRename={onRename}
+        onEnter={onEnter}
+        onDelete={onDelete}
+      />
+      {canExpand && expanded.has(t.id) ? (
+        <div className="border-b border-hair-soft pb-1 pl-9">
+          <SubtaskList
+            compact
+            parentId={t.id}
+            canEdit={canEdit}
+            onOpen={nav ? (sub) => nav.open(sub.id) : undefined}
+            startDraft={subDraft?.parentId === t.id}
+            initialDraft={subDraft?.parentId === t.id ? subDraft.title : undefined}
+            onDraftDone={() => setSubDraft((d) => (d?.parentId === t.id ? null : d))}
+            onOutdentDraft={(title) => {
+              // Shift+Tab: back to a top-level task row right after the parent
+              setSubDraft(null);
+              if (t.section_id) openDraft(t.section_id, t.id, title);
+            }}
+          />
+        </div>
+      ) : null}
+    </>
   );
 
   const renderBody = (section: Section) => {
@@ -492,6 +530,15 @@ export function ProjectTasksView({ projectId, canEdit }: { projectId: string; ca
           setDraft(null);
         }}
         onCancel={() => setDraft((d) => (d?.key === draftHere.key ? null : d))}
+        initialValue={draftHere.title}
+        onTab={(title) => {
+          // Tab: this new row becomes a subtask of the task above it
+          const parentId = draftHere.afterId;
+          if (!parentId || isTemp(parentId)) return;
+          setDraft(null);
+          setExpanded((s) => new Set(s).add(parentId));
+          setSubDraft({ parentId, title, sectionId: section.id });
+        }}
       />
     ) : null;
     const draftIndex = draftHere
@@ -507,7 +554,9 @@ export function ProjectTasksView({ projectId, canEdit }: { projectId: string; ca
         <VirtualRows
           items={items}
           getKey={(it) => (it.kind === 'draft' ? `draft-${draftHere?.key}` : it.task.id)}
-          render={(it) => (it.kind === 'draft' ? draftRow : renderRow(it.task))}
+          render={(it) =>
+            it.kind === 'draft' ? draftRow : renderRow(it.task, tasks.length <= VIRTUALIZE_OVER)
+          }
         />
         <SectionEnd
           sectionId={section.id}

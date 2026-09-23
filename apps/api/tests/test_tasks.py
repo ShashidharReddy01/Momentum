@@ -182,6 +182,13 @@ async def test_list_query_count(as_user: Clients) -> None:
     with count_queries(engine) as statements:
         r = await ravi.get(f"/api/v1/projects/{pid}/tasks")
     assert r.status_code == 200
-    # auth (identity, user, workspace) + project visibility + the single list query
+    # auth (identity, user, workspace) + project visibility + the list query + one query for
+    # subtask counts, independent of the number of tasks (no N+1)
     task_queries = [s for s in statements if "FROM tasks" in s]
-    assert len(task_queries) == 1, task_queries
+    assert len(task_queries) == 2, task_queries
+    await ravi.post(
+        f"/api/v1/projects/{pid}/tasks/batch", json={"titles": [f"x{i}" for i in range(20)]}
+    )
+    with count_queries(engine) as more:
+        await ravi.get(f"/api/v1/projects/{pid}/tasks")
+    assert len([s for s in more if "FROM tasks" in s]) == 2

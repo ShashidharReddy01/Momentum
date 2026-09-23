@@ -18,6 +18,8 @@ from momentum.domain.tasks.models import Task, TaskProject
 from momentum.domain.tasks.schemas import (
     NamedRef,
     ProjectRef,
+    SubtaskCreateIn,
+    SubtaskMoveIn,
     TaskBatchCreateIn,
     TaskBulkIn,
     TaskCreateIn,
@@ -30,7 +32,9 @@ from momentum.domain.tasks.schemas import (
 router = APIRouter(tags=["tasks"])
 
 
-def task_out(t: Task, p: TaskProject | None) -> TaskOut:
+def task_out(t: Task, p: TaskProject | None, counts: tuple[int, int] | None = None) -> TaskOut:
+    """API shape of a task. Subtasks have no section; their position is among siblings."""
+    sub = t.parent_id is not None
     return TaskOut(
         id=t.id,
         number=t.number,
@@ -38,8 +42,8 @@ def task_out(t: Task, p: TaskProject | None) -> TaskOut:
         title=t.title,
         type=t.type,
         project_id=p.project_id if p else None,
-        section_id=p.section_id if p else None,
-        position=p.position if p else None,
+        section_id=None if sub or not p else p.section_id,
+        position=t.parent_position if sub else (p.position if p else None),
         assignee_id=t.assignee_id,
         start_on=t.start_on,
         due_on=t.due_on,
@@ -49,6 +53,8 @@ def task_out(t: Task, p: TaskProject | None) -> TaskOut:
         priority=t.priority,
         version=t.version,
         created_at=t.created_at,
+        subtask_count=counts[0] if counts else 0,
+        completed_subtask_count=counts[1] if counts else 0,
     )
 
 
@@ -88,7 +94,8 @@ async def list_tasks(
             due=due,
             sort=sort,
         )
-        return ListOut(data=[task_out(t, p) for t, p in rows])
+        counts = await service.subtask_counts(s, [t.id for t, _ in rows])
+        return ListOut(data=[task_out(t, p, counts.get(t.id)) for t, p in rows])
 
 
 @router.post(
@@ -137,9 +144,12 @@ async def create_tasks(
 
 async def detail_out(s: AsyncSession, t: Task, p: TaskProject | None) -> TaskDetailOut:
     project = await s.get(Project, p.project_id) if p else None
-    section = await s.get(Section, p.section_id) if p else None
+    section = await s.get(Section, p.section_id) if p and t.parent_id is None else None
+    parent = await s.get(Task, t.parent_id) if t.parent_id else None
+    counts = (await service.subtask_counts(s, [t.id])).get(t.id)
     return TaskDetailOut(
-        **task_out(t, p).model_dump(),
+        **task_out(t, p, counts).model_dump(),
+        parent=NamedRef(id=parent.id, name=parent.title) if parent else None,
         description=t.description,
         description_hash=doc_hash(t.description),
         project=ProjectRef(id=project.id, name=project.name, color=project.color)
@@ -255,4 +265,67 @@ async def bulk_tasks(body: TaskBulkIn, ctx: CtxDep, uow: UowDep) -> MutationOut[
         return MutationOut(
             data=ListOut(data=[task_out(t, placements.get(t.id)) for t in m.entity]),
             meta=MutationMeta(batch_id=m.batch_id),
+        )
+
+
+@router.get("/tasks/{task_id}/subtasks", response_model=ListOut[TaskOut], summary="Subtasks")
+async def list_subtasks(task_id: uuid.UUID, ctx: CtxDep, uow: UowDep) -> ListOut[TaskOut]:
+    async with uow.transaction() as s:
+        children = await service.list_subtasks(s, ctx, task_id)
+        _, p, _ = await service.get_task(s, ctx, task_id)
+        counts = await service.subtask_counts(s, [c.id for c in children])
+        return ListOut(data=[task_out(c, p, counts.get(c.id)) for c in children])
+
+
+@router.post(
+    "/tasks/{task_id}/subtasks",
+    response_model=MutationOut[TaskOut],
+    status_code=status.HTTP_201_CREATED,
+    summary="Add a subtask",
+)
+async def create_subtask(
+    task_id: uuid.UUID, body: SubtaskCreateIn, ctx: CtxDep, uow: UowDep
+) -> MutationOut[TaskOut]:
+    async with uow.transaction() as s:
+        m = await service.create_subtask(
+            s, ctx, task_id, body.title, after_id=body.after_id, before_id=body.before_id
+        )
+        _, p, _ = await service.get_task(s, ctx, m.entity.id)
+        return MutationOut(
+            data=task_out(m.entity, p),
+            meta=MutationMeta(activity_id=m.activity_id, version=m.version),
+        )
+
+
+@router.post(
+    "/tasks/{task_id}/subtask-move",
+    response_model=MutationOut[TaskOut],
+    summary="Reorder a subtask among its siblings",
+)
+async def move_subtask(
+    task_id: uuid.UUID, body: SubtaskMoveIn, ctx: CtxDep, uow: UowDep
+) -> MutationOut[TaskOut]:
+    async with uow.transaction() as s:
+        m = await service.move_subtask(
+            s, ctx, task_id, after_id=body.after_id, before_id=body.before_id
+        )
+        _, p, _ = await service.get_task(s, ctx, task_id)
+        return MutationOut(
+            data=task_out(m.entity, p),
+            meta=MutationMeta(activity_id=m.activity_id, version=m.version),
+        )
+
+
+@router.post(
+    "/tasks/{task_id}/outdent",
+    response_model=MutationOut[TaskOut],
+    summary="Move a subtask up one level (to its grandparent, or into the parent's section)",
+)
+async def outdent_subtask(task_id: uuid.UUID, ctx: CtxDep, uow: UowDep) -> MutationOut[TaskOut]:
+    async with uow.transaction() as s:
+        m = await service.outdent_subtask(s, ctx, task_id)
+        t, _ = m.entity
+        _, p, _ = await service.get_task(s, ctx, task_id)
+        return MutationOut(
+            data=task_out(t, p), meta=MutationMeta(activity_id=m.activity_id, version=m.version)
         )

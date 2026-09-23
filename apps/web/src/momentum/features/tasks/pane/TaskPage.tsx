@@ -1,4 +1,4 @@
-import { useParams } from 'react-router';
+import { useNavigate, useParams } from 'react-router';
 import { useCrumbs } from '@/lib/crumbs';
 import { useTaskDetail } from '../detail';
 import { TaskPane } from './TaskPane';
@@ -7,10 +7,11 @@ import { TaskPane } from './TaskPane';
 export function TaskPage() {
   const { taskId = '' } = useParams();
   const task = useTaskDetail(taskId).data;
+  const navigate = useNavigate();
   useCrumbs(task ? [task.project?.name ?? 'Task', task.key] : null);
   return (
     <div className="h-full overflow-auto px-8 py-6">
-      <TaskPane taskId={taskId} mode="page" />
+      <TaskPane taskId={taskId} mode="page" onOpenTask={(id) => navigate(`/task/${id}`)} />
     </div>
   );
 }

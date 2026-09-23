@@ -14,8 +14,10 @@ type T = {
   due_on: string | null;
   due_at: string | null;
   completed_at: string | null;
-  parent_id: null;
+  parent_id: string | null;
   priority: null;
+  subtask_count?: number;
+  completed_subtask_count?: number;
   version: number;
   created_at: string;
   description?: unknown;
@@ -90,12 +92,25 @@ export function taskHandlers(
   };
 
   const prefs = new Map<string, unknown>();
+  const childrenOf = (id: string) =>
+    tasks.filter((t) => t.parent_id === id).sort((a, b) => (a.position < b.position ? -1 : 1));
+  const withCounts = (t: T): T => {
+    const kids = childrenOf(t.id);
+    return {
+      ...t,
+      subtask_count: kids.length,
+      completed_subtask_count: kids.filter((k) => k.completed_at).length,
+    };
+  };
   const detail = (t: T) => ({
     ...t,
     description: t.description ?? null,
     description_hash: mockHash(t.description),
     project: { id: t.project_id, name: 'Website Revamp', color: 'proj-6' },
-    section: { id: t.section_id, name: t.section_id === 'sec-1' ? 'Backlog' : 'Done' },
+    section: t.parent_id ? null : { id: t.section_id, name: t.section_id === 'sec-1' ? 'Backlog' : 'Done' },
+    parent: t.parent_id
+      ? { id: t.parent_id, name: tasks.find((x) => x.id === t.parent_id)?.title ?? '' }
+      : null,
     created_by: '01a0ccaf-8f68-77d2-a888-584ea1e80ea8',
     completed_by: null,
     updated_at: new Date().toISOString(),
@@ -120,8 +135,9 @@ export function taskHandlers(
     http.get(`*${base}/api/v1/projects/:pid/tasks`, ({ params, request }) => {
       const completed = new URL(request.url).searchParams.get('completed') === 'true';
       const data = tasks
-        .filter((t) => t.project_id === params.pid && !!t.completed_at === completed)
-        .sort((a, b) => (a.section_id + a.position < b.section_id + b.position ? -1 : 1));
+        .filter((t) => t.project_id === params.pid && !t.parent_id && !!t.completed_at === completed)
+        .sort((a, b) => (a.section_id + a.position < b.section_id + b.position ? -1 : 1))
+        .map(withCounts);
       return HttpResponse.json({ data, meta: { next_cursor: null } });
     }),
     http.post(`*${base}/api/v1/projects/:pid/tasks`, async ({ params, request }) => {
@@ -181,10 +197,33 @@ export function taskHandlers(
         }
       return HttpResponse.json({ data: { data: out, meta: {} }, meta: { ...meta, batch_id: 'batch-2' } });
     }),
+    http.get(`*${base}/api/v1/tasks/:id/subtasks`, ({ params }) =>
+      HttpResponse.json({ data: childrenOf(String(params.id)).map(withCounts), meta: { next_cursor: null } }),
+    ),
+    http.post(`*${base}/api/v1/tasks/:id/subtasks`, async ({ params, request }) => {
+      await delay(latency);
+      const b = (await request.json()) as { title: string; after_id?: string | null };
+      const parent = tasks.find((x) => x.id === params.id)!;
+      const siblings = childrenOf(parent.id);
+      const t = make(parent.project_id, '', b.title, '');
+      t.parent_id = parent.id;
+      const i = b.after_id ? siblings.findIndex((x) => x.id === b.after_id) + 1 : siblings.length;
+      [...siblings.slice(0, i), t, ...siblings.slice(i)].forEach((x, k) => (x.position = pos(k)));
+      tasks.push(t);
+      return HttpResponse.json({ data: withCounts(t), meta }, { status: 201 });
+    }),
+    http.post(`*${base}/api/v1/tasks/:id/outdent`, ({ params }) => {
+      const t = tasks.find((x) => x.id === params.id)!;
+      const parent = tasks.find((x) => x.id === t.parent_id)!;
+      t.parent_id = parent.parent_id;
+      t.section_id = parent.section_id;
+      place(t, parent.id);
+      return HttpResponse.json({ data: withCounts(t), meta });
+    }),
     http.get(`*${base}/api/v1/tasks/:id`, ({ params }) => {
       const t = tasks.find((x) => x.id === params.id);
       if (!t) return HttpResponse.json({ code: 'not_found', status: 404 }, { status: 404 });
-      return HttpResponse.json(detail(t));
+      return HttpResponse.json(withCounts(detail(t) as unknown as T));
     }),
     http.patch(`*${base}/api/v1/tasks/:id`, async ({ params, request }) => {
       await delay(latency);

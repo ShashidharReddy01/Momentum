@@ -406,6 +406,58 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/tasks/{task_id}/outdent": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Move a subtask up one level (to its grandparent, or into the parent's section) */
+        post: operations["outdent_subtask_api_v1_tasks__task_id__outdent_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tasks/{task_id}/subtask-move": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reorder a subtask among its siblings */
+        post: operations["move_subtask_api_v1_tasks__task_id__subtask_move_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tasks/{task_id}/subtasks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Subtasks */
+        get: operations["list_subtasks_api_v1_tasks__task_id__subtasks_get"];
+        put?: never;
+        /** Add a subtask */
+        post: operations["create_subtask_api_v1_tasks__task_id__subtasks_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tasks/{task_id}/uncomplete": {
         parameters: {
             query?: never;
@@ -916,6 +968,22 @@ export interface components {
             /** Name */
             name: string;
         };
+        /** SubtaskCreateIn */
+        SubtaskCreateIn: {
+            /** After Id */
+            after_id?: string | null;
+            /** Before Id */
+            before_id?: string | null;
+            /** Title */
+            title: string;
+        };
+        /** SubtaskMoveIn */
+        SubtaskMoveIn: {
+            /** After Id */
+            after_id?: string | null;
+            /** Before Id */
+            before_id?: string | null;
+        };
         /** TaskBatchCreateIn */
         TaskBatchCreateIn: {
             /** After Id */
@@ -970,6 +1038,11 @@ export interface components {
             /** Completed By */
             completed_by: string | null;
             /**
+             * Completed Subtask Count
+             * @default 0
+             */
+            completed_subtask_count: number;
+            /**
              * Created At
              * Format: date-time
              */
@@ -995,6 +1068,7 @@ export interface components {
             key: string;
             /** Number */
             number: number;
+            parent?: components["schemas"]["NamedRef"] | null;
             /** Parent Id */
             parent_id: string | null;
             /** Position */
@@ -1009,6 +1083,11 @@ export interface components {
             section_id: string | null;
             /** Start On */
             start_on: string | null;
+            /**
+             * Subtask Count
+             * @default 0
+             */
+            subtask_count: number;
             /** Title */
             title: string;
             /** Type */
@@ -1054,6 +1133,11 @@ export interface components {
             /** Completed At */
             completed_at: string | null;
             /**
+             * Completed Subtask Count
+             * @default 0
+             */
+            completed_subtask_count: number;
+            /**
              * Created At
              * Format: date-time
              */
@@ -1083,6 +1167,11 @@ export interface components {
             section_id: string | null;
             /** Start On */
             start_on: string | null;
+            /**
+             * Subtask Count
+             * @default 0
+             */
+            subtask_count: number;
             /** Title */
             title: string;
             /** Type */
@@ -2329,6 +2418,138 @@ export interface operations {
         responses: {
             /** @description Successful Response */
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationOut_TaskOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    outdent_subtask_api_v1_tasks__task_id__outdent_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationOut_TaskOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    move_subtask_api_v1_tasks__task_id__subtask_move_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SubtaskMoveIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationOut_TaskOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_subtasks_api_v1_tasks__task_id__subtasks_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListOut_TaskOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_subtask_api_v1_tasks__task_id__subtasks_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SubtaskCreateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
                 headers: {
                     [name: string]: unknown;
                 };

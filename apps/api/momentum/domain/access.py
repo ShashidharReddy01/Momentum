@@ -126,6 +126,23 @@ def require_project_role(role: str, needed: str, what: str = "do this") -> None:
 # ---------------- tasks ----------------
 
 
+MAX_TASK_DEPTH = 5
+
+
+async def task_ancestors(session: AsyncSession, task: Task) -> list[Task]:
+    """Parent, grandparent, … up to the top-level task (bounded; cycles are impossible by
+    construction but the walk is capped anyway)."""
+    chain: list[Task] = []
+    current = task
+    while current.parent_id is not None and len(chain) <= MAX_TASK_DEPTH + 1:
+        parent = await session.get(Task, current.parent_id)
+        if parent is None:
+            break
+        chain.append(parent)
+        current = parent
+    return chain
+
+
 async def get_visible_task(
     session: AsyncSession, ctx: Ctx, task_id: uuid.UUID, *, include_deleted: bool = False
 ) -> tuple[Task, TaskProject | None, str]:
@@ -133,6 +150,8 @@ async def get_visible_task(
 
     Visible through any visible project (role = project role); otherwise assignees get editor
     access and creators/followers get commenter access (auth-and-permissions.md §6).
+    Subtasks have no placement of their own: they are visible through their top-level task's
+    projects, and hidden when any ancestor is deleted.
     """
     task = await session.get(Task, task_id)
     if (
@@ -141,8 +160,12 @@ async def get_visible_task(
         or (task.deleted_at is not None and not include_deleted)
     ):
         raise NotFound("Task not found")
+    ancestors = await task_ancestors(session, task)
+    if any(a.deleted_at is not None for a in ancestors):
+        raise NotFound("Task not found")
+    root = ancestors[-1] if ancestors else task
     placements = (
-        (await session.execute(select(TaskProject).where(TaskProject.task_id == task.id)))
+        (await session.execute(select(TaskProject).where(TaskProject.task_id == root.id)))
         .scalars()
         .all()
     )
@@ -158,13 +181,18 @@ async def get_visible_task(
         return task, best[0], best[1]
     if ctx.actor.id is not None and task.assignee_id == ctx.actor.id:
         return task, best[0], "editor"
+    # personal access (follower/creator of the task, or assignee/follower of an ancestor)
+    chain_ids = [task.id, *(a.id for a in ancestors)]
     is_follower = (
         await session.execute(
             select(Follower.user_id).where(
-                Follower.task_id == task.id, Follower.user_id == ctx.actor.id
+                Follower.task_id.in_(chain_ids), Follower.user_id == ctx.actor.id
             )
         )
     ).first() is not None
-    if is_follower or (ctx.actor.id is not None and task.created_by == ctx.actor.id):
+    related = ctx.actor.id is not None and (
+        task.created_by == ctx.actor.id or any(a.assignee_id == ctx.actor.id for a in ancestors)
+    )
+    if is_follower or related:
         return task, best[0], "commenter"
     raise NotFound("Task not found")

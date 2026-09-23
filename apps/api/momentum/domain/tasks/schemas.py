@@ -27,6 +27,8 @@ class TaskOut(BaseModel):
     priority: str | None
     version: int
     created_at: datetime
+    subtask_count: int = 0
+    completed_subtask_count: int = 0
 
 
 class TaskCreateIn(BaseModel):
@@ -110,6 +112,7 @@ class ProjectRef(NamedRef):
 class TaskDetailOut(TaskOut):
     """A task with everything the task pane needs."""
 
+    parent: NamedRef | None = None
     description: dict[str, Any] | None
     description_hash: str
     project: ProjectRef | None
@@ -117,3 +120,16 @@ class TaskDetailOut(TaskOut):
     created_by: uuid.UUID | None
     completed_by: uuid.UUID | None
     updated_at: datetime
+
+
+class SubtaskCreateIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    title: str = Field(min_length=1, max_length=500)
+    after_id: uuid.UUID | None = None
+    before_id: uuid.UUID | None = None
+
+
+class SubtaskMoveIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    after_id: uuid.UUID | None = None
+    before_id: uuid.UUID | None = None
