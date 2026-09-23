@@ -10,7 +10,7 @@ The previous app (Care Cockpit) is a strong base for **design language and conve
 | React Router 6, flat route table under one `<Layout/>` | **Keep the pattern, upgrade to React Router 7** (library/data mode) | Nearly identical API; loaders/lazy routes; continued support |
 | `Layout` = Sidebar + TopBar + `<Outlet/>` + persistent AI slide-over | **Keep**: Sidebar + TopBar + Outlet + **Task pane** + **Ask Mo panel** | The proven shell becomes Asana's shell |
 | One ~1000-line global CSS organized by page | **Change**: tokens in CSS variables + Tailwind v4 utilities mapped to tokens (`@theme`) + small component CSS where needed | Page-organized global CSS doesn't scale to ~60 components and leaks into host apps when embedded |
-| `oklch()` custom-property palette (cream/paper/ink/hairline…) | **Keep the token approach, change the palette**: neutral surfaces (`canvas`, `surface`) + one blue accent, scoped to `.momentum-root` | Cream-paper editorial styling reads as generic AI design and tires the eyes in an all-day tool |
+| `oklch()` custom-property palette (cream/paper/ink/hairline…) | **Keep the cream palette for light mode ("Paper", ink accent)**; dark mode is **"Graphite"** (charcoal + lime). Tokens renamed semantically (`canvas`, `surface`, …), scoped to `.momentum-root` | Chosen on the real UI after comparing options (ADR-0005 amendment 2) |
 | "Color lives in text and thin bars, never filled pills" | **Keep** as a principle with named exceptions (project color chips, heat grids, workload) | Calm UI for a dense app |
 | **Amber = AI-authored content only** | **Keep, strictly** | Maps perfectly to "AI drafts, humans confirm" |
 | **Purple = mock data** (MockBadge) | **Keep, dev-only**. In production builds, mock UI is compiled out. | Honesty without silent fallbacks |
@@ -31,7 +31,7 @@ The previous app (Care Cockpit) is a strong base for **design language and conve
 | Two tab idioms (underline, segmented) | **Keep both** as named components: `Tabs` (views) and `Segmented` (sub-modes) | Each has a defined use |
 | `.reveal` staggered entrance animations, uppercase `.eyebrow` labels | **Drop.** Motion only for state changes; sentence-case `section-label` | Decorative motion and uppercase eyebrows are part of the generic-AI look |
 
-**Verdict (revised 2026-09-23):** keep Care Cockpit's *principles* (amber = AI only, purple = mock, honesty, hairlines over pills, tokens, shell + AI slide-over) and its layout ideas. **Replace its visual style** (cream paper, display serifs, italic AI voice, eyebrows, reveal animations) with a neutral, dense, single-accent work-tool style. The engineering layer is upgraded for an interactive, realtime, embeddable app.
+**Verdict (final, 2026-09-23):** keep Care Cockpit's principles and its cream palette as the light theme ("Paper"). Add a charcoal + lime dark theme ("Graphite"). Drop the decorative serifs, italic AI voice, uppercase eyebrows and reveal animations. The engineering layer is upgraded for an interactive, realtime, embeddable app.
 
 ## 2. Stack
 

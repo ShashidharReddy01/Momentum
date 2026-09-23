@@ -3,18 +3,14 @@ import { createStore, useStore, type StoreApi } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
 export type Theme = 'light' | 'dark';
-export const PALETTES = ['petrol', 'aubergine', 'indigo', 'forest', 'graphite'] as const;
-export type Palette = (typeof PALETTES)[number];
 
 export interface UiState {
   theme: Theme;
-  palette: Palette;
   sidebarCollapsed: boolean;
   askMoOpen: boolean;
   paletteOpen: boolean;
   shortcutsOpen: boolean;
   setTheme: (t: Theme) => void;
-  setPalette: (p: Palette) => void;
   toggleTheme: () => void;
   toggleSidebar: () => void;
   setAskMoOpen: (open: boolean) => void;
@@ -52,13 +48,11 @@ export function createUiStore(storageKey = 'momentum.ui'): StoreApi<UiState> {
     persist(
       (set, get) => ({
         theme: prefersDark() ? 'dark' : 'light',
-        palette: 'petrol',
         sidebarCollapsed: false,
         askMoOpen: false,
         paletteOpen: false,
         shortcutsOpen: false,
         setTheme: (theme) => set({ theme }),
-        setPalette: (palette) => set({ palette }),
         toggleTheme: () => set({ theme: get().theme === 'dark' ? 'light' : 'dark' }),
         toggleSidebar: () => set({ sidebarCollapsed: !get().sidebarCollapsed }),
         setAskMoOpen: (askMoOpen) => set({ askMoOpen }),
@@ -68,7 +62,7 @@ export function createUiStore(storageKey = 'momentum.ui'): StoreApi<UiState> {
       {
         name: storageKey,
         storage: createJSONStorage(safeLocalStorage),
-        partialize: (s) => ({ theme: s.theme, palette: s.palette, sidebarCollapsed: s.sidebarCollapsed }),
+        partialize: (s) => ({ theme: s.theme, sidebarCollapsed: s.sidebarCollapsed }),
       },
     ),
   );

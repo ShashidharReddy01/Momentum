@@ -55,6 +55,7 @@ Tracked in their phase files; copy the slice list here at each phase kickoff.
 | 2026-09-23 | Base path handled by React Router `basename` (no custom link wrapper) | Simpler; tested |
 | 2026-09-23 | Added `docs/integrations/asana-import.md` and root `INTEGRATION_GUIDE.md` | Asana data migration spec; guide for plugging into another project |
 | 2026-09-23 | Visual style changed to neutral + one blue accent, Inter only; tokens renamed to `canvas`/`sidebar`/`surface`/`surface-2`/`accent` (ADR-0005 amendment) | The inherited editorial style read as generic AI design; cheap to fix before Phase 1 |
+| 2026-09-23 | Final themes: Light = Paper (cream + ink accent), Dark = Graphite (charcoal + lime); palette picker removed (ADR-0005 amendment 2) | Blue/white rejected by the product owner; chosen from five options shown on the real UI |
 
 ## Phase retros
 ### Phase 0 (2026-09-23)

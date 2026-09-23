@@ -71,17 +71,12 @@ export function MomentumProvider({ basePath = '', config: preset, children }: Mo
 
 function Root({ children }: { children: ReactNode }) {
   const theme = useUi((s) => s.theme);
-  const palette = useUi((s) => s.palette);
   const [el, setEl] = useState<HTMLDivElement | null>(null);
   return (
-    <div ref={setEl} className="momentum-root" data-momentum data-theme={theme} data-palette={palette}>
+    <div ref={setEl} className="momentum-root" data-momentum data-theme={theme}>
       <PortalContext.Provider value={el}>
         {children}
-        <Toaster
-          position="bottom-left"
-          theme={palette === 'graphite' ? 'dark' : theme}
-          toastOptions={{ className: 'momentum-toast' }}
-        />
+        <Toaster position="bottom-left" theme={theme} toastOptions={{ className: 'momentum-toast' }} />
       </PortalContext.Provider>
     </div>
   );

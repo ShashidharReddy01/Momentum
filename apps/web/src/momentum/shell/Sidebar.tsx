@@ -20,14 +20,13 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/DropdownMenu';
 import { Icon } from '@/components/ui/Icon';
 import { useLogout, useMe } from '@/features/auth';
 import { cn } from '@/lib/cn';
-import { PALETTES, useUi } from '@/stores/ui';
+import { useUi } from '@/stores/ui';
 
 const NAV = [
   { to: '/', label: 'Home', icon: Home, end: true },
@@ -134,8 +133,6 @@ function UserMenu() {
   const logout = useLogout();
   const theme = useUi((s) => s.theme);
   const toggleTheme = useUi((s) => s.toggleTheme);
-  const palette = useUi((s) => s.palette);
-  const setPalette = useUi((s) => s.setPalette);
   const user = me.data?.user;
   if (!user) return null;
   return (
@@ -156,20 +153,9 @@ function UserMenu() {
       </DropdownMenuTrigger>
       <DropdownMenuContent side="top" className="w-[var(--radix-dropdown-menu-trigger-width)]">
         <DropdownMenuItem onSelect={toggleTheme}>
-          <Icon icon={theme === 'dark' ? Sun : Moon} /> {theme === 'dark' ? 'Light theme' : 'Dark theme'}
+          <Icon icon={theme === 'dark' ? Sun : Moon} />{' '}
+          {theme === 'dark' ? 'Light theme (Paper)' : 'Dark theme (Graphite)'}
         </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuLabel>Color palette</DropdownMenuLabel>
-        {PALETTES.map((p) => (
-          <DropdownMenuItem
-            key={p}
-            onSelect={() => setPalette(p)}
-            hint={p === palette ? 'current' : undefined}
-          >
-            <span aria-hidden className="h-3 w-3 rounded-full" style={{ background: `var(--swatch-${p})` }} />
-            <span className="capitalize">{p}</span>
-          </DropdownMenuItem>
-        ))}
         <DropdownMenuSeparator />
         <DropdownMenuItem onSelect={() => logout.mutate()}>
           <Icon icon={LogOut} /> Sign out

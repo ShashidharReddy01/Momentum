@@ -1,11 +1,15 @@
 # Momentum Design System
 
-A calm, dense, neutral work tool with **one brand accent (blue)**, **amber reserved for AI**, and **purple for mock data**. The principles come from the Care Cockpit conventions. The visual style was deliberately changed away from its editorial look (cream paper, display serifs, italic "AI voice", uppercase eyebrows, entrance animations) because that combination reads as generic AI-generated design and doesn't suit an all-day productivity tool (see ADR-0005 amendment).
+Two themes, one system:
+- **Light = "Paper":** warm cream surfaces, ink text, and **ink as the brand accent** (solid ink primary buttons, ink brand mark).
+- **Dark = "Graphite":** charcoal surfaces with a **lime signal accent**.
+
+**Amber is reserved for AI** in both themes, and **purple marks dev-only mock data**. Typography is Inter throughout, with JetBrains Mono for keys and numbers. Theme choice: user menu → Light (Paper) / Dark (Graphite); the default follows the OS preference. See ADR-0005 amendments for how we got here.
 
 ## 1. Principles
 
 1. **Calm density.** Lots of information, little noise. Hairlines separate; whitespace groups; hierarchy comes from weight and size, not from decorative fonts.
-2. **One accent.** Blue is for primary actions, selection, focus, and links. Nothing else competes with it.
+2. **One accent per theme.** Ink (light) or lime (dark) for primary actions and the brand mark. Nothing else competes with it.
 3. **Color lives in text, dots, and thin bars, never filled pills.** Named exceptions: the primary button, project color chips, avatar fallbacks, board card color strips, heat grids (workload, dashboards).
 4. **Amber means AI.** Anything authored or proposed by Mo or an agent uses the amber treatment (dashed amber border + left amber bar + ✦ label). Nothing else may use amber.
 5. **Purple means mock.** Only dev/test mock data uses the purple token. It never appears in production.
@@ -15,21 +19,22 @@ A calm, dense, neutral work tool with **one brand accent (blue)**, **amber reser
 
 ## 2. Tokens (`styles/tokens.css`, scoped to `.momentum-root`)
 
-| Group | Tokens | Light (oklch) | Use |
-|---|---|---|---|
-| Surfaces | `--canvas`, `--sidebar`, `--surface`, `--surface-2` | 0.985 / 0.972 / 1.0 / 0.965 (cool neutral, hue 260) | App background, sidebar, cards/panes/rows, hover/inputs |
-| Lines | `--hairline`, `--hair-soft` | 0.905 / 0.94 | Borders, dividers |
-| Ink | `--ink`, `--ink-2`, `--muted`, `--muted-2` | 0.22 / 0.36 / 0.52 / 0.66 | Text hierarchy |
-| Accent | `--accent`, `--accent-hover`, `--accent-tint`, `--on-accent` | 0.53 0.17 258 (blue) | Primary buttons, selection, focus, links, brand mark |
-| AI | `--amber`, `--amber-hi`, `--amber-2`, `--amber-ink` | 0.78 0.14 75 … | **AI content only** |
-| Status | `--ok`, `--warn`, `--crit` (+ `-tint`), `--info` (= accent) | | Due/overdue text, status dots |
-| Mock | `--mock`, `--mock-tint` | 0.52 0.18 300 | **Dev only** |
-| Interaction | `--focus`, `--selection` | | Focus ring, selected rows |
-| Projects | `--proj-1` … `--proj-12` | 12 hues at matched lightness | Project chips, avatars |
-| Shape | `--r-sm 4`, `--r-md 6`, `--r-lg 8`, `--r-xl 12`; `--shadow-pop`, `--shadow-pane` | | |
-| Layout | `--sidebar-w 240`, `--topbar-h 48`, `--pane-w 560`, `--askmo-w 420`, `--row-h 36` | | |
+| Group | Tokens | Light · Paper (oklch) | Dark · Graphite (oklch) | Use |
+|---|---|---|---|---|
+| Surfaces | `--canvas`, `--sidebar`, `--surface`, `--surface-2` | 0.975 0.012 85 / 0.955 0.014 85 / 0.995 0.004 85 / 0.972 0.007 85 | 0.205 / 0.17 / 0.24 / 0.275 (hue 255, chroma ≈0.007) | App background, sidebar, cards/panes/rows, hover/inputs |
+| Lines | `--hairline`, `--hair-soft` | 0.88 / 0.93 | 0.32 / 0.28 | Borders, dividers |
+| Ink | `--ink`, `--ink-2`, `--muted`, `--muted-2` | 0.22 / 0.35 / 0.50 / 0.64 (warm) | 0.95 / 0.86 / 0.68 / 0.56 | Text hierarchy |
+| Sidebar | `--sidebar-ink`, `--sidebar-muted`, `--sidebar-hover`, `--sidebar-active`, `--sidebar-line` | from ink/surfaces | own values | Sidebar can diverge from content |
+| Accent | `--accent`, `--accent-hover`, `--accent-tint`, `--on-accent` | **ink** 0.22 0.015 60 on cream | **lime** 0.87 0.18 128 with dark text | Primary buttons, brand mark, focus (dark) |
+| AI | `--amber`, `--amber-hi`, `--amber-2`, `--amber-ink` | 0.78 0.14 75 … | 0.80 0.14 75 … | **AI content only** |
+| Status | `--ok`, `--warn`, `--crit`, `--info` (+ `-tint`) | | | Due/overdue text, status dots |
+| Mock | `--mock`, `--mock-tint` | 0.52 0.18 300 | 0.75 0.15 300 | **Dev only** |
+| Interaction | `--focus`, `--selection` | blue focus, soft blue selection | lime focus, lime-tinted selection | |
+| Projects | `--proj-1` … `--proj-12` | 12 hues at matched lightness | same | Project chips, avatars |
+| Shape | `--r-sm 4`, `--r-md 6`, `--r-lg 8`, `--r-xl 12`; `--shadow-pop`, `--shadow-pane` | | | |
+| Layout | `--sidebar-w 240`, `--topbar-h 48`, `--pane-w 560`, `--askmo-w 420`, `--row-h 36` | | | |
 
-Dark theme (`[data-theme="dark"]`) redefines the same tokens (neutral dark grays, lighter accent). Tailwind v4 `@theme inline` maps them to utilities (`bg-canvas`, `bg-surface`, `text-ink`, `text-muted`, `border-hairline`, `bg-accent`, `text-on-accent`, `text-amber-ink`, …). **Raw color literals in components are forbidden** (ESLint rule).
+Tailwind v4 `@theme inline` maps tokens to utilities (`bg-canvas`, `bg-surface`, `text-ink`, `text-muted`, `border-hairline`, `bg-accent`, `text-on-accent`, `bg-sidebar`, `text-sidebar-ink`, `text-amber-ink`, …). **Raw color literals in components are forbidden** (ESLint rule). Never hard-code "dark means lime" in components; always use `accent`.
 
 ## 3. Typography
 
@@ -52,7 +57,7 @@ Mo's text uses the same typography as everything else. Its identity comes from t
 
 | Component | Notes |
 |---|---|
-| `Button` | `primary` (solid accent), `ai` (amber, *only* for buttons that run an AI action), `ghost` (hairline border), `text`, `danger`. Sizes `sm`/`md`/`icon`. Loading state with spinner. |
+| `Button` | `primary` (solid accent: ink in light, lime in dark), `sidebar` (on the sidebar), `ai` (amber, *only* for buttons that run an AI action), `ghost` (hairline border), `text`, `danger`. Sizes `sm`/`md`/`icon`. Loading state with spinner. |
 | `IconButton` | Always has `aria-label` + tooltip with shortcut |
 | `Input`, `Textarea`, `NumberInput` | Paper-2 background, hairline border, focus ring |
 | `Select`, `Combobox` | Radix; searchable; used by pickers |
@@ -72,7 +77,7 @@ Mo's text uses the same typography as everything else. Its identity comes from t
 | `PreviewCard` | List of proposed changes (diff rows: entity, field, old → new), risk indicator, Apply / Edit / Cancel |
 | `MockBadge`, `MockOutline` | Purple, dev only |
 | `Ledger` / `StatStrip` | Hairline-separated numeric stats |
-| `BrandMark` | Momentum logo (accent square with M stroke) |
+| `BrandMark` | Momentum logo (accent square with M stroke: ink in light, lime in dark) |
 | `ScoreRing`, `ProgressBar` (thin), `Sparkline` | Bespoke SVG using tokens |
 | `CommandPalette` | cmdk |
 | `RichTextEditor` | Tiptap with mentions (`@person`, `#task`, `+project`), slash menu, paste-as-markdown |
