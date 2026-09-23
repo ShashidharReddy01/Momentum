@@ -3,10 +3,10 @@
 **Goal:** run a real project end to end in the list view with the task pane, comments, activity, undo, and My Tasks. Milestone **M1 "Dogfood"**.
 
 **Exit criteria**
-- [ ] E2E J1 and J3 pass; J2 passes except inbox delivery (Phase 2)
-- [ ] 2,000-task project scrolls smoothly; inline edits feel instant
-- [ ] Permission matrix tests cover teams/projects/tasks
-- [ ] Retro written in STATUS
+- [x] E2E J1 and J3 pass; J2 passes except inbox delivery (Phase 2)
+- [x] 2,000-task project scrolls smoothly; inline edits feel instant
+- [x] Permission matrix tests cover teams/projects/tasks
+- [x] Retro written in STATUS
 
 ---
 

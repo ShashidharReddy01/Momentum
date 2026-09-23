@@ -177,6 +177,7 @@ Design tokens in `apps/web/src/momentum/styles/tokens.css` (scoped). To match a 
 | V6 | Styles isolated | Host pages look identical with and without Momentum mounted |
 | V7 | Background jobs | Worker logs `worker_heartbeat` within 5 minutes |
 | V8 | Momentum test suite | `make check` (or the host CI equivalent) is green |
+| V9 | User journeys | `make e2e` (Playwright; needs Postgres and a database name ending in `_e2e`, see `tools/e2e/serve.sh`) |
 
 ---
 
@@ -185,3 +186,4 @@ Design tokens in `apps/web/src/momentum/styles/tokens.css` (scoped). To match a 
 | Date | Phase | Integration-relevant change |
 |---|---|---|
 | 2026-09-23 | 0 | Initial: `create_app`, `mount_momentum` + `momentum_lifespan`, `host` auth mode, schema-scoped migrations and job queue, embeddable `MomentumApp` with `basePath`, scoped styles |
+| 2026-09-23 | 1 | Migrations 0002-0006 in the `momentum` schema (teams, projects, sections, tasks, followers, comments, mentions, reactions, per-user My Tasks placements); all new API under `/api/v1` (`/home`, `/me/tasks`, `/me/prefs/views/*`, `/tasks/*`, `/comments/*`, `/mentions/search`, `/undo`). UI stores only per-device conveniences in `localStorage` under the `momentum.` prefix (drafts, collapsed sections, last quick-add project). Responsive shell: below 900px the sidebar is a drawer and panes go full-screen, so a host page embedding the UI should give it the full viewport width. E2E journeys runnable in the host via `make e2e` (V9). |

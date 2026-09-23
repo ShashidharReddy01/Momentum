@@ -3,8 +3,8 @@
 > Updated by the AI at the end of every slice and every session. The human confirms "done" after trying the slice.
 
 ## Current focus
-- **Phase:** 1: Core tasks MVP (in progress)
-- **Next slice:** Phase 1 exit (responsive shell, E2E journeys, retro)
+- **Phase:** 1: Core tasks MVP (**complete**, awaiting product-owner sign-off)
+- **Next slice:** Phase 2 kickoff (after sign-off on Phase 1)
 - **Model:** **Opus 5.5** for all of Phase 1 (and Phases 3, 5), per product owner decision; see `docs/process/model-guide.md`
 - **Blockers:** none
 
@@ -73,10 +73,24 @@ Tracked in their phase files; copy the slice list here at each phase kickoff.
 | 2026-09-23 | Ordering jitter suffix 2 → 3 chars | 2 chars collided too often under concurrent inserts (flaky test) |
 | 2026-09-23 | Final themes: Light = Paper (cream + ink accent), Dark = Graphite (charcoal + lime); palette picker removed (ADR-0005 amendment 2) | Blue/white rejected by the product owner; chosen from five options shown on the real UI |
 
-## Notes for S1.2.6 (performance)
-- List view renders all rows (no virtualization yet). S1.2.6 must virtualize and measure with the 2,000-task seed.
-
 ## Phase retros
+### Phase 1 (2026-09-23)
+**Exit criteria:** all met. E2E J1, J3 and J2 (up to inbox delivery, which is Phase 2) pass with `make e2e`, plus a quick-add journey; the 2,000-task list renders in 0.44s and scrolls at 60fps (`docs/engineering/performance.md`); `tests/test_permission_matrix.py` covers 7 kinds of user x 9 task actions, and teams/projects/sections have their own matrices; `make check`: 158 backend and 124 web tests.
+
+- **Went well:**
+  - Checking every slice in a real browser against the production build caught what unit tests with mocks couldn't: rapid-create ordering, phantom autosaves, a double-follow insert on self-assigned quick adds, a quick-add project default race, and unreadable list rows on phones.
+  - The generic undo registry with its coverage test kept "every mutation is undoable" true as features grew.
+  - Syncing on read (My Tasks placements) avoided a background job and its failure modes.
+- **Went less well:**
+  - Mocked UI tests passed while the real app was wrong (single-project fixtures hid the default-project bug). New rule: fixtures should have at least two of whatever the code chooses between.
+  - Two backend tests computed "today" in UTC instead of the user's timezone and failed late in the UTC day. Tests that depend on dates must use the actor's timezone.
+  - The full parallel web suite needed more time for async queries (`asyncUtilTimeout` 4s). Flakes are fixed at the root, never retried away.
+- **Watch in Phase 2:**
+  - The initial JS bundle is 222 KB gzipped (Phase 0: 178 KB). Split Tiptap and dnd-kit out of the entry chunk before Board and Calendar add more.
+  - Home and My Tasks resolve subtask ancestors one query per subtask. Fine at 10-15 users; batch it if profiles show it.
+  - Realtime (Phase 2) should replace the refetch-on-focus and invalidate-on-close paths (Home, the pane).
+- **Needs product-owner decision:** an assignee who isn't a project member can edit, move (between the project's sections) and delete that one task. All of these are undoable and documented in auth §6. Say if deleting should require project membership instead.
+
 ### Phase 0 (2026-09-23)
 - Went well: portability tests from day one; the Easy Auth simulator exercises the real parser locally.
 - Watch: bundle is 178 KB gz; keep the lazy-loading discipline in Phase 1 (editor, DnD).
