@@ -65,7 +65,7 @@ export const SHORTCUTS: { combo: Combo; label: string; phase?: number }[] = [
   { combo: 'mod+\\', label: 'Collapse sidebar' },
   { combo: '?', label: 'Keyboard shortcuts' },
   { combo: 'mod+z', label: 'Undo last action' },
-  { combo: 'q', label: 'Quick add task', phase: 3 },
+  { combo: 'q', label: 'Quick add task' },
   // list rows (focus a row first)
   { combo: 'j', label: 'Next task (or ↓)' },
   { combo: 'k', label: 'Previous task (or ↑)' },

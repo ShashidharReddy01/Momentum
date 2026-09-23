@@ -118,6 +118,9 @@ async def create_task(
             section_id=body.section_id,
             after_id=body.after_id,
             before_id=body.before_id,
+            assignee_id=body.assignee_id,
+            due_on=body.due_on,
+            due_at=body.due_at,
         )
         t, p = m.entity
         return MutationOut(

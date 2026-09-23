@@ -192,3 +192,46 @@ async def test_list_query_count(as_user: Clients) -> None:
     with count_queries(engine) as more:
         await ravi.get(f"/api/v1/projects/{pid}/tasks")
     assert len([s for s in more if "FROM tasks" in s]) == 2
+
+
+async def test_quick_add_creates_assigned_and_dated_in_one_undoable_step(as_user: Clients) -> None:
+    ravi, ana = await as_user("ravi"), await as_user("ana")
+    pid = await _project(ravi)
+    users = {
+        u["email"].split("@")[0]: u["id"] for u in (await ravi.get("/api/v1/users")).json()["data"]
+    }
+    r = await ravi.post(
+        f"/api/v1/projects/{pid}/tasks",
+        json={"title": "Quick one", "assignee_id": users["ana"], "due_on": "2031-03-04"},
+    )
+    assert r.status_code == 201, r.text
+    t = r.json()["data"]
+    assert t["assignee_id"] == users["ana"] and t["due_on"] == "2031-03-04"
+    detail = (await ravi.get(f"/api/v1/tasks/{t['id']}")).json()
+    assert set(detail["followers"]) >= {users["ana"], users["ravi"]}  # assignee follows
+    mine = (await ana.get("/api/v1/me/tasks")).json()["data"]
+    assert any(x["id"] == t["id"] for x in mine)
+    # one undo removes it entirely
+    u = await ravi.post("/api/v1/undo", json={"activity_id": r.json()["meta"]["activity_id"]})
+    assert u.status_code == 200
+    assert (await ravi.get(f"/api/v1/tasks/{t['id']}")).status_code == 404
+    # assigning yourself (the quick-add default) works too
+    mine_too = await ravi.post(
+        f"/api/v1/projects/{pid}/tasks", json={"title": "For me", "assignee_id": users["ravi"]}
+    )
+    assert mine_too.status_code == 201, mine_too.text
+    # a time: due_on follows the creator's timezone (Ravi: Asia/Kolkata, UTC+5:30)
+    timed = await ravi.post(
+        f"/api/v1/projects/{pid}/tasks",
+        json={"title": "Late call", "due_at": "2031-03-04T20:00:00Z"},
+    )
+    assert timed.status_code == 201, timed.text
+    assert timed.json()["data"]["due_on"] == "2031-03-05"
+    # bad assignee: nothing is created
+    before = len((await ravi.get(f"/api/v1/projects/{pid}/tasks")).json()["data"])
+    bad = await ravi.post(
+        f"/api/v1/projects/{pid}/tasks",
+        json={"title": "Nope", "assignee_id": "01a0ccaf-0000-7000-8000-000000000999"},
+    )
+    assert bad.status_code == 422 and bad.json()["code"] == "invalid_assignee"
+    assert len((await ravi.get(f"/api/v1/projects/{pid}/tasks")).json()["data"]) == before

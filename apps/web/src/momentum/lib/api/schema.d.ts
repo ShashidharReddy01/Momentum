@@ -1512,8 +1512,14 @@ export interface components {
         TaskCreateIn: {
             /** After Id */
             after_id?: string | null;
+            /** Assignee Id */
+            assignee_id?: string | null;
             /** Before Id */
             before_id?: string | null;
+            /** Due At */
+            due_at?: string | null;
+            /** Due On */
+            due_on?: string | null;
             /** Section Id */
             section_id?: string | null;
             /** Title */

@@ -37,6 +37,9 @@ class TaskCreateIn(BaseModel):
     section_id: uuid.UUID | None = None
     after_id: uuid.UUID | None = None
     before_id: uuid.UUID | None = None
+    assignee_id: uuid.UUID | None = None
+    due_on: date | None = None
+    due_at: datetime | None = None
 
 
 class TaskBatchCreateIn(BaseModel):

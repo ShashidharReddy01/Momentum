@@ -46,6 +46,7 @@ export function Sidebar() {
   const collapsed = useUi((s) => s.sidebarCollapsed);
   const drawerOpen = useUi((s) => s.drawerOpen);
   const setDrawerOpen = useUi((s) => s.setDrawerOpen);
+  const setQuickAddOpen = useUi((s) => s.setQuickAddOpen);
   const narrow = useNarrow();
   const location = useLocation();
   const [newTeam, setNewTeam] = useState(false);
@@ -87,7 +88,11 @@ export function Sidebar() {
           <span className="text-[15px] font-semibold tracking-tight">Momentum</span>
         </div>
         <div className="px-3 pb-2">
-          <CreateMenu onNewTeam={() => setNewTeam(true)} onNewProject={() => setNewProject(true)} />
+          <CreateMenu
+            onNewTask={() => setQuickAddOpen(true)}
+            onNewTeam={() => setNewTeam(true)}
+            onNewProject={() => setNewProject(true)}
+          />
         </div>
         <ul className="flex flex-col gap-0.5 px-2">
           {NAV.map((n) => (
@@ -193,7 +198,15 @@ function TeamsSection({ onNewTeam }: { onNewTeam: () => void }) {
   );
 }
 
-function CreateMenu({ onNewTeam, onNewProject }: { onNewTeam: () => void; onNewProject: () => void }) {
+function CreateMenu({
+  onNewTask,
+  onNewTeam,
+  onNewProject,
+}: {
+  onNewTask: () => void;
+  onNewTeam: () => void;
+  onNewProject: () => void;
+}) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -202,7 +215,7 @@ function CreateMenu({ onNewTeam, onNewProject }: { onNewTeam: () => void; onNewP
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent>
-        <DropdownMenuItem disabled hint="Phase 1" shortcut="q">
+        <DropdownMenuItem onSelect={onNewTask} shortcut="q">
           <Icon icon={ListChecks} /> Task
         </DropdownMenuItem>
         <DropdownMenuItem onSelect={onNewProject}>

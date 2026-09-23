@@ -7,3 +7,4 @@ export { TaskRow } from './TaskRow';
 export { dropNeighbors, emptySelection, step, type DropPlacement, type Selection } from './selection';
 export { dropTask, syncTask } from './detail';
 export type { TaskPatch } from './queries';
+export { QuickAddDialog } from './QuickAddDialog';

@@ -28,6 +28,9 @@ export const mockHash = (doc: unknown) =>
   doc ? `h${JSON.stringify(doc).length}-${JSON.stringify(doc).slice(-12)}` : '';
 
 /** In-memory tasks API with a small network delay (exercises optimistic UI and the create queue). */
+/** Bodies of task creates (tests assert on them). */
+export const lastCreated: Record<string, unknown>[] = [];
+
 /** Moves made through the My Tasks mock (tests assert on them). */
 export const myMoves: { id: string; bucket: string; after_id?: string; before_id?: string }[] = [];
 
@@ -211,9 +214,22 @@ export function taskHandlers(
     }),
     http.post(`*${base}/api/v1/projects/:pid/tasks`, async ({ params, request }) => {
       await delay(latency);
-      const b = (await request.json()) as { title: string; section_id: string; after_id?: string | null };
-      const t = make(String(params.pid), b.section_id, b.title, '');
+      const b = (await request.json()) as {
+        title: string;
+        section_id?: string;
+        after_id?: string | null;
+        assignee_id?: string | null;
+        due_on?: string | null;
+        due_at?: string | null;
+      };
+      // like the API: no section → the project's first one
+      const sid = b.section_id ?? tasks.find((x) => x.project_id === params.pid)?.section_id ?? 'sec-1';
+      const t = make(String(params.pid), sid, b.title, '');
+      t.assignee_id = b.assignee_id ?? null;
+      t.due_at = b.due_at ?? null;
+      t.due_on = b.due_on ?? (b.due_at ? b.due_at.slice(0, 10) : null);
       tasks.push(t);
+      lastCreated.push(b);
       place(t, b.after_id);
       return HttpResponse.json({ data: t, meta }, { status: 201 });
     }),

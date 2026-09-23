@@ -185,8 +185,10 @@ async def _require_assignable(session: AsyncSession, ctx: Ctx, user_id: uuid.UUI
 
 
 async def _follow(session: AsyncSession, task_id: uuid.UUID, user_id: uuid.UUID | None) -> None:
+    """Idempotent, also within one transaction (flushes so a second call sees the first)."""
     if user_id is not None and await session.get(Follower, (task_id, user_id)) is None:
         session.add(Follower(task_id=task_id, user_id=user_id))
+        await session.flush()
 
 
 # ---------- reads ----------
@@ -314,12 +316,18 @@ async def create_task(
     after_id: uuid.UUID | None = None,
     before_id: uuid.UUID | None = None,
     batch_id: uuid.UUID | None = None,
+    assignee_id: uuid.UUID | None = None,
+    due_on: date | None = None,
+    due_at: datetime | None = None,
 ) -> Mutation[tuple[Task, TaskProject]]:
+    """Create a task (optionally already assigned and dated: quick add is one change, one undo)."""
     _, role = await get_visible_project(session, ctx, project_id)
     require_project_role(role, "editor", "add tasks")
     title = " ".join(title.split())
     if not title:
         raise ValidationFailed("Task name can't be empty")
+    if assignee_id is not None:
+        await _require_assignable(session, ctx, assignee_id)
     section = await _section_for(session, project_id, section_id)
     (position,) = await _keys_for(
         session, project_id, section.id, 1, after_id=after_id, before_id=before_id
@@ -328,9 +336,18 @@ async def create_task(
         workspace_id=ctx.workspace_id,
         number=await _next_number(session, ctx.workspace_id),
         title=title,
+        assignee_id=assignee_id,
         created_by=ctx.actor.id,
         created_via=ctx.via,
     )
+    created: Diff = {"title": (None, title)}
+    if assignee_id is not None:
+        created["assignee_id"] = (None, assignee_id)
+    dates = {k: v for k, v in (("due_on", due_on), ("due_at", due_at)) if v is not None}
+    _apply_dates(task, dates, ctx, created)  # same rules as editing (due_at → local due_on)
+    for field in ("due_on", "due_at"):
+        if field in created:
+            setattr(task, field, created[field][1])
     session.add(task)
     await session.flush()
     placement = TaskProject(
@@ -342,13 +359,14 @@ async def create_task(
     )
     session.add(placement)
     await _follow(session, task.id, ctx.actor.id)
+    await _follow(session, task.id, assignee_id)
     act = await record_activity(
         session,
         ctx,
         entity_type="task",
         entity_id=task.id,
         verb="task.created",
-        changes={"title": (None, title)},
+        changes=created,
         undo=undo_op("tasks.delete", task_id=task.id),
         batch_id=batch_id,
     )
@@ -366,6 +384,17 @@ async def create_task(
         channels=channels(task, placement),
         activity_id=act.id,
     )
+    if assignee_id is not None:
+        await emit(
+            session,
+            ctx,
+            type="task.assigned",
+            entity_type="task",
+            entity_id=task.id,
+            data={"assignee_id": str(assignee_id), "previous_assignee_id": None},
+            channels=channels(task, placement),
+            activity_id=act.id,
+        )
     await session.flush()
     return Mutation((task, placement), act.id, batch_id=batch_id, version=task.version)
 

@@ -115,8 +115,10 @@ Consequences, by design (as in Asana): adding someone as a **collaborator** on a
 commenter access to that task (and its subtasks), even in a private project they're not a member
 of, but not to the project or its other tasks; leaving the task removes that access. Subtasks
 have no project placement of their own: their role comes from their top-level task, and they are
-hidden while any ancestor is deleted. (Implemented in `access.get_visible_task`; tests in
-`test_followers.py` and `test_subtasks.py`.)
+hidden while any ancestor is deleted. The **assignee** gets editor access to that one task
+(edit, complete, subtasks, move between its project's sections, delete; all undoable) without
+seeing the project. (Implemented in `access.get_visible_task`; the full role × action table is
+`tests/test_permission_matrix.py`, with more cases in `test_followers.py` and `test_subtasks.py`.)
 
 This is implemented once in `permissions.visible_tasks_clause(ctx)` (a SQL expression) and reused by lists, search, AI retrieval, notifications, and exports.
 

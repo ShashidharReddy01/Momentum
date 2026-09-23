@@ -1,4 +1,5 @@
 import { Outlet } from 'react-router';
+import { QuickAddDialog } from '@/features/tasks';
 import { useUndoShortcut } from '@/lib/undo';
 import { useHotkey } from '@/lib/keyboard';
 import { useUi } from '@/stores/ui';
@@ -16,6 +17,7 @@ export function Layout() {
   useHotkey('mod+j', () => ui.setAskMoOpen(!ui.askMoOpen));
   useHotkey('mod+\\', ui.toggleSidebar);
   useHotkey('?', () => ui.setShortcutsOpen(true));
+  useHotkey('q', () => ui.setQuickAddOpen(true));
 
   return (
     <div className="flex h-dvh overflow-hidden">
@@ -32,6 +34,7 @@ export function Layout() {
       </div>
       <CommandPalette />
       <ShortcutSheet />
+      <QuickAddDialog open={ui.quickAddOpen} onOpenChange={ui.setQuickAddOpen} />
     </div>
   );
 }

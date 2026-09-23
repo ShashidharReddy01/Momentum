@@ -9,6 +9,9 @@ export interface UiState {
   sidebarCollapsed: boolean;
   /** Sidebar drawer on narrow screens (not persisted). */
   drawerOpen: boolean;
+  /** Quick add task dialog (Create → Task, `Q`). */
+  quickAddOpen: boolean;
+  setQuickAddOpen: (open: boolean) => void;
   setDrawerOpen: (open: boolean) => void;
   askMoOpen: boolean;
   paletteOpen: boolean;
@@ -56,6 +59,8 @@ export function createUiStore(storageKey = 'momentum.ui'): StoreApi<UiState> {
         theme: prefersDark() ? 'dark' : 'light',
         sidebarCollapsed: false,
         drawerOpen: false,
+        quickAddOpen: false,
+        setQuickAddOpen: (quickAddOpen) => set({ quickAddOpen }),
         setDrawerOpen: (drawerOpen) => set({ drawerOpen }),
         askMoOpen: false,
         paletteOpen: false,
