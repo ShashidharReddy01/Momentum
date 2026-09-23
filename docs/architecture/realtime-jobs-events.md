@@ -9,12 +9,23 @@ Every service mutation writes, **in the same transaction**:
 
 After commit, the service calls `pg_notify('momentum_events', outbox_id)` (skipped in dry-run mode).
 
-A **dispatcher** (a Procrastinate periodic task every 2s plus a NOTIFY-triggered wake-up) reads undispatched outbox rows in order and:
-- fans out to the **WS hub** (via NOTIFY, already sent),
-- enqueues jobs for **rules** (Phase 4), **notifications** (Phase 2), **embeddings** (Phase 3), **agent event triggers** (Phase 5), and **integrations** (Phase 7),
-- marks `dispatched_at`.
+**Realtime dispatch (S2.1.1, implemented):** each app process runs one background task
+(`momentum/realtime/listener.py`) that `LISTEN`s on `momentum_events` and, on every
+notification, calls `momentum/realtime/dispatch.py:dispatch_pending`, which re-reads every
+outbox row above *that process's own* in-memory cursor (never filtered by `dispatched_at`,
+because that flag is shared across processes and would make one process's read cause
+another to skip rows — see the module docstring) and hands each one to that process's own
+in-process `Hub` (`momentum/realtime/hub.py`), which fans it out to its own live websocket
+connections. `dispatched_at` is still set (first writer wins) as a cross-process
+"something saw this" marker for monitoring/pruning, not as a delivery lock.
 
-Dispatch is **at-least-once**, so consumers must be idempotent (key: `outbox_id` + consumer name, stored in `consumer_offsets(consumer, last_outbox_id)` or a per-job dedupe key).
+**Job dispatch (Phase 2+, not yet built):** the same outbox additionally feeds
+Procrastinate jobs for **rules** (Phase 4), **notifications** (Phase 2), **embeddings**
+(Phase 3), **agent event triggers** (Phase 5), and **integrations** (Phase 7). Job
+consumers are at-least-once and must be idempotent; each gets its own row in the generic
+`consumer_offsets(consumer, last_event_id)` table (e.g. `consumer='notifications'`) —
+the same table realtime uses per-connection (`consumer='ws:<user_id>'`), so this is one
+cursor table for every kind of outbox consumer, not one table each.
 
 ## 2. Event catalog
 
@@ -66,17 +77,46 @@ Event payloads share an envelope:
 
 **Adding an event type** requires updating this table, `momentum/core/events.py` (`EventType` enum), and the frontend event handler map (`apps/web/src/lib/realtime/handlers.ts`).
 
-## 3. WebSocket protocol (`/ws`)
+## 3. WebSocket protocol (`/ws`) — implemented (S2.1.1), see `momentum/realtime/router.py`
 
-- Auth: the same cookie as the API (Easy Auth covers the upgrade request). Unauthenticated connections are closed with code 4401.
-- Client → server:
-  - `{"type":"subscribe","channels":["project:<id>","task:<id>","user:me"]}`. The server checks `can(view)` per channel; denied channels come back in `{"type":"subscribe_denied","channels":[…]}`.
-  - `{"type":"unsubscribe","channels":[…]}`
-  - `{"type":"ping"}` every 25s → `{"type":"pong"}`
-- Server → client: `{"type":"event","event":{…envelope…}}`, plus `{"type":"resync"}` when the server detects a gap (client must refetch the active queries).
-- Each event carries `id` (outbox id). The client tracks the last seen id per connection and requests `{"type":"replay","since":<id>}` on reconnect (the server replays up to 500 events from the outbox; beyond that it sends `resync`).
-- Reconnect: exponential backoff 1s → 30s with jitter. On reconnect the client re-subscribes and replays.
-- Multi-instance: each instance `LISTEN`s on `momentum_events` and loads the outbox row by id, so sticky sessions aren't needed.
+The Phase-0 sketch of this section (batched `subscribe`/`channels`, a separate `replay`
+message, client-initiated pings) was simplified once it came time to actually build and
+test it; what shipped:
+
+- Auth: the same session cookie/header as the REST API — `AuthProvider.authenticate()`
+  only reads cookies/headers, which a `WebSocket` carries the same as a `Request`.
+  Unauthenticated connections are closed with code 4401; realtime disabled
+  (`MOMENTUM_REALTIME_ENABLED=false`) closes with 4503.
+- Client → server, one channel per message (simpler than batching; the client just calls
+  it once per channel it wants):
+  - `{"op":"subscribe","channel":"project:<id>","since":<id>|omitted}`. The server checks
+    the same visibility rules as the REST API (`momentum.domain.access`) before
+    subscribing. Denied: `{"type":"denied","channel":"…","reason":"<error code>"}`.
+    `since=0` means "everything you have" (first-ever subscribe on this device);
+    omitting `since` means "just start live" (no backlog).
+  - `{"op":"unsubscribe","channel":"…"}`
+  - `{"op":"pong"}` — replies to the server's ping (see below).
+- Server → client:
+  - `{"type":"hello","connection_id":"…"}` right after accept.
+  - `{"type":"subscribed","channel":"…"}` once a subscribe (and any backlog) is done.
+  - `{"type":"event","id":…,"event":"task.updated","entity_type":…,"entity_id":…,"data":…,"actor":…,"request_id":…}`
+    — the outbox envelope, flattened; sent both for backlog and for live events.
+  - `{"type":"resync","channel":"…"}` when a requested backlog is over 500 events (the
+    client should refetch that channel's data instead of trusting a giant replay).
+  - `{"type":"ping"}` every 25s from the **server**, expecting `{"op":"pong"}` within
+    45s more or the server closes the connection — server-initiated because it's the
+    server that needs to reclaim resources for a browser tab that silently vanished
+    (backgrounded/suspended tabs can stop running client timers but leave the socket
+    looking open).
+- Backlog channels: each `subscribe` with a `since` replays that one channel's history
+  above it (`events_outbox` filtered by `workspace_id`, `id > since`, and a Postgres JSONB
+  `?` containment check on `payload->'channels'`), oldest first, capped at 500 rows.
+- Reconnect: left to the frontend client (S2.1.2, not yet built) — exponential backoff,
+  re-subscribe every channel it cares about with `since` set to the last id it saw (its
+  own remembered id takes priority over the durable `consumer_offsets` row, which is only
+  a fallback for "this device forgot its own cursor").
+- Multi-instance: every instance runs its own listener + Hub and dispatches independently
+  to its own local connections (see §1) — no sticky sessions needed.
 
 ## 4. Frontend handling
 

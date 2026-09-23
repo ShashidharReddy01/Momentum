@@ -36,6 +36,8 @@ def make_settings(**overrides: object) -> Settings:
         "database_url": TEST_DB,
         "db_schema": TEST_SCHEMA,
         "worker_mode": "off",
+        "realtime_enabled": False,  # most tests don't need a LISTEN connection; realtime
+        # tests (tests/test_realtime.py) turn it back on explicitly
         "serve_spa": False,
         "auth_mode": "dev",
         "secret_key": "test-secret",

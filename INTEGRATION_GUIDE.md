@@ -163,6 +163,9 @@ Any OpenAI-compatible endpoint: set `MOMENTUM_LLM_BASE_URL`, `MOMENTUM_LLM_API_K
 ### 6.5 Look and feel
 Design tokens in `apps/web/src/momentum/styles/tokens.css` (scoped). To match a host brand, override the token values; component code never contains raw colors.
 
+### 6.6 Realtime (Phase 2+)
+`GET /ws` (docs/architecture/realtime-jobs-events.md §3) is a plain FastAPI websocket route, mounted at the app root alongside the API and SPA — under `settings.base_path` the same way they are, no separate config. Any reverse proxy or gateway in front of Momentum (Mode A/B) must forward websocket upgrades (`Connection: Upgrade`) for that path, not just HTTP; Azure App Service and most modern proxies do this by default, but confirm with the host's ops docs. Set `MOMENTUM_REALTIME_ENABLED=false` to turn the whole feature off (the route then closes every connection with code 4503) if the host can't proxy websockets yet — the UI falls back to its Phase 1 behavior (refetch on window focus).
+
 ---
 
 ## 7. Verification suite (run after integrating)
@@ -178,6 +181,7 @@ Design tokens in `apps/web/src/momentum/styles/tokens.css` (scoped). To match a 
 | V7 | Background jobs | Worker logs `worker_heartbeat` within 5 minutes |
 | V8 | Momentum test suite | `make check` (or the host CI equivalent) is green |
 | V9 | User journeys | `make e2e` (Playwright; needs Postgres and a database name ending in `_e2e`, see `tools/e2e/serve.sh`) |
+| V10 | Realtime | Open two browser tabs logged in as different users on the same project; edit a task in one, see it update in the other within ~1s. If it doesn't and the browser console shows repeated WS connection failures, the host's proxy is likely not forwarding websocket upgrades (see §6.6) |
 
 ---
 
@@ -187,3 +191,4 @@ Design tokens in `apps/web/src/momentum/styles/tokens.css` (scoped). To match a 
 |---|---|---|
 | 2026-09-23 | 0 | Initial: `create_app`, `mount_momentum` + `momentum_lifespan`, `host` auth mode, schema-scoped migrations and job queue, embeddable `MomentumApp` with `basePath`, scoped styles |
 | 2026-09-23 | 1 | Migrations 0002-0006 in the `momentum` schema (teams, projects, sections, tasks, followers, comments, mentions, reactions, per-user My Tasks placements); all new API under `/api/v1` (`/home`, `/me/tasks`, `/me/prefs/views/*`, `/tasks/*`, `/comments/*`, `/mentions/search`, `/undo`). UI stores only per-device conveniences in `localStorage` under the `momentum.` prefix (drafts, collapsed sections, last quick-add project). Responsive shell: below 900px the sidebar is a drawer and panes go full-screen, so a host page embedding the UI should give it the full viewport width. E2E journeys runnable in the host via `make e2e` (V9). |
+| 2026-09-24 | 2 | S2.1.1 realtime: `GET /ws` (websocket), migration 0007 (`consumer_offsets`, an index on `events_outbox`); `MOMENTUM_REALTIME_ENABLED` (default true) controls it. See §6.6 and V10. |

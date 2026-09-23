@@ -11,6 +11,14 @@ from momentum.core.settings import Settings
 
 if TYPE_CHECKING:
     from momentum.auth.base import AuthProvider
+    from momentum.realtime.hub import Hub
+
+
+@dataclass
+class RealtimeState:
+    """Non-None only while the realtime listener is running (see app.py's lifespan)."""
+
+    hub: Hub
 
 
 @dataclass
@@ -19,4 +27,5 @@ class MomentumRuntime:
     engine: AsyncEngine
     session_factory: async_sessionmaker[AsyncSession]
     auth: AuthProvider
+    realtime: RealtimeState | None = None
     extras: dict[str, Any] = field(default_factory=dict)

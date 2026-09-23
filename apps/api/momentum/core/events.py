@@ -41,6 +41,26 @@ class OutboxEvent(Base):
             "id",
             postgresql_where=text("dispatched_at IS NULL"),
         ),
+        Index("ix_events_outbox_workspace_id", "workspace_id", "id"),
+    )
+
+
+class ConsumerOffset(Base):
+    """A generic durable cursor into events_outbox, keyed by an arbitrary consumer name.
+
+    Realtime uses ``ws:<user_id>`` so a client that lost its own memory of ``since`` (new
+    device, cleared storage) can still resume roughly where it left off, preferring its own
+    remembered id when present since that can be newer than this row (see realtime/router.py).
+    Later phases' background consumers (notifications, embeddings, ...) get their own keys
+    on the same table instead of a table each.
+    """
+
+    __tablename__ = "consumer_offsets"
+
+    consumer: Mapped[str] = mapped_column(String(200), primary_key=True)
+    last_event_id: Mapped[int] = mapped_column(BigInteger)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
 
 

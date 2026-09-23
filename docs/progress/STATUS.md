@@ -3,12 +3,18 @@
 > Updated by the AI at the end of every slice and every session. The human confirms "done" after trying the slice.
 
 ## Current focus
-- **Phase:** 1: Core tasks MVP (**complete**, awaiting product-owner sign-off)
-- **Next slice:** Phase 2 kickoff (after sign-off on Phase 1)
-- **Model:** **Opus 5.5** for all of Phase 1 (and Phases 3, 5), per product owner decision; see `docs/process/model-guide.md`
+- **Phase:** 2: Daily-Use Parity (in progress; started without a Phase 1 sign-off gate, per explicit product-owner instruction to proceed autonomously — see plan-changes log)
+- **Next slice:** S2.1.2 Realtime frontend client
+- **Model:** Opus 5.5 for Phase 1; **switched to Sonnet 5 mid-Phase-2** by product owner instruction (Phase 2 was never designated an Opus-only phase — see `docs/process/model-guide.md`)
 - **Blockers:** none
 
-## Handoff notes (latest session: 2026-09-23, Phase 1)
+## Handoff notes (latest session: 2026-09-23/24, Phase 2 start)
+- Product owner said (asleep, unavailable for questions): proceed through Phase 2 at the AI's own pace, no permission-asking; note blockers/decisions here instead of stopping.
+- **S2.1.1 Realtime (done):** `momentum/realtime/{hub,dispatch,listener,router}.py`. Design: each app process runs its own `Hub` (in-process pub/sub) plus a `LISTEN momentum_events` background task; on every NOTIFY it re-reads `events_outbox` rows above *that process's own* cursor (never filtered by `dispatched_at`, which is a shared, first-writer-wins "seen by someone" marker, not a per-reader lock — see dispatch.py's docstring) and fans them out locally. `GET /ws`: one-channel-per-message subscribe/unsubscribe (`{"op":"subscribe","channel":"project:<id>","since":<id>}`), permission-checked by reusing `domain/access.py`'s existing visibility functions (not re-derived), backlog replay per channel (JSONB `?` containment query, capped at 500, else `resync`), server-initiated ping/pong (45s timeout), a durable `consumer_offsets(consumer, last_event_id)` cursor table (generic — realtime uses `ws:<user_id>`, later job consumers get their own key on the same table). Migration 0007. Tested against real Postgres LISTEN/NOTIFY across two separate app instances (not a same-process shortcut) in `tests/test_realtime.py`; AC "two browsers see an update within 1s" passes with room to spare. `docs/architecture/realtime-jobs-events.md` updated to match what actually shipped (the Phase-0 sketch had batched subscribes and a separate replay message; simplified once real). Tests default `realtime_enabled=False` (most don't need a LISTEN connection open); the new test files turn it on explicitly.
+- Deliberate simplification, flagged for later: a subscribed channel's permission is checked once, at subscribe time, not re-validated on every subsequent event. Someone who loses access to a project mid-connection keeps receiving its events until they reconnect. Fine for 10-15 users; revisit if that ever matters.
+- Bug caught only by actually running the test (not by reasoning about the code): the replay condition was `since > 0`, silently skipping backlog replay whenever a client asked for `since=0` ("everything"). Fixed to `since >= 0`.
+
+## Handoff notes (2026-09-23, Phase 1)
 - Phase 1 kickoff written (`docs/roadmap/phase-1-kickoff.md`). Project/team access rules live in `momentum/domain/access.py`.
 - Build container: Postgres must be restarted at session start (`su postgres -c "/usr/lib/postgresql/16/bin/pg_ctl -D /home/user/.pgdata -o '-p 5432 -k /tmp' -l /tmp/pg.log start"`). The web app uses **pnpm** (npm fails on the pnpm lockfile).
 - S1.2.3: dates are parsed in the **browser's** timezone (chrono-node, `lib/dates.ts`); the server derives `due_on` from `due_at` in the user's stored timezone only when the client omits it (the UI always sends both). Rows are focusable: `A` / `M` / `D` / `Enter`. 
@@ -56,7 +62,16 @@
 - [x] S1.4.1 Comments (migration 0005: comments, mentions, reactions; sanitized rich text; @people/tasks/projects validated against what the author can see, mentioned people follow; author-only edit, author/admin delete, undo with conflict guard; fixed reaction set; device drafts for new comments and edits; JSON→React renderer instead of an editor per comment) · [x] S1.4.2 Activity feed (`GET /tasks/{id}/feed`: comments + task and subtask activity, oldest first, 300 max; undone changes and their reversals hidden, reorders hidden; readable sentences; All/Comments/Changes filter; runs of small edits folded) · [x] S1.4.3 Undo (coverage table test over 33 mutation types + handler registry check; session undo stack; ⌘Z outside text fields; shortcut sheet lists the real list shortcuts)
 - [x] S1.5.1 My Tasks (migration 0006: per-user placements; synced lazily on read, so no background job: new assignments top of Recently assigned, reassigned/deleted drop out, tasks in a deleted project or under a deleted parent hide but keep their spot for restore; once-a-day pass in my timezone moves unpinned tasks by due date, hand-placed ones stay; drag and ⌘↑/⌘↓ between buckets with undo; completed view; concurrent first loads and first sign-ins race-safe) · [x] S1.5.2 Home (`GET /home` in one round trip: top 5 by due date then priority then My Tasks order; recent projects from my own activity on projects, sections, tasks and comments, visibility-checked, archived/deleted/templates excluded, topped up with starred then recently updated; overdue tasks I created or follow that others own; summary line; complete with undo from Home; pane opens in place; first-project prompt for new users)
 
-### Phases 2–9
+### Phase 2: Daily-Use Parity
+- [x] S2.1.1 WS hub and outbox dispatcher (`momentum/realtime/*`, migration 0007; see handoff notes above) · [ ] S2.1.2 Realtime frontend client
+- [ ] S2.2.1 Board view · [ ] S2.2.2 Calendar view · [ ] S2.2.3 View switcher and defaults
+- [ ] S2.3.1 Field definitions and library · [ ] S2.3.2 Fields in views · [ ] S2.3.3 Tags
+- [ ] S2.4.1 Multi-homing · [ ] S2.4.2 Dependencies · [ ] S2.4.3 Milestones
+- [ ] S2.5.1 Notification generation · [ ] S2.5.2 Inbox UI · [ ] S2.5.3 Notification preferences
+- [ ] S2.6.1 Attachments · [ ] S2.6.2 Global search
+- [ ] S2.7.1 Asana importer · [ ] S2.7.2 CSV import · [ ] S2.7.3 Onboarding
+
+### Phases 3–9
 Tracked in their phase files; copy the slice list here at each phase kickoff.
 
 ## Plan changes log
@@ -72,6 +87,7 @@ Tracked in their phase files; copy the slice list here at each phase kickoff.
 | 2026-09-23 | Visual style changed to neutral + one blue accent, Inter only; tokens renamed to `canvas`/`sidebar`/`surface`/`surface-2`/`accent` (ADR-0005 amendment) | The inherited editorial style read as generic AI design; cheap to fix before Phase 1 |
 | 2026-09-23 | Ordering jitter suffix 2 → 3 chars | 2 chars collided too often under concurrent inserts (flaky test) |
 | 2026-09-23 | Final themes: Light = Paper (cream + ink accent), Dark = Graphite (charcoal + lime); palette picker removed (ADR-0005 amendment 2) | Blue/white rejected by the product owner; chosen from five options shown on the real UI |
+| 2026-09-24 | Phase 2 started without a human sign-off gate on Phase 1, at explicit product-owner instruction ("finish off Phase 2 as you have all the context", "do not ask any permission... just finish this whole phase at ur own pace") given while unavailable | Phase 1 exit criteria were already met and the product owner asked to proceed rather than wait; noted here per that same instruction to record decisions/blockers instead of stopping |
 
 ## Phase retros
 ### Phase 1 (2026-09-23)

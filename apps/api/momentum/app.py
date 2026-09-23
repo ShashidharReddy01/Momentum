@@ -13,7 +13,7 @@ from contextlib import asynccontextmanager
 from fastapi import APIRouter, FastAPI
 from starlette.middleware.gzip import GZipMiddleware
 
-from momentum.api.runtime import MomentumRuntime
+from momentum.api.runtime import MomentumRuntime, RealtimeState
 from momentum.api.system import VERSION, config_router, health_router
 from momentum.auth.base import HostPrincipalResolver
 from momentum.auth.factory import build_auth_provider
@@ -84,6 +84,16 @@ def create_app(
             from momentum.migrations_runner import upgrade_head
 
             await asyncio.to_thread(upgrade_head, settings)
+        listener_task: asyncio.Task[None] | None = None
+        if settings.realtime_enabled:
+            from momentum.realtime.hub import Hub
+            from momentum.realtime.listener import run_listener
+
+            hub = Hub()
+            runtime.realtime = RealtimeState(hub=hub)
+            listener_task = asyncio.create_task(
+                run_listener(settings, runtime.session_factory, hub)
+            )
         worker_task: asyncio.Task[None] | None = None
         job_app = None
         if settings.worker_mode == "embedded":
@@ -103,6 +113,10 @@ def create_app(
         try:
             yield
         finally:
+            if listener_task is not None:
+                listener_task.cancel()
+                with contextlib.suppress(asyncio.CancelledError, Exception):
+                    await listener_task
             if worker_task is not None:
                 worker_task.cancel()
                 with contextlib.suppress(asyncio.CancelledError, Exception):
@@ -127,6 +141,10 @@ def create_app(
     install_error_handlers(app)
     app.include_router(health_router)
     app.include_router(_api_router(settings))
+    if settings.realtime_enabled:
+        from momentum.realtime.router import router as realtime_router
+
+        app.include_router(realtime_router)
 
     if settings.serve_spa:
         from momentum.web.spa import mount_spa, resolve_spa_dir
