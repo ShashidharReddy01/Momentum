@@ -98,7 +98,7 @@ export function TaskPane({
       className={cn(
         'flex min-h-0 flex-col bg-surface outline-none',
         mode === 'pane'
-          ? 'h-full w-[var(--pane-w)] shrink-0 border-l border-hairline shadow-[var(--shadow-pane)]'
+          ? 'h-full w-[var(--pane-w)] shrink-0 border-l border-hairline shadow-[var(--shadow-pane)] max-md:fixed max-md:inset-0 max-md:z-30 max-md:w-full max-md:border-l-0'
           : 'mx-auto w-full max-w-3xl',
       )}
     >

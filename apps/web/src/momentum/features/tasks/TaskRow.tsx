@@ -240,7 +240,7 @@ const RowBody = memo(function RowBody({
   const dueCell = (
     <Cell
       disabled={!canEdit}
-      className="w-32 @max-3xl:w-28"
+      className="w-32 @max-3xl:w-28 @max-md:w-20"
       aria-label={task.due_on ? `Due ${formatDue(task.due_on, task.due_at)}` : 'Set due date'}
       aria-keyshortcuts="D"
       onClick={() => setPicker('due')}
@@ -258,7 +258,7 @@ const RowBody = memo(function RowBody({
       aria-label={`Open details for ${task.title}`}
       title="Open details (Space)"
       onClick={() => onOpen(task)}
-      className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-muted opacity-0 group-hover/row:opacity-100 hover:bg-surface hover:text-ink focus-visible:opacity-100"
+      className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-muted opacity-0 group-hover/row:opacity-100 hover:bg-surface hover:text-ink focus-visible:opacity-100 @max-md:opacity-100 [@media(hover:none)]:opacity-100"
     >
       <Icon icon={PanelRightOpen} size={15} />
     </button>
@@ -269,7 +269,7 @@ const RowBody = memo(function RowBody({
       aria-label={`Actions for ${task.title}`}
       aria-haspopup="menu"
       onClick={() => setMenuOpen(true)}
-      className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-muted opacity-0 group-hover/row:opacity-100 hover:bg-surface hover:text-ink focus-visible:opacity-100 data-[state=open]:opacity-100"
+      className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-muted opacity-0 group-hover/row:opacity-100 @max-md:hidden hover:bg-surface hover:text-ink focus-visible:opacity-100 data-[state=open]:opacity-100"
     >
       <Icon icon={MoreHorizontal} size={15} />
     </button>
@@ -362,7 +362,7 @@ const RowBody = memo(function RowBody({
         ) : null}
       </div>
       {project ? (
-        <span className="flex w-40 shrink-0 items-center gap-1.5 truncate text-xs text-muted @max-3xl:w-24">
+        <span className="flex w-40 shrink-0 items-center gap-1.5 truncate text-xs text-muted @max-3xl:w-24 @max-md:hidden">
           <span
             aria-hidden
             className="h-2 w-2 shrink-0 rounded-sm"

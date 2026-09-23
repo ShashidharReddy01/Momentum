@@ -605,8 +605,8 @@ export function ProjectTasksView({ projectId, canEdit }: { projectId: string; ca
         <span className="w-36 px-1.5 @max-3xl:w-10">
           <span className="@max-3xl:sr-only">Assignee</span>
         </span>
-        <span className="w-32 px-1.5 @max-3xl:w-28">Due date</span>
-        <span className="w-7" />
+        <span className="w-32 px-1.5 @max-3xl:w-28 @max-md:w-20">Due date</span>
+        <span className="w-7 @max-md:hidden" />
       </div>
       {order.length === 0 && filterCount(view) > 0 ? (
         <div className="py-10 text-center text-sm text-muted">

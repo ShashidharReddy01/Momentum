@@ -49,7 +49,7 @@ export function TeamPage() {
 
   if (team.isPending) {
     return (
-      <div className="mx-auto max-w-3xl px-8 py-8">
+      <div className="mx-auto max-w-3xl px-4 md:px-8 py-8">
         <Skeleton className="h-7 w-48" />
         <Skeleton className="mt-6 h-40" />
       </div>
@@ -63,7 +63,7 @@ export function TeamPage() {
   const leads = t.members.filter((m) => m.role === 'lead').length;
 
   return (
-    <div className="mx-auto max-w-3xl px-8 py-8">
+    <div className="mx-auto max-w-3xl px-4 md:px-8 py-8">
       <header className="flex items-start gap-3">
         <span
           aria-hidden

@@ -43,7 +43,7 @@ export function ProjectPage() {
 
   if (project.isPending) {
     return (
-      <div className="px-8 py-6">
+      <div className="px-4 md:px-8 py-6">
         <Skeleton className="h-7 w-64" />
         <Skeleton className="mt-6 h-64" />
       </div>
@@ -57,7 +57,7 @@ export function ProjectPage() {
 
   return (
     <div className="flex h-full flex-col">
-      <header className="border-b border-hair-soft px-8 pt-5">
+      <header className="border-b border-hair-soft px-4 md:px-8 pt-5">
         <div className="flex items-center gap-3">
           <span
             aria-hidden
@@ -152,7 +152,7 @@ export function ProjectPage() {
       </header>
 
       {p.archived_at ? (
-        <div role="status" className="flex items-center gap-3 bg-warn-tint px-8 py-2 text-sm">
+        <div role="status" className="flex items-center gap-3 bg-warn-tint px-4 md:px-8 py-2 text-sm">
           This project is archived. It's hidden from the sidebar.
           {isAdmin ? (
             <Button size="sm" onClick={() => archive.mutate(false)}>
@@ -164,7 +164,7 @@ export function ProjectPage() {
 
       <ShareDialog project={p} open={share} onOpenChange={setShare} />
       {p.my_role === 'viewer' || p.my_role === 'commenter' ? (
-        <div role="status" className="bg-info-tint px-8 py-1.5 text-xs text-ink-2">
+        <div role="status" className="bg-info-tint px-4 md:px-8 py-1.5 text-xs text-ink-2">
           You have {p.my_role} access to this project.
         </div>
       ) : null}
@@ -180,7 +180,7 @@ function ProjectBody({ view, projectId, canEdit }: { view: string; projectId: st
   const nav = useTaskNav()!;
   return (
     <div className="flex min-h-0 flex-1">
-      <div className="min-w-0 flex-1 overflow-auto px-8 py-5">
+      <div className="min-w-0 flex-1 overflow-auto px-4 md:px-8 py-5">
         {view === 'list' ? (
           <ProjectTasksView key={projectId} projectId={projectId} canEdit={canEdit} />
         ) : null}

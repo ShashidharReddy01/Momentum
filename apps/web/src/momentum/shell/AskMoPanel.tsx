@@ -12,7 +12,7 @@ export function AskMoPanel() {
   return (
     <aside
       aria-label="Ask Mo"
-      className="flex h-full w-[var(--askmo-w)] shrink-0 flex-col border-l border-hair-soft bg-surface shadow-pane"
+      className="flex h-full w-[var(--askmo-w)] shrink-0 flex-col border-l border-hair-soft bg-surface shadow-pane max-md:fixed max-md:inset-0 max-md:z-30 max-md:w-full max-md:border-l-0"
     >
       <header className="flex h-[var(--topbar-h)] items-center gap-2 border-b border-hair-soft px-4">
         <MoMark size={16} />

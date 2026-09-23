@@ -7,6 +7,9 @@ export type Theme = 'light' | 'dark';
 export interface UiState {
   theme: Theme;
   sidebarCollapsed: boolean;
+  /** Sidebar drawer on narrow screens (not persisted). */
+  drawerOpen: boolean;
+  setDrawerOpen: (open: boolean) => void;
   askMoOpen: boolean;
   paletteOpen: boolean;
   shortcutsOpen: boolean;
@@ -52,6 +55,8 @@ export function createUiStore(storageKey = 'momentum.ui'): StoreApi<UiState> {
       (set, get) => ({
         theme: prefersDark() ? 'dark' : 'light',
         sidebarCollapsed: false,
+        drawerOpen: false,
+        setDrawerOpen: (drawerOpen) => set({ drawerOpen }),
         askMoOpen: false,
         paletteOpen: false,
         shortcutsOpen: false,

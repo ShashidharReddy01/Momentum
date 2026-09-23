@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import {
   ChevronDown,
   ChevronRight,
@@ -15,7 +15,7 @@ import {
   Sun,
   Users,
 } from 'lucide-react';
-import { NavLink } from 'react-router';
+import { NavLink, useLocation } from 'react-router';
 import { BrandMark } from '@/components/common/BrandMark';
 import { MoMark } from '@/components/common/MoMark';
 import { Avatar } from '@/components/ui/Avatar';
@@ -33,6 +33,7 @@ import { useLogout, useMe } from '@/features/auth';
 import { NewProjectDialog, useFavorites, useProjects, type Project } from '@/features/projects';
 import { colorVar, NewTeamDialog, useTeams } from '@/features/teams';
 import { cn } from '@/lib/cn';
+import { useNarrow } from '@/lib/media';
 import { useUi } from '@/stores/ui';
 
 const NAV = [
@@ -43,47 +44,76 @@ const NAV = [
 
 export function Sidebar() {
   const collapsed = useUi((s) => s.sidebarCollapsed);
+  const drawerOpen = useUi((s) => s.drawerOpen);
+  const setDrawerOpen = useUi((s) => s.setDrawerOpen);
+  const narrow = useNarrow();
+  const location = useLocation();
   const [newTeam, setNewTeam] = useState(false);
   const [newProject, setNewProject] = useState(false);
+  // the drawer closes when you go somewhere, or when the window gets wide again
+  useEffect(() => setDrawerOpen(false), [location.pathname, narrow, setDrawerOpen]);
+  useEffect(() => {
+    if (!narrow || !drawerOpen) return;
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setDrawerOpen(false);
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [narrow, drawerOpen, setDrawerOpen]);
   return (
-    <nav
-      aria-label="Main"
-      className={cn(
-        'flex h-dvh flex-col border-r border-sidebar-line bg-sidebar text-sidebar-ink transition-[width] duration-150',
-        collapsed ? 'w-0 overflow-hidden border-r-0' : 'w-[var(--sidebar-w)]',
-      )}
-    >
-      <div className="flex h-[var(--topbar-h)] items-center gap-2 px-4">
-        <BrandMark size={22} />
-        <span className="text-[15px] font-semibold tracking-tight">Momentum</span>
-      </div>
-      <div className="px-3 pb-2">
-        <CreateMenu onNewTeam={() => setNewTeam(true)} onNewProject={() => setNewProject(true)} />
-      </div>
-      <ul className="flex flex-col gap-0.5 px-2">
-        {NAV.map((n) => (
-          <li key={n.to}>
-            <NavItem to={n.to} end={'end' in n ? n.end : false}>
-              <Icon icon={n.icon} />
-              {n.label}
+    <>
+      {narrow && drawerOpen ? (
+        <button
+          type="button"
+          aria-label="Close menu"
+          className="fixed inset-0 z-40 bg-ink/20"
+          onClick={() => setDrawerOpen(false)}
+        />
+      ) : null}
+      <nav
+        aria-label="Main"
+        hidden={narrow && !drawerOpen}
+        className={cn(
+          'flex h-dvh flex-col border-r border-sidebar-line bg-sidebar text-sidebar-ink transition-[width] duration-150',
+          narrow
+            ? drawerOpen
+              ? 'fixed inset-y-0 left-0 z-50 w-[min(var(--sidebar-w),85vw)] shadow-pop'
+              : 'hidden'
+            : collapsed
+              ? 'w-0 overflow-hidden border-r-0'
+              : 'w-[var(--sidebar-w)]',
+        )}
+      >
+        <div className="flex h-[var(--topbar-h)] items-center gap-2 px-4">
+          <BrandMark size={22} />
+          <span className="text-[15px] font-semibold tracking-tight">Momentum</span>
+        </div>
+        <div className="px-3 pb-2">
+          <CreateMenu onNewTeam={() => setNewTeam(true)} onNewProject={() => setNewProject(true)} />
+        </div>
+        <ul className="flex flex-col gap-0.5 px-2">
+          {NAV.map((n) => (
+            <li key={n.to}>
+              <NavItem to={n.to} end={'end' in n ? n.end : false}>
+                <Icon icon={n.icon} />
+                {n.label}
+              </NavItem>
+            </li>
+          ))}
+          <li>
+            <NavItem to="/ask">
+              <MoMark size={16} />
+              Ask Mo
             </NavItem>
           </li>
-        ))}
-        <li>
-          <NavItem to="/ask">
-            <MoMark size={16} />
-            Ask Mo
-          </NavItem>
-        </li>
-      </ul>
-      <FavoritesSection />
-      <TeamsSection onNewTeam={() => setNewTeam(true)} />
-      <div className="mt-auto border-t border-sidebar-line p-2">
-        <UserMenu />
-      </div>
-      <NewTeamDialog open={newTeam} onOpenChange={setNewTeam} />
-      <NewProjectDialog open={newProject} onOpenChange={setNewProject} />
-    </nav>
+        </ul>
+        <FavoritesSection />
+        <TeamsSection onNewTeam={() => setNewTeam(true)} />
+        <div className="mt-auto border-t border-sidebar-line p-2">
+          <UserMenu />
+        </div>
+        <NewTeamDialog open={newTeam} onOpenChange={setNewTeam} />
+        <NewProjectDialog open={newProject} onOpenChange={setNewProject} />
+      </nav>
+    </>
   );
 }
 
