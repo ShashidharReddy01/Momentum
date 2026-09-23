@@ -1,5 +1,5 @@
 import { useDraggable, useDroppable } from '@dnd-kit/core';
-import { CalendarDays, MoreHorizontal, Trash2, UserRound } from 'lucide-react';
+import { CalendarDays, MoreHorizontal, PanelRightOpen, Trash2, UserRound } from 'lucide-react';
 import {
   forwardRef,
   memo,
@@ -32,6 +32,7 @@ import { isTemp, type Task, type TaskPatch } from './queries';
 import type { DropPlacement, Modifiers } from './selection';
 
 type Picker = 'assignee' | 'due' | null;
+const INTERACTIVE = 'button, input, textarea, a, [role="checkbox"], [role="menuitem"]';
 
 export interface TaskRowProps {
   task: Task;
@@ -47,6 +48,10 @@ export interface TaskRowProps {
   dropIndicator?: DropPlacement | null;
   /** Row clicks (plain / shift / ⌘) drive the selection. */
   onSelectClick?: (task: Task, mods: Modifiers) => void;
+  /** This task is open in the details pane. */
+  isOpen?: boolean;
+  /** Open (or toggle) the details pane. */
+  onOpen?: (task: Task) => void;
   onFocusRow?: (task: Task) => void;
   onUpdate: (task: Task, patch: TaskPatch, message?: string) => void;
   onToggle: (task: Task) => void;
@@ -113,6 +118,8 @@ const RowBody = memo(function RowBody({
   dropIndicator = null,
   onSelectClick,
   onFocusRow,
+  isOpen = false,
+  onOpen,
   onUpdate,
   onToggle,
   onRename,
@@ -195,6 +202,7 @@ const RowBody = memo(function RowBody({
     else if (k === 'd') setPicker('due');
     else if (k === 'm' && meId && task.assignee_id !== meId) assign(meId);
     else if (e.key === 'Enter') setEditing(true);
+    else if (e.key === ' ' && onOpen) onOpen(task);
     else return;
     e.preventDefault();
   };
@@ -202,7 +210,7 @@ const RowBody = memo(function RowBody({
   const assigneeCell = (
     <Cell
       disabled={!canEdit}
-      className="w-36"
+      className="w-36 @max-3xl:w-10"
       aria-label={assignee ? `Assignee: ${assignee.name}` : 'Assign'}
       aria-keyshortcuts="A"
       onClick={() => setPicker('assignee')}
@@ -210,7 +218,9 @@ const RowBody = memo(function RowBody({
       {assignee ? (
         <>
           <Avatar name={assignee.name} src={assignee.avatar_url} size={20} />
-          <span className="truncate text-[12.5px] text-ink-2">{assignee.name.split(' ')[0]}</span>
+          <span className="truncate text-[12.5px] text-ink-2 @max-3xl:hidden">
+            {assignee.name.split(' ')[0]}
+          </span>
         </>
       ) : (
         <Placeholder icon={UserRound} show={canEdit} />
@@ -220,7 +230,7 @@ const RowBody = memo(function RowBody({
   const dueCell = (
     <Cell
       disabled={!canEdit}
-      className="w-32"
+      className="w-32 @max-3xl:w-28"
       aria-label={task.due_on ? `Due ${formatDue(task.due_on, task.due_at)}` : 'Set due date'}
       aria-keyshortcuts="D"
       onClick={() => setPicker('due')}
@@ -232,6 +242,17 @@ const RowBody = memo(function RowBody({
       )}
     </Cell>
   );
+  const detailsButton = onOpen ? (
+    <button
+      type="button"
+      aria-label={`Open details for ${task.title}`}
+      title="Open details (Space)"
+      onClick={() => onOpen(task)}
+      className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-muted opacity-0 group-hover/row:opacity-100 hover:bg-surface hover:text-ink focus-visible:opacity-100"
+    >
+      <Icon icon={PanelRightOpen} size={15} />
+    </button>
+  ) : null;
   const menuButton = (
     <button
       type="button"
@@ -253,9 +274,15 @@ const RowBody = memo(function RowBody({
       aria-label={task.title}
       data-selected={selected || undefined}
       data-task-id={task.id}
+      data-open={isOpen || undefined}
       data-section-id={task.section_id}
       onPointerDown={onPointerDown}
       onClickCapture={onClickCapture}
+      onClick={(e) => {
+        // a click on the row itself (not a control inside it) opens the details pane
+        if (!e.shiftKey && !e.metaKey && !e.ctrlKey && !(e.target as HTMLElement).closest(INTERACTIVE))
+          onOpen?.(task);
+      }}
       onFocus={(e) => e.target === e.currentTarget && onFocusRow?.(task)}
       // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex
       tabIndex={0}
@@ -265,6 +292,7 @@ const RowBody = memo(function RowBody({
         (done || fading) && 'text-muted',
         fading && 'opacity-60',
         selected && 'bg-selection hover:bg-selection focus-visible:bg-selection',
+        isOpen && !selected && 'bg-accent-tint hover:bg-accent-tint',
         dragging && 'opacity-40',
       )}
     >
@@ -285,31 +313,34 @@ const RowBody = memo(function RowBody({
         label={done ? `Mark ${task.title} incomplete` : `Complete ${task.title}`}
         onChange={() => onToggle(task)}
       />
-      {editing ? (
-        <input
-          ref={input}
-          aria-label="Task name"
-          value={draft}
-          maxLength={500}
-          onChange={(e) => setDraft(e.target.value)}
-          onBlur={commit}
-          onKeyDown={onKey}
-          className="h-7 min-w-0 flex-1 rounded-sm border border-focus bg-surface px-1 text-[13.5px] outline-none"
-        />
-      ) : (
-        <button
-          type="button"
-          disabled={!canEdit}
-          onClick={() => setEditing(true)}
-          className={cn(
-            'min-w-0 flex-1 cursor-text truncate text-left text-[13.5px] disabled:cursor-default',
-            done && 'line-through decoration-muted-2',
-          )}
-        >
-          {task.title}
-        </button>
-      )}
-      <span className="w-14 shrink-0 text-right font-mono text-[11px] text-muted-2 opacity-0 group-hover/row:opacity-100">
+      {/* The name button fits its text: the rest of the row is a click target for the pane. */}
+      <div className="flex min-w-0 flex-1 items-center">
+        {editing ? (
+          <input
+            ref={input}
+            aria-label="Task name"
+            value={draft}
+            maxLength={500}
+            onChange={(e) => setDraft(e.target.value)}
+            onBlur={commit}
+            onKeyDown={onKey}
+            className="h-7 w-full min-w-0 rounded-sm border border-focus bg-surface px-1 text-[13.5px] outline-none"
+          />
+        ) : (
+          <button
+            type="button"
+            disabled={!canEdit}
+            onClick={() => setEditing(true)}
+            className={cn(
+              'max-w-full min-w-0 cursor-text truncate rounded-sm px-0.5 text-left text-[13.5px] hover:ring-1 hover:ring-hairline disabled:cursor-default disabled:hover:ring-0',
+              done && 'line-through decoration-muted-2',
+            )}
+          >
+            {task.title}
+          </button>
+        )}
+      </div>
+      <span className="w-14 shrink-0 text-right font-mono text-[11px] text-muted-2 opacity-0 group-hover/row:opacity-100 @max-3xl:hidden">
         {isTemp(task.id) ? '…' : task.key}
       </span>
       {/* Pickers and the menu mount only while open: most rows never open them, and each
@@ -345,6 +376,7 @@ const RowBody = memo(function RowBody({
       ) : (
         dueCell
       )}
+      {detailsButton}
       {canEdit ? (
         menuOpen ? (
           <DropdownMenu open onOpenChange={setMenuOpen}>

@@ -42,3 +42,7 @@ export function toApiError(status: number, body: unknown): ApiError {
 export function isUnauthenticated(err: unknown): err is ApiError {
   return err instanceof ApiError && err.status === 401;
 }
+
+export function isNotFound(e: unknown): boolean {
+  return e instanceof ApiError && e.status === 404;
+}

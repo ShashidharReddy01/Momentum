@@ -12,10 +12,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from momentum.core.activity import Activity, Diff, jsonable_diff, record_activity
 from momentum.core.context import Ctx
-from momentum.core.errors import NotFound, ValidationFailed
+from momentum.core.errors import NotFound, ValidationFailed, VersionConflict
 from momentum.core.events import emit
 from momentum.core.mutation import Mutation
 from momentum.core.ordering import even_keys, key_between, keys_between, needs_rebalance
+from momentum.core.richtext import doc_hash, plain_text, preview, sanitize_doc
 from momentum.core.undo import UndoConflict, undo_handler, undo_op
 from momentum.domain.access import (
     get_visible_project,
@@ -407,10 +408,19 @@ async def update_task(
     task, placement, role = await get_visible_task(session, ctx, task_id)
     require_project_role(role, "editor", "edit this task")
     if expected_version is not None and expected_version != task.version:
-        from momentum.core.errors import VersionConflict
-
         raise VersionConflict("This task was changed by someone else", version=task.version)
     changes: Diff = {}
+    if "description" in patch:
+        # Conflict only when the description itself changed since the client loaded it
+        # (other fields changing in between must not block a save).
+        base = patch.get("description_base")
+        if base is not None and base != doc_hash(task.description):
+            raise VersionConflict(
+                "The description was changed by someone else", version=task.version
+            )
+        doc = sanitize_doc(patch["description"])
+        if doc != task.description:
+            changes["description"] = (task.description, doc)
     if "title" in patch:
         title = " ".join(str(patch["title"] or "").split())
         if not title:
@@ -431,24 +441,35 @@ async def update_task(
     previous_assignee = task.assignee_id
     for field, (_, new) in changes.items():
         setattr(task, field, new)
+    if "description" in changes:
+        task.description_text = plain_text(task.description) or None
     task.version += 1
-    act = await record_activity(
-        session,
-        ctx,
-        entity_type="task",
-        entity_id=task.id,
-        verb="task.updated",
-        changes=changes,
-        undo=undo_op(
-            "tasks.update",
-            task_id=task.id,
-            version=task.version,
-            patch={k: o for k, (o, _) in changes.items()},
+    # Activity/event payloads carry a text preview of descriptions, not whole documents.
+    shown: Diff = {
+        k: ((preview(o), preview(n)) if k == "description" else (o, n))
+        for k, (o, n) in changes.items()
+    }
+    act = None
+    if record_undo and batch_id is None and set(changes) == {"description"}:
+        act = await _coalesce_description_edit(session, ctx, task, shown)
+    if act is None:
+        act = await record_activity(
+            session,
+            ctx,
+            entity_type="task",
+            entity_id=task.id,
+            verb="task.updated",
+            changes=shown,
+            undo=undo_op(
+                "tasks.update",
+                task_id=task.id,
+                version=task.version,
+                patch={k: o for k, (o, _) in changes.items()},
+            )
+            if record_undo
+            else None,
+            batch_id=batch_id,
         )
-        if record_undo
-        else None,
-        batch_id=batch_id,
-    )
     await emit(
         session,
         ctx,
@@ -456,7 +477,7 @@ async def update_task(
         entity_type="task",
         entity_id=task.id,
         data={
-            "changes": jsonable_diff(changes),
+            "changes": jsonable_diff(shown),
             "version": task.version,
         },
         channels=channels(task, placement),
@@ -478,6 +499,42 @@ async def update_task(
             activity_id=act.id,
         )
     return Mutation(task, act.id, batch_id=batch_id, version=task.version)
+
+
+COALESCE_WINDOW = timedelta(minutes=10)
+
+
+async def _coalesce_description_edit(
+    session: AsyncSession, ctx: Ctx, task: Task, shown: Diff
+) -> Activity | None:
+    """Autosave writes the description every second or so while someone types. Fold those saves
+    into the actor's previous description edit (if it's the task's latest activity and recent),
+    so the feed shows one change and undo returns to the text from before the editing session."""
+    last = (
+        await session.execute(
+            select(Activity)
+            .where(Activity.entity_type == "task", Activity.entity_id == task.id)
+            .order_by(Activity.created_at.desc(), Activity.id.desc())
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+    if (
+        last is None
+        or last.actor_id != ctx.actor.id
+        or last.verb != "task.updated"
+        or set(last.diff) != {"description"}
+        or last.undone_at is not None
+        or last.batch_id is not None
+        or last.undo_payload is None
+        or datetime.now(UTC) - last.created_at > COALESCE_WINDOW
+    ):
+        return None
+    first_old = last.diff["description"][0]
+    last.diff = jsonable_diff({"description": (first_old, shown["description"][1])})
+    args = dict(last.undo_payload.get("args") or {})
+    args["version"] = task.version
+    last.undo_payload = {**last.undo_payload, "args": args}
+    return last
 
 
 def _apply_dates(task: Task, patch: dict[str, Any], ctx: Ctx, changes: Diff) -> None:

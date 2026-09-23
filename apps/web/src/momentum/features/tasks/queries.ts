@@ -43,6 +43,8 @@ function patchTask(qc: QueryClient, projectId: string, id: string, fn: (t: Task)
       old?.map((t) => (t.id === id ? fn(t) : t)),
     );
   }
+  // keep an open task pane in step with list edits
+  qc.setQueryData<Task>(taskKeys.detail(id), (old) => (old ? { ...old, ...fn(old) } : old));
 }
 
 function insertAfter(list: Task[], task: Task, afterId: string | null): Task[] {

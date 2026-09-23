@@ -77,7 +77,11 @@ describe('List selection and keyboard', () => {
     await user.click(row('Two'));
     expect(selectedTitles()).toEqual([]);
     // modifier clicks never start editing the title
-    expect(screen.queryByRole('textbox', { name: 'Task name' })).toBeNull();
+    expect(
+      within(screen.getByRole('list', { name: 'Tasks in Backlog' })).queryByRole('textbox', {
+        name: 'Task name',
+      }),
+    ).toBeNull();
   });
 
   it('⌘A selects the focused section; bulk assign applies to all with one toast', async () => {

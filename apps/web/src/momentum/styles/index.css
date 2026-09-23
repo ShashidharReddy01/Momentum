@@ -5,6 +5,7 @@
 @import 'tailwindcss/utilities.css' layer(utilities);
 @import './tokens.css';
 @import './base.css';
+@import './prose.css';
 
 @source '../';
 

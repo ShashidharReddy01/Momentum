@@ -18,7 +18,12 @@ type T = {
   priority: null;
   version: number;
   created_at: string;
+  description?: unknown;
 };
+
+// Same contract as the API: a short fingerprint of the description ('' when empty).
+export const mockHash = (doc: unknown) =>
+  doc ? `h${JSON.stringify(doc).length}-${JSON.stringify(doc).slice(-12)}` : '';
 
 /** In-memory tasks API with a small network delay (exercises optimistic UI and the create queue). */
 export function taskHandlers(
@@ -85,6 +90,16 @@ export function taskHandlers(
   };
 
   const prefs = new Map<string, unknown>();
+  const detail = (t: T) => ({
+    ...t,
+    description: t.description ?? null,
+    description_hash: mockHash(t.description),
+    project: { id: t.project_id, name: 'Website Revamp', color: 'proj-6' },
+    section: { id: t.section_id, name: t.section_id === 'sec-1' ? 'Backlog' : 'Done' },
+    created_by: '01a0ccaf-8f68-77d2-a888-584ea1e80ea8',
+    completed_by: null,
+    updated_at: new Date().toISOString(),
+  });
   return [
     http.get(`*${base}/api/v1/me/prefs/views/:pid`, ({ params }) =>
       HttpResponse.json(
@@ -166,11 +181,30 @@ export function taskHandlers(
         }
       return HttpResponse.json({ data: { data: out, meta: {} }, meta: { ...meta, batch_id: 'batch-2' } });
     }),
+    http.get(`*${base}/api/v1/tasks/:id`, ({ params }) => {
+      const t = tasks.find((x) => x.id === params.id);
+      if (!t) return HttpResponse.json({ code: 'not_found', status: 404 }, { status: 404 });
+      return HttpResponse.json(detail(t));
+    }),
     http.patch(`*${base}/api/v1/tasks/:id`, async ({ params, request }) => {
+      await delay(latency);
       const t = tasks.find((x) => x.id === params.id)!;
-      Object.assign(t, await request.json());
+      const body = (await request.json()) as Record<string, unknown>;
+      if (
+        'description' in body &&
+        typeof body.description_base === 'string' &&
+        body.description_base !== mockHash(t.description)
+      ) {
+        return HttpResponse.json(
+          { code: 'version_conflict', status: 409, title: 'Version conflict' },
+          { status: 409 },
+        );
+      }
+      const fields = { ...body };
+      delete fields.description_base;
+      Object.assign(t, fields);
       t.version += 1;
-      return HttpResponse.json({ data: t, meta });
+      return HttpResponse.json({ data: detail(t), meta });
     }),
     http.post(`*${base}/api/v1/tasks/:id/complete`, ({ params }) => {
       const t = tasks.find((x) => x.id === params.id)!;

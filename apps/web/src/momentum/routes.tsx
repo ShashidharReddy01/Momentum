@@ -4,6 +4,7 @@ import { AuthGate, DevLoginPage } from '@/features/auth';
 import { HomePage } from '@/features/home';
 import { NotFoundPage, Placeholder } from '@/features/placeholders';
 import { ProjectPage } from '@/features/projects';
+import { TaskPage } from '@/features/tasks';
 import { TeamPage } from '@/features/teams';
 import type { RuntimeConfig } from '@/lib/config';
 import { Layout } from '@/shell/Layout';
@@ -34,6 +35,7 @@ export function buildRoutes(config: RuntimeConfig): RouteObject[] {
         },
         { path: 'teams/:teamId', element: <TeamPage />, handle: { crumb: 'Team' } },
         { path: 'projects/:projectId/:view?', element: <ProjectPage />, handle: { crumb: 'Project' } },
+        { path: 'task/:taskId', element: <TaskPage />, handle: { crumb: 'Task' } },
         {
           path: 'inbox',
           element: <Placeholder icon={Inbox} title="Inbox" phase={2} />,

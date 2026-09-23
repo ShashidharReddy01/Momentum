@@ -360,7 +360,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** A task */
+        /** A task with details */
         get: operations["get_task_api_v1_tasks__task_id__get"];
         put?: never;
         post?: never;
@@ -654,6 +654,11 @@ export interface components {
             data: components["schemas"]["SectionOut"];
             meta: components["schemas"]["MutationMeta"];
         };
+        /** MutationOut[TaskDetailOut] */
+        MutationOut_TaskDetailOut_: {
+            data: components["schemas"]["TaskDetailOut"];
+            meta: components["schemas"]["MutationMeta"];
+        };
         /** MutationOut[TaskOut] */
         MutationOut_TaskOut_: {
             data: components["schemas"]["TaskOut"];
@@ -668,6 +673,16 @@ export interface components {
         MutationOut_TeamOut_: {
             data: components["schemas"]["TeamOut"];
             meta: components["schemas"]["MutationMeta"];
+        };
+        /** NamedRef */
+        NamedRef: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
         };
         /** OkOut */
         OkOut: {
@@ -806,6 +821,18 @@ export interface components {
             /** Privacy */
             privacy?: ("team" | "private") | null;
         };
+        /** ProjectRef */
+        ProjectRef: {
+            /** Color */
+            color: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+        };
         /**
          * ProjectViewPrefs
          * @description How one user last viewed a project's list (restored on revisit).
@@ -932,6 +959,69 @@ export interface components {
             title: string;
         };
         /**
+         * TaskDetailOut
+         * @description A task with everything the task pane needs.
+         */
+        TaskDetailOut: {
+            /** Assignee Id */
+            assignee_id: string | null;
+            /** Completed At */
+            completed_at: string | null;
+            /** Completed By */
+            completed_by: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Created By */
+            created_by: string | null;
+            /** Description */
+            description: {
+                [key: string]: unknown;
+            } | null;
+            /** Description Hash */
+            description_hash: string;
+            /** Due At */
+            due_at: string | null;
+            /** Due On */
+            due_on: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Key */
+            key: string;
+            /** Number */
+            number: number;
+            /** Parent Id */
+            parent_id: string | null;
+            /** Position */
+            position: string | null;
+            /** Priority */
+            priority: string | null;
+            project: components["schemas"]["ProjectRef"] | null;
+            /** Project Id */
+            project_id: string | null;
+            section: components["schemas"]["NamedRef"] | null;
+            /** Section Id */
+            section_id: string | null;
+            /** Start On */
+            start_on: string | null;
+            /** Title */
+            title: string;
+            /** Type */
+            type: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Version */
+            version: number;
+        };
+        /**
          * TaskFieldsIn
          * @description Fields that can be set on many tasks at once.
          */
@@ -1007,6 +1097,18 @@ export interface components {
         TaskPatchIn: {
             /** Assignee Id */
             assignee_id?: string | null;
+            /**
+             * Description
+             * @description Rich text (Tiptap JSON); null clears it
+             */
+            description?: {
+                [key: string]: unknown;
+            } | null;
+            /**
+             * Description Base
+             * @description description_hash the edit started from; a mismatch returns 409
+             */
+            description_base?: string | null;
             /**
              * Due At
              * @description Due time (timezone-aware). Setting it without due_on derives due_on in the actor's timezone; clearing due_on clears due_at.
@@ -2097,7 +2199,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["TaskOut"];
+                    "application/json": components["schemas"]["TaskDetailOut"];
                 };
             };
             /** @description Validation Error */
@@ -2165,7 +2267,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["MutationOut_TaskOut_"];
+                    "application/json": components["schemas"]["MutationOut_TaskDetailOut_"];
                 };
             };
             /** @description Validation Error */

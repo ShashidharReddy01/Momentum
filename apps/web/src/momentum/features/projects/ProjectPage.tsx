@@ -21,7 +21,7 @@ import { cn } from '@/lib/cn';
 import { useCrumbs } from '@/lib/crumbs';
 import { useProject, useProjectLifecycle, useToggleFavorite, useUpdateProject } from './queries';
 import { ShareDialog } from './ShareDialog';
-import { ProjectTasksView } from '@/features/tasks';
+import { ProjectTasksView, TaskNavProvider, TaskPane, useTaskNav } from '@/features/tasks';
 
 const VIEWS = [
   { key: 'list', label: 'List' },
@@ -168,11 +168,26 @@ export function ProjectPage() {
           You have {p.my_role} access to this project.
         </div>
       ) : null}
-      <div className="flex-1 overflow-auto px-8 py-5">
+      <TaskNavProvider>
+        <ProjectBody view={view} projectId={p.id} canEdit={canEdit && !p.archived_at} />
+      </TaskNavProvider>
+    </div>
+  );
+}
+
+/** The list (scrolls on its own) with the task pane docked on the right when `?task=` is set. */
+function ProjectBody({ view, projectId, canEdit }: { view: string; projectId: string; canEdit: boolean }) {
+  const nav = useTaskNav()!;
+  return (
+    <div className="flex min-h-0 flex-1">
+      <div className="min-w-0 flex-1 overflow-auto px-8 py-5">
         {view === 'list' ? (
-          <ProjectTasksView key={p.id} projectId={p.id} canEdit={canEdit && !p.archived_at} />
+          <ProjectTasksView key={projectId} projectId={projectId} canEdit={canEdit} />
         ) : null}
       </div>
+      {nav.openId ? (
+        <TaskPane taskId={nav.openId} onClose={nav.close} onStep={nav.step} canEditHint={canEdit} />
+      ) : null}
     </div>
   );
 }

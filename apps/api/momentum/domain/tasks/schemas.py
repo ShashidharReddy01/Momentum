@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import date, datetime
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -49,6 +49,14 @@ class TaskPatchIn(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
     title: str | None = Field(default=None, min_length=1, max_length=500)
+    description: dict[str, Any] | None = Field(
+        default=None, description="Rich text (Tiptap JSON); null clears it"
+    )
+    description_base: str | None = Field(
+        default=None,
+        max_length=64,
+        description="description_hash the edit started from; a mismatch returns 409",
+    )
     assignee_id: uuid.UUID | None = None
     start_on: date | None = None
     due_on: date | None = None
@@ -88,3 +96,24 @@ class TaskBulkIn(BaseModel):
     section_id: uuid.UUID | None = None
     after_id: uuid.UUID | None = None
     before_id: uuid.UUID | None = None
+
+
+class NamedRef(BaseModel):
+    id: uuid.UUID
+    name: str
+
+
+class ProjectRef(NamedRef):
+    color: str | None
+
+
+class TaskDetailOut(TaskOut):
+    """A task with everything the task pane needs."""
+
+    description: dict[str, Any] | None
+    description_hash: str
+    project: ProjectRef | None
+    section: NamedRef | None
+    created_by: uuid.UUID | None
+    completed_by: uuid.UUID | None
+    updated_at: datetime

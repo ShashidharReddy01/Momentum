@@ -32,6 +32,7 @@ import {
   type Selection,
 } from './selection';
 import { DraftRow, TaskRow } from './TaskRow';
+import { useTaskNav } from './pane/nav';
 import { useListView } from './useListView';
 import { VirtualRows } from './VirtualRows';
 import {
@@ -70,6 +71,8 @@ export function ProjectTasksView({ projectId, canEdit }: { projectId: string; ca
   const draftKey = useRef(0);
   const container = useRef<HTMLDivElement>(null);
   const meId = useMe().data?.user.id;
+  const nav = useTaskNav();
+  const openId = nav?.openId ?? null;
   const people = usePeople().data;
   const peopleById = useMemo(() => new Map<string, Person>((people ?? []).map((p) => [p.id, p])), [people]);
   // Rows edited or created here stay visible even if they stop matching the filters,
@@ -145,6 +148,23 @@ export function ProjectTasksView({ projectId, canEdit }: { projectId: string; ca
     selectionRef.current = selection;
     bySectionRef.current = bySection;
   });
+
+  // The pane steps through tasks in this list's order (J/K) and highlights the open row.
+  useEffect(() => nav?.setOrder(order), [nav, order]);
+  useEffect(() => {
+    if (!openId) return;
+    container.current
+      ?.querySelector<HTMLElement>(`[data-task-id="${CSS.escape(openId)}"]`)
+      ?.scrollIntoView?.({ block: 'nearest' });
+  }, [openId]);
+  const onOpen = useCallback(
+    (t: Task) => {
+      if (!nav || isTemp(t.id)) return;
+      if (nav.openId === t.id) nav.close();
+      else nav.open(t.id);
+    },
+    [nav],
+  );
 
   const focusRow = useCallback((id: string | null) => {
     if (!id) return;
@@ -331,7 +351,12 @@ export function ProjectTasksView({ projectId, canEdit }: { projectId: string; ca
     e.preventDefault();
     if (next) {
       setSelection(next);
-      if (next.focus !== selection.focus) focusRow(next.focus);
+      if (next.focus !== selection.focus) {
+        focusRow(next.focus);
+        // with the pane open, it follows keyboard focus
+        if (openId && next.focus && !e.shiftKey && !isTemp(next.focus))
+          nav?.open(next.focus, { replace: true });
+      }
     }
   };
 
@@ -435,6 +460,8 @@ export function ProjectTasksView({ projectId, canEdit }: { projectId: string; ca
       dropIndicator={dropTarget?.anchorId === t.id ? dropTarget.placement : null}
       onSelectClick={onSelectClick}
       onFocusRow={onFocusRow}
+      isOpen={openId === t.id}
+      onOpen={nav ? onOpen : undefined}
       onUpdate={onUpdate}
       onToggle={onToggle}
       onRename={onRename}
@@ -506,7 +533,7 @@ export function ProjectTasksView({ projectId, canEdit }: { projectId: string; ca
   return (
     // Keyboard handling is delegated from the rows (each row is focusable).
     // eslint-disable-next-line jsx-a11y/no-static-element-interactions
-    <div ref={container} onKeyDownCapture={onKeyDownCapture} onKeyDown={onKeyDown}>
+    <div ref={container} className="@container" onKeyDownCapture={onKeyDownCapture} onKeyDown={onKeyDown}>
       <ListToolbar view={view} onChange={setView} />
       {!manual && canEdit ? (
         <p className="mb-2 text-xs text-muted">
@@ -525,9 +552,11 @@ export function ProjectTasksView({ projectId, canEdit }: { projectId: string; ca
         className="flex h-8 items-center gap-2.5 border-b border-hairline pr-2 pl-11 text-xs text-muted"
       >
         <span className="flex-1 pl-[30px]">Task name</span>
-        <span className="w-14" />
-        <span className="w-36 px-1.5">Assignee</span>
-        <span className="w-32 px-1.5">Due date</span>
+        <span className="w-14 @max-3xl:hidden" />
+        <span className="w-36 px-1.5 @max-3xl:w-10">
+          <span className="@max-3xl:sr-only">Assignee</span>
+        </span>
+        <span className="w-32 px-1.5 @max-3xl:w-28">Due date</span>
         <span className="w-7" />
       </div>
       {order.length === 0 && filterCount(view) > 0 ? (

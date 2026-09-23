@@ -4,17 +4,24 @@ import uuid
 from datetime import datetime
 
 from fastapi import APIRouter, Header, Query, status
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from momentum.api.deps import CtxDep, UowDep
 from momentum.api.schemas import ListOut, MutationMeta, MutationOut, OkOut
 from momentum.core.errors import ValidationFailed
 from momentum.core.ids import task_key
+from momentum.core.richtext import doc_hash
+from momentum.domain.projects.models import Project
+from momentum.domain.sections.models import Section
 from momentum.domain.tasks import service
 from momentum.domain.tasks.models import Task, TaskProject
 from momentum.domain.tasks.schemas import (
+    NamedRef,
+    ProjectRef,
     TaskBatchCreateIn,
     TaskBulkIn,
     TaskCreateIn,
+    TaskDetailOut,
     TaskMoveIn,
     TaskOut,
     TaskPatchIn,
@@ -128,28 +135,47 @@ async def create_tasks(
         )
 
 
-@router.get("/tasks/{task_id}", response_model=TaskOut, summary="A task")
-async def get_task(task_id: uuid.UUID, ctx: CtxDep, uow: UowDep) -> TaskOut:
+async def detail_out(s: AsyncSession, t: Task, p: TaskProject | None) -> TaskDetailOut:
+    project = await s.get(Project, p.project_id) if p else None
+    section = await s.get(Section, p.section_id) if p else None
+    return TaskDetailOut(
+        **task_out(t, p).model_dump(),
+        description=t.description,
+        description_hash=doc_hash(t.description),
+        project=ProjectRef(id=project.id, name=project.name, color=project.color)
+        if project
+        else None,
+        section=NamedRef(id=section.id, name=section.name) if section else None,
+        created_by=t.created_by,
+        completed_by=t.completed_by,
+        updated_at=t.updated_at,
+    )
+
+
+@router.get("/tasks/{task_id}", response_model=TaskDetailOut, summary="A task with details")
+async def get_task(task_id: uuid.UUID, ctx: CtxDep, uow: UowDep) -> TaskDetailOut:
     async with uow.transaction() as s:
         t, p, _ = await service.get_task(s, ctx, task_id)
-        return task_out(t, p)
+        return await detail_out(s, t, p)
 
 
-@router.patch("/tasks/{task_id}", response_model=MutationOut[TaskOut], summary="Edit a task")
+@router.patch("/tasks/{task_id}", response_model=MutationOut[TaskDetailOut], summary="Edit a task")
 async def patch_task(
     task_id: uuid.UUID,
     body: TaskPatchIn,
     ctx: CtxDep,
     uow: UowDep,
     if_match: int | None = Header(default=None),
-) -> MutationOut[TaskOut]:
+) -> MutationOut[TaskDetailOut]:
     async with uow.transaction() as s:
         m = await service.update_task(
             s, ctx, task_id, body.model_dump(exclude_unset=True), expected_version=if_match
         )
         _, p, _ = await service.get_task(s, ctx, task_id)
+        await s.flush()
+        await s.refresh(m.entity, ["updated_at"])
         return MutationOut(
-            data=task_out(m.entity, p),
+            data=await detail_out(s, m.entity, p),
             meta=MutationMeta(activity_id=m.activity_id, version=m.version),
         )
 

@@ -1,0 +1,95 @@
+/* Rich text (Tiptap) inside Momentum. Scoped: only .mo-prose content. */
+.momentum-root .mo-prose {
+  outline: none;
+  min-height: 6rem;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.momentum-root .mo-prose > * + * {
+  margin-top: 0.5em;
+}
+.momentum-root .mo-prose h1 {
+  font-size: 1.35em;
+  font-weight: 600;
+}
+.momentum-root .mo-prose h2 {
+  font-size: 1.18em;
+  font-weight: 600;
+}
+.momentum-root .mo-prose h3 {
+  font-size: 1.05em;
+  font-weight: 600;
+}
+.momentum-root .mo-prose ul {
+  list-style: disc;
+  padding-left: 1.4em;
+}
+.momentum-root .mo-prose ol {
+  list-style: decimal;
+  padding-left: 1.5em;
+}
+.momentum-root .mo-prose ul[data-type='taskList'] {
+  list-style: none;
+  padding-left: 0.1em;
+}
+.momentum-root .mo-prose ul[data-type='taskList'] li {
+  display: flex;
+  gap: 0.5em;
+  align-items: flex-start;
+}
+.momentum-root .mo-prose ul[data-type='taskList'] li > label {
+  margin-top: 0.3em;
+  flex: none;
+}
+.momentum-root .mo-prose ul[data-type='taskList'] li[data-checked='true'] > div {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+.momentum-root .mo-prose ul[data-type='taskList'] input[type='checkbox'] {
+  accent-color: var(--accent);
+  width: 14px;
+  height: 14px;
+}
+.momentum-root .mo-prose a {
+  color: var(--info);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.momentum-root .mo-prose code {
+  font-family: var(--font-mono);
+  font-size: 0.88em;
+  background: var(--surface-2);
+  border-radius: var(--r-sm);
+  padding: 0.1em 0.3em;
+}
+.momentum-root .mo-prose pre {
+  font-family: var(--font-mono);
+  font-size: 0.86em;
+  background: var(--surface-2);
+  border-radius: var(--r-md);
+  padding: 0.7em 0.9em;
+  overflow-x: auto;
+}
+.momentum-root .mo-prose pre code {
+  background: none;
+  padding: 0;
+}
+.momentum-root .mo-prose blockquote {
+  border-left: 3px solid var(--hairline);
+  padding-left: 0.8em;
+  color: var(--ink-2);
+}
+.momentum-root .mo-prose hr {
+  border: 0;
+  border-top: 1px solid var(--hairline);
+  margin: 1em 0;
+}
+.momentum-root .mo-prose p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: var(--muted-2);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
