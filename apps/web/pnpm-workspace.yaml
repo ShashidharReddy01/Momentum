@@ -1,0 +1,3 @@
+# Supply-chain safety: never install a package version published less than a day ago
+# (matches newer pnpm defaults, so every pnpm version accepts this lockfile).
+minimumReleaseAge: 1440
