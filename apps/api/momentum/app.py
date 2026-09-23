@@ -11,6 +11,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from fastapi import APIRouter, FastAPI
+from starlette.middleware.gzip import GZipMiddleware
 
 from momentum.api.runtime import MomentumRuntime
 from momentum.api.system import VERSION, config_router, health_router
@@ -114,6 +115,9 @@ def create_app(
     )
     app.add_middleware(CsrfMiddleware, api_prefix=API_PREFIX, exempt_prefixes=CSRF_EXEMPT)
     app.add_middleware(RequestIdMiddleware)
+    # Large lists (e.g. 2,000 tasks ≈ 0.9 MB of JSON) compress ~8x; App Service containers
+    # don't compress for us.
+    app.add_middleware(GZipMiddleware, minimum_size=1024, compresslevel=5)
     install_error_handlers(app)
     app.include_router(health_router)
     app.include_router(_api_router(settings))

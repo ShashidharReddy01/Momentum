@@ -5,11 +5,13 @@ import {
   memo,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type ComponentProps,
   type KeyboardEvent,
   type MouseEvent,
+  type RefObject,
 } from 'react';
 import { CompleteCheck } from '@/components/common/CompleteCheck';
 import { DueText } from '@/components/common/DueText';
@@ -21,7 +23,6 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/DropdownMenu';
 import { Icon } from '@/components/ui/Icon';
-import { IconButton } from '@/components/ui/IconButton';
 import { cn } from '@/lib/cn';
 import { formatDue } from '@/lib/dates';
 import type { Person } from '@/features/people';
@@ -54,14 +55,60 @@ export interface TaskRowProps {
   onDelete: (task: Task) => void;
 }
 
-export const TaskRow = memo(function TaskRow({
+/**
+ * A list row. Split in two for performance: this thin shell owns the drag-and-drop hooks (dnd-kit
+ * re-renders every hook user when any draggable/droppable registers, e.g. while scrolling a
+ * virtualized list) and passes stable refs/handlers to the memoized {@link RowBody}, which only
+ * re-renders when the task or its own props change.
+ */
+export const TaskRow = memo(function TaskRow(props: TaskRowProps) {
+  const { task, canEdit, draggable = true } = props;
+  const [busy, setBusy] = useState(false);
+  const node = useRef<HTMLDivElement | null>(null);
+  const drag = useDraggable({
+    id: task.id,
+    data: { kind: 'task', sectionId: task.section_id },
+    disabled: !canEdit || !draggable || busy || isTemp(task.id),
+  });
+  const { setNodeRef: setDragRef } = drag;
+  const setDndRef = useCallback(
+    (el: HTMLDivElement | null) => {
+      node.current = el;
+      setDragRef(el);
+    },
+    [setDragRef],
+  );
+  // Pointer drags only: Enter/Space on a row are editing keys, not keyboard-drag keys.
+  const onPointerDown = drag.listeners?.onPointerDown as ((e: unknown) => void) | undefined;
+  return (
+    <>
+      {/* Drop targets exist only during a drag: registering one re-renders every dnd-kit hook,
+          which made each row mounted while scrolling re-render all mounted rows. */}
+      {drag.active ? <RowDropTarget task={task} node={node} /> : null}
+      <RowBody {...props} setDndRef={setDndRef} onPointerDown={onPointerDown} setBusy={setBusy} />
+    </>
+  );
+});
+
+function RowDropTarget({ task, node }: { task: Task; node: RefObject<HTMLDivElement | null> }) {
+  const { setNodeRef } = useDroppable({
+    id: `row:${task.id}`,
+    data: { kind: 'task', taskId: task.id, sectionId: task.section_id },
+  });
+  useLayoutEffect(() => {
+    setNodeRef(node.current);
+    return () => setNodeRef(null);
+  }, [node, setNodeRef]);
+  return null;
+}
+
+const RowBody = memo(function RowBody({
   task,
   canEdit,
   fading,
   assignee,
   meId,
   selected = false,
-  draggable = true,
   dragging = false,
   dropIndicator = null,
   onSelectClick,
@@ -71,31 +118,26 @@ export const TaskRow = memo(function TaskRow({
   onRename,
   onEnter,
   onDelete,
-}: TaskRowProps) {
+  setDndRef,
+  onPointerDown,
+  setBusy,
+}: TaskRowProps & {
+  setDndRef: (node: HTMLDivElement | null) => void;
+  onPointerDown?: (e: unknown) => void;
+  setBusy: (busy: boolean) => void;
+}) {
   const [editing, setEditing] = useState(false);
   const [picker, setPicker] = useState<Picker>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
   const row = useRef<HTMLDivElement | null>(null);
-  const drag = useDraggable({
-    id: task.id,
-    data: { kind: 'task', sectionId: task.section_id },
-    disabled: !canEdit || !draggable || editing || picker !== null || isTemp(task.id),
-  });
-  const drop = useDroppable({
-    id: `row:${task.id}`,
-    data: { kind: 'task', taskId: task.id, sectionId: task.section_id },
-  });
-  const { setNodeRef: setDragRef } = drag;
-  const { setNodeRef: setDropRef } = drop;
   const setRefs = useCallback(
     (node: HTMLDivElement | null) => {
       row.current = node;
-      setDragRef(node);
-      setDropRef(node);
+      setDndRef(node);
     },
-    [setDragRef, setDropRef],
+    [setDndRef],
   );
-  // Pointer drags only: Enter/Space on a row are editing keys, not keyboard-drag keys.
-  const onPointerDown = drag.listeners?.onPointerDown as ((e: unknown) => void) | undefined;
+  useEffect(() => setBusy(editing || picker !== null), [editing, picker, setBusy]);
   const onClickCapture = (e: MouseEvent) => {
     const mods = { shift: e.shiftKey, meta: e.metaKey || e.ctrlKey };
     if (mods.shift || mods.meta) {
@@ -156,6 +198,51 @@ export const TaskRow = memo(function TaskRow({
     else return;
     e.preventDefault();
   };
+
+  const assigneeCell = (
+    <Cell
+      disabled={!canEdit}
+      className="w-36"
+      aria-label={assignee ? `Assignee: ${assignee.name}` : 'Assign'}
+      aria-keyshortcuts="A"
+      onClick={() => setPicker('assignee')}
+    >
+      {assignee ? (
+        <>
+          <Avatar name={assignee.name} src={assignee.avatar_url} size={20} />
+          <span className="truncate text-[12.5px] text-ink-2">{assignee.name.split(' ')[0]}</span>
+        </>
+      ) : (
+        <Placeholder icon={UserRound} show={canEdit} />
+      )}
+    </Cell>
+  );
+  const dueCell = (
+    <Cell
+      disabled={!canEdit}
+      className="w-32"
+      aria-label={task.due_on ? `Due ${formatDue(task.due_on, task.due_at)}` : 'Set due date'}
+      aria-keyshortcuts="D"
+      onClick={() => setPicker('due')}
+    >
+      {task.due_on ? (
+        <DueText dueOn={task.due_on} dueAt={task.due_at} startOn={task.start_on} done={done} />
+      ) : (
+        <Placeholder icon={CalendarDays} show={canEdit} />
+      )}
+    </Cell>
+  );
+  const menuButton = (
+    <button
+      type="button"
+      aria-label={`Actions for ${task.title}`}
+      aria-haspopup="menu"
+      onClick={() => setMenuOpen(true)}
+      className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-muted opacity-0 group-hover/row:opacity-100 hover:bg-surface hover:text-ink focus-visible:opacity-100 data-[state=open]:opacity-100"
+    >
+      <Icon icon={MoreHorizontal} size={15} />
+    </button>
+  );
 
   return (
     // Rows are keyboard targets (A/M/D/Enter); S1.2.4 adds roving focus + selection.
@@ -225,70 +312,52 @@ export const TaskRow = memo(function TaskRow({
       <span className="w-14 shrink-0 text-right font-mono text-[11px] text-muted-2 opacity-0 group-hover/row:opacity-100">
         {isTemp(task.id) ? '…' : task.key}
       </span>
-      <AssigneePicker
-        open={picker === 'assignee'}
-        onOpenChange={(o) => (o ? setPicker('assignee') : closePicker(false))}
-        assigneeId={task.assignee_id}
-        onChange={(u) => assign(u?.id ?? null, u?.id === meId ? 'you' : u?.name)}
-      >
-        <Cell
-          disabled={!canEdit}
-          className="w-36"
-          aria-label={assignee ? `Assignee: ${assignee.name}` : 'Assign'}
-          aria-keyshortcuts="A"
+      {/* Pickers and the menu mount only while open: most rows never open them, and each
+          Radix root costs real time when hundreds of rows mount while scrolling. */}
+      {picker === 'assignee' ? (
+        <AssigneePicker
+          open
+          onOpenChange={(o) => !o && closePicker(false)}
+          assigneeId={task.assignee_id}
+          onChange={(u) => assign(u?.id ?? null, u?.id === meId ? 'you' : u?.name)}
         >
-          {assignee ? (
-            <>
-              <Avatar name={assignee.name} src={assignee.avatar_url} size={20} />
-              <span className="truncate text-[12.5px] text-ink-2">{assignee.name.split(' ')[0]}</span>
-            </>
-          ) : (
-            <Placeholder icon={UserRound} show={canEdit} />
-          )}
-        </Cell>
-      </AssigneePicker>
-      <DatePicker
-        open={picker === 'due'}
-        onOpenChange={(o) => (o ? setPicker('due') : closePicker(false))}
-        dueOn={task.due_on}
-        dueAt={task.due_at}
-        onChange={(v) =>
-          onUpdate(
-            task,
-            v ? { due_on: v.date, due_at: v.at } : { due_on: null, due_at: null },
-            v ? `Due date set: ${formatDue(v.date, v.at)}` : 'Due date removed',
-          )
-        }
-      >
-        <Cell
-          disabled={!canEdit}
-          className="w-32"
-          aria-label={task.due_on ? `Due ${formatDue(task.due_on, task.due_at)}` : 'Set due date'}
-          aria-keyshortcuts="D"
+          {assigneeCell}
+        </AssigneePicker>
+      ) : (
+        assigneeCell
+      )}
+      {picker === 'due' ? (
+        <DatePicker
+          open
+          onOpenChange={(o) => !o && closePicker(false)}
+          dueOn={task.due_on}
+          dueAt={task.due_at}
+          onChange={(v) =>
+            onUpdate(
+              task,
+              v ? { due_on: v.date, due_at: v.at } : { due_on: null, due_at: null },
+              v ? `Due date set: ${formatDue(v.date, v.at)}` : 'Due date removed',
+            )
+          }
         >
-          {task.due_on ? (
-            <DueText dueOn={task.due_on} dueAt={task.due_at} startOn={task.start_on} done={done} />
-          ) : (
-            <Placeholder icon={CalendarDays} show={canEdit} />
-          )}
-        </Cell>
-      </DatePicker>
+          {dueCell}
+        </DatePicker>
+      ) : (
+        dueCell
+      )}
       {canEdit ? (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <IconButton
-              icon={MoreHorizontal}
-              label={`Actions for ${task.title}`}
-              size="icon-sm"
-              className="opacity-0 group-hover/row:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100"
-            />
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem className="text-crit" onSelect={() => onDelete(task)}>
-              <Icon icon={Trash2} /> Delete task
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        menuOpen ? (
+          <DropdownMenu open onOpenChange={setMenuOpen}>
+            <DropdownMenuTrigger asChild>{menuButton}</DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem className="text-crit" onSelect={() => onDelete(task)}>
+                <Icon icon={Trash2} /> Delete task
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        ) : (
+          menuButton
+        )
       ) : (
         <span className="w-7" />
       )}

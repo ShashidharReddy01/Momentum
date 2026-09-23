@@ -58,3 +58,11 @@ async def test_unknown_error_is_problem_json(client: httpx.AsyncClient) -> None:
     assert r.headers["content-type"].startswith("application/problem+json")
     assert r.json()["code"] == "unauthenticated"
     assert r.json()["login_url"].startswith("/dev/login")
+
+
+async def test_large_responses_are_gzipped(client) -> None:  # type: ignore[no-untyped-def]
+    r = await client.get("/api/v1/openapi.json", headers={"Accept-Encoding": "gzip"})
+    if r.status_code == 404:
+        r = await client.get("/openapi.json", headers={"Accept-Encoding": "gzip"})
+    assert r.status_code == 200
+    assert r.headers.get("content-encoding") == "gzip"

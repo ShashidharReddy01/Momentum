@@ -290,3 +290,121 @@ async def _seed_tasks(session: AsyncSession, ws: Workspace) -> int:
                 created += 1
     await session.flush()
     return created
+
+
+PERF_PROJECT = "Load Test (2k)"
+PERF_SECTIONS = ["Inbox", "Planned", "In progress", "Review", "Done"]
+_WORDS = [
+    "update",
+    "review",
+    "draft",
+    "fix",
+    "plan",
+    "audit",
+    "sync",
+    "design",
+    "test",
+    "ship",
+    "migrate",
+    "refactor",
+    "document",
+    "prepare",
+    "check",
+    "verify",
+    "clean",
+    "polish",
+    "measure",
+    "publish",
+    "analyse",
+]
+_THINGS = [
+    "homepage",
+    "copy",
+    "invoice",
+    "flow",
+    "onboarding",
+    "email",
+    "pricing",
+    "table",
+    "API",
+    "client",
+    "release",
+    "notes",
+    "search",
+    "index",
+    "billing",
+    "page",
+    "vendor",
+    "list",
+    "roadmap",
+    "slide",
+    "QA",
+    "checklist",
+    "style",
+    "guide",
+]
+
+
+async def seed_perf(session: AsyncSession, settings: Settings, n: int = 2000) -> dict[str, int]:
+    """A large synthetic project for performance work (S1.2.6). Safe to re-run."""
+    await seed(session, settings)
+    ws = await ensure_default_workspace(session, settings)
+    exists = await session.execute(
+        select(Project.id).where(Project.workspace_id == ws.id, Project.name == PERF_PROJECT)
+    )
+    if exists.scalar_one_or_none() is not None:
+        return {"perf_tasks_created": 0}
+    users = list((await session.execute(select(User).where(User.workspace_id == ws.id))).scalars())
+    owner = next(u for u in users if u.email.startswith("ravi@"))
+    team = (
+        await session.execute(
+            select(Team).where(Team.workspace_id == ws.id, Team.name == "Product")
+        )
+    ).scalar_one()
+    project = Project(
+        workspace_id=ws.id,
+        team_id=team.id,
+        name=PERF_PROJECT,
+        color="proj-10",
+        privacy="team",
+        owner_id=owner.id,
+        created_by=owner.id,
+        created_via="import",
+    )
+    session.add(project)
+    await session.flush()
+    session.add(ProjectMember(project_id=project.id, user_id=owner.id, role="admin"))
+    sections = [
+        Section(workspace_id=ws.id, project_id=project.id, name=name, position=pos)
+        for name, pos in zip(
+            PERF_SECTIONS, keys_between(None, None, len(PERF_SECTIONS)), strict=True
+        )
+    ]
+    session.add_all(sections)
+    await session.flush()
+    rng = random.Random(7)  # noqa: S311 (synthetic data)
+    today = datetime.now(UTC).date()
+    per = n // len(sections)
+    for s_index, section in enumerate(sections):
+        count = per if s_index < len(sections) - 1 else n - per * (len(sections) - 1)
+        for pos in keys_between(None, None, count):
+            ws.task_seq += 1
+            assignee = rng.choice(users) if rng.random() < 0.75 else None
+            task = Task(
+                workspace_id=ws.id,
+                number=ws.task_seq,
+                title=f"{rng.choice(_WORDS).capitalize()} {rng.choice(_THINGS)} #{ws.task_seq}",
+                assignee_id=assignee.id if assignee else None,
+                due_on=today + timedelta(days=rng.randint(-10, 40)) if rng.random() < 0.6 else None,
+                created_by=owner.id,
+                created_via="import",
+            )
+            session.add(task)
+            await session.flush()
+            session.add(
+                TaskProject(
+                    task_id=task.id, project_id=project.id, section_id=section.id, position=pos
+                )
+            )
+    await session.flush()
+    return {"perf_tasks_created": n}

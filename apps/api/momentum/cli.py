@@ -59,10 +59,13 @@ def migrate(revision: str = "head") -> None:
 
 
 @cli.command()
-def seed() -> None:
+def seed(
+    perf: bool = typer.Option(False, "--perf", help="Also add a 2,000-task project (performance)"),
+) -> None:
     """Load the synthetic demo workspace (safe to re-run)."""
     from momentum.core.db import UnitOfWork, create_engine, create_session_factory
     from momentum.seed import seed as run_seed
+    from momentum.seed import seed_perf
 
     settings = Settings()
 
@@ -71,6 +74,8 @@ def seed() -> None:
         uow = UnitOfWork(create_session_factory(engine)())
         try:
             async with uow.transaction() as session:
+                if perf:
+                    return await seed_perf(session, settings)
                 return await run_seed(session, settings)
         finally:
             await uow.close()

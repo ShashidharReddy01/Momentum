@@ -33,6 +33,7 @@ import {
 } from './selection';
 import { DraftRow, TaskRow } from './TaskRow';
 import { useListView } from './useListView';
+import { VirtualRows } from './VirtualRows';
 import {
   filterCount,
   groupTasks,
@@ -91,7 +92,11 @@ export function ProjectTasksView({ projectId, canEdit }: { projectId: string; ca
     const visible = (open.data ?? []).filter(
       (t) => (!t.completed_at || fading.has(t.id) || showCompleted) && shown(t),
     );
-    for (const t of visible) map.set(t.section_id!, [...(map.get(t.section_id!) ?? []), t]);
+    for (const t of visible) {
+      const list = map.get(t.section_id!);
+      if (list) list.push(t);
+      else map.set(t.section_id!, [t]);
+    }
     if (showCompleted) {
       const ids = new Set(visible.map((t) => t.id));
       for (const t of done.data ?? []) {
@@ -467,16 +472,16 @@ export function ProjectTasksView({ projectId, canEdit }: { projectId: string; ca
         ? tasks.findIndex((t) => t.id === draftHere.afterId) + 1
         : tasks.length
       : -1;
+    type Item = { kind: 'task'; task: Task } | { kind: 'draft' };
+    const items: Item[] = tasks.map((task) => ({ kind: 'task', task }));
+    if (draftRow) items.splice(Math.max(0, Math.min(draftIndex, items.length)), 0, { kind: 'draft' });
     return (
       <div role="list" aria-label={`Tasks in ${section.name}`}>
-        {draftIndex === 0 ? draftRow : null}
-        {tasks.map((t, i) => (
-          <div key={t.id}>
-            {renderRow(t)}
-            {draftIndex === i + 1 ? draftRow : null}
-          </div>
-        ))}
-        {draftIndex > tasks.length ? draftRow : null}
+        <VirtualRows
+          items={items}
+          getKey={(it) => (it.kind === 'draft' ? `draft-${draftHere?.key}` : it.task.id)}
+          render={(it) => (it.kind === 'draft' ? draftRow : renderRow(it.task))}
+        />
         <SectionEnd
           sectionId={section.id}
           active={dropTarget?.sectionId === section.id && !dropTarget.anchorId}
@@ -546,9 +551,7 @@ export function ProjectTasksView({ projectId, canEdit }: { projectId: string; ca
               <span className="tabular text-xs font-normal text-muted">{g.tasks.length}</span>
             </h2>
             <div role="list" aria-label={`Tasks in ${g.name}`} className="pb-3 pl-11">
-              {g.tasks.map((t) => (
-                <div key={t.id}>{renderRow(t)}</div>
-              ))}
+              <VirtualRows items={g.tasks} getKey={(t) => t.id} render={renderRow} />
             </div>
           </section>
         ))

@@ -180,7 +180,9 @@ export function groupTasks(
   const map = new Map<string, Task[]>();
   for (const t of tasks) {
     const key = t.assignee_id ?? 'none';
-    map.set(key, [...(map.get(key) ?? []), t]);
+    const list = map.get(key);
+    if (list) list.push(t);
+    else map.set(key, [t]);
   }
   const label = (id: string) => (id === 'none' ? 'Unassigned' : (nameOf(id) ?? 'Unknown person'));
   return [...map.entries()]
