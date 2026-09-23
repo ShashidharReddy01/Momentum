@@ -1,2 +1,2 @@
 export { useSections, type Section } from './queries';
-export { SectionList } from './SectionList';
+export { SectionList, useCollapsed, type ItemDnd } from './SectionList';

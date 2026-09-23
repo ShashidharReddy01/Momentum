@@ -58,6 +58,46 @@ function insertAfter(list: Task[], task: Task, afterId: string | null): Task[] {
   return last >= 0 ? [...list.slice(0, last + 1), task, ...list.slice(last + 1)] : [...list, task];
 }
 
+export interface MoveVars {
+  ids: string[]; // display order
+  sectionId: string;
+  afterId: string | null;
+  beforeId: string | null;
+  message?: string;
+}
+
+export interface BulkVars {
+  ids: string[];
+  action: 'update' | 'complete' | 'uncomplete' | 'delete';
+  patch?: TaskPatch;
+  message: string;
+}
+
+/** Optimistically place `ids` (in order) in a section after/before an anchor (or at its end). */
+export function reorder(
+  list: Task[],
+  v: Pick<MoveVars, 'ids' | 'sectionId' | 'afterId' | 'beforeId'>,
+): Task[] {
+  const moving = new Set(v.ids);
+  const byId = new Map(list.map((t) => [t.id, t]));
+  const block = v.ids.flatMap((id) => {
+    const t = byId.get(id);
+    return t ? [{ ...t, section_id: v.sectionId }] : [];
+  });
+  const rest = list.filter((t) => !moving.has(t.id));
+  let at: number;
+  if (v.afterId) at = rest.findIndex((t) => t.id === v.afterId) + 1;
+  else if (v.beforeId) at = rest.findIndex((t) => t.id === v.beforeId);
+  else {
+    at = -1;
+    rest.forEach((t, i) => {
+      if (t.section_id === v.sectionId) at = i + 1;
+    });
+  }
+  if (at < 0) at = rest.length; // empty section: its tasks are grouped by section id, any spot works
+  return [...rest.slice(0, at), ...block, ...rest.slice(at)];
+}
+
 /**
  * Task mutations for one project list. Creation is queued so that rapid Enter presses create
  * tasks in order even before earlier ones have real ids (temp id → server id).
@@ -68,6 +108,23 @@ export function useTaskMutations(projectId: string) {
   const undoToast = useUndoToast();
   const key = taskKeys.byProject(projectId);
   const pending = useRef(new Map<string, Promise<string>>());
+  // Order-changing requests run one at a time so the server sees moves in the order made.
+  const queue = useRef<Promise<unknown>>(Promise.resolve());
+  const serial = <R>(fn: () => Promise<R>): Promise<R> => {
+    const run = queue.current.then(fn, fn);
+    queue.current = run.catch(() => undefined);
+    return run;
+  };
+  // Tasks with an order change still in flight: a response only lands when it is the latest.
+  const inflight = useRef(new Map<string, number>());
+  const track = (ids: string[], delta: 1 | -1) => {
+    for (const id of ids) {
+      const n = (inflight.current.get(id) ?? 0) + delta;
+      if (n > 0) inflight.current.set(id, n);
+      else inflight.current.delete(id);
+    }
+  };
+  const refetchAll = () => qc.invalidateQueries({ queryKey: ['projects', projectId, 'tasks'] });
   const resolveId = async (id: string | null | undefined) =>
     id && isTemp(id) ? ((await pending.current.get(id)) ?? null) : (id ?? null);
 
@@ -167,6 +224,95 @@ export function useTaskMutations(projectId: string) {
     },
   });
 
+  /**
+   * Move tasks (display order) to a slot: optimistic reorder in the cache, then one request
+   * (single move → /move, several → /bulk as one undo batch).
+   */
+  const move = useMutation({
+    mutationFn: (v: MoveVars) =>
+      serial(async () => {
+        const ids = await Promise.all(v.ids.map((id) => resolveId(id)));
+        const body = {
+          section_id: v.sectionId,
+          after_id: await resolveId(v.afterId),
+          before_id: await resolveId(v.beforeId),
+        };
+        if (ids.length === 1) {
+          const res = (
+            await api.POST('/api/v1/tasks/{task_id}/move', { params: { path: { task_id: ids[0]! } }, body })
+          ).data!;
+          return { tasks: [res.data], meta: res.meta };
+        }
+        const res = (
+          await api.POST('/api/v1/tasks/bulk', {
+            body: { task_ids: ids as string[], action: 'move', ...body },
+          })
+        ).data!;
+        return { tasks: res.data.data, meta: res.meta };
+      }),
+    onMutate: async (v) => {
+      track(v.ids, 1);
+      await qc.cancelQueries({ queryKey: key });
+      qc.setQueryData<Task[]>(key, (old) => (old ? reorder(old, v) : old));
+    },
+    onSettled: (_res, _e, v) => track(v.ids, -1),
+    onSuccess: (res, v) => {
+      const latest = res.tasks.filter((t) => (inflight.current.get(t.id) ?? 0) <= 1);
+      const byId = new Map(latest.map((t) => [t.id, t]));
+      qc.setQueryData<Task[]>(key, (old) => old?.map((t) => byId.get(t.id) ?? t));
+      if (v.message) undoToast(v.message, res.meta, refetchAll);
+      // completed tasks have their own list; its order is refreshed lazily
+      void qc.invalidateQueries({ queryKey: taskKeys.byProject(projectId, true), refetchType: 'none' });
+    },
+    onError: (e) => {
+      toastError(e, "Couldn't move the task");
+      void refetchAll();
+    },
+  });
+
+  /** One action on several tasks (all-or-nothing on the server, one undo). */
+  const bulk = useMutation({
+    mutationFn: (v: BulkVars) =>
+      serial(async () => {
+        const ids = (await Promise.all(v.ids.map((id) => resolveId(id)))) as string[];
+        return (
+          await api.POST('/api/v1/tasks/bulk', { body: { task_ids: ids, action: v.action, patch: v.patch } })
+        ).data!;
+      }),
+    onMutate: async (v) => {
+      await qc.cancelQueries({ queryKey: ['projects', projectId, 'tasks'] });
+      const ids = new Set(v.ids);
+      const now = new Date().toISOString();
+      for (const completed of [false, true]) {
+        qc.setQueryData<Task[]>(taskKeys.byProject(projectId, completed), (old) => {
+          if (!old) return old;
+          if (v.action === 'delete') return old.filter((t) => !ids.has(t.id));
+          return old.map((t) => {
+            if (!ids.has(t.id)) return t;
+            if (v.action === 'complete') return { ...t, completed_at: t.completed_at ?? now };
+            if (v.action === 'uncomplete') return { ...t, completed_at: null };
+            return { ...t, ...v.patch };
+          });
+        });
+      }
+    },
+    onSuccess: (res, v) => {
+      if (v.action !== 'delete') {
+        const byId = new Map(res.data.data.map((t) => [t.id, t]));
+        for (const completed of [false, true])
+          qc.setQueryData<Task[]>(taskKeys.byProject(projectId, completed), (old) =>
+            old?.map((t) => byId.get(t.id) ?? t),
+          );
+      }
+      undoToast(v.message, res.meta, refetchAll);
+      if (v.action === 'complete' || v.action === 'uncomplete') void refetchAll();
+    },
+    onError: (e) => {
+      toastError(e, "Couldn't update the tasks");
+      void refetchAll();
+    },
+  });
+
   const setCompleted = useMutation({
     mutationFn: async (v: { id: string; completed: boolean }) => {
       const path = { task_id: (await resolveId(v.id))! };
@@ -209,5 +355,5 @@ export function useTaskMutations(projectId: string) {
     },
   });
 
-  return { create, createMany, rename, update, setCompleted, remove };
+  return { create, createMany, rename, update, move, bulk, setCompleted, remove };
 }

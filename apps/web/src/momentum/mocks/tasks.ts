@@ -60,11 +60,30 @@ export function taskHandlers(
     tasks.filter((t) => t.section_id === sid).sort((a, b) => (a.position < b.position ? -1 : 1));
   const renumber = (ordered: T[]) => ordered.forEach((t, i) => (t.position = pos(i)));
   const meta = { activity_id: '01a0ccaf-0000-7000-8000-00000000d001', batch_id: null, version: 1 };
-  const place = (t: T, afterId?: string | null) => {
+  const place = (t: T, afterId?: string | null, beforeId?: string | null) => {
     const rest = inSection(t.section_id).filter((x) => x.id !== t.id);
-    const i = afterId ? rest.findIndex((x) => x.id === afterId) + 1 : rest.length;
+    const i = afterId
+      ? rest.findIndex((x) => x.id === afterId) + 1
+      : beforeId
+        ? rest.findIndex((x) => x.id === beforeId)
+        : rest.length;
     renumber([...rest.slice(0, i), t, ...rest.slice(i)]);
   };
+  const moveMany = (ids: string[], sid: string, afterId?: string | null, beforeId?: string | null) => {
+    const moving = ids.map((id) => tasks.find((x) => x.id === id)!);
+    const sources = new Set(moving.map((t) => t.section_id));
+    let after = afterId ?? null;
+    let before = beforeId ?? null;
+    for (const t of moving) {
+      t.section_id = sid;
+      place(t, after, after ? null : before);
+      after = t.id;
+      before = null;
+    }
+    sources.forEach((s) => renumber(inSection(s)));
+    return moving;
+  };
+
   return [
     http.get(`*${base}/api/v1/projects/:pid/tasks`, ({ params, request }) => {
       const completed = new URL(request.url).searchParams.get('completed') === 'true';
@@ -95,6 +114,40 @@ export function taskHandlers(
         { data: { data: created, meta: {} }, meta: { ...meta, batch_id: 'batch-1' } },
         { status: 201 },
       );
+    }),
+    http.post(`*${base}/api/v1/tasks/:id/move`, async ({ params, request }) => {
+      await delay(latency);
+      const b = (await request.json()) as {
+        section_id: string;
+        after_id?: string | null;
+        before_id?: string | null;
+      };
+      const [t] = moveMany([String(params.id)], b.section_id, b.after_id, b.before_id);
+      return HttpResponse.json({ data: t, meta });
+    }),
+    http.post(`*${base}/api/v1/tasks/bulk`, async ({ request }) => {
+      await delay(latency);
+      const b = (await request.json()) as {
+        task_ids: string[];
+        action: string;
+        patch?: Partial<T>;
+        section_id?: string;
+        after_id?: string | null;
+        before_id?: string | null;
+      };
+      let out: T[] = [];
+      if (b.action === 'move') out = moveMany(b.task_ids, b.section_id!, b.after_id, b.before_id);
+      else
+        for (const id of b.task_ids) {
+          const i = tasks.findIndex((x) => x.id === id);
+          const t = tasks[i]!;
+          if (b.action === 'delete') tasks.splice(i, 1);
+          else if (b.action === 'complete') t.completed_at = new Date().toISOString();
+          else if (b.action === 'uncomplete') t.completed_at = null;
+          else Object.assign(t, b.patch);
+          out.push(t);
+        }
+      return HttpResponse.json({ data: { data: out, meta: {} }, meta: { ...meta, batch_id: 'batch-2' } });
     }),
     http.patch(`*${base}/api/v1/tasks/:id`, async ({ params, request }) => {
       const t = tasks.find((x) => x.id === params.id)!;

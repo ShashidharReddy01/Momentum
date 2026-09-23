@@ -73,7 +73,11 @@ async def undo(
         if activity_id
         else query.where(Activity.batch_id == batch_id)
     )
-    rows = list((await session.execute(query.order_by(Activity.created_at.desc()))).scalars())
+    rows = list(
+        (
+            await session.execute(query.order_by(Activity.created_at.desc(), Activity.id.desc()))
+        ).scalars()
+    )
     if not rows:
         raise NotFound()
     now = datetime.now(UTC)

@@ -1,28 +1,60 @@
+import {
+  DragOverlay,
+  useDndContext,
+  useDroppable,
+  type DragMoveEvent,
+  type DragStartEvent,
+} from '@dnd-kit/core';
 import { CheckCircle2, Plus } from 'lucide-react';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { ErrorState } from '@/components/common/States';
 import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useMe } from '@/features/auth';
 import { usePeople, type Person } from '@/features/people';
-import { SectionList, type Section } from '@/features/sections';
+import { SectionList, useCollapsed, useSections, type ItemDnd, type Section } from '@/features/sections';
+import { cn } from '@/lib/cn';
+import { formatDue } from '@/lib/dates';
+import { BulkBar, type BulkPicker } from './BulkBar';
 import { useProjectTasks, useTaskMutations, type Task, type TaskPatch } from './queries';
+import {
+  clickRow,
+  dropNeighbors,
+  emptySelection,
+  prune,
+  selectAll,
+  step,
+  targets,
+  type DropPlacement,
+  type Modifiers,
+  type Selection,
+} from './selection';
 import { DraftRow, TaskRow } from './TaskRow';
 
 type Draft = { sectionId: string; afterId: string | null; key: number };
+type DropTarget = { sectionId: string; anchorId: string | null; placement: DropPlacement };
 const FADE_MS = 1500;
 const CONFIRM_PASTE_OVER = 5;
+const plural = (n: number, one: string) => `${n} ${one}${n === 1 ? '' : 's'}`;
 
-/** The project list view: sections with their tasks, inline create/edit/complete. */
+/** The project list view: sections with their tasks; inline create/edit/complete, selection,
+ * keyboard navigation, drag and drop (multi), and bulk actions. */
 export function ProjectTasksView({ projectId, canEdit }: { projectId: string; canEdit: boolean }) {
   const [showCompleted, setShowCompleted] = useState(false);
   const open = useProjectTasks(projectId);
   const done = useProjectTasks(projectId, true, showCompleted);
+  const sections = useSections(projectId).data;
   const m = useTaskMutations(projectId);
+  const { collapsed, toggle } = useCollapsed(projectId);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [fading, setFading] = useState<Set<string>>(new Set());
+  const [rawSelection, setSelection] = useState<Selection>(emptySelection);
+  const [drag, setDrag] = useState<{ ids: string[]; active: Task } | null>(null);
+  const [dropTarget, setDropTarget] = useState<DropTarget | null>(null);
+  const [bulkPicker, setBulkPicker] = useState<BulkPicker>(null);
   const draftKey = useRef(0);
+  const container = useRef<HTMLDivElement>(null);
   const meId = useMe().data?.user.id;
   const people = usePeople().data;
   const peopleById = useMemo(() => new Map<string, Person>((people ?? []).map((p) => [p.id, p])), [people]);
@@ -44,29 +76,64 @@ export function ProjectTasksView({ projectId, canEdit }: { projectId: string; ca
     return map;
   }, [open.data, done.data, fading, showCompleted]);
 
+  // Visible rows in display order (collapsed sections excluded): the basis for ranges and arrows.
+  const order = useMemo(
+    () =>
+      (sections ?? [])
+        .filter((s) => !collapsed.has(s.id))
+        .flatMap((s) => (bySection.get(s.id) ?? []).map((t) => t.id)),
+    [sections, collapsed, bySection],
+  );
+  const selection = useMemo(() => prune(rawSelection, order), [rawSelection, order]);
+  const taskById = useMemo(() => {
+    const map = new Map<string, Task>();
+    for (const list of bySection.values()) for (const t of list) map.set(t.id, t);
+    return map;
+  }, [bySection]);
+
+  // Refs so row callbacks and drag handlers see current values (rows are memoized).
+  const orderRef = useRef(order);
+  const selectionRef = useRef(selection);
+  const bySectionRef = useRef(bySection);
+  const dropRef = useRef(dropTarget);
+  useEffect(() => {
+    orderRef.current = order;
+    selectionRef.current = selection;
+    bySectionRef.current = bySection;
+  });
+
+  const focusRow = useCallback((id: string | null) => {
+    if (!id) return;
+    const el = container.current?.querySelector<HTMLElement>(`[data-task-id="${CSS.escape(id)}"]`);
+    el?.focus();
+    el?.scrollIntoView?.({ block: 'nearest' });
+  }, []);
+
   const openDraft = useCallback((sectionId: string, afterId: string | null) => {
     draftKey.current += 1;
     setDraft({ sectionId, afterId, key: draftKey.current });
+  }, []);
+
+  const fade = useCallback((ids: string[]) => {
+    setFading((s) => new Set([...s, ...ids]));
+    setTimeout(
+      () =>
+        setFading((s) => {
+          const n = new Set(s);
+          ids.forEach((id) => n.delete(id));
+          return n;
+        }),
+      FADE_MS,
+    );
   }, []);
 
   const onToggle = useCallback(
     (t: Task) => {
       const completing = !t.completed_at;
       m.setCompleted.mutate({ id: t.id, completed: completing });
-      if (completing) {
-        setFading((s) => new Set(s).add(t.id));
-        setTimeout(
-          () =>
-            setFading((s) => {
-              const n = new Set(s);
-              n.delete(t.id);
-              return n;
-            }),
-          FADE_MS,
-        );
-      }
+      if (completing) fade([t.id]);
     },
-    [m.setCompleted],
+    [m.setCompleted, fade],
   );
   const onRename = useCallback((t: Task, title: string) => m.rename.mutate({ id: t.id, title }), [m.rename]);
   const onEnter = useCallback((t: Task) => canEdit && openDraft(t.section_id!, t.id), [canEdit, openDraft]);
@@ -75,6 +142,225 @@ export function ProjectTasksView({ projectId, canEdit }: { projectId: string; ca
     (t: Task, patch: TaskPatch, message?: string) => m.update.mutate({ id: t.id, patch, message }),
     [m.update],
   );
+  const onSelectClick = useCallback(
+    (t: Task, mods: Modifiers) =>
+      setSelection((s) => clickRow(prune(s, orderRef.current), t.id, mods, orderRef.current)),
+    [],
+  );
+  // Focus moves on mouse-down, before the click: it must not move the Shift/⌘ range anchor.
+  const onFocusRow = useCallback(
+    (t: Task) => setSelection((s) => (s.focus === t.id ? s : { ...s, focus: t.id })),
+    [],
+  );
+
+  // ---------- actions on the selection (or the focused row) ----------
+
+  const sectionName = (id: string) => sections?.find((s) => s.id === id)?.name ?? 'section';
+
+  const moveBlock = useCallback(
+    (
+      ids: string[],
+      sectionId: string,
+      anchorId: string | null,
+      placement: DropPlacement,
+      message?: string,
+    ) => {
+      const sectionOrder = (bySectionRef.current.get(sectionId) ?? []).map((t) => t.id);
+      const n = dropNeighbors(sectionOrder, ids, anchorId, placement);
+      if (!n) return false;
+      m.move.mutate({ ids, sectionId, ...n, message });
+      return true;
+    },
+    [m.move],
+  );
+
+  /** ⌘↑ / ⌘↓: move the target block one step, crossing into the neighboring section at the edges. */
+  const nudge = (dir: 1 | -1) => {
+    const ids = targets(selection, order);
+    if (!ids.length || !sections) return;
+    const first = taskById.get(ids[0]!);
+    if (!first?.section_id) return;
+    const sectionOrder = (bySection.get(first.section_id) ?? []).map((t) => t.id);
+    const moving = new Set(ids);
+    const firstIdx = sectionOrder.findIndex((id) => moving.has(id));
+    let lastIdx = firstIdx;
+    sectionOrder.forEach((id, i) => {
+      if (moving.has(id)) lastIdx = i;
+    });
+    const si = sections.findIndex((s) => s.id === first.section_id);
+    if (dir === -1) {
+      const prev = sectionOrder
+        .slice(0, firstIdx)
+        .reverse()
+        .find((id) => !moving.has(id));
+      if (prev) moveBlock(ids, first.section_id, prev, 'before');
+      else if (sections[si - 1]) {
+        const target = sections[si - 1]!;
+        moveBlock(ids, target.id, null, 'after', `Moved to ${target.name}`);
+      }
+    } else {
+      const next = sectionOrder.slice(lastIdx + 1).find((id) => !moving.has(id));
+      if (next) moveBlock(ids, first.section_id, next, 'after');
+      else if (sections[si + 1]) {
+        const target = sections[si + 1]!;
+        const head = (bySection.get(target.id) ?? [])[0];
+        moveBlock(ids, target.id, head?.id ?? null, head ? 'before' : 'after', `Moved to ${target.name}`);
+      }
+    }
+    requestAnimationFrame(() => focusRow(selection.focus));
+  };
+
+  const bulkIds = targets(selection, order);
+  const bulkUpdate = (patch: TaskPatch, message: string) =>
+    m.bulk.mutate({ ids: bulkIds, action: 'update', patch, message });
+  const bulkComplete = (ids: string[]) => {
+    const incomplete = ids.filter((id) => !taskById.get(id)?.completed_at);
+    if (!incomplete.length) {
+      m.bulk.mutate({
+        ids,
+        action: 'uncomplete',
+        message: `${plural(ids.length, 'task')} marked incomplete`,
+      });
+      return;
+    }
+    fade(incomplete);
+    m.bulk.mutate({
+      ids: incomplete,
+      action: 'complete',
+      message: `${plural(incomplete.length, 'task')} completed`,
+    });
+    setSelection(emptySelection);
+  };
+  const bulkDelete = (ids: string[]) => {
+    m.bulk.mutate({ ids, action: 'delete', message: `${plural(ids.length, 'task')} deleted` });
+    setSelection(emptySelection);
+  };
+
+  // ---------- keyboard ----------
+
+  const isRowTarget = (e: KeyboardEvent) => (e.target as HTMLElement).dataset?.taskId !== undefined;
+
+  const onKeyDownCapture = (e: KeyboardEvent<HTMLDivElement>) => {
+    // With several rows selected, A / D / M act on the whole selection.
+    if (!isRowTarget(e) || selection.selected.size < 2 || !canEdit) return;
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    const k = e.key.toLowerCase();
+    if (k === 'a') setBulkPicker('assignee');
+    else if (k === 'd') setBulkPicker('due');
+    else if (k === 'm' && meId)
+      bulkUpdate({ assignee_id: meId }, `${plural(bulkIds.length, 'task')} assigned to you`);
+    else return;
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    if (!isRowTarget(e) || e.defaultPrevented) return;
+    const mod = e.metaKey || e.ctrlKey;
+    const k = e.key;
+    let next: Selection | null = null;
+    if ((k === 'ArrowDown' || k === 'ArrowUp') && mod) {
+      if (canEdit) nudge(k === 'ArrowDown' ? 1 : -1);
+    } else if (k === 'ArrowDown' || (k === 'j' && !mod)) next = step(selection, 1, e.shiftKey, order);
+    else if (k === 'ArrowUp' || (k === 'k' && !mod)) next = step(selection, -1, e.shiftKey, order);
+    else if (k === 'Escape' && selection.selected.size) next = { ...selection, selected: new Set() };
+    else if (mod && k.toLowerCase() === 'a') {
+      const sid = selection.focus ? taskById.get(selection.focus)?.section_id : null;
+      if (!sid) return;
+      next = selectAll(
+        selection,
+        (bySection.get(sid) ?? []).map((t) => t.id),
+      );
+    } else if (mod && k === 'Enter' && canEdit) {
+      const ids = targets(selection, order);
+      if (ids.length === 1) onToggle(taskById.get(ids[0]!)!);
+      else if (ids.length > 1) bulkComplete(ids);
+    } else if (mod && (k === 'Backspace' || k === 'Delete') && canEdit) {
+      const ids = targets(selection, order);
+      if (ids.length) bulkDelete(ids);
+    } else return;
+    e.preventDefault();
+    if (next) {
+      setSelection(next);
+      if (next.focus !== selection.focus) focusRow(next.focus);
+    }
+  };
+
+  // ---------- drag and drop ----------
+
+  const setDrop = (next: DropTarget | null) => {
+    const prev = dropRef.current;
+    if (
+      prev?.sectionId === next?.sectionId &&
+      prev?.anchorId === next?.anchorId &&
+      prev?.placement === next?.placement
+    )
+      return;
+    dropRef.current = next;
+    setDropTarget(next);
+  };
+  const endDrag = () => {
+    setDrag(null);
+    setDrop(null);
+  };
+
+  const itemDnd: ItemDnd = {
+    onDragStart: (e: DragStartEvent) => {
+      const id = String(e.active.id);
+      const active = taskById.get(id);
+      if (!active) return;
+      const current = selectionRef.current;
+      let ids = [id];
+      if (current.selected.has(id)) ids = targets(current, orderRef.current);
+      else setSelection((s) => clickRow(s, id, {}, orderRef.current));
+      setDraft(null);
+      setDrag({ ids, active });
+    },
+    onDragMove: (e: DragMoveEvent) => {
+      const data = e.over?.data.current as { kind?: string; taskId?: string; sectionId?: string } | undefined;
+      if (data?.kind === 'section-end' && data.sectionId) {
+        return setDrop({ sectionId: data.sectionId, anchorId: null, placement: 'after' });
+      }
+      if (data?.kind === 'task' && data.taskId && data.sectionId && e.over) {
+        const r = e.active.rect.current.translated;
+        const mid = r ? r.top + r.height / 2 : 0;
+        const placement = mid < e.over.rect.top + e.over.rect.height / 2 ? 'before' : 'after';
+        return setDrop({ sectionId: data.sectionId, anchorId: data.taskId, placement });
+      }
+      setDrop(null);
+    },
+    onDragEnd: () => {
+      const target = dropRef.current;
+      if (drag && target) {
+        const n = drag.ids.length;
+        const crossing = drag.active.section_id !== target.sectionId;
+        const msg =
+          n > 1
+            ? `Moved ${plural(n, 'task')}`
+            : crossing
+              ? `Moved to ${sectionName(target.sectionId)}`
+              : undefined;
+        moveBlock(drag.ids, target.sectionId, target.anchorId, target.placement, msg);
+      }
+      endDrag();
+    },
+    onDragCancel: endDrag,
+    overlay: (
+      <DragOverlay dropAnimation={null}>
+        {drag ? (
+          <div className="flex h-9 max-w-md items-center gap-2 rounded-md bg-surface px-3 text-[13.5px] shadow-pop">
+            <span className="truncate">{drag.active.title}</span>
+            {drag.ids.length > 1 ? (
+              <span className="tabular rounded-full bg-accent px-1.5 text-xs font-medium text-on-accent">
+                {drag.ids.length}
+              </span>
+            ) : null}
+          </div>
+        ) : null}
+      </DragOverlay>
+    ),
+  };
+  const draggingIds = useMemo(() => new Set(drag?.ids ?? []), [drag]);
 
   if (open.isPending) {
     return (
@@ -125,6 +411,11 @@ export function ProjectTasksView({ projectId, canEdit }: { projectId: string; ca
               fading={fading.has(t.id)}
               assignee={t.assignee_id ? peopleById.get(t.assignee_id) : undefined}
               meId={meId}
+              selected={selection.selected.has(t.id)}
+              dragging={draggingIds.has(t.id)}
+              dropIndicator={dropTarget?.anchorId === t.id ? dropTarget.placement : null}
+              onSelectClick={onSelectClick}
+              onFocusRow={onFocusRow}
               onUpdate={onUpdate}
               onToggle={onToggle}
               onRename={onRename}
@@ -135,23 +426,31 @@ export function ProjectTasksView({ projectId, canEdit }: { projectId: string; ca
           </div>
         ))}
         {draftIndex > tasks.length ? draftRow : null}
-        {canEdit && !draftHere ? (
-          <Button
-            variant="text"
-            size="sm"
-            className="mt-1 text-muted"
-            onClick={() => openDraft(section.id, tasks.filter((t) => !t.completed_at).at(-1)?.id ?? null)}
-          >
-            <Icon icon={Plus} /> Add task
-          </Button>
-        ) : null}
-        {!canEdit && tasks.length === 0 ? <p className="py-1 text-sm text-muted-2">No tasks</p> : null}
+        <SectionEnd
+          sectionId={section.id}
+          active={dropTarget?.sectionId === section.id && !dropTarget.anchorId}
+        >
+          {canEdit && !draftHere ? (
+            <Button
+              variant="text"
+              size="sm"
+              className="mt-1 text-muted"
+              onClick={() => openDraft(section.id, tasks.filter((t) => !t.completed_at).at(-1)?.id ?? null)}
+            >
+              <Icon icon={Plus} /> Add task
+            </Button>
+          ) : null}
+          {!canEdit && tasks.length === 0 ? <p className="py-1 text-sm text-muted-2">No tasks</p> : null}
+        </SectionEnd>
       </div>
     );
   };
 
+  const count = bulkIds.length;
   return (
-    <div>
+    // Keyboard handling is delegated from the rows (each row is focusable).
+    // eslint-disable-next-line jsx-a11y/no-static-element-interactions
+    <div ref={container} onKeyDownCapture={onKeyDownCapture} onKeyDown={onKeyDown}>
       <div className="mb-3 flex items-center justify-end">
         <Button
           size="sm"
@@ -172,7 +471,69 @@ export function ProjectTasksView({ projectId, canEdit }: { projectId: string; ca
         <span className="w-32 px-1.5">Due date</span>
         <span className="w-7" />
       </div>
-      <SectionList projectId={projectId} canEdit={canEdit} renderBody={renderBody} />
+      <SectionList
+        projectId={projectId}
+        canEdit={canEdit}
+        renderBody={renderBody}
+        collapsed={collapsed}
+        onToggleCollapsed={toggle}
+        itemDnd={canEdit ? itemDnd : undefined}
+      />
+      {canEdit && selection.selected.size > 1 ? (
+        <BulkBar
+          count={count}
+          sections={sections ?? []}
+          picker={bulkPicker}
+          onPickerChange={setBulkPicker}
+          onAssign={(u) =>
+            bulkUpdate(
+              { assignee_id: u?.id ?? null },
+              u
+                ? `${plural(count, 'task')} assigned to ${u.id === meId ? 'you' : u.name}`
+                : `${plural(count, 'task')} unassigned`,
+            )
+          }
+          onDue={(v) =>
+            bulkUpdate(
+              v ? { due_on: v.date, due_at: v.at } : { due_on: null, due_at: null },
+              v
+                ? `${plural(count, 'task')} due ${formatDue(v.date, v.at)}`
+                : `Due date removed from ${plural(count, 'task')}`,
+            )
+          }
+          onMove={(sid) =>
+            moveBlock(bulkIds, sid, null, 'after', `Moved ${plural(count, 'task')} to ${sectionName(sid)}`)
+          }
+          onComplete={() => bulkComplete(bulkIds)}
+          onDelete={() => bulkDelete(bulkIds)}
+          onClear={() => setSelection((s) => ({ ...s, selected: new Set() }))}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+/** Drop zone at the end of a section (also where "Add task" lives). */
+function SectionEnd({
+  sectionId,
+  active,
+  children,
+}: {
+  sectionId: string;
+  active: boolean;
+  children: ReactNode;
+}) {
+  const { setNodeRef } = useDroppable({
+    id: `section-end:${sectionId}`,
+    data: { kind: 'section-end', sectionId },
+  });
+  const dragging = useDndContext().active !== null;
+  return (
+    <div ref={setNodeRef} className={cn('relative min-h-3', dragging && 'min-h-9')}>
+      {active ? (
+        <span aria-hidden className="absolute top-0 right-0 left-0 h-0.5 rounded-full bg-focus" />
+      ) : null}
+      {children}
     </div>
   );
 }

@@ -318,6 +318,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/tasks/bulk": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Apply one action to many tasks (all-or-nothing, one undo batch) */
+        post: operations["bulk_tasks_api_v1_tasks_bulk_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tasks/{task_id}": {
         parameters: {
             query?: never;
@@ -348,6 +365,23 @@ export interface paths {
         put?: never;
         /** Complete */
         post: operations["complete_api_v1_tasks__task_id__complete_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tasks/{task_id}/move": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Move a task to a slot in a section of its project */
+        post: operations["move_task_api_v1_tasks__task_id__move_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -815,6 +849,28 @@ export interface components {
             /** Titles */
             titles: string[];
         };
+        /**
+         * TaskBulkIn
+         * @description One action on many tasks, all-or-nothing, undoable as one batch.
+         *
+         *     ``move`` keeps the tasks' current relative order and places them consecutively.
+         */
+        TaskBulkIn: {
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "update" | "move" | "complete" | "uncomplete" | "delete";
+            /** After Id */
+            after_id?: string | null;
+            /** Before Id */
+            before_id?: string | null;
+            patch?: components["schemas"]["TaskFieldsIn"] | null;
+            /** Section Id */
+            section_id?: string | null;
+            /** Task Ids */
+            task_ids: string[];
+        };
         /** TaskCreateIn */
         TaskCreateIn: {
             /** After Id */
@@ -825,6 +881,32 @@ export interface components {
             section_id?: string | null;
             /** Title */
             title: string;
+        };
+        /**
+         * TaskFieldsIn
+         * @description Fields that can be set on many tasks at once.
+         */
+        TaskFieldsIn: {
+            /** Assignee Id */
+            assignee_id?: string | null;
+            /** Due At */
+            due_at?: string | null;
+            /** Due On */
+            due_on?: string | null;
+            /** Start On */
+            start_on?: string | null;
+        };
+        /** TaskMoveIn */
+        TaskMoveIn: {
+            /** After Id */
+            after_id?: string | null;
+            /** Before Id */
+            before_id?: string | null;
+            /**
+             * Section Id
+             * Format: uuid
+             */
+            section_id: string;
         };
         /** TaskOut */
         TaskOut: {
@@ -1846,6 +1928,39 @@ export interface operations {
             };
         };
     };
+    bulk_tasks_api_v1_tasks_bulk_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TaskBulkIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationOut_ListOut_TaskOut__"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_task_api_v1_tasks__task_id__get: {
         parameters: {
             query?: never;
@@ -1955,6 +2070,41 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationOut_TaskOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    move_task_api_v1_tasks__task_id__move_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TaskMoveIn"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {

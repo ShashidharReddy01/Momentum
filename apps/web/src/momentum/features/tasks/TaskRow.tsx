@@ -1,12 +1,15 @@
+import { useDraggable, useDroppable } from '@dnd-kit/core';
 import { CalendarDays, MoreHorizontal, Trash2, UserRound } from 'lucide-react';
 import {
   forwardRef,
   memo,
+  useCallback,
   useEffect,
   useRef,
   useState,
   type ComponentProps,
   type KeyboardEvent,
+  type MouseEvent,
 } from 'react';
 import { CompleteCheck } from '@/components/common/CompleteCheck';
 import { DueText } from '@/components/common/DueText';
@@ -25,6 +28,7 @@ import type { Person } from '@/features/people';
 import { AssigneePicker } from './AssigneePicker';
 import { DatePicker } from './DatePicker';
 import { isTemp, type Task, type TaskPatch } from './queries';
+import type { DropPlacement, Modifiers } from './selection';
 
 type Picker = 'assignee' | 'due' | null;
 
@@ -34,6 +38,13 @@ export interface TaskRowProps {
   fading?: boolean;
   assignee?: Person;
   meId?: string;
+  selected?: boolean;
+  /** Part of the set being dragged (dimmed). */
+  dragging?: boolean;
+  dropIndicator?: DropPlacement | null;
+  /** Row clicks (plain / shift / ⌘) drive the selection. */
+  onSelectClick?: (task: Task, mods: Modifiers) => void;
+  onFocusRow?: (task: Task) => void;
   onUpdate: (task: Task, patch: TaskPatch, message?: string) => void;
   onToggle: (task: Task) => void;
   onRename: (task: Task, title: string) => void;
@@ -47,6 +58,11 @@ export const TaskRow = memo(function TaskRow({
   fading,
   assignee,
   meId,
+  selected = false,
+  dragging = false,
+  dropIndicator = null,
+  onSelectClick,
+  onFocusRow,
   onUpdate,
   onToggle,
   onRename,
@@ -55,7 +71,40 @@ export const TaskRow = memo(function TaskRow({
 }: TaskRowProps) {
   const [editing, setEditing] = useState(false);
   const [picker, setPicker] = useState<Picker>(null);
-  const row = useRef<HTMLDivElement>(null);
+  const row = useRef<HTMLDivElement | null>(null);
+  const drag = useDraggable({
+    id: task.id,
+    data: { kind: 'task', sectionId: task.section_id },
+    disabled: !canEdit || editing || picker !== null || isTemp(task.id),
+  });
+  const drop = useDroppable({
+    id: `row:${task.id}`,
+    data: { kind: 'task', taskId: task.id, sectionId: task.section_id },
+  });
+  const { setNodeRef: setDragRef } = drag;
+  const { setNodeRef: setDropRef } = drop;
+  const setRefs = useCallback(
+    (node: HTMLDivElement | null) => {
+      row.current = node;
+      setDragRef(node);
+      setDropRef(node);
+    },
+    [setDragRef, setDropRef],
+  );
+  // Pointer drags only: Enter/Space on a row are editing keys, not keyboard-drag keys.
+  const onPointerDown = drag.listeners?.onPointerDown as ((e: unknown) => void) | undefined;
+  const onClickCapture = (e: MouseEvent) => {
+    const mods = { shift: e.shiftKey, meta: e.metaKey || e.ctrlKey };
+    if (mods.shift || mods.meta) {
+      e.preventDefault();
+      e.stopPropagation();
+      if (mods.shift) window.getSelection()?.removeAllRanges();
+      onSelectClick?.(task, mods);
+      row.current?.focus();
+    } else {
+      onSelectClick?.(task, {});
+    }
+  };
   const [draft, setDraft] = useState(task.title);
   const input = useRef<HTMLInputElement>(null);
   const done = !!task.completed_at;
@@ -109,19 +158,37 @@ export const TaskRow = memo(function TaskRow({
     // Rows are keyboard targets (A/M/D/Enter); S1.2.4 adds roving focus + selection.
     // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions
     <div
-      ref={row}
+      ref={setRefs}
       role="listitem"
       aria-label={task.title}
+      data-selected={selected || undefined}
       data-task-id={task.id}
+      data-section-id={task.section_id}
+      onPointerDown={onPointerDown}
+      onClickCapture={onClickCapture}
+      onFocus={(e) => e.target === e.currentTarget && onFocusRow?.(task)}
       // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex
       tabIndex={0}
       onKeyDown={onRowKey}
       className={cn(
-        'group/row flex h-9 items-center gap-2.5 border-b border-hair-soft px-2 transition-opacity duration-300 outline-none hover:bg-surface-2 focus-visible:bg-surface-2 focus-visible:shadow-[inset_2px_0_0_var(--focus)]',
+        'group/row relative flex h-9 items-center gap-2.5 border-b border-hair-soft px-2 transition-opacity duration-300 outline-none hover:bg-surface-2 focus-visible:bg-surface-2 focus-visible:shadow-[inset_2px_0_0_var(--focus)]',
         (done || fading) && 'text-muted',
         fading && 'opacity-60',
+        selected && 'bg-selection hover:bg-selection focus-visible:bg-selection',
+        dragging && 'opacity-40',
       )}
     >
+      {selected ? <span className="sr-only">Selected</span> : null}
+      {dropIndicator ? (
+        <span
+          aria-hidden
+          data-drop={dropIndicator}
+          className={cn(
+            'pointer-events-none absolute right-0 left-0 z-10 h-0.5 rounded-full bg-focus',
+            dropIndicator === 'before' ? '-top-px' : '-bottom-px',
+          )}
+        />
+      ) : null}
       <CompleteCheck
         checked={done}
         disabled={!canEdit}

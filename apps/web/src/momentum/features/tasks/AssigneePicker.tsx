@@ -12,8 +12,11 @@ export function AssigneePicker({
   onOpenChange,
   assigneeId,
   onChange,
+  allowClear = false,
   children,
 }: {
+  /** Always offer "Unassign" (bulk editing, where there's no single current assignee). */
+  allowClear?: boolean;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   assigneeId: string | null;
@@ -23,7 +26,7 @@ export function AssigneePicker({
   const me = useMe().data?.user;
   const pick = (user: { id: string; name: string } | null) => {
     onOpenChange(false);
-    if ((user?.id ?? null) !== assigneeId) onChange(user);
+    if (allowClear || (user?.id ?? null) !== assigneeId) onChange(user);
   };
   return (
     <Popover open={open} onOpenChange={onOpenChange}>
@@ -44,7 +47,7 @@ export function AssigneePicker({
                   <Icon icon={UserRound} className="text-muted" /> Assign to me
                 </Command.Item>
               ) : null}
-              {assigneeId ? (
+              {assigneeId || allowClear ? (
                 <Command.Item
                   value="__none unassign remove"
                   onSelect={() => pick(null)}

@@ -10,7 +10,14 @@ from momentum.api.schemas import ListOut, MutationMeta, MutationOut, OkOut
 from momentum.core.ids import task_key
 from momentum.domain.tasks import service
 from momentum.domain.tasks.models import Task, TaskProject
-from momentum.domain.tasks.schemas import TaskBatchCreateIn, TaskCreateIn, TaskOut, TaskPatchIn
+from momentum.domain.tasks.schemas import (
+    TaskBatchCreateIn,
+    TaskBulkIn,
+    TaskCreateIn,
+    TaskMoveIn,
+    TaskOut,
+    TaskPatchIn,
+)
 
 router = APIRouter(tags=["tasks"])
 
@@ -155,3 +162,50 @@ async def delete_task(task_id: uuid.UUID, ctx: CtxDep, uow: UowDep) -> MutationO
     async with uow.transaction() as s:
         m = await service.delete_task(s, ctx, task_id)
     return MutationOut(data=OkOut(), meta=MutationMeta(activity_id=m.activity_id))
+
+
+@router.post(
+    "/tasks/{task_id}/move",
+    response_model=MutationOut[TaskOut],
+    summary="Move a task to a slot in a section of its project",
+)
+async def move_task(
+    task_id: uuid.UUID, body: TaskMoveIn, ctx: CtxDep, uow: UowDep
+) -> MutationOut[TaskOut]:
+    async with uow.transaction() as s:
+        m = await service.move_tasks(
+            s,
+            ctx,
+            [task_id],
+            section_id=body.section_id,
+            after_id=body.after_id,
+            before_id=body.before_id,
+        )
+        t, p = m.entity[0]
+        return MutationOut(
+            data=task_out(t, p), meta=MutationMeta(activity_id=m.activity_id, version=t.version)
+        )
+
+
+@router.post(
+    "/tasks/bulk",
+    response_model=MutationOut[ListOut[TaskOut]],
+    summary="Apply one action to many tasks (all-or-nothing, one undo batch)",
+)
+async def bulk_tasks(body: TaskBulkIn, ctx: CtxDep, uow: UowDep) -> MutationOut[ListOut[TaskOut]]:
+    async with uow.transaction() as s:
+        m = await service.bulk(
+            s,
+            ctx,
+            body.task_ids,
+            body.action,
+            patch=body.patch.model_dump(exclude_unset=True) if body.patch else None,
+            section_id=body.section_id,
+            after_id=body.after_id,
+            before_id=body.before_id,
+        )
+        placements = await service.placements_for(s, [t.id for t in m.entity])
+        return MutationOut(
+            data=ListOut(data=[task_out(t, placements.get(t.id)) for t in m.entity]),
+            meta=MutationMeta(batch_id=m.batch_id),
+        )

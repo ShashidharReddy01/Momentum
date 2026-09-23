@@ -63,3 +63,24 @@ def test_prefix_edge_case() -> None:
     for _ in range(100):
         k = key_between("A", "B5")
         assert "A" < k < "B5"
+
+
+@settings(max_examples=100, deadline=None)
+@given(
+    st.integers(min_value=1, max_value=600), st.sampled_from(["both", "after", "before", "none"])
+)
+def test_keys_between_is_ordered_bounded_and_short(n: int, bounds: str) -> None:
+    lo = key_between(None, None) if bounds in ("both", "after") else None
+    hi = key_between(lo, None) if bounds in ("both", "before") else None
+    ks = keys_between(lo, hi, n)
+    assert len(ks) == n and ks == sorted(ks) and len(set(ks)) == n
+    assert all((lo is None or lo < k) and (hi is None or k < hi) for k in ks)
+    assert max(len(k) for k in ks) <= 12  # log growth, far below the 64-char column
+
+
+def test_even_keys_fixed_length() -> None:
+    from momentum.core.ordering import even_keys
+
+    ks = even_keys(2000)
+    assert ks == sorted(ks) and len(set(ks)) == 2000 and max(map(len, ks)) <= 2
+    assert all(not k.endswith("0") for k in ks)

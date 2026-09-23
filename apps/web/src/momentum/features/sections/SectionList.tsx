@@ -2,10 +2,16 @@ import {
   closestCenter,
   DndContext,
   KeyboardSensor,
+  pointerWithin,
   PointerSensor,
+  useDndContext,
+  useDroppable,
   useSensor,
   useSensors,
+  type CollisionDetection,
   type DragEndEvent,
+  type DragMoveEvent,
+  type DragStartEvent,
 } from '@dnd-kit/core';
 import {
   arrayMove,
@@ -43,7 +49,8 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { cn } from '@/lib/cn';
 import { useSectionMutations, useSections, type Section } from './queries';
 
-function useCollapsed(projectId: string) {
+/** Collapsed sections per project, remembered in localStorage. */
+export function useCollapsed(projectId: string) {
   const storageKey = `momentum.collapsed.${projectId}`;
   const [collapsed, setCollapsed] = useState<Set<string>>(() => {
     try {
@@ -67,18 +74,54 @@ function useCollapsed(projectId: string) {
   return { collapsed, toggle };
 }
 
+/**
+ * Drag handlers for items other than sections (tasks) that share this list's DndContext.
+ * Draggables/droppables mark themselves with `data.kind`: 'task' rows and 'section-end' zones.
+ */
+export interface ItemDnd {
+  onDragStart: (e: DragStartEvent) => void;
+  onDragMove: (e: DragMoveEvent) => void;
+  onDragEnd: (e: DragEndEvent) => void;
+  onDragCancel: () => void;
+  overlay: ReactNode;
+}
+
 export interface SectionListProps {
   projectId: string;
   canEdit: boolean;
   /** Renders the body of a section (tasks). */
   renderBody?: (section: Section) => ReactNode;
+  /** Controlled collapse (so the parent knows which rows are visible). */
+  collapsed?: ReadonlySet<string>;
+  onToggleCollapsed?: (id: string) => void;
+  itemDnd?: ItemDnd;
 }
 
+const isItem = (data: unknown) => (data as { kind?: string } | undefined)?.kind !== undefined;
+
+/** Sections only collide with sections; task drags only with task rows and section drop zones. */
+const collisions: CollisionDetection = (args) => {
+  const item = isItem(args.active.data.current);
+  const droppableContainers = args.droppableContainers.filter((c) => isItem(c.data.current) === item);
+  if (!item) return closestCenter({ ...args, droppableContainers });
+  const within = pointerWithin({ ...args, droppableContainers });
+  return within.length ? within : closestCenter({ ...args, droppableContainers });
+};
+
 /** Sections of a project: collapse, rename, add, delete, and reorder by drag or menu. */
-export function SectionList({ projectId, canEdit, renderBody }: SectionListProps) {
+export function SectionList({
+  projectId,
+  canEdit,
+  renderBody,
+  collapsed: controlled,
+  onToggleCollapsed,
+  itemDnd,
+}: SectionListProps) {
   const sections = useSections(projectId);
   const { create, rename, move, remove } = useSectionMutations(projectId);
-  const { collapsed, toggle } = useCollapsed(projectId);
+  const own = useCollapsed(projectId);
+  const collapsed = controlled ?? own.collapsed;
+  const toggle = onToggleCollapsed ?? own.toggle;
   const [adding, setAdding] = useState(false);
   const [newName, setNewName] = useState('');
   const sensors = useSensors(
@@ -108,6 +151,7 @@ export function SectionList({ projectId, canEdit, renderBody }: SectionListProps
   };
 
   const onDragEnd = (e: DragEndEvent) => {
+    if (isItem(e.active.data.current)) return itemDnd?.onDragEnd(e);
     if (!e.over || e.active.id === e.over.id) return;
     moveTo(
       String(e.active.id),
@@ -124,7 +168,14 @@ export function SectionList({ projectId, canEdit, renderBody }: SectionListProps
 
   return (
     <div className="flex flex-col gap-1">
-      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+      <DndContext
+        sensors={sensors}
+        collisionDetection={collisions}
+        onDragStart={(e) => isItem(e.active.data.current) && itemDnd?.onDragStart(e)}
+        onDragMove={(e) => isItem(e.active.data.current) && itemDnd?.onDragMove(e)}
+        onDragEnd={onDragEnd}
+        onDragCancel={(e) => isItem(e.active.data.current) && itemDnd?.onDragCancel()}
+      >
         <SortableContext items={list.map((s) => s.id)} strategy={verticalListSortingStrategy}>
           {list.map((s, i) => (
             <SortableSection
@@ -143,6 +194,7 @@ export function SectionList({ projectId, canEdit, renderBody }: SectionListProps
             </SortableSection>
           ))}
         </SortableContext>
+        {itemDnd?.overlay}
       </DndContext>
       {canEdit ? (
         adding ? (
@@ -197,7 +249,14 @@ function SortableSection({
     useSortable({
       id: section.id,
       disabled: !canEdit,
+      data: {},
     });
+  // Dropping tasks on the header appends them to this section (works when collapsed too).
+  const head = useDroppable({
+    id: `section-head:${section.id}`,
+    data: { kind: 'section-end', sectionId: section.id },
+  });
+  const draggingItem = isItem(useDndContext().active?.data.current);
   return (
     <section
       ref={setNodeRef}
@@ -205,7 +264,13 @@ function SortableSection({
       style={{ transform: CSS.Translate.toString(transform), transition }}
       className={cn('group/section rounded-md', isDragging && 'relative z-10 bg-surface shadow-pop')}
     >
-      <div className="flex h-9 items-center gap-1">
+      <div
+        ref={head.setNodeRef}
+        className={cn(
+          'flex h-9 items-center gap-1 rounded-md',
+          draggingItem && head.isOver && 'bg-accent-tint ring-1 ring-focus',
+        )}
+      >
         {canEdit ? (
           <button
             type="button"

@@ -64,13 +64,35 @@ def key_between(a: str | None, b: str | None, *, jitter: bool = True) -> str:
 
 
 def keys_between(a: str | None, b: str | None, n: int) -> list[str]:
-    """n increasing keys between a and b (used for bulk inserts and rebalancing)."""
-    keys: list[str] = []
-    prev = a
-    for _ in range(n):
-        prev = key_between(prev, b, jitter=False)
-        keys.append(prev)
-    return keys
+    """n increasing keys between a and b (bulk moves, rebalancing).
+
+    Keys are placed by bisection so their length grows with log(n), not n. With no bounds the
+    keys are evenly spaced at a fixed length (see :func:`even_keys`)."""
+    if n <= 0:
+        return []
+    if a is None and b is None:
+        return even_keys(n)
+    mid = key_between(a, b, jitter=False)
+    left = n // 2
+    return [*keys_between(a, mid, left), mid, *keys_between(mid, b, n - left - 1)]
+
+
+def even_keys(n: int) -> list[str]:
+    """n evenly spaced keys of the shortest fixed length that fits (trailing zeros stripped)."""
+    base = len(DIGITS)
+    length = 1
+    while base**length <= n + 1:
+        length += 1
+    span = base**length
+    out: list[str] = []
+    for i in range(1, n + 1):
+        value = i * span // (n + 1)
+        digits = []
+        for _ in range(length):
+            value, r = divmod(value, base)
+            digits.append(DIGITS[r])
+        out.append("".join(reversed(digits)).rstrip(ZERO))
+    return out
 
 
 def needs_rebalance(key: str) -> bool:

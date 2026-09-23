@@ -4,18 +4,18 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, date, datetime
-from typing import Any
+from typing import Any, Literal
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from momentum.core.activity import Diff, jsonable_diff, record_activity
+from momentum.core.activity import Activity, Diff, jsonable_diff, record_activity
 from momentum.core.context import Ctx
 from momentum.core.errors import NotFound, ValidationFailed
 from momentum.core.events import emit
 from momentum.core.mutation import Mutation
-from momentum.core.ordering import key_between
+from momentum.core.ordering import even_keys, key_between, keys_between, needs_rebalance
 from momentum.core.undo import UndoConflict, undo_handler, undo_op
 from momentum.domain.access import (
     get_visible_project,
@@ -81,19 +81,19 @@ async def _ordered_placements(
     return list(rows.scalars())
 
 
-async def _neighbors(
+async def _slot(
     session: AsyncSession,
     project_id: uuid.UUID,
     section_id: uuid.UUID,
     after_id: uuid.UUID | None,
     before_id: uuid.UUID | None,
-    *,
-    exclude: uuid.UUID | None = None,
+    exclude: set[uuid.UUID],
 ) -> tuple[str | None, str | None]:
+    """Neighbor keys for an insert after ``after_id`` / before ``before_id`` / at the end."""
     items = [
         p
         for p in await _ordered_placements(session, project_id, section_id)
-        if p.task_id != exclude
+        if p.task_id not in exclude
     ]
     ids = [p.task_id for p in items]
     if after_id is not None:
@@ -107,6 +107,46 @@ async def _neighbors(
         i = ids.index(before_id)
         return items[i - 1].position if i > 0 else None, items[i].position
     return (items[-1].position if items else None), None
+
+
+async def _rebalance(session: AsyncSession, project_id: uuid.UUID, section_id: uuid.UUID) -> None:
+    """Re-space every placement in a section, keeping order. Includes deleted tasks (so restores
+    sort correctly) and tasks being moved (so their undo positions stay consistent)."""
+    rows = (
+        (
+            await session.execute(
+                select(TaskProject)
+                .where(TaskProject.project_id == project_id, TaskProject.section_id == section_id)
+                .order_by(TaskProject.position, TaskProject.task_id)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    for row, key in zip(rows, even_keys(len(rows)), strict=True):
+        row.position = key
+    await session.flush()
+
+
+async def _keys_for(
+    session: AsyncSession,
+    project_id: uuid.UUID,
+    section_id: uuid.UUID,
+    n: int,
+    *,
+    after_id: uuid.UUID | None = None,
+    before_id: uuid.UUID | None = None,
+    exclude: set[uuid.UUID] | None = None,
+) -> list[str]:
+    """n order keys for consecutive items at a slot; rebalances the section if keys got long."""
+    skip = exclude or set()
+    for attempt in range(2):
+        a, b = await _slot(session, project_id, section_id, after_id, before_id, skip)
+        keys = [key_between(a, b)] if n == 1 else keys_between(a, b, n)
+        if attempt == 1 or not any(needs_rebalance(k) for k in keys):
+            return keys
+        await _rebalance(session, project_id, section_id)
+    raise AssertionError("unreachable")
 
 
 def _as_uuid(v: Any) -> uuid.UUID | None:
@@ -189,6 +229,16 @@ async def get_task(
     return await get_visible_task(session, ctx, task_id)
 
 
+async def placements_for(
+    session: AsyncSession, task_ids: list[uuid.UUID]
+) -> dict[uuid.UUID, TaskProject]:
+    """Home-project placement per task (one query; Phase 1 tasks live in one project)."""
+    if not task_ids:
+        return {}
+    rows = await session.execute(select(TaskProject).where(TaskProject.task_id.in_(task_ids)))
+    return {p.task_id: p for p in rows.scalars()}
+
+
 # ---------- writes ----------
 
 
@@ -209,7 +259,9 @@ async def create_task(
     if not title:
         raise ValidationFailed("Task name can't be empty")
     section = await _section_for(session, project_id, section_id)
-    a, b = await _neighbors(session, project_id, section.id, after_id, before_id)
+    (position,) = await _keys_for(
+        session, project_id, section.id, 1, after_id=after_id, before_id=before_id
+    )
     task = Task(
         workspace_id=ctx.workspace_id,
         number=await _next_number(session, ctx.workspace_id),
@@ -223,7 +275,7 @@ async def create_task(
         task_id=task.id,
         project_id=project_id,
         section_id=section.id,
-        position=key_between(a, b),
+        position=position,
         added_by=ctx.actor.id,
     )
     session.add(placement)
@@ -291,6 +343,7 @@ async def update_task(
     *,
     expected_version: int | None = None,
     record_undo: bool = True,
+    batch_id: uuid.UUID | None = None,
 ) -> Mutation[Task]:
     task, placement, role = await get_visible_task(session, ctx, task_id)
     require_project_role(role, "editor", "edit this task")
@@ -335,6 +388,7 @@ async def update_task(
         )
         if record_undo
         else None,
+        batch_id=batch_id,
     )
     await emit(
         session,
@@ -364,7 +418,7 @@ async def update_task(
             + ([f"user:{previous_assignee}"] if previous_assignee else []),
             activity_id=act.id,
         )
-    return Mutation(task, act.id, version=task.version)
+    return Mutation(task, act.id, batch_id=batch_id, version=task.version)
 
 
 def _apply_dates(task: Task, patch: dict[str, Any], ctx: Ctx, changes: Diff) -> None:
@@ -461,6 +515,152 @@ async def delete_task(
     return Mutation(task, act.id, batch_id=batch_id, version=task.version)
 
 
+MAX_BULK = 500
+BulkAction = Literal["update", "move", "complete", "uncomplete", "delete"]
+
+
+def _dedupe(ids: list[uuid.UUID]) -> list[uuid.UUID]:
+    return list(dict.fromkeys(ids))
+
+
+async def move_tasks(
+    session: AsyncSession,
+    ctx: Ctx,
+    task_ids: list[uuid.UUID],
+    *,
+    section_id: uuid.UUID,
+    after_id: uuid.UUID | None = None,
+    before_id: uuid.UUID | None = None,
+    batch_id: uuid.UUID | None = None,
+) -> Mutation[list[tuple[Task, TaskProject]]]:
+    """Move tasks (keeping their current relative order) to a slot in a section of their project.
+
+    All tasks must be top-level tasks of the same project and editable by the actor; the anchor
+    (``after_id``/``before_id``) must not be one of the moved tasks. One task → one activity;
+    several → one batch (a single undo)."""
+    ids = _dedupe(task_ids)
+    if not ids:
+        raise ValidationFailed("Nothing to move")
+    if len(ids) > MAX_BULK:
+        raise ValidationFailed(f"At most {MAX_BULK} tasks at a time", code="too_many")
+    if after_id is not None and before_id is not None:
+        raise ValidationFailed("Give after_id or before_id, not both")
+    if after_id in ids or before_id in ids:
+        raise ValidationFailed("A task can't be moved next to itself", code="invalid_anchor")
+    section = await session.get(Section, section_id)
+    if section is None or section.deleted_at is not None:
+        raise NotFound("Section not found")
+    items: list[tuple[Task, TaskProject]] = []
+    for tid in ids:
+        task, placement, role = await get_visible_task(session, ctx, tid)
+        require_project_role(role, "editor", "move this task")
+        if placement is None or task.parent_id is not None:
+            raise ValidationFailed("Only top-level project tasks can be moved", code="not_movable")
+        if placement.project_id != section.project_id:
+            raise ValidationFailed(
+                "Tasks can only move within their project", code="cross_project_move"
+            )
+        items.append((task, placement))
+    # keep the tasks' current visual order (section order, then position)
+    section_order = {
+        s.id: i for i, s in enumerate(await list_sections(session, section.project_id))
+    }
+    items.sort(key=lambda tp: (section_order.get(tp[1].section_id, 0), tp[1].position, tp[0].id))
+    keys = await _keys_for(
+        session,
+        section.project_id,
+        section.id,
+        len(items),
+        after_id=after_id,
+        before_id=before_id,
+        exclude=set(ids),
+    )
+    if len(items) > 1 and batch_id is None:
+        batch_id = uuid.uuid4()
+    last: Activity | None = None
+    for (task, placement), key in zip(items, keys, strict=True):
+        old_section, old_position = placement.section_id, placement.position
+        placement.section_id, placement.position = section.id, key
+        changes: Diff = {"position": (old_position, key)}
+        if old_section != section.id:
+            changes["section_id"] = (old_section, section.id)
+        last = await record_activity(
+            session,
+            ctx,
+            entity_type="task",
+            entity_id=task.id,
+            verb="task.moved",
+            changes=changes,
+            undo=undo_op(
+                "tasks.move_back",
+                task_id=task.id,
+                project_id=section.project_id,
+                section_id=old_section,
+                position=old_position,
+                expect_section_id=section.id,
+                expect_position=key,
+            ),
+            batch_id=batch_id,
+        )
+        await emit(
+            session,
+            ctx,
+            type="task.moved",
+            entity_type="task",
+            entity_id=task.id,
+            data={"section_id": str(section.id), "position": key},
+            channels=channels(task, placement),
+            activity_id=last.id,
+        )
+    await session.flush()
+    return Mutation(items, last.id if last and batch_id is None else None, batch_id=batch_id)
+
+
+async def bulk(
+    session: AsyncSession,
+    ctx: Ctx,
+    task_ids: list[uuid.UUID],
+    action: BulkAction,
+    *,
+    patch: dict[str, Any] | None = None,
+    section_id: uuid.UUID | None = None,
+    after_id: uuid.UUID | None = None,
+    before_id: uuid.UUID | None = None,
+) -> Mutation[list[Task]]:
+    """Apply one action to many tasks, all-or-nothing, as one undoable batch."""
+    ids = _dedupe(task_ids)
+    if not ids:
+        raise ValidationFailed("No tasks selected")
+    if len(ids) > MAX_BULK:
+        raise ValidationFailed(f"At most {MAX_BULK} tasks at a time", code="too_many")
+    batch_id = uuid.uuid4()
+    if action == "move":
+        if section_id is None:
+            raise ValidationFailed("Choose a section to move to")
+        m = await move_tasks(
+            session,
+            ctx,
+            ids,
+            section_id=section_id,
+            after_id=after_id,
+            before_id=before_id,
+            batch_id=batch_id,
+        )
+        return Mutation([t for t, _ in m.entity], batch_id=batch_id)
+    out: list[Task] = []
+    for tid in ids:
+        if action == "update":
+            if not patch:
+                raise ValidationFailed("Nothing to change")
+            out.append((await update_task(session, ctx, tid, patch, batch_id=batch_id)).entity)
+        elif action in ("complete", "uncomplete"):
+            done = action == "complete"
+            out.append((await set_completed(session, ctx, tid, done, batch_id=batch_id)).entity)
+        else:
+            out.append((await delete_task(session, ctx, tid, batch_id=batch_id)).entity)
+    return Mutation(out, batch_id=batch_id)
+
+
 # ---------- section hooks ----------
 
 
@@ -491,13 +691,12 @@ async def _move_or_delete_section_tasks(
             t.version += 1
         return {"deleted": [str(i) for i in ids]}
     assert target is not None
-    tail = await _ordered_placements(session, section.project_id, target)
-    prev = tail[-1].position if tail else None
-    for p in placements:
+    moving = {p.task_id for p in placements}
+    keys = await _keys_for(session, section.project_id, target, len(placements), exclude=moving)
+    for p, key in zip(placements, keys, strict=True):
         moved[str(p.task_id)] = p.position
         p.section_id = target
-        p.position = key_between(prev, None)
-        prev = p.position
+        p.position = key
     return {"moved": moved, "from": str(section.id)}
 
 
@@ -530,6 +729,32 @@ async def _undo_update(session: AsyncSession, ctx: Ctx, args: dict[str, Any]) ->
     if task.version != int(args["version"]):
         raise UndoConflict("This task changed after your edit")
     await update_task(session, ctx, task.id, dict(args["patch"]), record_undo=False)
+
+
+@undo_handler("tasks.move_back")
+async def _undo_move(session: AsyncSession, ctx: Ctx, args: dict[str, Any]) -> None:
+    task, placement, role = await get_visible_task(session, ctx, _tid(args))
+    require_project_role(role, "editor", "move this task")
+    if (
+        placement is None
+        or str(placement.section_id) != str(args["expect_section_id"])
+        or placement.position != args["expect_position"]
+    ):
+        raise UndoConflict("This task was moved again since")
+    section = await session.get(Section, uuid.UUID(str(args["section_id"])))
+    if section is None or section.deleted_at is not None:
+        raise UndoConflict("The original section no longer exists")
+    placement.section_id = section.id
+    placement.position = str(args["position"])
+    await emit(
+        session,
+        ctx,
+        type="task.moved",
+        entity_type="task",
+        entity_id=task.id,
+        data={"section_id": str(section.id), "position": placement.position},
+        channels=channels(task, placement),
+    )
 
 
 @undo_handler("tasks.set_completed")

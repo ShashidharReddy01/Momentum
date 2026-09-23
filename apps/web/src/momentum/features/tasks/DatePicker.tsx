@@ -27,8 +27,10 @@ export function DatePicker({
   dueOn,
   dueAt,
   onChange,
+  allowClear = false,
   children,
 }: {
+  allowClear?: boolean;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   dueOn: string | null;
@@ -43,7 +45,7 @@ export function DatePicker({
   const parsed = useMemo(() => parseNaturalDate(text), [text]);
   const apply = (v: DueValue | null) => {
     onOpenChange(false);
-    if ((v?.date ?? null) !== dueOn || (v?.at ?? null) !== dueAt) onChange(v);
+    if (allowClear || (v?.date ?? null) !== dueOn || (v?.at ?? null) !== dueAt) onChange(v);
   };
   const today = new Date();
   const quick: { label: string; value: DueValue | null }[] = [
@@ -88,7 +90,7 @@ export function DatePicker({
               {q.label}
             </QuickPick>
           ))}
-          {dueOn ? <QuickPick onClick={() => apply(null)}>No date</QuickPick> : null}
+          {dueOn || allowClear ? <QuickPick onClick={() => apply(null)}>No date</QuickPick> : null}
         </div>
         <Calendar selected={dueOn} onSelect={(date) => apply({ date, at: null })} />
       </PopoverContent>
