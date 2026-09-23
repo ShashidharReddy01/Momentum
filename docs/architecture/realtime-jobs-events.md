@@ -43,6 +43,8 @@ Event payloads share an envelope:
 | `task.assigned` | 1 | old/new assignee |
 | `task.dependency_added` / `task.dependency_removed` | 2 | depends_on_id |
 | `subtask.reordered` | 1 | parent_id |
+| `team.created` / `team.updated` / `team.deleted` / `team.restored` | 1 | `changes`, `version` (updated) |
+| `team.member_added` / `team.member_updated` / `team.member_removed` | 1 | `user_id`, `role` (channels also `user:<id>`) |
 | `section.created` / `section.updated` / `section.moved` / `section.deleted` | 1 | |
 | `project.created` / `project.updated` / `project.archived` / `project.deleted` | 1 | |
 | `project.member_added` / `project.member_removed` | 1 | user_id, role |

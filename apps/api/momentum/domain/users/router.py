@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Query, Request
 from pydantic import BaseModel
 from starlette.responses import JSONResponse
 
 from momentum.api.deps import CtxDep, RuntimeDep, UowDep
+from momentum.api.schemas import ListOut
 from momentum.core.errors import NotFound
 from momentum.domain.users import service
 from momentum.domain.users.models import User
@@ -21,6 +22,18 @@ async def me(ctx: CtxDep, uow: UowDep) -> MeOut:
     async with uow.transaction() as session:
         user, ws = await service.get_me(session, ctx)
         return MeOut(user=UserOut.model_validate(user), workspace=WorkspaceOut.model_validate(ws))
+
+
+@router.get("/users", response_model=ListOut[UserOut], summary="Workspace members (for pickers)")
+async def list_users(
+    ctx: CtxDep,
+    uow: UowDep,
+    q: str | None = Query(default=None, max_length=100),
+    limit: int = Query(default=50, ge=1, le=200),
+) -> ListOut[UserOut]:
+    async with uow.transaction() as session:
+        users = await service.list_users(session, ctx, q=q, limit=limit)
+        return ListOut(data=[UserOut.model_validate(u) for u in users])
 
 
 class LogoutOut(BaseModel):

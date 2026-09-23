@@ -4,6 +4,7 @@ from momentum.core.activity import Activity
 from momentum.core.db import Base
 from momentum.core.events import OutboxEvent
 from momentum.core.idempotency import IdempotencyKey
+from momentum.domain.teams.models import Team, TeamMember
 from momentum.domain.users.models import ApiToken, User, UserIdentity
 from momentum.domain.workspace.models import Workspace
 
@@ -14,6 +15,8 @@ __all__ = [
     "ApiToken",
     "IdempotencyKey",
     "OutboxEvent",
+    "Team",
+    "TeamMember",
     "User",
     "UserIdentity",
     "Workspace",

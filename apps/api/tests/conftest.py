@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import os
 from collections.abc import AsyncIterator, Callable
+from typing import TYPE_CHECKING
 
 import httpx
 import pytest
@@ -17,6 +18,9 @@ from momentum.app import create_app
 from momentum.core.db import UnitOfWork, create_engine, create_session_factory
 from momentum.core.settings import Settings
 from momentum.migrations_runner import upgrade_head
+
+if TYPE_CHECKING:
+    from tests.helpers import Clients
 
 TEST_DB = os.environ.get(
     "MOMENTUM_TEST_DATABASE_URL",
@@ -121,3 +125,20 @@ async def seed_users(uow: UnitOfWork, settings: Settings) -> None:
 
     async with uow.transaction() as session:
         await seed(session, settings)
+
+
+@pytest.fixture
+async def seeded(uow: UnitOfWork, settings: Settings) -> None:
+    await seed_users(uow, settings)
+
+
+@pytest.fixture
+async def as_user(app_factory: AppFactory, seeded: None) -> AsyncIterator[Clients]:
+    """``c = await as_user("ravi")`` → an authenticated client for a seeded user."""
+    from tests.helpers import Clients
+
+    app = app_factory()
+    async with app.router.lifespan_context(app):
+        clients = Clients(app)
+        yield clients
+        await clients.close()

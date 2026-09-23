@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from momentum.core.context import Ctx
@@ -28,4 +28,25 @@ async def list_dev_login_users(session: AsyncSession, workspace_id: uuid.UUID) -
         )
         .order_by(User.role, User.name)
     )
+    return list(result.scalars())
+
+
+async def list_users(
+    session: AsyncSession,
+    ctx: Ctx,
+    *,
+    q: str | None = None,
+    limit: int = 50,
+    include_agents: bool = False,
+) -> list[User]:
+    """Active workspace members for pickers, optionally filtered by name/email prefix."""
+    query = select(User).where(User.workspace_id == ctx.workspace_id, User.status != "disabled")
+    if not include_agents:
+        query = query.where(User.is_agent.is_(False))
+    if q:
+        like = f"%{q.strip().lower()}%"
+        query = query.where(
+            (func.lower(User.name).like(like)) | (func.lower(User.email).like(like))
+        )
+    result = await session.execute(query.order_by(func.lower(User.name)).limit(min(limit, 200)))
     return list(result.scalars())

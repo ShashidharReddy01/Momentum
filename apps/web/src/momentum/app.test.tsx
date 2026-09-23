@@ -5,6 +5,7 @@ import { setupServer } from 'msw/node';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { MomentumApp } from './MomentumApp';
 import { authHandlers } from './mocks/handlers';
+import { teamHandlers } from './mocks/teams';
 
 const server = setupServer();
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
@@ -20,7 +21,7 @@ function at(path: string) {
 
 describe('Momentum app shell', () => {
   it('redirects to dev login, logs in, and lands on Home', async () => {
-    server.use(...authHandlers().handlers);
+    server.use(...authHandlers().handlers, ...teamHandlers());
     at('/');
     render(<MomentumApp />);
     const user = userEvent.setup();
@@ -36,7 +37,7 @@ describe('Momentum app shell', () => {
   });
 
   it('opens the command palette with Ctrl+K and navigates', async () => {
-    server.use(...authHandlers({ loggedIn: true }).handlers);
+    server.use(...authHandlers({ loggedIn: true }).handlers, ...teamHandlers());
     at('/');
     render(<MomentumApp />);
     const user = userEvent.setup();
@@ -51,7 +52,7 @@ describe('Momentum app shell', () => {
   });
 
   it('toggles the Ask Mo panel with Ctrl+J', async () => {
-    server.use(...authHandlers({ loggedIn: true }).handlers);
+    server.use(...authHandlers({ loggedIn: true }).handlers, ...teamHandlers());
     at('/');
     render(<MomentumApp />);
     const user = userEvent.setup();
@@ -63,7 +64,7 @@ describe('Momentum app shell', () => {
 
   it('works when mounted under a base path (embeddable)', async () => {
     const { handlers, requests } = authHandlers({ base: '/x', loggedIn: true });
-    server.use(...handlers);
+    server.use(...handlers, ...teamHandlers('/x'));
     at('/x/');
     render(<MomentumApp basePath="/x" />);
     await screen.findByRole('heading', { name: /Ravi$/ });

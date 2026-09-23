@@ -11,6 +11,8 @@
 
 ## 2. Always Opus
 
+- **Whole phases on Opus (product owner decision, 2026-09-23): Phase 1, Phase 3, Phase 5.** The per-slice tags below still apply to the other phases.
+
 - **Phase kickoff** (the start of every phase) and **phase exit review** (retro, doc updates, integration-guide changelog).
 - Any change to **auth, permissions, or AI safety/autonomy rules** (CLAUDE.md §6 areas).
 - **Destructive or data-rewriting migrations.**
@@ -28,7 +30,7 @@ After Opus unblocks it, switch back to Sonnet for the rest of the phase.
 
 **O** = Opus 5.5, **S** = Sonnet 5. Kickoff and exit of every phase = **O**.
 
-### Phase 1: Core tasks
+### Phase 1: Core tasks (whole phase on Opus by decision; tags kept for reference)
 | Slice | Model | Why |
 |---|---|---|
 | S1.1.1 Teams | S | Standard create/edit |
@@ -63,7 +65,7 @@ After Opus unblocks it, switch back to Sonnet for the rest of the phase.
 | **S2.7.1 Asana importer** | **O** | S2.7.2 CSV import | S |
 | S2.7.3 Onboarding | S | | |
 
-### Phase 3: AI layer (Mo)
+### Phase 3: AI layer (Mo) (whole phase on Opus by decision)
 | Slice | Model | Slice | Model |
 |---|---|---|---|
 | S3.1.1 LLM gateway + llm-check | S | S3.1.2 Tool registry + dry-run | **O** |
@@ -85,7 +87,7 @@ After Opus unblocks it, switch back to Sonnet for the rest of the phase.
 | S4.2.2 Conversational intake | S | S4.3.1–S4.3.3 Templates | S |
 | S4.4.1 Approvals | S | S4.4.2 Recurring tasks | S |
 
-### Phase 5: Agents
+### Phase 5: Agents (whole phase on Opus by decision)
 | Slice | Model | Slice | Model |
 |---|---|---|---|
 | S5.1.1 Agent model + accounts | S | S5.1.2 Runtime loop + triggers | **O** |

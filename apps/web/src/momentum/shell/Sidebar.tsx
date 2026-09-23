@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import {
   ChevronsUpDown,
   FolderPlus,
@@ -24,7 +24,9 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/DropdownMenu';
 import { Icon } from '@/components/ui/Icon';
+import { IconButton } from '@/components/ui/IconButton';
 import { useLogout, useMe } from '@/features/auth';
+import { colorVar, NewTeamDialog, useTeams } from '@/features/teams';
 import { cn } from '@/lib/cn';
 import { useUi } from '@/stores/ui';
 
@@ -36,6 +38,7 @@ const NAV = [
 
 export function Sidebar() {
   const collapsed = useUi((s) => s.sidebarCollapsed);
+  const [newTeam, setNewTeam] = useState(false);
   return (
     <nav
       aria-label="Main"
@@ -49,7 +52,7 @@ export function Sidebar() {
         <span className="text-[15px] font-semibold tracking-tight">Momentum</span>
       </div>
       <div className="px-3 pb-2">
-        <CreateMenu />
+        <CreateMenu onNewTeam={() => setNewTeam(true)} />
       </div>
       <ul className="flex flex-col gap-0.5 px-2">
         {NAV.map((n) => (
@@ -70,14 +73,11 @@ export function Sidebar() {
       <SidebarSection title="Favorites">
         <p className="px-4 text-xs text-sidebar-muted">Star a project to pin it here.</p>
       </SidebarSection>
-      <SidebarSection title="Teams">
-        <p className="flex items-center gap-2 px-4 text-xs text-sidebar-muted">
-          <Icon icon={Users} size={14} /> Teams arrive in Phase 1.
-        </p>
-      </SidebarSection>
+      <TeamsSection onNewTeam={() => setNewTeam(true)} />
       <div className="mt-auto border-t border-sidebar-line p-2">
         <UserMenu />
       </div>
+      <NewTeamDialog open={newTeam} onOpenChange={setNewTeam} />
     </nav>
   );
 }
@@ -99,16 +99,66 @@ function NavItem({ to, end, children }: { to: string; end?: boolean; children: R
   );
 }
 
-function SidebarSection({ title, children }: { title: string; children: ReactNode }) {
+function SidebarSection({
+  title,
+  action,
+  children,
+}: {
+  title: string;
+  action?: ReactNode;
+  children: ReactNode;
+}) {
   return (
     <section className="mt-5">
-      <h2 className="section-label px-4 pb-1 !text-sidebar-muted">{title}</h2>
+      <div className="flex items-center justify-between pr-2">
+        <h2 className="section-label px-4 pb-1 !text-sidebar-muted">{title}</h2>
+        {action}
+      </div>
       {children}
     </section>
   );
 }
 
-function CreateMenu() {
+function TeamsSection({ onNewTeam }: { onNewTeam: () => void }) {
+  const teams = useTeams();
+  return (
+    <SidebarSection
+      title="Teams"
+      action={
+        <IconButton
+          icon={Plus}
+          label="New team"
+          size="icon-sm"
+          className="h-6 w-6 text-sidebar-muted hover:bg-sidebar-hover hover:text-sidebar-ink"
+          onClick={onNewTeam}
+        />
+      }
+    >
+      {teams.isPending ? null : (teams.data ?? []).length === 0 ? (
+        <p className="flex items-center gap-2 px-4 text-xs text-sidebar-muted">
+          <Icon icon={Users} size={14} /> No teams yet.
+        </p>
+      ) : (
+        <ul className="flex flex-col gap-0.5 px-2">
+          {teams.data?.map((t) => (
+            <li key={t.id}>
+              <NavItem to={`/teams/${t.id}`}>
+                <span
+                  aria-hidden
+                  className="h-2.5 w-2.5 shrink-0 rounded-full"
+                  style={{ background: colorVar(t.color) }}
+                />
+                <span className="truncate">{t.name}</span>
+              </NavItem>
+            </li>
+          ))}
+        </ul>
+      )}
+    </SidebarSection>
+  );
+}
+
+function CreateMenu({ onNewTeam }: { onNewTeam: () => void }) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -120,8 +170,11 @@ function CreateMenu() {
         <DropdownMenuItem disabled hint="Phase 1" shortcut="q">
           <Icon icon={ListChecks} /> Task
         </DropdownMenuItem>
-        <DropdownMenuItem disabled hint="Phase 1">
+        <DropdownMenuItem disabled hint="Next slice">
           <Icon icon={FolderPlus} /> Project
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={onNewTeam}>
+          <Icon icon={Users} /> Team
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

@@ -4,11 +4,15 @@
 
 ## Current focus
 - **Phase:** 0: Foundations. **Complete** except the items noted below
-- **Next slice:** Phase 1 kickoff → S1.1.1 Teams
-- **Model:** kickoff on **Opus 5.5**, then S1.1.1 on **Sonnet 5** (see `docs/process/model-guide.md`)
+- **Next slice:** S1.1.2 Projects
+- **Model:** **Opus 5.5** for all of Phase 1 (and Phases 3, 5), per product owner decision; see `docs/process/model-guide.md`
 - **Blockers:** the GitHub repo `shashidharreddy01/momentum` must be created and connected so the code can be pushed
 
-## Handoff notes (latest session: 2026-09-23)
+## Handoff notes (latest session: 2026-09-23, Phase 1)
+- Phase 1 kickoff written (`docs/roadmap/phase-1-kickoff.md`). Project/team access rules live in `momentum/domain/access.py`.
+- Build container: Postgres must be restarted at session start (`su postgres -c "pg_ctl -D /home/user/.pgdata -o '-p 5432 -k /tmp' start"`).
+
+## Handoff notes (Phase 0)
 - Built in a cloud container: native Postgres 16 + pgvector 0.6 (no Docker there). Docker Compose is provided for local machines.
 - `make check` is green: backend 35 tests (ruff, mypy --strict, import-linter), frontend 10 tests (eslint, tsc, prettier, vitest).
 - The app runs end to end: dev login → Home; ⌘K palette; ⌘J Ask Mo panel; `/dev/ui` gallery in light and dark.
@@ -37,7 +41,7 @@
 - [x] S0.3.2 Layout shell + routing + command palette skeleton
 
 ### Phase 1: Core tasks MVP
-- [ ] S1.1.1 Teams · [ ] S1.1.2 Projects · [ ] S1.1.3 Project members and roles
+- [x] S1.1.1 Teams (+ undo registry, `POST /undo`, `GET /users`, PeoplePicker, InlineText, undo toasts) · [ ] S1.1.2 Projects · [ ] S1.1.3 Project members and roles
 - [ ] S1.2.1 Sections · [ ] S1.2.2 Tasks · [ ] S1.2.3 Assignee and dates · [ ] S1.2.4 DnD, multi-select, bulk · [ ] S1.2.5 Filter/sort/group · [ ] S1.2.6 List performance
 - [ ] S1.3.1 Pane · [ ] S1.3.2 Subtasks · [ ] S1.3.3 Followers
 - [ ] S1.4.1 Comments · [ ] S1.4.2 Activity feed · [ ] S1.4.3 Undo

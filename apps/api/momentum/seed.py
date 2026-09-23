@@ -6,6 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from momentum.core.settings import Settings
+from momentum.domain.teams.models import Team, TeamMember
 from momentum.domain.users.models import User
 from momentum.domain.workspace.service import ensure_default_workspace
 
@@ -42,4 +43,39 @@ async def seed(session: AsyncSession, settings: Settings) -> dict[str, int]:
             session.add(User(workspace_id=ws.id, email=email, name=name, role=role, timezone=tz))
             created += 1
     await session.flush()
-    return {"users_created": created}
+    teams_created = await _seed_teams(session, ws.id)
+    return {"users_created": created, "teams_created": teams_created}
+
+
+# (team name, color token, lead local-part, member local-parts)
+SEED_TEAMS: list[tuple[str, str, str, list[str]]] = [
+    ("Product", "proj-7", "ravi", ["ana", "priya", "mei", "admin"]),
+    ("Marketing", "proj-2", "ana", ["tom", "lena", "noor"]),
+    ("Operations", "proj-4", "jordan", ["sam", "diego", "kim", "ravi"]),
+]
+
+
+async def _seed_teams(session: AsyncSession, workspace_id: object) -> int:
+    users = {
+        u.email.split("@")[0]: u
+        for u in (
+            await session.execute(select(User).where(User.workspace_id == workspace_id))
+        ).scalars()
+    }
+    created = 0
+    for name, color, lead, members in SEED_TEAMS:
+        exists = await session.execute(
+            select(Team.id).where(Team.workspace_id == workspace_id, Team.name == name)
+        )
+        if exists.scalar_one_or_none() is not None or lead not in users:
+            continue
+        team = Team(workspace_id=workspace_id, name=name, color=color, created_by=users[lead].id)
+        session.add(team)
+        await session.flush()
+        session.add(TeamMember(team_id=team.id, user_id=users[lead].id, role="lead"))
+        for m in members:
+            if m in users:
+                session.add(TeamMember(team_id=team.id, user_id=users[m].id, role="member"))
+        created += 1
+    await session.flush()
+    return created

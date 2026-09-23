@@ -79,6 +79,17 @@ resolve_user(principal):
 | Create/edit agents | ✓ | Personal/project agents (Phase 5 setting) | ✗ |
 | See private projects they aren't a member of | ✗ (admins can see *that it exists* in admin settings, not content) | ✗ | ✗ |
 
+## 4a. Team rules (implemented in `momentum/domain/access.py`)
+
+| Action | Admin | Team lead | Team member | Not a member |
+|---|---|---|---|---|
+| See team + members | ✓ | ✓ | ✓ | ✗ (404) |
+| Create a team | ✓ | ✓ | ✓ | ✓ (members of the workspace) |
+| Rename / describe / delete team | ✓ | ✓ | ✗ (403) | ✗ (404) |
+| Add members, change roles | ✓ | ✓ | ✗ | ✗ |
+| Remove a member | ✓ | ✓ | only themselves (leave) | ✗ |
+| Last lead | Can't be demoted or removed; the team always keeps at least one lead (409 `last_lead`) | | | |
+
 ## 5. Project roles
 
 | Action | Project admin | Editor | Commenter | Viewer |

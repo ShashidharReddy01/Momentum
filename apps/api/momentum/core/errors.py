@@ -10,9 +10,11 @@ class DomainError(Exception):
     code: str = "bad_request"
     title: str = "Bad request"
 
-    def __init__(self, detail: str | None = None, **extra: Any) -> None:
+    def __init__(self, detail: str | None = None, *, code: str | None = None, **extra: Any) -> None:
         super().__init__(detail or self.title)
         self.detail = detail or self.title
+        if code is not None:
+            self.code = code
         self.extra = extra
 
 

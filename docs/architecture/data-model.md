@@ -64,7 +64,7 @@ id, workspace_id, user_id, name, `token_hash` (sha256), `prefix` (first 8 chars 
 ## 2. Organization
 
 ### `teams`
-id, workspace_id, name, description, color, created_by, timestamps, deleted_at.
+id, workspace_id, name (≤120), description, color (token `proj-1`…`proj-12`), created_by, version, timestamps, deleted_at.
 
 ### `team_members`
 team_id, user_id, role check in (`lead`,`member`), pk (team_id, user_id).
