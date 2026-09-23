@@ -8,3 +8,7 @@ Keep Care Cockpit's design language (tokens, fonts (self-hosted), amber = AI, pu
 Pure global CSS (doesn't scale, leaks when embedded); a full component library like MUI (heavy, hard to match the design language).
 ## Consequences
 A distinctive look separate from Asana's visuals with an Asana-like layout; accessible primitives; realtime-ready data layer. More dependencies than Care Cockpit, each justified.
+
+## Amendment (2026-09-23): visual style
+After seeing the shell running, we reviewed the inherited visual style honestly. Cream paper backgrounds, Fraunces display serif, an Instrument Serif italic "AI voice", uppercase eyebrow labels, and staggered reveal animations together form a recognizable generic AI-generated look, and they suit landing pages more than an all-day work tool.
+**Decision:** keep the principles (amber = AI only, purple = mock, honest empty states, hairlines over pills, token system, scoped styles). Replace the style with neutral cool surfaces (`canvas`/`surface` tokens), Inter-only typography with weight-based hierarchy, one blue brand accent (primary actions, selection, focus, links), sentence-case labels, and functional motion only. Implemented before Phase 1, while only the shell existed, so the cost was a token and font swap.

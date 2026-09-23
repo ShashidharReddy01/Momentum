@@ -12,7 +12,7 @@ export function AskMoPanel() {
   return (
     <aside
       aria-label="Ask Mo"
-      className="flex h-full w-[var(--askmo-w)] shrink-0 flex-col border-l border-hair-soft bg-paper shadow-pane"
+      className="flex h-full w-[var(--askmo-w)] shrink-0 flex-col border-l border-hair-soft bg-surface shadow-pane"
     >
       <header className="flex h-[var(--topbar-h)] items-center gap-2 border-b border-hair-soft px-4">
         <MoMark size={16} />
@@ -27,7 +27,7 @@ export function AskMoPanel() {
       </header>
       <div className="flex-1 overflow-auto p-4">
         <AICallout>
-          <p className="font-accent text-[15px] italic leading-[22px] text-ink">Hi, I'm Mo.</p>
+          <p className="font-medium text-ink">Hi, I'm Mo.</p>
           <p className="mt-1">
             Soon you'll be able to ask me about your work, and to have me plan, update and summarize it. I
             arrive in Phase 3.

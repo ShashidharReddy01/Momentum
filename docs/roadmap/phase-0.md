@@ -106,7 +106,7 @@
 
 ### S0.3.1: Design tokens, fonts, base components
 **Read first:** frontend/design-system.md.
-**Build:** `styles/tokens.css` (light + dark), `fonts.css` (@fontsource-variable Inter, Fraunces, JetBrains Mono; @fontsource Instrument Serif), `index.css` (Tailwind v4 import, `@theme` token mapping, `@layer momentum`, scoped base reset under `.momentum-root`); shadcn/ui init with our token names; primitives: Button, IconButton, Input, Tooltip, DropdownMenu, Dialog, Sheet, Tabs, Segmented, Kbd, Avatar, Skeleton, EmptyState, ErrorState, AICallout, AIBadge, MockBadge, Toast (sonner); `<Icon>` wrapper (lucide) and `<MoMark>`. A dev-only `/dev/ui` gallery page showing every component in light/dark.
+**Build:** `styles/tokens.css` (light + dark), `fonts.css` (@fontsource-variable Inter, JetBrains Mono), `index.css` (Tailwind v4 import, `@theme` token mapping, `@layer momentum`, scoped base reset under `.momentum-root`); shadcn/ui init with our token names; primitives: Button, IconButton, Input, Tooltip, DropdownMenu, Dialog, Sheet, Tabs, Segmented, Kbd, Avatar, Skeleton, EmptyState, ErrorState, AICallout, AIBadge, MockBadge, Toast (sonner); `<Icon>` wrapper (lucide) and `<MoMark>`. A dev-only `/dev/ui` gallery page showing every component in light/dark.
 **AC**
 - [ ] Gallery renders all components in both themes; contrast of text tokens checked (documented table)
 - [ ] No raw color literals in component code (lint rule active)

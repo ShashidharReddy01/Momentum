@@ -10,12 +10,12 @@ export const buttonVariants = cva(
   {
     variants: {
       variant: {
-        primary: 'bg-primary text-primary-ink hover:opacity-90',
+        primary: 'bg-accent text-on-accent hover:bg-accent-hover',
         /** Only for buttons that run an AI action (amber = AI). */
         ai: 'bg-amber-2 text-amber-ink border border-dashed border-amber hover:bg-amber-hi/40',
-        ghost: 'border border-hairline bg-paper text-ink hover:bg-paper-2',
-        text: 'text-ink-2 hover:bg-paper-2 hover:text-ink',
-        danger: 'bg-crit text-paper hover:opacity-90',
+        ghost: 'border border-hairline bg-surface text-ink hover:bg-surface-2',
+        text: 'text-ink-2 hover:bg-surface-2 hover:text-ink',
+        danger: 'bg-crit text-surface hover:opacity-90',
       },
       size: {
         sm: 'h-7 px-2.5 text-[13px]',

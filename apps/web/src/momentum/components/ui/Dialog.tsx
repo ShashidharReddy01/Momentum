@@ -32,7 +32,7 @@ export function Dialog({
         <D.Content
           aria-describedby={description ? undefined : undefined}
           className={cn(
-            'fixed left-1/2 top-[14vh] z-50 w-[min(560px,calc(100vw-32px))] -translate-x-1/2 rounded-xl bg-paper shadow-pop',
+            'fixed left-1/2 top-[14vh] z-50 w-[min(560px,calc(100vw-32px))] -translate-x-1/2 rounded-xl bg-surface shadow-pop',
             className,
           )}
         >
@@ -41,7 +41,7 @@ export function Dialog({
           ) : (
             <div className="flex items-start justify-between gap-4 border-b border-hair-soft px-5 py-4">
               <div>
-                <D.Title className="font-serif text-lg font-medium">{title}</D.Title>
+                <D.Title className="text-[15px] font-semibold">{title}</D.Title>
                 {description ? (
                   <D.Description className="text-sm text-muted">{description}</D.Description>
                 ) : null}

@@ -1,5 +1,6 @@
 import { useNavigate, useSearchParams } from 'react-router';
 import { ErrorState } from '@/components/common/States';
+import { BrandMark } from '@/components/common/BrandMark';
 import { Avatar } from '@/components/ui/Avatar';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useMomentumConfig } from '@/lib/config';
@@ -24,7 +25,9 @@ export function DevLoginPage() {
         <span className="w-fit rounded-sm border border-mock px-1.5 font-mono text-[10px] uppercase tracking-wider text-mock">
           Dev login · {config.auth.mode}
         </span>
-        <h1 className="font-serif text-3xl">Momentum</h1>
+        <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight">
+          <BrandMark size={28} /> Momentum
+        </h1>
         <p className="text-sm text-muted">
           Pick a seeded user. In production, Easy Auth (Entra ID) signs people in.
         </p>
@@ -42,12 +45,12 @@ export function DevLoginPage() {
           No users yet. Run <code className="font-mono">make seed</code>.
         </p>
       ) : (
-        <ul className="flex flex-col divide-y divide-hair-soft overflow-hidden rounded-lg border border-hairline bg-paper">
+        <ul className="flex flex-col divide-y divide-hair-soft overflow-hidden rounded-lg border border-hairline bg-surface">
           {users.data.map((u) => (
             <li key={u.id}>
               <button
                 type="button"
-                className="flex w-full items-center gap-3 px-3 py-2.5 text-left hover:bg-paper-2 disabled:opacity-50"
+                className="flex w-full items-center gap-3 px-3 py-2.5 text-left hover:bg-surface-2 disabled:opacity-50"
                 disabled={login.isPending}
                 onClick={() => login.mutate(u.id, { onSuccess: () => navigate(target, { replace: true }) })}
               >
@@ -56,7 +59,7 @@ export function DevLoginPage() {
                   <span className="block text-sm font-medium">{u.name}</span>
                   <span className="block text-xs text-muted">{u.email}</span>
                 </span>
-                <span className="eyebrow">{u.role}</span>
+                <span className="section-label">{u.role}</span>
               </button>
             </li>
           ))}

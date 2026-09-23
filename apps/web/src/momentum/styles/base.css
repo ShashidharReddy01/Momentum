@@ -14,9 +14,9 @@
     font-size: 14px;
     line-height: 20px;
     color: var(--ink);
-    background: var(--cream);
+    background: var(--canvas);
     -webkit-font-smoothing: antialiased;
-    font-feature-settings: 'cv11', 'ss01';
+    font-feature-settings: 'cv11', 'ss01', 'ss03';
     min-height: 100dvh;
   }
   .momentum-root :where(button, input, select, textarea) {

@@ -80,7 +80,7 @@ export function CommandPalette() {
             <Command.Group
               key={g.heading}
               heading={g.heading}
-              className="[&_[cmdk-group-heading]]:eyebrow [&_[cmdk-group-heading]]:px-2.5 [&_[cmdk-group-heading]]:py-1.5"
+              className="[&_[cmdk-group-heading]]:section-label [&_[cmdk-group-heading]]:px-2.5 [&_[cmdk-group-heading]]:py-1.5"
             >
               {g.items.map((a) => (
                 <Command.Item
@@ -90,7 +90,7 @@ export function CommandPalette() {
                     setOpen(false);
                     a.run();
                   }}
-                  className="flex h-9 cursor-pointer items-center gap-2.5 rounded-md px-2.5 text-sm data-[selected=true]:bg-paper-2"
+                  className="flex h-9 cursor-pointer items-center gap-2.5 rounded-md px-2.5 text-sm data-[selected=true]:bg-surface-2"
                 >
                   {a.icon ? <Icon icon={a.icon} className="text-muted" /> : <MoMark size={16} />}
                   <span className="flex-1">{a.label}</span>

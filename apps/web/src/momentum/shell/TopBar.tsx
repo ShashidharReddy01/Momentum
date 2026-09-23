@@ -21,7 +21,7 @@ export function TopBar() {
     .filter((c): c is string => Boolean(c));
 
   return (
-    <header className="flex h-[var(--topbar-h)] shrink-0 items-center gap-3 border-b border-hair-soft bg-cream px-3">
+    <header className="flex h-[var(--topbar-h)] shrink-0 items-center gap-3 border-b border-hair-soft bg-canvas px-3">
       <IconButton icon={PanelLeft} label="Toggle sidebar" shortcut="mod+\" onClick={toggleSidebar} />
       <nav aria-label="Breadcrumb" className="min-w-0 flex-1">
         <ol className="flex items-center gap-1.5 text-sm">
@@ -36,7 +36,7 @@ export function TopBar() {
       <button
         type="button"
         onClick={() => setPaletteOpen(true)}
-        className="hidden h-8 w-[min(360px,32vw)] items-center gap-2 rounded-md border border-hairline bg-paper px-2.5 text-sm text-muted-2 hover:border-muted-2 md:flex"
+        className="hidden h-8 w-[min(360px,32vw)] items-center gap-2 rounded-md border border-hairline bg-surface px-2.5 text-sm text-muted-2 hover:border-muted-2 md:flex"
         aria-label="Search or run a command"
       >
         <Icon icon={Search} />

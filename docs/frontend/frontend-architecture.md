@@ -10,12 +10,12 @@ The previous app (Care Cockpit) is a strong base for **design language and conve
 | React Router 6, flat route table under one `<Layout/>` | **Keep the pattern, upgrade to React Router 7** (library/data mode) | Nearly identical API; loaders/lazy routes; continued support |
 | `Layout` = Sidebar + TopBar + `<Outlet/>` + persistent AI slide-over | **Keep**: Sidebar + TopBar + Outlet + **Task pane** + **Ask Mo panel** | The proven shell becomes Asana's shell |
 | One ~1000-line global CSS organized by page | **Change**: tokens in CSS variables + Tailwind v4 utilities mapped to tokens (`@theme`) + small component CSS where needed | Page-organized global CSS doesn't scale to ~60 components and leaks into host apps when embedded |
-| `oklch()` custom-property palette (cream/paper/ink/hairline…) | **Keep**, scoped to `.momentum-root` | Distinctive, accessible, easy dark mode |
+| `oklch()` custom-property palette (cream/paper/ink/hairline…) | **Keep the token approach, change the palette**: neutral surfaces (`canvas`, `surface`) + one blue accent, scoped to `.momentum-root` | Cream-paper editorial styling reads as generic AI design and tires the eyes in an all-day tool |
 | "Color lives in text and thin bars, never filled pills" | **Keep** as a principle with named exceptions (project color chips, heat grids, workload) | Calm UI for a dense app |
 | **Amber = AI-authored content only** | **Keep, strictly** | Maps perfectly to "AI drafts, humans confirm" |
 | **Purple = mock data** (MockBadge) | **Keep, dev-only**. In production builds, mock UI is compiled out. | Honesty without silent fallbacks |
 | Nulls shown as empty states, never fabricated | **Keep** as a rule | |
-| Fonts: Fraunces / Instrument Serif / Inter / JetBrains Mono from Google Fonts | **Keep the families, self-host via `@fontsource`**. Inter is the workhorse; Fraunces for page titles and big numbers; JetBrains Mono for keys (`T-123`), times, and numbers; Instrument Serif italic sparingly for Mo's voice | Offline/office networks, privacy, no CDN dependency |
+| Fonts: Fraunces / Instrument Serif / Inter / JetBrains Mono from Google Fonts | **Inter only + JetBrains Mono**, self-hosted via `@fontsource`. Drop the display serif and the italic "AI voice" | One sans with weight-based hierarchy is how serious work tools read; self-hosting works on office networks |
 | No UI library; hand-built everything | **Change**: Radix primitives (via shadcn/ui source, restyled to our tokens) for menus, popovers, dialogs, comboboxes, tooltips, tabs | Accessibility and keyboard behavior of menus/popovers/date pickers is hard to get right by hand, and Momentum needs dozens of them |
 | Hand-drawn SVG icons | **Change**: `lucide-react` with the same visual spec (24 viewBox, 1.7 stroke, round caps) through one `<Icon>` wrapper; custom SVGs only for brand/special marks | Hundreds of icons needed |
 | Hand-drawn SVG charts (ScoreRing, arcs) | **Keep for small bespoke visuals** (ScoreRing, sparklines, progress). **Recharts** for dashboard charts (Phase 6) | |
@@ -29,9 +29,9 @@ The previous app (Care Cockpit) is a strong base for **design language and conve
 | No tests | **Add** Vitest + Testing Library + MSW + Playwright | |
 | Ad-hoc breakpoints (1300/1200/1100/1080/900/820) | **Tokenize**: `sm 640 · md 900 · lg 1200 · xl 1440` | |
 | Two tab idioms (underline, segmented) | **Keep both** as named components: `Tabs` (views) and `Segmented` (sub-modes) | Each has a defined use |
-| `.reveal` staggered entrance animations | **Keep sparingly** (Home, dashboards). Never on lists or editing surfaces. Respect `prefers-reduced-motion`. | |
+| `.reveal` staggered entrance animations, uppercase `.eyebrow` labels | **Drop.** Motion only for state changes; sentence-case `section-label` | Decorative motion and uppercase eyebrows are part of the generic-AI look |
 
-**Verdict:** Care Cockpit's *design language* (palette, typography, amber-AI, purple-mock, honesty, shell + AI slide-over) **becomes Momentum's identity**. That also gives Momentum a look clearly distinct from Asana while keeping Asana's layout. The *engineering layer* is upgraded for an interactive, realtime, embeddable app.
+**Verdict (revised 2026-09-23):** keep Care Cockpit's *principles* (amber = AI only, purple = mock, honesty, hairlines over pills, tokens, shell + AI slide-over) and its layout ideas. **Replace its visual style** (cream paper, display serifs, italic AI voice, eyebrows, reveal animations) with a neutral, dense, single-accent work-tool style. The engineering layer is upgraded for an interactive, realtime, embeddable app.
 
 ## 2. Stack
 

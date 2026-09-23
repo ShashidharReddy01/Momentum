@@ -12,6 +12,7 @@ import {
   Users,
 } from 'lucide-react';
 import { NavLink } from 'react-router';
+import { BrandMark } from '@/components/common/BrandMark';
 import { MoMark } from '@/components/common/MoMark';
 import { Avatar } from '@/components/ui/Avatar';
 import { Button } from '@/components/ui/Button';
@@ -39,18 +40,13 @@ export function Sidebar() {
     <nav
       aria-label="Main"
       className={cn(
-        'flex h-dvh flex-col border-r border-hair-soft bg-cream-2 transition-[width] duration-150',
+        'flex h-dvh flex-col border-r border-hair-soft bg-sidebar transition-[width] duration-150',
         collapsed ? 'w-0 overflow-hidden border-r-0' : 'w-[var(--sidebar-w)]',
       )}
     >
       <div className="flex h-[var(--topbar-h)] items-center gap-2 px-4">
-        <span
-          aria-hidden
-          className="grid h-6 w-6 place-items-center rounded-md bg-ink font-serif text-sm text-amber"
-        >
-          M
-        </span>
-        <span className="font-serif text-[17px] font-medium">Momentum</span>
+        <BrandMark size={22} />
+        <span className="text-[15px] font-semibold tracking-tight">Momentum</span>
       </div>
       <div className="px-3 pb-2">
         <CreateMenu />
@@ -93,8 +89,8 @@ function NavItem({ to, end, children }: { to: string; end?: boolean; children: R
       end={end}
       className={({ isActive }) =>
         cn(
-          'flex h-8 items-center gap-2.5 rounded-md px-2.5 text-sm text-ink-2 hover:bg-paper-2 hover:text-ink',
-          isActive && 'bg-paper font-medium text-ink shadow-[0_0_0_1px_var(--hair-soft)]',
+          'flex h-8 items-center gap-2.5 rounded-md px-2.5 text-sm text-ink-2 hover:bg-surface-2 hover:text-ink',
+          isActive && 'bg-surface-2 font-medium text-ink',
         )
       }
     >
@@ -106,7 +102,7 @@ function NavItem({ to, end, children }: { to: string; end?: boolean; children: R
 function SidebarSection({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="mt-5">
-      <h2 className="eyebrow px-5 pb-1.5">{title}</h2>
+      <h2 className="section-label px-4 pb-1">{title}</h2>
       {children}
     </section>
   );
@@ -144,7 +140,7 @@ function UserMenu() {
       <DropdownMenuTrigger asChild>
         <button
           type="button"
-          className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left hover:bg-paper-2"
+          className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left hover:bg-surface-2"
           aria-label="Account menu"
         >
           <Avatar name={user.name} src={user.avatar_url} size={26} />

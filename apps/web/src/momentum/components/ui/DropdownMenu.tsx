@@ -14,7 +14,7 @@ export function DropdownMenuContent({ className, ...props }: ComponentProps<type
       <M.Content
         sideOffset={6}
         align="start"
-        className={cn('z-50 min-w-[200px] rounded-lg bg-paper p-1 shadow-pop', className)}
+        className={cn('z-50 min-w-[200px] rounded-lg bg-surface p-1 shadow-pop', className)}
         {...props}
       />
     </M.Portal>
@@ -31,7 +31,7 @@ export function DropdownMenuItem({
   return (
     <M.Item
       className={cn(
-        'flex cursor-pointer select-none items-center gap-2 rounded-md px-2 py-1.5 text-sm outline-none data-[disabled]:cursor-default data-[disabled]:text-muted-2 data-[highlighted]:bg-paper-2',
+        'flex cursor-pointer select-none items-center gap-2 rounded-md px-2 py-1.5 text-sm outline-none data-[disabled]:cursor-default data-[disabled]:text-muted-2 data-[highlighted]:bg-surface-2',
         className,
       )}
       {...props}
@@ -48,5 +48,5 @@ export function DropdownMenuSeparator() {
 }
 
 export function DropdownMenuLabel({ children }: { children: ReactNode }) {
-  return <M.Label className="eyebrow px-2 pb-1 pt-2">{children}</M.Label>;
+  return <M.Label className="section-label px-2 pb-1 pt-2">{children}</M.Label>;
 }

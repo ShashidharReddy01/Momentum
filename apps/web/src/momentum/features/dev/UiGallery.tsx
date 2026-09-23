@@ -26,15 +26,17 @@ import { ApiError } from '@/lib/api/errors';
 import { useUi } from '@/stores/ui';
 
 const SWATCHES = [
-  'cream',
-  'cream-2',
-  'paper',
-  'paper-2',
+  'canvas',
+  'sidebar',
+  'surface',
+  'surface-2',
   'hairline',
   'ink',
   'ink-2',
   'muted',
   'muted-2',
+  'accent',
+  'accent-tint',
   'amber',
   'amber-2',
   'amber-ink',
@@ -56,8 +58,8 @@ export function UiGallery() {
     <div className="mx-auto flex max-w-5xl flex-col gap-10 px-8 py-10">
       <header className="flex items-center justify-between">
         <div>
-          <p className="eyebrow">Design system</p>
-          <h1 className="font-serif text-[32px] leading-[38px]">Component gallery</h1>
+          <p className="section-label">Design system</p>
+          <h1 className="page-title">Component gallery</h1>
         </div>
         <div className="flex items-center gap-2">
           <MockBadge label="Dev only" />
@@ -77,12 +79,12 @@ export function UiGallery() {
       </Section>
 
       <Section title="Typography">
-        <p className="font-serif text-[32px] leading-[38px]">Display · Fraunces</p>
-        <p className="font-serif text-[22px] font-medium leading-7">Page title · Fraunces</p>
-        <p className="eyebrow">Section label</p>
+        <p className="page-title">Page title · Inter 20/600</p>
+        <p className="text-[15px] font-semibold">Section title · Inter 15/600</p>
+        <p className="section-label">Section label · Inter 12/600</p>
         <p>Body text · Inter 14/20. The quick brown fox jumps over the lazy dog.</p>
         <p className="font-mono text-xs tabular">T-1024 · 2026-09-26 · 12:30</p>
-        <p className="font-accent text-[15px] italic">Mo's voice: "Here's what changed this week."</p>
+        <p className="text-[13px] text-muted">Meta · Inter 13 muted: created by Ana · 2 days ago</p>
       </Section>
 
       <Section title="Buttons">
@@ -105,7 +107,7 @@ export function UiGallery() {
           <Kbd combo="mod+enter" />
           <div className="flex -space-x-1.5">
             {['Ravi Kumar', 'Ana Souza', 'Priya Nair', 'Tom Becker'].map((n) => (
-              <Avatar key={n} name={n} size={26} className="ring-2 ring-paper" />
+              <Avatar key={n} name={n} size={26} className="ring-2 ring-surface" />
             ))}
           </div>
           <Avatar name="Herald" size={26} isAgent />
@@ -189,7 +191,7 @@ export function UiGallery() {
           Comment drafted by Mo <AIBadge />
         </p>
         <div className="mt-3 grid gap-4 md:grid-cols-3">
-          <div className="rounded-lg border border-hairline bg-paper">
+          <div className="rounded-lg border border-hairline bg-surface">
             <EmptyState
               icon={FolderKanban}
               title="No projects yet"
@@ -198,7 +200,7 @@ export function UiGallery() {
               Create one or import from Asana.
             </EmptyState>
           </div>
-          <div className="rounded-lg border border-hairline bg-paper">
+          <div className="rounded-lg border border-hairline bg-surface">
             <ErrorState
               error={
                 new ApiError({
@@ -211,7 +213,7 @@ export function UiGallery() {
               onRetry={() => {}}
             />
           </div>
-          <div className="flex flex-col gap-2 rounded-lg border border-hairline bg-paper p-4">
+          <div className="flex flex-col gap-2 rounded-lg border border-hairline bg-surface p-4">
             <Skeleton className="h-5 w-2/3" />
             <Skeleton className="h-5" />
             <Skeleton className="h-5 w-1/2" />
@@ -225,7 +227,7 @@ export function UiGallery() {
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section>
-      <h2 className="eyebrow mb-3">{title}</h2>
+      <h2 className="section-label mb-3">{title}</h2>
       {children}
     </section>
   );

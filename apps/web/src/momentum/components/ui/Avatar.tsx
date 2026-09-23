@@ -33,14 +33,14 @@ export function Avatar({
     <A.Root
       className={cn(
         'inline-flex shrink-0 select-none items-center justify-center overflow-hidden rounded-full',
-        isAgent && 'ring-2 ring-amber ring-offset-1 ring-offset-paper',
+        isAgent && 'ring-2 ring-amber ring-offset-1 ring-offset-surface',
         className,
       )}
       style={{ width: size, height: size, background: PALETTE[hash(name) % PALETTE.length] }}
       title={name}
     >
       {src ? <A.Image src={src} alt={name} className="h-full w-full object-cover" /> : null}
-      <A.Fallback className="font-medium text-paper" style={{ fontSize: Math.round(size * 0.42) }}>
+      <A.Fallback className="font-medium text-surface" style={{ fontSize: Math.round(size * 0.42) }}>
         {initials(name)}
       </A.Fallback>
     </A.Root>

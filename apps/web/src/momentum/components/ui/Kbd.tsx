@@ -9,7 +9,7 @@ export function Kbd({ combo, inverted }: { combo: string; inverted?: boolean }) 
           key={i}
           className={cn(
             'min-w-[18px] rounded-sm border px-1 text-center font-mono text-[10.5px] leading-[16px]',
-            inverted ? 'border-muted text-cream-2' : 'border-hairline bg-paper-2 text-muted',
+            inverted ? 'border-muted text-sidebar' : 'border-hairline bg-surface-2 text-muted',
           )}
         >
           {k}

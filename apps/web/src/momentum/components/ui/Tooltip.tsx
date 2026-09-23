@@ -21,7 +21,7 @@ export function Tooltip({
       <T.Portal container={container}>
         <T.Content
           sideOffset={6}
-          className="z-50 flex items-center gap-2 rounded-md bg-ink px-2 py-1 text-xs text-paper shadow-pop"
+          className="z-50 flex items-center gap-2 rounded-md bg-ink px-2 py-1 text-xs text-surface shadow-pop"
         >
           {content}
           {shortcut ? <Kbd combo={shortcut} inverted /> : null}

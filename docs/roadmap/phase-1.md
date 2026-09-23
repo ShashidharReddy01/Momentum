@@ -137,7 +137,7 @@
 **Size:** M
 
 ### S1.5.2: Home
-**Frontend:** greeting (Fraunces), date, "My priorities" (top 5), "Recent projects" (from activity), "Waiting on others", empty states for new users.
+**Frontend:** greeting (page title), date, "My priorities" (top 5), "Recent projects" (from activity), "Waiting on others", empty states for new users.
 **Backend:** `GET /home` aggregate endpoint (single round trip).
 **Size:** S
 

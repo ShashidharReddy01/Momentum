@@ -27,7 +27,7 @@ Screen-by-screen behavior. Visual rules are in `design-system.md`. Each phase fi
 
 ## 2. Home (`/`)
 
-- Greeting in Fraunces ("Good morning, Ravi") + date + Mo one-liner (amber, Phase 3+): "You have 3 tasks due today; the Website Revamp launch is at risk."
+- Greeting as the page title ("Good morning, Ravi", Inter 20/600) + date + Mo one-liner (amber, Phase 3+): "You have 3 tasks due today; the Website Revamp launch is at risk."
 - Cards: **My priorities** (next 5 tasks by due and priority), **Recent projects** (6 tiles), **Waiting on others** (tasks I created or follow that are assigned to others and overdue), **Agent activity** (Phase 5).
 - Empty state for new users: "Create your first project" / "Import from Asana".
 
