@@ -1,21 +1,38 @@
 # Runbook: Local Development
 
 ## Prerequisites
-- Docker (Desktop or Engine) · Python 3.12 + **uv** · Node 22 LTS + **pnpm** · make
+- Python 3.12 + **uv** · Node 22 LTS + **pnpm** · make
+- PostgreSQL 16 with **pgvector**: either Docker (`make db-up`) or a native install (below)
 - Optional: a LiteLLM endpoint you can reach (else `MOMENTUM_LLM_MODE=mock`)
 
 ## First run
 ```bash
 cp .env.example .env
-make dev        # postgres (5432) + api (8000, reload) + web (5173, proxy)
-make migrate    # (auto in local if MOMENTUM_DB_AUTO_MIGRATE=true)
-make seed       # synthetic "Acme Demo" workspace
+make install    # uv sync + pnpm install
+make db-up      # Docker Postgres+pgvector on :5432 (skip if native)
+make migrate    # creates everything in the `momentum` schema
+make seed       # synthetic "Acme Demo" workspace (12 users)
+make dev        # api :8000 (reload) + web :5173 (proxies /api)
 ```
-Open http://localhost:5173 → dev login → pick a user.
+Open http://localhost:5173 → dev login → pick a user. The component gallery is at http://localhost:5173/dev/ui.
+
+**Single-process run (like production):** `make build && cd apps/api && uv run momentum serve` → http://localhost:8000.
+
+## Native Postgres (no Docker)
+```bash
+# Ubuntu/Debian: sudo apt install postgresql-16 postgresql-16-pgvector
+# macOS (Homebrew): brew install postgresql@16 pgvector
+createuser -s momentum && psql -c "alter user momentum password 'momentum'"
+createdb -O momentum momentum && createdb -O momentum momentum_test
+for db in momentum momentum_test; do psql -d $db -c "create extension if not exists vector; create extension if not exists pg_trgm; create extension if not exists citext;"; done
+```
+
+## Tests
+`make check` runs everything. Backend tests use `MOMENTUM_TEST_DATABASE_URL` (default `postgresql+psycopg://momentum:momentum@localhost:5432/momentum_test`) and migrate a throwaway schema `momentum_test`.
 
 ## Auth modes locally
 - `MOMENTUM_AUTH_MODE=dev`: simple picker.
-- `MOMENTUM_AUTH_MODE=easyauth-sim`: same picker, but requests flow through the real Easy Auth header parser. Use this regularly.
+- `MOMENTUM_AUTH_MODE=easyauth-sim`: same picker, but every request is converted into realistic `X-MS-CLIENT-PRINCIPAL` claims and parsed by the real Easy Auth provider. Use this regularly so the production path stays exercised.
 
 ## AI locally
 - Mock: `MOMENTUM_LLM_MODE=mock` (default). Deterministic fixtures.
@@ -33,4 +50,5 @@ See `CLAUDE.md` §4.
 | 403 on every POST | Missing `X-Requested-With: momentum` header (use the API client) |
 | WS keeps reconnecting | The API isn't running, or the Vite proxy `ws: true` is missing |
 | Stale frontend types | `make types` |
-| Testcontainers fail | Docker not running, or on macOS set `TESTCONTAINERS_RYUK_DISABLED=true` if needed |
+| Backend tests can't connect | Start Postgres (`make db-up`) and create `momentum_test` with the extensions (see above) |
+| `pkill`/port 8000 busy | Another `momentum serve` is running; stop it or use `--port` |

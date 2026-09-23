@@ -1,0 +1,106 @@
+/* Momentum design tokens (docs/frontend/design-system.md §2).
+   Scoped to .momentum-root so Momentum can be embedded without leaking styles. */
+.momentum-root {
+  /* Surfaces */
+  --cream: oklch(0.975 0.012 85);
+  --cream-2: oklch(0.955 0.014 85);
+  --paper: oklch(0.995 0.004 85);
+  --paper-2: oklch(0.972 0.007 85);
+  --hairline: oklch(0.88 0.01 85);
+  --hair-soft: oklch(0.93 0.008 85);
+  /* Ink */
+  --ink: oklch(0.22 0.015 60);
+  --ink-2: oklch(0.35 0.012 60);
+  --muted: oklch(0.5 0.01 60);
+  --muted-2: oklch(0.64 0.008 60);
+  /* AI (amber): AI-authored content ONLY */
+  --amber: oklch(0.78 0.14 75);
+  --amber-hi: oklch(0.85 0.12 80);
+  --amber-2: oklch(0.96 0.035 85);
+  --amber-ink: oklch(0.45 0.1 60);
+  /* Semantics */
+  --ok: oklch(0.52 0.12 150);
+  --ok-tint: oklch(0.95 0.03 150);
+  --warn: oklch(0.58 0.13 65);
+  --warn-tint: oklch(0.96 0.04 80);
+  --crit: oklch(0.52 0.18 27);
+  --crit-tint: oklch(0.95 0.03 27);
+  --info: oklch(0.5 0.13 250);
+  --info-tint: oklch(0.95 0.02 250);
+  --mock: oklch(0.52 0.18 300); /* DEV ONLY */
+  --mock-tint: oklch(0.95 0.04 300);
+  /* Interaction */
+  --focus: oklch(0.6 0.15 250);
+  --selection: oklch(0.93 0.03 250);
+  --primary: var(--ink);
+  --primary-ink: var(--paper);
+  /* Project palette */
+  --proj-1: oklch(0.66 0.14 25);
+  --proj-2: oklch(0.7 0.13 60);
+  --proj-3: oklch(0.74 0.12 95);
+  --proj-4: oklch(0.66 0.13 140);
+  --proj-5: oklch(0.66 0.1 180);
+  --proj-6: oklch(0.62 0.11 220);
+  --proj-7: oklch(0.6 0.13 260);
+  --proj-8: oklch(0.6 0.14 290);
+  --proj-9: oklch(0.63 0.14 330);
+  --proj-10: oklch(0.58 0.02 60);
+  --proj-11: oklch(0.55 0.09 40);
+  --proj-12: oklch(0.62 0.1 110);
+  /* Type */
+  --font-sans: 'Inter Variable', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-serif: 'Fraunces Variable', Georgia, serif;
+  --font-accent: 'Instrument Serif', Georgia, serif;
+  --font-mono: 'JetBrains Mono Variable', ui-monospace, SFMono-Regular, Menlo, monospace;
+  /* Radius, shadow, motion */
+  --r-sm: 4px;
+  --r-md: 6px;
+  --r-lg: 10px;
+  --r-xl: 14px;
+  --shadow-pop: 0 8px 24px -8px oklch(0.2 0.02 60 / 0.18), 0 0 0 1px var(--hairline);
+  --shadow-pane: -12px 0 32px -16px oklch(0.2 0.02 60 / 0.2);
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --spring: cubic-bezier(0.3, 1.4, 0.5, 1);
+  --dur-1: 120ms;
+  --dur-2: 180ms;
+  --dur-3: 260ms;
+  /* Layout */
+  --sidebar-w: 248px;
+  --topbar-h: 52px;
+  --pane-w: 560px;
+  --askmo-w: 440px;
+  --row-h: 36px;
+  color-scheme: light;
+}
+
+.momentum-root[data-theme='dark'] {
+  --cream: oklch(0.19 0.008 60);
+  --cream-2: oklch(0.17 0.008 60);
+  --paper: oklch(0.225 0.009 60);
+  --paper-2: oklch(0.26 0.01 60);
+  --hairline: oklch(0.33 0.01 60);
+  --hair-soft: oklch(0.29 0.01 60);
+  --ink: oklch(0.94 0.008 85);
+  --ink-2: oklch(0.84 0.008 85);
+  --muted: oklch(0.7 0.008 85);
+  --muted-2: oklch(0.58 0.008 85);
+  --amber: oklch(0.8 0.14 75);
+  --amber-hi: oklch(0.86 0.12 80);
+  --amber-2: oklch(0.29 0.04 75);
+  --amber-ink: oklch(0.85 0.11 80);
+  --ok: oklch(0.74 0.13 150);
+  --ok-tint: oklch(0.3 0.04 150);
+  --warn: oklch(0.8 0.13 75);
+  --warn-tint: oklch(0.31 0.05 75);
+  --crit: oklch(0.72 0.16 27);
+  --crit-tint: oklch(0.3 0.05 27);
+  --info: oklch(0.74 0.12 250);
+  --info-tint: oklch(0.29 0.04 250);
+  --mock: oklch(0.75 0.15 300);
+  --mock-tint: oklch(0.3 0.06 300);
+  --focus: oklch(0.72 0.14 250);
+  --selection: oklch(0.32 0.05 250);
+  --shadow-pop: 0 10px 28px -8px oklch(0 0 0 / 0.5), 0 0 0 1px var(--hairline);
+  --shadow-pane: -12px 0 32px -16px oklch(0 0 0 / 0.6);
+  color-scheme: dark;
+}

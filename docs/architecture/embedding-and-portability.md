@@ -24,9 +24,10 @@ async def host_principal(request) -> Principal | None:
     return Principal(provider="host", subject=str(user.id), tenant_id=None,
                      email=user.email, name=user.name, roles=tuple(user.roles), raw_claims={})
 
-mount_momentum(host_app, settings=Settings(base_path="/momentum", auth_mode="host",
-               serve_spa=False, worker_mode="separate"),
-               resolve_principal=host_principal)
+sub = mount_momentum(host_app, settings=Settings(base_path="/momentum", auth_mode="host",
+                     serve_spa=False, worker_mode="separate"),
+                     resolve_principal=host_principal)
+# In the host lifespan: `async with momentum_lifespan(sub): yield` (see INTEGRATION_GUIDE.md §4 Mode B)
 ```
 
 `mount_momentum` builds a Momentum sub-application (`FastAPI()` mounted at `base_path`) with its own lifespan (engine, worker, WS hub). It never modifies the host's middleware, exception handlers, or OpenAPI.
@@ -76,7 +77,7 @@ import { MomentumProvider, momentumRoutes } from '@momentum/web';
 | No global singletons | QueryClient, Zustand stores, and the WS client are created inside `MomentumProvider` |
 | Fonts self-hosted | `@fontsource-variable/*` packages, loaded by Momentum's CSS; no external CDN |
 | Portals | Radix portals render into a `.momentum-root` container, so tokens apply to menus/dialogs |
-| Router-agnostic links | Use the module's `<MLink>` wrapper around React Router `Link`, respecting `basePath` |
+| Router-agnostic links | The router uses `basename = basePath`, so plain React Router `Link`/`NavLink` paths are prefixed automatically (tested) |
 
 ## 3. Lift-and-shift checklist
 

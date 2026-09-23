@@ -1,0 +1,19 @@
+# Example LOCAL LiteLLM config. Copy to config.yaml (git-ignored) and fill in your own credentials.
+# Momentum only knows the aliases on the left (see MOMENTUM_LLM_MODEL_* settings).
+model_list:
+  - model_name: claude-fast
+    litellm_params:
+      model: bedrock/<your-haiku-class-model-id>
+      aws_region_name: <region>
+  - model_name: claude-default
+    litellm_params:
+      model: bedrock/<your-sonnet-class-model-id>
+      aws_region_name: <region>
+  - model_name: claude-smart
+    litellm_params:
+      model: bedrock/<your-strongest-claude-model-id>
+      aws_region_name: <region>
+  - model_name: cohere-embed-v3
+    litellm_params:
+      model: bedrock/cohere.embed-english-v3
+      aws_region_name: <region>

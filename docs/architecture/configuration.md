@@ -16,6 +16,8 @@ Frontend build-time variables use the `VITE_MOMENTUM_` prefix, but the SPA prefe
 | `MOMENTUM_LOG_FORMAT` | `console` (local) / `json` | |
 | `MOMENTUM_DEFAULT_WORKSPACE_SLUG` | `default` | Single-workspace mode |
 | `MOMENTUM_SERVE_SPA` | `true` | Serve built SPA from FastAPI (false when a host serves the UI) |
+| `MOMENTUM_SPA_DIR` | (package `web/static`) | Directory with the built SPA (`index.html`), e.g. `apps/web/dist` locally |
+| `MOMENTUM_DEFAULT_WORKSPACE_NAME` | `Momentum` | Name used when the default workspace is first created |
 
 ## Database
 
@@ -39,6 +41,7 @@ Frontend build-time variables use the `VITE_MOMENTUM_` prefix, but the SPA prefe
 | `MOMENTUM_IDENTITY_LINK_BY_EMAIL` | `true` | Re-link identities by email (tenant moves) |
 | `MOMENTUM_AUTO_PROVISION` | `true` | Create users on first login if allow-listed |
 | `MOMENTUM_EASYAUTH_EMAIL_CLAIMS` | see auth doc | Claim precedence |
+| `MOMENTUM_EASYAUTH_SIM_TENANT_ID` | fixed test GUID | Tenant id used by the local Easy Auth simulator |
 | `MOMENTUM_EASYAUTH_TRUST_HEADERS` | `false` | Force-trust headers outside App Service (never in prod unless behind a trusted proxy) |
 | `MOMENTUM_OIDC_ISSUER` / `_CLIENT_ID` / `_CLIENT_SECRET` | | oidc mode |
 | `MOMENTUM_API_TOKENS_ENABLED` | `true` | Allow bearer tokens on `/api` and `/mcp` |

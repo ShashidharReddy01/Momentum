@@ -82,7 +82,7 @@ Event payloads share an envelope:
 
 ## 5. Jobs (Procrastinate)
 
-| Queue | Jobs | Concurrency |
+| Queue (prefixed `momentum_` in code) | Jobs | Concurrency |
 |---|---|---|
 | `default` | outbox dispatch, notifications, emails/Slack sends | 4 |
 | `ai` | embeddings, summaries, agent runs, AI rule steps | 2 (protects gateway rate limits) |

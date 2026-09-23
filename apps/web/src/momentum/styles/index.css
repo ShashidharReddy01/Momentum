@@ -1,0 +1,90 @@
+@layer momentum-base, theme, components, utilities;
+
+@import './fonts.css';
+@import 'tailwindcss/theme.css' layer(theme);
+@import 'tailwindcss/utilities.css' layer(utilities);
+@import './tokens.css';
+@import './base.css';
+
+@source '../';
+
+/* Map tokens to Tailwind utilities. `inline` makes utilities reference the token variables
+   directly, so they resolve inside .momentum-root (and switch with data-theme). */
+@theme inline {
+  --color-*: initial;
+  --color-transparent: transparent;
+  --color-current: currentColor;
+  --color-cream: var(--cream);
+  --color-cream-2: var(--cream-2);
+  --color-paper: var(--paper);
+  --color-paper-2: var(--paper-2);
+  --color-hairline: var(--hairline);
+  --color-hair-soft: var(--hair-soft);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-muted: var(--muted);
+  --color-muted-2: var(--muted-2);
+  --color-amber: var(--amber);
+  --color-amber-hi: var(--amber-hi);
+  --color-amber-2: var(--amber-2);
+  --color-amber-ink: var(--amber-ink);
+  --color-ok: var(--ok);
+  --color-ok-tint: var(--ok-tint);
+  --color-warn: var(--warn);
+  --color-warn-tint: var(--warn-tint);
+  --color-crit: var(--crit);
+  --color-crit-tint: var(--crit-tint);
+  --color-info: var(--info);
+  --color-info-tint: var(--info-tint);
+  --color-mock: var(--mock);
+  --color-mock-tint: var(--mock-tint);
+  --color-focus: var(--focus);
+  --color-selection: var(--selection);
+  --color-primary: var(--primary);
+  --color-primary-ink: var(--primary-ink);
+
+  --font-sans: var(--font-sans);
+  --font-serif: var(--font-serif);
+  --font-accent: var(--font-accent);
+  --font-mono: var(--font-mono);
+
+  --radius-sm: var(--r-sm);
+  --radius-md: var(--r-md);
+  --radius-lg: var(--r-lg);
+  --radius-xl: var(--r-xl);
+  --shadow-pop: var(--shadow-pop);
+  --shadow-pane: var(--shadow-pane);
+
+  --breakpoint-sm: 640px;
+  --breakpoint-md: 900px;
+  --breakpoint-lg: 1200px;
+  --breakpoint-xl: 1440px;
+}
+
+@utility eyebrow {
+  font-size: 11px;
+  line-height: 16px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+@utility tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+@keyframes momentum-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@utility reveal {
+  animation: momentum-reveal var(--dur-3) var(--ease) both;
+}

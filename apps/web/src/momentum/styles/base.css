@@ -1,0 +1,57 @@
+/* Scoped reset + base styles. Tailwind's global preflight is intentionally NOT used (ADR-0006). */
+@layer momentum-base {
+  .momentum-root,
+  .momentum-root *,
+  .momentum-root *::before,
+  .momentum-root *::after {
+    box-sizing: border-box;
+    border: 0 solid var(--hairline);
+    margin: 0;
+    padding: 0;
+  }
+  .momentum-root {
+    font-family: var(--font-sans);
+    font-size: 14px;
+    line-height: 20px;
+    color: var(--ink);
+    background: var(--cream);
+    -webkit-font-smoothing: antialiased;
+    font-feature-settings: 'cv11', 'ss01';
+    min-height: 100dvh;
+  }
+  .momentum-root :where(button, input, select, textarea) {
+    font: inherit;
+    color: inherit;
+    background: transparent;
+  }
+  .momentum-root :where(button) {
+    cursor: pointer;
+  }
+  .momentum-root :where(a) {
+    color: inherit;
+    text-decoration: inherit;
+  }
+  .momentum-root :where(ul, ol) {
+    list-style: none;
+  }
+  .momentum-root :where(img, svg) {
+    display: block;
+    max-width: 100%;
+  }
+  .momentum-root :where(:focus-visible) {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+    border-radius: var(--r-sm);
+  }
+  .momentum-root ::selection {
+    background: var(--selection);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .momentum-root *,
+    .momentum-root *::before,
+    .momentum-root *::after {
+      animation-duration: 1ms !important;
+      transition-duration: 1ms !important;
+    }
+  }
+}

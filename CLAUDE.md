@@ -58,13 +58,15 @@ One slice at a time. Don't start the next slice without the human's go-ahead unl
 
 | Command | What it does |
 |---|---|
-| `make dev` | Start Postgres (+pgvector) and the app (API with reload + Vite dev server with proxy) |
+| `make db-up` | Start Postgres (+pgvector) in Docker (or run Postgres natively, see the runbook) |
+| `make dev` | Run the API (reload, :8000) and the Vite dev server (:5173, proxies `/api`) |
 | `make check` | Lint + format check + typecheck + backend tests + frontend tests (the gate) |
 | `make test-api` / `make test-web` / `make e2e` | Subsets |
 | `make migrate` / `make migration m="msg"` | Apply migrations / autogenerate a new migration (always review autogen output) |
 | `make seed` | Load the synthetic seed workspace |
 | `make types` | Regenerate `apps/web/src/lib/api/schema.d.ts` from FastAPI OpenAPI |
-| `make evals` | Run AI evals (mock by default; `EVALS_LIVE=1` hits the configured LiteLLM) |
+| `make evals` | Run AI evals (Phase 3+; mock by default; `EVALS_LIVE=1` hits the configured LiteLLM) |
+| `make build` | Build the SPA into the API package for a single-process run on :8000 |
 | `uv run momentum --help` | Backend CLI (serve, worker, migrate, seed, export, import, reindex, llm-check) |
 
 ## 5. Documentation update rules (do these as part of the slice)
@@ -78,6 +80,7 @@ One slice at a time. Don't start the next slice without the human's go-ahead unl
 | Adds a setting | `docs/architecture/configuration.md` + `.env.example` |
 | Adds an AI tool, prompt, or agent | `docs/ai/ai-architecture.md` tool table / `docs/ai/agents.md` + eval fixtures |
 | Adds a UI pattern or design token | `docs/frontend/design-system.md` |
+| Changes embedding, auth adapters, config, or data portability | `INTEGRATION_GUIDE.md` (and its change log) |
 | Makes an architectural decision | New ADR in `docs/adr/` (template in `docs/templates/adr.md`) |
 | Discovers that the plan was wrong or incomplete | Fix the phase file and note it in the STATUS "Plan changes" log |
 
@@ -91,4 +94,4 @@ One slice at a time. Don't start the next slice without the human's go-ahead unl
 
 ## 7. Map of the docs
 
-See `docs/README.md` for the full index and reading order.
+See `docs/README.md` for the full index and reading order. **`INTEGRATION_GUIDE.md`** (repo root) explains how to lift Momentum into another project. Update its change log at every phase exit, and whenever a change affects embedding, auth adapters, config, or data portability.

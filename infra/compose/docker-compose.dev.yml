@@ -1,0 +1,28 @@
+# Local development services. The app itself runs natively via `make dev` for fast reload.
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: momentum
+      POSTGRES_PASSWORD: momentum
+      POSTGRES_DB: momentum
+    ports: ["5432:5432"]
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U momentum"]
+      interval: 3s
+      retries: 20
+
+  # Optional local AI gateway: `docker compose -f infra/compose/docker-compose.dev.yml --profile ai up litellm`
+  litellm:
+    profiles: ["ai"]
+    image: ghcr.io/berriai/litellm:main-stable
+    command: ["--config", "/config.yaml", "--port", "4000"]
+    ports: ["4000:4000"]
+    volumes:
+      - ../litellm/config.yaml:/config.yaml:ro
+
+volumes:
+  pgdata:

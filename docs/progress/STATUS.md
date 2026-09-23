@@ -1,36 +1,39 @@
 # STATUS
 
-> Updated by the AI at the end of every slice and every session. The human confirms "done" after trying the slice and pushing.
+> Updated by the AI at the end of every slice and every session. The human confirms "done" after trying the slice.
 
 ## Current focus
-- **Phase:** 0: Foundations
-- **Next slice:** S0.1.1 Monorepo scaffold
-- **Blockers:** none
+- **Phase:** 0: Foundations. **Complete** except the items noted below
+- **Next slice:** Phase 1 kickoff → S1.1.1 Teams
+- **Blockers:** the GitHub repo `shashidharreddy01/momentum` must be created and connected so the code can be pushed
 
-## Handoff notes (latest session)
-- Docs pack created. No code yet.
+## Handoff notes (latest session: 2026-09-23)
+- Built in a cloud container: native Postgres 16 + pgvector 0.6 (no Docker there). Docker Compose is provided for local machines.
+- `make check` is green: backend 35 tests (ruff, mypy --strict, import-linter), frontend 10 tests (eslint, tsc, prettier, vitest).
+- The app runs end to end: dev login → Home; ⌘K palette; ⌘J Ask Mo panel; `/dev/ui` gallery in light and dark.
+- Not verified here: `docker build` of `infra/docker/Dockerfile` (no Docker daemon in the build container). Verify on first local run.
 
 ## Open questions
 | # | Question | Needed by | Status |
 |---|---|---|---|
 | 1 | LiteLLM model aliases for Claude (fast/default/smart) and Cohere v3 variant (english/multilingual) | Phase 3 | open |
 | 2 | Office Azure constraints (region, networking, Entra app registration owner) | Phase 9 kickoff (ask during Phase 7) | open |
-| 3 | Which host project will Momentum be plugged into (if any), and its stack/auth | Before Phase 8 | open |
+| 3 | Target host project for plugging in (stack/auth) | Before Phase 8 | open (INTEGRATION_GUIDE.md covers all modes) |
 
 ## Progress
 
 ### Phase 0: Foundations
-- [ ] S0.1.1 Monorepo scaffold
-- [ ] S0.1.2 Dev environment and Docker image
-- [ ] S0.1.3 Quality gate
-- [ ] S0.1.4 Settings, logging, telemetry, errors
-- [ ] S0.1.5 Database core and job queue
-- [ ] S0.2.1 AuthProvider + dev mode + /me
-- [ ] S0.2.2 Easy Auth provider + simulator
-- [ ] S0.2.3 Identity resolution and bootstrap admin
-- [ ] S0.2.4 Permissions skeleton
-- [ ] S0.3.1 Design tokens, fonts, base components
-- [ ] S0.3.2 Layout shell + routing + command palette skeleton
+- [x] S0.1.1 Monorepo scaffold
+- [x] S0.1.2 Dev environment and Docker image. Compose + Dockerfile written; **docker build not yet verified**
+- [x] S0.1.3 Quality gate (`make check`; incl. stale API-types check)
+- [x] S0.1.4 Settings, logging, errors (OTEL exporter deferred to Phase 9 as planned)
+- [x] S0.1.5 Database core and job queue (Procrastinate schema inside the Momentum schema)
+- [x] S0.2.1 AuthProvider + dev mode + /me
+- [x] S0.2.2 Easy Auth provider + simulator
+- [x] S0.2.3 Identity resolution and bootstrap admin (link-by-email tested)
+- [x] S0.2.4 Permissions skeleton
+- [x] S0.3.1 Design tokens, fonts, base components (+ `/dev/ui` gallery)
+- [x] S0.3.2 Layout shell + routing + command palette skeleton
 
 ### Phase 1: Core tasks MVP
 - [ ] S1.1.1 Teams · [ ] S1.1.2 Projects · [ ] S1.1.3 Project members and roles
@@ -45,6 +48,15 @@ Tracked in their phase files; copy the slice list here at each phase kickoff.
 ## Plan changes log
 | Date | Change | Reason |
 |---|---|---|
+| 2026-09-23 | Backend tests use a real Postgres via `MOMENTUM_TEST_DATABASE_URL` + truncate-per-test, instead of testcontainers + SAVEPOINT | Build environment has no Docker; services commit normally, which keeps tests realistic |
+| 2026-09-23 | Migrations live inside the package (`momentum/migrations`) | Hosts that install the package get migrations too (embedding) |
+| 2026-09-23 | App wiring moved to `momentum/api/` (deps, runtime, system) | Keeps `core` free of outer-layer imports (import-linter) |
+| 2026-09-23 | Queue names prefixed `momentum_`; NOTIFY channel `<schema>_events` | Coexist with a host that also uses Procrastinate/NOTIFY |
+| 2026-09-23 | Base path handled by React Router `basename` (no custom link wrapper) | Simpler; tested |
+| 2026-09-23 | Added `docs/integrations/asana-import.md` and root `INTEGRATION_GUIDE.md` | Asana data migration spec; guide for plugging into another project |
 
 ## Phase retros
-(Written at each phase exit: what went well, what to change, lessons moved into docs.)
+### Phase 0 (2026-09-23)
+- Went well: portability tests from day one; the Easy Auth simulator exercises the real parser locally.
+- Watch: bundle is 178 KB gz; keep the lazy-loading discipline in Phase 1 (editor, DnD).
+- Lesson moved to docs: never `pkill -f` with a pattern that matches your own shell command (runbook troubleshooting).

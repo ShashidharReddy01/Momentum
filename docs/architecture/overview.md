@@ -34,6 +34,7 @@ apps/api/
 │   ├── __init__.py             # exports create_app, mount_momentum, Settings (no side effects)
 │   ├── app.py                  # create_app(settings) and mount_momentum(host_app, ...)
 │   ├── cli.py                  # Typer CLI: serve, worker, migrate, seed, export, import, reindex, llm-check
+│   ├── api/                    # app wiring: deps.py (get_ctx/get_uow), runtime.py, system.py (healthz, config)
 │   ├── core/
 │   │   ├── settings.py         # pydantic-settings, env prefix MOMENTUM_ (see configuration.md)
 │   │   ├── db.py               # async engine/session factory, schema search_path, UoW helper
@@ -45,7 +46,7 @@ apps/api/
 │   │   ├── events.py           # outbox write, event types, NOTIFY publisher
 │   │   ├── ordering.py         # fractional index helpers
 │   │   ├── telemetry.py        # structlog + OpenTelemetry setup (no-op exporter locally)
-│   │   └── deps.py             # FastAPI dependencies (get_ctx, get_session)
+│   │   └── http.py             # request ids, CSRF guard, problem+json handlers
 │   ├── auth/
 │   │   ├── base.py             # AuthProvider protocol, Principal
 │   │   ├── dev.py  easyauth.py  easyauth_sim.py  oidc.py  host.py  tokens.py
@@ -73,7 +74,7 @@ apps/api/
 │   ├── integrations/           # slack/, graph_calendar/, email_in/, asana_import/, csv_import/
 │   ├── mcp/                    # FastMCP server exposing the tool registry
 │   └── web/                    # SPA static serving + index.html fallback
-├── migrations/                 # Alembic (version table in the Momentum schema)
+│   ├── migrations/             # Alembic, inside the package so hosts get them too (version table in the Momentum schema)
 └── tests/                      # unit/, integration/, api/, ai/, factories.py, conftest.py
 ```
 

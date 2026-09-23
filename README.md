@@ -12,8 +12,10 @@
 
 ```bash
 cp .env.example .env          # defaults work for local dev (AUTH_MODE=dev, LLM_MODE=mock)
-make dev                      # postgres + api (http://localhost:8000) + web (http://localhost:5173)
-make seed                     # synthetic workspace "Acme Demo" with sample users/projects
+make install                  # backend (uv) + frontend (pnpm) deps
+make db-up                    # Postgres 16 + pgvector in Docker (or native: see the runbook)
+make migrate && make seed     # schema + synthetic "Acme Demo" workspace
+make dev                      # api http://localhost:8000 + web http://localhost:5173
 make check                    # the quality gate
 ```
 
@@ -21,4 +23,4 @@ Open http://localhost:5173 and pick a seeded user on the dev login screen.
 
 ## Documentation
 
-Start at [`docs/README.md`](docs/README.md). AI contributors start at [`CLAUDE.md`](CLAUDE.md).
+Start at [`docs/README.md`](docs/README.md). AI contributors start at [`CLAUDE.md`](CLAUDE.md). Plugging Momentum into another project: [`INTEGRATION_GUIDE.md`](INTEGRATION_GUIDE.md).

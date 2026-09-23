@@ -5,7 +5,7 @@
 | Layer | Tool | Scope | Runs in |
 |---|---|---|---|
 | Unit (backend) | pytest | Pure functions: ordering, NL date helpers, permission matrix, claim parsing, rule condition evaluation, cost calc | `make check` |
-| Service integration | pytest + **testcontainers Postgres (pgvector image)** | Services with a real DB: activity, outbox, undo, permissions in SQL, cycles, multi-homing | `make check` |
+| Service integration | pytest + a real Postgres 16 with pgvector (`MOMENTUM_TEST_DATABASE_URL`, default local `momentum_test`; Docker Compose provides one) | Services with a real DB: activity, outbox, undo, permissions in SQL, cycles, multi-homing | `make check` |
 | API | pytest + httpx `AsyncClient` | Routing, schemas, auth modes, problem+json, CSRF, pagination | `make check` |
 | Realtime | pytest | WS subscribe/permission deny/replay using the ASGI test client | `make check` |
 | Jobs | pytest | Job functions invoked directly + Procrastinate in-memory connector for scheduling | `make check` |
@@ -20,7 +20,7 @@
 
 - `tests/factories.py`: factory-boy style async factories: `make_workspace`, `make_user(role=…)`, `make_team`, `make_project(privacy=…)`, `make_task(**)`, `make_comment`.
 - `ctx_for(user)` helper builds a `Ctx`.
-- Each test runs in a transaction rolled back at the end (`db_session` fixture with nested SAVEPOINT). One container per test session.
+- The test session migrates a fresh schema (`MOMENTUM_TEST_SCHEMA`, default `momentum_test`). After each test the Momentum tables are truncated, so services can commit normally.
 - `assert_max_queries(n)` fixture counts SQL statements.
 - `frozen_time` fixture (time-machine) for due-date logic.
 - Seed data (`momentum seed`) is **synthetic**: workspace "Acme Demo", 12 users (incl. 1 admin), 3 teams, 8 projects, ~400 tasks with realistic distributions (overdue, completed, subtasks, comments).
