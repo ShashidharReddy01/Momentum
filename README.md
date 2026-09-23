@@ -20,6 +20,15 @@ make check                    # the quality gate
 make e2e                      # E2E journeys (Playwright, throwaway *_e2e database)
 ```
 
+**Windows (PowerShell, no `make` needed):** install [uv](https://docs.astral.sh/uv/), Node.js 20+ with `npm install -g pnpm`, and Docker Desktop (running). Then:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tools\dev.ps1 setup   # install, Postgres in Docker, migrate, seed
+powershell -ExecutionPolicy Bypass -File tools\dev.ps1 dev     # API :8000 (new window) + web http://localhost:5173
+```
+
+`tools\dev.ps1` also has `seed-perf` (adds the 2,000-task project), `db-down` and `check`.
+
 Open http://localhost:5173 and pick a seeded user on the dev login screen.
 
 ## Documentation

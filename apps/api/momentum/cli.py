@@ -4,12 +4,22 @@ from __future__ import annotations
 
 import asyncio
 import os
+import sys
+from collections.abc import Coroutine
+from typing import Any
 
 import typer
 
 from momentum.core.settings import Settings
 
 cli = typer.Typer(no_args_is_help=True, add_completion=False, help="Momentum operations CLI")
+
+# psycopg's async mode can't run on Windows' default Proactor loop; use the selector loop there.
+WINDOWS = sys.platform == "win32"
+
+
+def run_async[T](coro: Coroutine[Any, Any, T]) -> T:
+    return asyncio.run(coro, loop_factory=asyncio.SelectorEventLoop if WINDOWS else None)
 
 
 @cli.command()
@@ -30,6 +40,7 @@ def serve(
         workers=None if reload else workers,
         proxy_headers=True,
         forwarded_allow_ips="*",
+        loop="asyncio:SelectorEventLoop" if WINDOWS else "auto",
     )
 
 
@@ -45,7 +56,7 @@ def worker() -> None:
         async with app.open_async():
             await app.run_worker_async(queues=QUEUES, concurrency=settings.worker_concurrency)
 
-    asyncio.run(_run())
+    run_async(_run())
 
 
 @cli.command()
@@ -81,7 +92,7 @@ def seed(
             await uow.close()
             await engine.dispose()
 
-    typer.echo(asyncio.run(_run()))
+    typer.echo(run_async(_run()))
 
 
 def main() -> None:
