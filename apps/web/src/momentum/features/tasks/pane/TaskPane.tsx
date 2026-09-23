@@ -38,6 +38,7 @@ import { AssigneePicker } from '../AssigneePicker';
 import { DatePicker } from '../DatePicker';
 import { useTaskDetail, useTaskDetailMutations, type TaskDetail } from '../detail';
 import { SubtaskList } from '../SubtaskList';
+import { Collaborators } from './Collaborators';
 import { useDescriptionAutosave, type SaveState } from './useDescriptionAutosave';
 
 const EDITABLE = 'input, textarea, [contenteditable="true"]';
@@ -125,7 +126,9 @@ export function TaskPane({
           mode={mode}
           onClose={onClose}
           onOpenTask={onOpenTask}
-          canEdit={canEditHint ?? true}
+          canEdit={
+            (detail.data.my_role === 'admin' || detail.data.my_role === 'editor') && (canEditHint ?? true)
+          }
         />
       )}
     </aside>
@@ -344,7 +347,8 @@ function PaneBody({
           onOpen={onOpenTask ? (sub) => onOpenTask(sub.id) : undefined}
         />
 
-        <p className="mt-8 border-t border-hair-soft pt-3 text-xs text-muted">
+        <Collaborators task={task} />
+        <p className="mt-3 text-xs text-muted">
           Created by {nameOf(task.created_by) ?? 'someone'} · {formatDay(task.created_at.slice(0, 10))}
           {task.completed_at ? ` · Completed ${formatDay(task.completed_at.slice(0, 10))}` : ''}
         </p>

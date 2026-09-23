@@ -16,6 +16,8 @@ from momentum.domain.sections.models import Section
 from momentum.domain.tasks import service
 from momentum.domain.tasks.models import Task, TaskProject
 from momentum.domain.tasks.schemas import (
+    FollowerIn,
+    FollowersOut,
     NamedRef,
     ProjectRef,
     SubtaskCreateIn,
@@ -142,7 +144,9 @@ async def create_tasks(
         )
 
 
-async def detail_out(s: AsyncSession, t: Task, p: TaskProject | None) -> TaskDetailOut:
+async def detail_out(
+    s: AsyncSession, t: Task, p: TaskProject | None, role: str | None = None
+) -> TaskDetailOut:
     project = await s.get(Project, p.project_id) if p else None
     section = await s.get(Section, p.section_id) if p and t.parent_id is None else None
     parent = await s.get(Task, t.parent_id) if t.parent_id else None
@@ -150,6 +154,8 @@ async def detail_out(s: AsyncSession, t: Task, p: TaskProject | None) -> TaskDet
     return TaskDetailOut(
         **task_out(t, p, counts).model_dump(),
         parent=NamedRef(id=parent.id, name=parent.title) if parent else None,
+        followers=await service.list_followers(s, t.id),
+        my_role=role,
         description=t.description,
         description_hash=doc_hash(t.description),
         project=ProjectRef(id=project.id, name=project.name, color=project.color)
@@ -165,8 +171,8 @@ async def detail_out(s: AsyncSession, t: Task, p: TaskProject | None) -> TaskDet
 @router.get("/tasks/{task_id}", response_model=TaskDetailOut, summary="A task with details")
 async def get_task(task_id: uuid.UUID, ctx: CtxDep, uow: UowDep) -> TaskDetailOut:
     async with uow.transaction() as s:
-        t, p, _ = await service.get_task(s, ctx, task_id)
-        return await detail_out(s, t, p)
+        t, p, role = await service.get_task(s, ctx, task_id)
+        return await detail_out(s, t, p, role)
 
 
 @router.patch("/tasks/{task_id}", response_model=MutationOut[TaskDetailOut], summary="Edit a task")
@@ -181,11 +187,11 @@ async def patch_task(
         m = await service.update_task(
             s, ctx, task_id, body.model_dump(exclude_unset=True), expected_version=if_match
         )
-        _, p, _ = await service.get_task(s, ctx, task_id)
+        _, p, role = await service.get_task(s, ctx, task_id)
         await s.flush()
         await s.refresh(m.entity, ["updated_at"])
         return MutationOut(
-            data=await detail_out(s, m.entity, p),
+            data=await detail_out(s, m.entity, p, role),
             meta=MutationMeta(activity_id=m.activity_id, version=m.version),
         )
 
@@ -328,4 +334,34 @@ async def outdent_subtask(task_id: uuid.UUID, ctx: CtxDep, uow: UowDep) -> Mutat
         _, p, _ = await service.get_task(s, ctx, task_id)
         return MutationOut(
             data=task_out(t, p), meta=MutationMeta(activity_id=m.activity_id, version=m.version)
+        )
+
+
+@router.post(
+    "/tasks/{task_id}/followers",
+    response_model=MutationOut[FollowersOut],
+    summary="Follow a task (yourself, or add someone as a collaborator)",
+)
+async def add_follower(
+    task_id: uuid.UUID, body: FollowerIn, ctx: CtxDep, uow: UowDep
+) -> MutationOut[FollowersOut]:
+    async with uow.transaction() as s:
+        m = await service.set_following(s, ctx, task_id, body.user_id, True)
+        return MutationOut(
+            data=FollowersOut(followers=m.entity), meta=MutationMeta(activity_id=m.activity_id)
+        )
+
+
+@router.delete(
+    "/tasks/{task_id}/followers/{user_id}",
+    response_model=MutationOut[FollowersOut],
+    summary="Stop following (yourself, or remove a collaborator)",
+)
+async def remove_follower(
+    task_id: uuid.UUID, user_id: uuid.UUID, ctx: CtxDep, uow: UowDep
+) -> MutationOut[FollowersOut]:
+    async with uow.transaction() as s:
+        m = await service.set_following(s, ctx, task_id, user_id, False)
+        return MutationOut(
+            data=FollowersOut(followers=m.entity), meta=MutationMeta(activity_id=m.activity_id)
         )

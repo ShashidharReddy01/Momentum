@@ -104,6 +104,28 @@ describe('Task pane', () => {
     expect(await screen.findByText('Task deleted')).toBeInTheDocument();
   });
 
+  it('collaborators: stop and restart following, add and remove someone', async () => {
+    const user = await boot();
+    await user.click(await screen.findByRole('button', { name: 'Open details for First' }));
+    const collab = await within(pane()).findByRole('region', { name: 'Collaborators' });
+    expect(within(collab).getByRole('button', { name: 'Ravi Kumar' })).toBeInTheDocument();
+    await user.click(within(collab).getByRole('button', { name: /Stop following/ }));
+    await waitFor(() => expect(within(collab).queryByRole('button', { name: 'Ravi Kumar' })).toBeNull());
+    expect(await screen.findByText("You won't get updates on this task")).toBeInTheDocument();
+    await user.click(within(collab).getByRole('button', { name: /Follow task/ }));
+    await waitFor(() =>
+      expect(within(collab).getByRole('button', { name: 'Ravi Kumar' })).toBeInTheDocument(),
+    );
+    await user.click(within(collab).getByRole('button', { name: 'Add collaborator' }));
+    await user.type(await screen.findByPlaceholderText('Add a collaborator…'), 'ana{Enter}');
+    await waitFor(() =>
+      expect(within(collab).getByRole('button', { name: 'Ana Souza' })).toBeInTheDocument(),
+    );
+    await user.click(within(collab).getByRole('button', { name: 'Ana Souza' }));
+    await user.click(await screen.findByRole('menuitem', { name: /Remove Ana Souza/ }));
+    await waitFor(() => expect(within(collab).queryByRole('button', { name: 'Ana Souza' })).toBeNull());
+  });
+
   it('a missing task says so instead of failing', async () => {
     await boot('/projects/seed-1?task=gone');
     expect(await screen.findByText(/deleted, or you don't have access/)).toBeInTheDocument();

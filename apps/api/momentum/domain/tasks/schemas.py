@@ -113,6 +113,10 @@ class TaskDetailOut(TaskOut):
     """A task with everything the task pane needs."""
 
     parent: NamedRef | None = None
+    followers: list[uuid.UUID] = Field(default_factory=list)
+    my_role: str | None = Field(
+        default=None, description="The caller's access: admin, editor, commenter or viewer"
+    )
     description: dict[str, Any] | None
     description_hash: str
     project: ProjectRef | None
@@ -133,3 +137,12 @@ class SubtaskMoveIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
     after_id: uuid.UUID | None = None
     before_id: uuid.UUID | None = None
+
+
+class FollowerIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    user_id: uuid.UUID
+
+
+class FollowersOut(BaseModel):
+    followers: list[uuid.UUID]

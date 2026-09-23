@@ -389,6 +389,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/tasks/{task_id}/followers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Follow a task (yourself, or add someone as a collaborator) */
+        post: operations["add_follower_api_v1_tasks__task_id__followers_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tasks/{task_id}/followers/{user_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Stop following (yourself, or remove a collaborator) */
+        delete: operations["remove_follower_api_v1_tasks__task_id__followers__user_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tasks/{task_id}/move": {
         parameters: {
             query?: never;
@@ -617,6 +651,19 @@ export interface components {
             /** Before Id */
             before_id?: string | null;
         };
+        /** FollowerIn */
+        FollowerIn: {
+            /**
+             * User Id
+             * Format: uuid
+             */
+            user_id: string;
+        };
+        /** FollowersOut */
+        FollowersOut: {
+            /** Followers */
+            followers: string[];
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -680,6 +727,11 @@ export interface components {
             batch_id?: string | null;
             /** Version */
             version?: number | null;
+        };
+        /** MutationOut[FollowersOut] */
+        MutationOut_FollowersOut_: {
+            data: components["schemas"]["FollowersOut"];
+            meta: components["schemas"]["MutationMeta"];
         };
         /** MutationOut[ListOut[TaskOut]] */
         MutationOut_ListOut_TaskOut__: {
@@ -1059,6 +1111,8 @@ export interface components {
             due_at: string | null;
             /** Due On */
             due_on: string | null;
+            /** Followers */
+            followers?: string[];
             /**
              * Id
              * Format: uuid
@@ -1066,6 +1120,11 @@ export interface components {
             id: string;
             /** Key */
             key: string;
+            /**
+             * My Role
+             * @description The caller's access: admin, editor, commenter or viewer
+             */
+            my_role?: string | null;
             /** Number */
             number: number;
             parent?: components["schemas"]["NamedRef"] | null;
@@ -2388,6 +2447,73 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MutationOut_TaskOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_follower_api_v1_tasks__task_id__followers_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FollowerIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationOut_FollowersOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_follower_api_v1_tasks__task_id__followers__user_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationOut_FollowersOut_"];
                 };
             };
             /** @description Validation Error */

@@ -92,6 +92,7 @@ export function taskHandlers(
   };
 
   const prefs = new Map<string, unknown>();
+  const followers = new Map<string, string[]>();
   const childrenOf = (id: string) =>
     tasks.filter((t) => t.parent_id === id).sort((a, b) => (a.position < b.position ? -1 : 1));
   const withCounts = (t: T): T => {
@@ -113,6 +114,8 @@ export function taskHandlers(
       : null,
     created_by: '01a0ccaf-8f68-77d2-a888-584ea1e80ea8',
     completed_by: null,
+    followers: followers.get(t.id) ?? ['01a0ccaf-8f68-77d2-a888-584ea1e80ea8'],
+    my_role: 'admin',
     updated_at: new Date().toISOString(),
   });
   return [
@@ -196,6 +199,22 @@ export function taskHandlers(
           out.push(t);
         }
       return HttpResponse.json({ data: { data: out, meta: {} }, meta: { ...meta, batch_id: 'batch-2' } });
+    }),
+    http.post(`*${base}/api/v1/tasks/:id/followers`, async ({ params, request }) => {
+      const { user_id } = (await request.json()) as { user_id: string };
+      const id = String(params.id);
+      const list = followers.get(id) ?? ['01a0ccaf-8f68-77d2-a888-584ea1e80ea8'];
+      followers.set(id, list.includes(user_id) ? list : [...list, user_id]);
+      return HttpResponse.json({ data: { followers: followers.get(id) }, meta });
+    }),
+    http.delete(`*${base}/api/v1/tasks/:id/followers/:uid`, ({ params }) => {
+      const id = String(params.id);
+      const list = followers.get(id) ?? ['01a0ccaf-8f68-77d2-a888-584ea1e80ea8'];
+      followers.set(
+        id,
+        list.filter((f) => f !== params.uid),
+      );
+      return HttpResponse.json({ data: { followers: followers.get(id) }, meta });
     }),
     http.get(`*${base}/api/v1/tasks/:id/subtasks`, ({ params }) =>
       HttpResponse.json({ data: childrenOf(String(params.id)).map(withCounts), meta: { next_cursor: null } }),

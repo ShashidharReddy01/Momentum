@@ -95,7 +95,8 @@ resolve_user(principal):
 | Action | Project admin | Editor | Commenter | Viewer |
 |---|---|---|---|---|
 | View project and tasks | ✓ | ✓ | ✓ | ✓ |
-| Comment, react, follow | ✓ | ✓ | ✓ | ✗ |
+| Comment, react, follow (yourself) | ✓ | ✓ | ✓ | ✗ |
+| Add/remove other collaborators (followers) | ✓ | ✓ | ✗ | ✗ |
 | Create/edit/complete/move tasks | ✓ | ✓ | ✗ | ✗ |
 | Manage sections, fields, views | ✓ | ✓ | ✗ | ✗ |
 | Manage rules, forms, templates | ✓ | ✓ (setting) | ✗ | ✗ |
@@ -109,6 +110,13 @@ A user can see task T if **any** of these hold:
 1. T is in a project P the user can view, or
 2. the user is T's assignee, creator, or a follower, or
 3. T is a subtask of a task the user can see (subtasks inherit parent visibility).
+
+Consequences, by design (as in Asana): adding someone as a **collaborator** on a task gives them
+commenter access to that task (and its subtasks), even in a private project they're not a member
+of, but not to the project or its other tasks; leaving the task removes that access. Subtasks
+have no project placement of their own: their role comes from their top-level task, and they are
+hidden while any ancestor is deleted. (Implemented in `access.get_visible_task`; tests in
+`test_followers.py` and `test_subtasks.py`.)
 
 This is implemented once in `permissions.visible_tasks_clause(ctx)` (a SQL expression) and reused by lists, search, AI retrieval, notifications, and exports.
 

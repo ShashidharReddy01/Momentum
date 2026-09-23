@@ -1025,6 +1025,70 @@ async def outdent_subtask(
     return Mutation((task, new_placement or placement), act.id, version=task.version)
 
 
+# ---------- followers ----------
+
+
+async def list_followers(session: AsyncSession, task_id: uuid.UUID) -> list[uuid.UUID]:
+    rows = await session.execute(
+        select(Follower.user_id)
+        .where(Follower.task_id == task_id)
+        .order_by(Follower.created_at, Follower.user_id)
+    )
+    return list(rows.scalars())
+
+
+async def set_following(
+    session: AsyncSession,
+    ctx: Ctx,
+    task_id: uuid.UUID,
+    user_id: uuid.UUID,
+    follow: bool,
+    *,
+    record_undo: bool = True,
+) -> Mutation[list[uuid.UUID]]:
+    """Add or remove a follower. Anyone with comment access may follow or leave a task
+    themselves; adding or removing someone else needs edit access. A follower can see and comment
+    on the task even outside its project (auth-and-permissions.md §6)."""
+    task, placement, role = await get_visible_task(session, ctx, task_id)
+    if user_id == ctx.actor.id:
+        require_project_role(role, "commenter", "follow this task")
+    else:
+        require_project_role(role, "editor", "change who follows this task")
+        if follow:
+            await _require_assignable(session, ctx, user_id)
+    existing = await session.get(Follower, (task.id, user_id))
+    if (existing is not None) == follow:
+        return Mutation(await list_followers(session, task.id))
+    if follow:
+        session.add(Follower(task_id=task.id, user_id=user_id))
+    else:
+        await session.delete(existing)
+    await session.flush()
+    verb = "task.follower_added" if follow else "task.follower_removed"
+    act = await record_activity(
+        session,
+        ctx,
+        entity_type="task",
+        entity_id=task.id,
+        verb=verb,
+        changes={"follower": (None, user_id) if follow else (user_id, None)},
+        undo=undo_op("tasks.follow", task_id=task.id, user_id=user_id, follow=not follow)
+        if record_undo
+        else None,
+    )
+    await emit(
+        session,
+        ctx,
+        type=verb,
+        entity_type="task",
+        entity_id=task.id,
+        data={"user_id": str(user_id)},
+        channels=[*channels(task, placement), f"user:{user_id}"],
+        activity_id=act.id,
+    )
+    return Mutation(await list_followers(session, task.id), act.id)
+
+
 # ---------- section hooks ----------
 
 
@@ -1152,6 +1216,18 @@ async def _undo_parent_change(session: AsyncSession, ctx: Ctx, args: dict[str, A
         entity_id=task.id,
         data={"parent_id": str(parent.id), "position": task.parent_position},
         channels=[f"task:{task.id}", f"task:{parent.id}"],
+    )
+
+
+@undo_handler("tasks.follow")
+async def _undo_follow(session: AsyncSession, ctx: Ctx, args: dict[str, Any]) -> None:
+    await set_following(
+        session,
+        ctx,
+        _tid(args),
+        uuid.UUID(str(args["user_id"])),
+        bool(args["follow"]),
+        record_undo=False,
     )
 
 
