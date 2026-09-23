@@ -13,12 +13,13 @@ from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from momentum.core.activity import Activity
 from momentum.core.context import Ctx
 from momentum.core.errors import Conflict, Forbidden, NotFound
+from momentum.core.ids import new_id
 
 UndoHandler = Callable[[AsyncSession, Ctx, dict[str, Any]], Awaitable[None]]
 
@@ -90,6 +91,11 @@ async def undo(
             raise UndoConflict("This change can't be undone")
         if now - row.created_at > UNDO_WINDOW:
             raise UndoConflict("Changes can only be undone within 24 hours")
+    # Activity ids are time-ordered (UUIDv7): anything this request records from here on is part
+    # of the undo itself (the reversal) and is marked undone too, so feeds show neither the
+    # change nor its reversal. Matching on request_id keeps other people's concurrent activity
+    # untouched.
+    first_reversal = new_id()
     for row in rows:
         assert row.undo_payload is not None
         handler = _HANDLERS.get(str(row.undo_payload.get("op")))
@@ -98,4 +104,14 @@ async def undo(
         await handler(session, ctx, dict(row.undo_payload.get("args") or {}))
         row.undone_at = now
     await session.flush()
+    await session.execute(
+        update(Activity)
+        .where(
+            Activity.workspace_id == ctx.workspace_id,
+            Activity.request_id == ctx.request_id,
+            Activity.id > first_reversal,
+            Activity.undone_at.is_(None),
+        )
+        .values(undone_at=now)
+    )
     return rows

@@ -10,7 +10,7 @@ from typing import Any
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from momentum.core.activity import record_activity
+from momentum.core.activity import Activity, record_activity
 from momentum.core.context import Ctx
 from momentum.core.errors import Forbidden, NotFound, ValidationFailed
 from momentum.core.events import emit
@@ -378,3 +378,45 @@ async def _undo_edit(session: AsyncSession, ctx: Ctx, args: dict[str, Any]) -> N
     if doc_hash(comment.body) != args.get("expect"):
         raise UndoConflict("This comment was edited again since")
     await edit_comment(session, ctx, comment.id, args["body"], record_undo=False)
+
+
+# ---------- feed (S1.4.2) ----------
+
+FEED_LIMIT = 300
+# Activity that isn't worth a line in the feed (comments show as themselves; reorders are noise).
+HIDDEN_VERBS = {"comment.created", "comment.edited", "comment.deleted"}
+CHILD_VERBS = {"task.created", "task.completed", "task.uncompleted", "task.deleted"}
+
+
+async def task_feed(
+    session: AsyncSession, ctx: Ctx, task_id: uuid.UUID
+) -> tuple[list[Activity], list[Comment], dict[uuid.UUID, Task], str, bool]:
+    """Activity of a task (and key events of its direct subtasks) plus its comments, oldest first.
+    Undone changes are left out; pure reorders within a section too."""
+    _, _, role = await get_visible_task(session, ctx, task_id)
+    children = {
+        t.id: t
+        for t in (await session.execute(select(Task).where(Task.parent_id == task_id))).scalars()
+    }
+    query = (
+        select(Activity)
+        .where(
+            Activity.entity_type == "task",
+            Activity.undone_at.is_(None),
+            (Activity.entity_id == task_id)
+            | (Activity.entity_id.in_(list(children)) & Activity.verb.in_(CHILD_VERBS)),
+        )
+        .order_by(Activity.created_at.desc(), Activity.id.desc())
+        .limit(FEED_LIMIT + 1)
+    )
+    rows = list((await session.execute(query)).scalars())
+    truncated = len(rows) > FEED_LIMIT
+    rows = [
+        a
+        for a in rows[:FEED_LIMIT]
+        if a.verb not in HIDDEN_VERBS
+        and not (a.verb == "task.moved" and set(a.diff) <= {"position", "parent_position"})
+    ]
+    rows.reverse()
+    comments, _ = await list_comments(session, ctx, task_id)
+    return rows, comments, children, role, truncated

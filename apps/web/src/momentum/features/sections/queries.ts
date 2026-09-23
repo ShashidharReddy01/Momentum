@@ -10,10 +10,11 @@ export const sectionKeys = {
   byProject: (projectId: string) => ['projects', projectId, 'sections'] as const,
 };
 
-export function useSections(projectId: string) {
+export function useSections(projectId: string, enabled = true) {
   const api = useApi();
   return useQuery({
     queryKey: sectionKeys.byProject(projectId),
+    enabled: enabled && !!projectId,
     queryFn: async () =>
       (
         await api.GET('/api/v1/projects/{project_id}/sections', {

@@ -58,3 +58,32 @@ class MentionSearchOut(BaseModel):
     users: list[MentionUser]
     tasks: list[MentionTask]
     projects: list[MentionProject]
+
+
+class FeedSubject(BaseModel):
+    id: uuid.UUID
+    title: str
+
+
+class ActivityItemOut(BaseModel):
+    id: uuid.UUID
+    verb: str
+    actor_id: uuid.UUID | None
+    actor_kind: str
+    created_at: datetime
+    changes: dict[str, list[Any]]
+    subject: FeedSubject | None = Field(
+        default=None, description="Set when the entry is about a subtask of this task"
+    )
+
+
+class FeedItemOut(BaseModel):
+    kind: str = Field(description="comment | activity")
+    at: datetime
+    comment: CommentOut | None = None
+    activity: ActivityItemOut | None = None
+
+
+class FeedOut(BaseModel):
+    data: list[FeedItemOut]
+    truncated: bool

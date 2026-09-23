@@ -139,7 +139,7 @@ describe('Task pane', () => {
     });
     localStorage.setItem('momentum.draft.comment.task-1', JSON.stringify(doc('Half-written reply')));
     await user.click(await screen.findByRole('button', { name: 'Open details for First' }));
-    const comments = await within(pane()).findByRole('region', { name: 'Comments' });
+    const comments = await within(pane()).findByRole('region', { name: 'Comments and activity' });
     expect(await within(comments).findByText('First thoughts')).toBeInTheDocument();
     // the draft comes back in the composer
     expect(await within(comments).findByText('Half-written reply')).toBeInTheDocument();

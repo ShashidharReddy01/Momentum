@@ -14,8 +14,12 @@ from momentum.domain.access import visible_projects_clause
 from momentum.domain.comments import service
 from momentum.domain.comments.models import Comment
 from momentum.domain.comments.schemas import (
+    ActivityItemOut,
     CommentIn,
     CommentOut,
+    FeedItemOut,
+    FeedOut,
+    FeedSubject,
     MentionProject,
     MentionSearchOut,
     MentionTask,
@@ -164,3 +168,34 @@ async def mention_search(
             tasks=[MentionTask(id=t.id, title=t.title, key=task_key(t.number)) for t in tasks],
             projects=[MentionProject(id=p.id, name=p.name, color=p.color) for p in projects],
         )
+
+
+@router.get(
+    "/tasks/{task_id}/feed", response_model=FeedOut, summary="Comments and activity, oldest first"
+)
+async def task_feed(task_id: uuid.UUID, ctx: CtxDep, uow: UowDep) -> FeedOut:
+    async with uow.transaction() as s:
+        activity, comments, children, role, truncated = await service.task_feed(s, ctx, task_id)
+        items = [
+            FeedItemOut(kind="comment", at=c.created_at, comment=c_out)
+            for c, c_out in zip(comments, await _out(s, ctx, comments, role), strict=True)
+        ]
+        for a in activity:
+            child = children.get(a.entity_id)
+            items.append(
+                FeedItemOut(
+                    kind="activity",
+                    at=a.created_at,
+                    activity=ActivityItemOut(
+                        id=a.id,
+                        verb=a.verb,
+                        actor_id=a.actor_id,
+                        actor_kind=a.actor_kind,
+                        created_at=a.created_at,
+                        changes=a.diff,
+                        subject=FeedSubject(id=child.id, title=child.title) if child else None,
+                    ),
+                )
+            )
+        items.sort(key=lambda i: i.at)
+        return FeedOut(data=items, truncated=truncated)

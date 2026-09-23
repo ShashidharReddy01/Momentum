@@ -1,47 +1,124 @@
 import { Pencil, SmilePlus, Trash2 } from 'lucide-react';
-import { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { useEffect, useState } from 'react';
 import { RichTextView } from '@/components/editor/RichTextView';
 import { Avatar } from '@/components/ui/Avatar';
 import { Icon } from '@/components/ui/Icon';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/Popover';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { Segmented } from '@/components/ui/Tabs';
 import { useMe } from '@/features/auth';
 import { usePeople } from '@/features/people';
+import { useSections } from '@/features/sections';
 import { cn } from '@/lib/cn';
 import { formatRelative } from '@/lib/dates';
-import { REACTIONS, useCommentMutations, useComments, type Comment } from '../comments';
+import {
+  feedKey,
+  REACTIONS,
+  useCommentMutations,
+  useTaskFeed,
+  type Comment,
+  type FeedItem,
+} from '../comments';
 import type { TaskDetail } from '../detail';
 import { CommentEditor } from './CommentEditor';
+import { buildFeed } from './feedText';
 
-/** Comments on a task, with the composer at the bottom. */
+type FeedFilter = 'all' | 'comments' | 'activity';
+const FILTER_KEY = 'momentum.feedFilter';
+
+/** Comments and activity on a task (oldest first), with the composer at the bottom. */
 export function Comments({ task }: { task: TaskDetail }) {
-  const comments = useComments(task.id);
+  const qc = useQueryClient();
+  const feed = useTaskFeed(task.id);
   const meId = useMe().data?.user.id;
   const people = usePeople().data ?? [];
+  const sections = useSections(task.project?.id ?? '', !!task.project).data;
   const nameOf = (id: string | null | undefined) => people.find((p) => p.id === id)?.name;
   const m = useCommentMutations(task.id, meId);
   const canComment = task.my_role === 'admin' || task.my_role === 'editor' || task.my_role === 'commenter';
+  const [filter, setFilterState] = useState<FeedFilter>(() => {
+    try {
+      const v = localStorage.getItem(FILTER_KEY);
+      return v === 'comments' || v === 'activity' ? v : 'all';
+    } catch {
+      return 'all';
+    }
+  });
+  const setFilter = (f: FeedFilter) => {
+    setFilterState(f);
+    try {
+      localStorage.setItem(FILTER_KEY, f);
+    } catch {
+      /* ignore */
+    }
+  };
+  // Refresh the feed when the task changes (edits from the pane, the list, or subtasks).
+  const signature = `${task.version}:${task.subtask_count}:${task.completed_subtask_count}:${(task.followers ?? []).length}`;
+  useEffect(() => {
+    void qc.invalidateQueries({ queryKey: feedKey(task.id) });
+  }, [qc, task.id, signature]);
+
+  const names = {
+    person: (id: string) => nameOf(id),
+    section: (id: string) => sections?.find((s) => s.id === id)?.name,
+  };
+  const entries = feed.data ? buildFeed(feed.data.data, names, filter) : [];
 
   return (
-    <section aria-label="Comments" className="mt-8">
-      <h3 className="section-label mb-2">Comments</h3>
-      {comments.isPending ? (
+    <section aria-label="Comments and activity" className="mt-8">
+      <div className="mb-2 flex items-center gap-3">
+        <h3 className="section-label">Activity</h3>
+        <Segmented
+          label="Show"
+          value={filter}
+          onChange={(v) => setFilter(v)}
+          options={[
+            { value: 'all', label: 'All' },
+            { value: 'comments', label: 'Comments' },
+            { value: 'activity', label: 'Changes' },
+          ]}
+        />
+      </div>
+      {feed.isPending ? (
         <Skeleton className="h-12" />
       ) : (
-        <ol className="flex flex-col gap-4">
-          {(comments.data ?? []).map((c) => (
-            <CommentItem
-              key={c.id}
-              comment={c}
-              meId={meId}
-              authorName={nameOf(c.author_id) ?? 'Former member'}
-              nameOf={nameOf}
-              canReact={canComment}
-              onEdit={async (body) => !!(await m.edit.mutateAsync({ id: c.id, body }).catch(() => null))}
-              onDelete={() => m.remove.mutate(c.id)}
-              onReact={(emoji, active) => m.react.mutate({ id: c.id, emoji, active })}
-            />
-          ))}
+        <ol className="flex flex-col gap-3" aria-label="Feed">
+          {feed.data?.truncated ? <li className="text-xs text-muted">Older activity is not shown.</li> : null}
+          {entries.map((e) =>
+            e.kind === 'comment' ? (
+              <CommentItem
+                key={e.item.comment!.id}
+                comment={e.item.comment!}
+                meId={meId}
+                authorName={nameOf(e.item.comment!.author_id) ?? 'Former member'}
+                nameOf={nameOf}
+                canReact={canComment}
+                onEdit={async (body) =>
+                  !!(await m.edit.mutateAsync({ id: e.item.comment!.id, body }).catch(() => null))
+                }
+                onDelete={() => m.remove.mutate(e.item.comment!.id)}
+                onReact={(emoji, active) => m.react.mutate({ id: e.item.comment!.id, emoji, active })}
+              />
+            ) : e.kind === 'activity' ? (
+              <ActivityLine
+                key={e.item.activity!.id}
+                who={actorName(e.item, nameOf)}
+                at={e.item.at}
+                lines={e.lines}
+              />
+            ) : (
+              <FoldedLine
+                key={e.entries[0]!.item.activity!.id}
+                who={actorName(e.entries[0]!.item, nameOf)}
+                at={e.at}
+                entries={e.entries}
+              />
+            ),
+          )}
+          {!entries.length && filter === 'comments' ? (
+            <li className="text-sm text-muted">No comments yet.</li>
+          ) : null}
         </ol>
       )}
       {canComment ? (
@@ -56,6 +133,51 @@ export function Comments({ task }: { task: TaskDetail }) {
         <p className="mt-3 text-xs text-muted">You can view this task but not comment on it.</p>
       )}
     </section>
+  );
+}
+
+function actorName(item: FeedItem, nameOf: (id: string | null | undefined) => string | undefined): string {
+  const a = item.activity;
+  if (!a) return 'Someone';
+  if (a.actor_kind === 'system') return 'Momentum';
+  return nameOf(a.actor_id) ?? 'Someone';
+}
+
+function ActivityLine({ who, at, lines }: { who: string; at: string; lines: string[] }) {
+  return (
+    <li className="flex gap-3 pl-1 text-xs text-muted">
+      <span aria-hidden className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-muted-2" />
+      <span>
+        <span className="font-medium text-ink-2">{who}</span> {lines.join(', ')}
+        <span className="text-muted-2"> · {formatRelative(at)}</span>
+      </span>
+    </li>
+  );
+}
+
+function FoldedLine({ who, at, entries }: { who: string; at: string; entries: { lines: string[] }[] }) {
+  const [open, setOpen] = useState(false);
+  const count = entries.reduce((n, e) => n + e.lines.length, 0);
+  return (
+    <li className="pl-1 text-xs text-muted">
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOpen(!open)}
+        className="flex gap-3 text-left hover:text-ink"
+      >
+        <span aria-hidden className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-muted-2" />
+        <span>
+          <span className="font-medium text-ink-2">{who}</span> made {count} changes
+          <span className="text-muted-2"> · {formatRelative(at)}</span>
+        </span>
+      </button>
+      {open ? (
+        <ul className="mt-1 ml-5 flex flex-col gap-0.5">
+          {entries.flatMap((e, i) => e.lines.map((l, j) => <li key={`${i}-${j}`}>{l}</li>))}
+        </ul>
+      ) : null}
+    </li>
   );
 }
 

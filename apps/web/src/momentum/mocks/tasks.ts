@@ -276,6 +276,30 @@ export function taskHandlers(
       c.reactions = c.reactions.filter((x) => x.user_ids.length);
       return HttpResponse.json({ data: c, meta: {} });
     }),
+    http.get(`*${base}/api/v1/tasks/:id/feed`, ({ params }) => {
+      const t = tasks.find((x) => x.id === params.id);
+      const created = t
+        ? [
+            {
+              kind: 'activity',
+              at: t.created_at,
+              activity: {
+                id: `act-${t.id}`,
+                verb: 'task.created',
+                actor_id: me,
+                actor_kind: 'user',
+                created_at: t.created_at,
+                changes: { title: [null, t.title] },
+                subject: null,
+              },
+            },
+          ]
+        : [];
+      const items = comments
+        .filter((c) => c.task_id === params.id)
+        .map((c) => ({ kind: 'comment', at: c.created_at, comment: c }));
+      return HttpResponse.json({ data: [...created, ...items], truncated: false });
+    }),
     http.get(`*${base}/api/v1/mentions/search`, () =>
       HttpResponse.json({
         users: [{ id: me, name: 'Ravi Kumar', email: 'ravi@acme-demo.test' }],
