@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRef } from 'react';
 import { toastError } from '@/lib/toast';
-import { useUndoToast } from '@/lib/undo';
+import { useRecordUndo, useUndoToast } from '@/lib/undo';
 import { useApi } from '@/providers/api';
 import { syncTask } from './detail';
 import { taskKeys, type Task, type TaskPatch } from './queries';
@@ -28,6 +28,7 @@ export function useSubtaskMutations(parentId: string) {
   const api = useApi();
   const qc = useQueryClient();
   const undoToast = useUndoToast();
+  const record = useRecordUndo();
   const key = subtaskKey(parentId);
   const queue = useRef<Promise<unknown>>(Promise.resolve());
   const serial = <R>(fn: () => Promise<R>) => {
@@ -94,6 +95,7 @@ export function useSubtaskMutations(parentId: string) {
     onSuccess: (res, _v, c) => {
       qc.setQueryData<Task[]>(key, (old) => old?.map((t) => (t.id === c?.tempId ? res.data : t)));
       recount();
+      record('Subtask added', res.meta, refresh);
     },
     onError: (e, _v, c) => {
       qc.setQueryData<Task[]>(key, (old) => old?.filter((t) => t.id !== c?.tempId));
@@ -110,6 +112,7 @@ export function useSubtaskMutations(parentId: string) {
     onSuccess: (res, v) => {
       patchLocal(v.id, res.data);
       if (v.message) undoToast(v.message, res.meta, refresh);
+      else record('Subtask updated', res.meta, refresh);
     },
     onError: (e) => {
       toastError(e, "Couldn't update the subtask");
@@ -174,8 +177,10 @@ export function useSubtaskMutations(parentId: string) {
           : rest.findIndex((t) => t.id === v.beforeId);
         return [...rest.slice(0, Math.max(0, at)), moving, ...rest.slice(Math.max(0, at))];
       }),
-    onSuccess: (res, v) =>
-      qc.setQueryData<Task[]>(key, (old) => old?.map((t) => (t.id === v.id ? res.data : t))),
+    onSuccess: (res, v) => {
+      qc.setQueryData<Task[]>(key, (old) => old?.map((t) => (t.id === v.id ? res.data : t)));
+      record('Subtask moved', res.meta, refresh);
+    },
     onError: (e) => {
       toastError(e, "Couldn't move the subtask");
       refresh();

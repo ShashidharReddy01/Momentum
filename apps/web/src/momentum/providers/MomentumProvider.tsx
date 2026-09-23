@@ -6,6 +6,7 @@ import { TooltipProvider } from '@/components/ui/Tooltip';
 import { createApiClient, type MomentumClient } from '@/lib/api/client';
 import { ApiError } from '@/lib/api/errors';
 import { ConfigContext, loadRuntimeConfig, type RuntimeConfig } from '@/lib/config';
+import { UndoStack, UndoStackContext } from '@/lib/undo';
 import { createUiStore, UiStoreContext, useUi } from '@/stores/ui';
 import { ApiContext } from './api';
 import { PortalContext } from './portal';
@@ -36,6 +37,7 @@ export function MomentumProvider({ basePath = '', config: preset, children }: Mo
   const [queryClient] = useState(makeQueryClient);
   const [uiStore] = useState(() => createUiStore(`momentum.ui${basePath || ''}`));
   const [api] = useState<MomentumClient>(() => createApiClient(basePath));
+  const [undoStack] = useState(() => new UndoStack());
 
   useEffect(() => {
     if (preset) return;
@@ -59,7 +61,9 @@ export function MomentumProvider({ basePath = '', config: preset, children }: Mo
           <ConfigContext.Provider value={config}>
             <ApiContext.Provider value={api}>
               <QueryClientProvider client={queryClient}>
-                <TooltipProvider>{children}</TooltipProvider>
+                <UndoStackContext.Provider value={undoStack}>
+                  <TooltipProvider>{children}</TooltipProvider>
+                </UndoStackContext.Provider>
               </QueryClientProvider>
             </ApiContext.Provider>
           </ConfigContext.Provider>

@@ -1,4 +1,5 @@
 import { Outlet } from 'react-router';
+import { useUndoShortcut } from '@/lib/undo';
 import { useHotkey } from '@/lib/keyboard';
 import { useUi } from '@/stores/ui';
 import { AskMoPanel } from './AskMoPanel';
@@ -10,6 +11,7 @@ import { TopBar } from './TopBar';
 /** App shell: Sidebar · (TopBar + routed content) · task pane host (Phase 1) · Ask Mo panel. */
 export function Layout() {
   const ui = useUi((s) => s);
+  useUndoShortcut();
   useHotkey('mod+k', () => ui.setPaletteOpen(!ui.paletteOpen));
   useHotkey('mod+j', () => ui.setAskMoOpen(!ui.askMoOpen));
   useHotkey('mod+\\', ui.toggleSidebar);

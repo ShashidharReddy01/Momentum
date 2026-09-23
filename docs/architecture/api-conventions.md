@@ -103,3 +103,21 @@ The frontend shows **Undo** in the toast using `activity_id`/`batch_id`.
 - [ ] Calls exactly one service function (composition lives in services)
 - [ ] Documented error codes in `responses=`
 - [ ] API test for happy path + permission denial + validation error
+
+
+## Undo (S1.4.3)
+
+Every mutation returns `meta.activity_id` (or `meta.batch_id` for bulk actions); `POST /undo`
+with either reverses it. Rules (enforced in `core/undo.py` and the handlers):
+
+- only the person who made the change, or a workspace admin; within 24 hours; once;
+- refused with `409 undo_conflict` if the thing changed again since (version, position or
+  content checks in each handler), so an undo never overwrites someone's later work;
+- the reversal's own activity is marked undone too, so feeds show neither;
+- batches undo newest first as one unit.
+
+Coverage is tested in `tests/test_undo_coverage.py`: a table of every Phase 1 mutation type
+(teams, projects, members, sections, tasks, dates, descriptions, bulk actions, subtasks,
+followers, comments) plus a static check that every recorded undo op has a handler. Add a row
+there for every new mutation. In the UI, every mutation with an undo handle goes on the session
+undo stack (`lib/undo.ts`); ⌘Z / Ctrl+Z outside text fields undoes the latest.

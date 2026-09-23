@@ -16,6 +16,8 @@ describe('keyboard', () => {
   });
   it('formats combos for display', () => {
     expect(formatCombo('mod+k')).toEqual(['Ctrl', 'K']);
-    expect(formatCombo('mod+enter')).toEqual(['Ctrl', 'enter']);
+    expect(formatCombo('mod+enter')).toEqual(['Ctrl', 'Enter']);
+    expect(formatCombo('shift+down')).toEqual(['⇧', '↓']);
+    expect(formatCombo('mod+backspace')).toEqual(['Ctrl', '⌫']);
   });
 });

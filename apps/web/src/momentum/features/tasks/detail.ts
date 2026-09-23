@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import type { components } from '@/lib/api/schema';
 import { toastError } from '@/lib/toast';
-import { useUndoToast } from '@/lib/undo';
+import { useRecordUndo, useUndoToast } from '@/lib/undo';
 import { useApi } from '@/providers/api';
 import { taskKeys, type Task, type TaskPatch } from './queries';
 
@@ -49,6 +49,7 @@ export function useTaskDetailMutations(taskId: string) {
   const api = useApi();
   const qc = useQueryClient();
   const undoToast = useUndoToast();
+  const record = useRecordUndo();
   const refetch = () => {
     void qc.invalidateQueries({ queryKey: taskKeys.detail(taskId) });
     void qc.invalidateQueries({ predicate: (q) => isTaskList(q.queryKey) });
@@ -62,6 +63,7 @@ export function useTaskDetailMutations(taskId: string) {
     onSuccess: (res, v) => {
       syncTask(qc, taskId, res.data);
       if (v.message) undoToast(v.message, res.meta, refetch);
+      else record('Task updated', res.meta, refetch);
     },
     onError: (e) => {
       toastError(e, "Couldn't update the task");

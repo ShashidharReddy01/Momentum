@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tansta
 import { useRef } from 'react';
 import type { components } from '@/lib/api/schema';
 import { toastError } from '@/lib/toast';
-import { useUndoToast } from '@/lib/undo';
+import { useRecordUndo, useUndoToast } from '@/lib/undo';
 import { useApi } from '@/providers/api';
 
 export type Task = components['schemas']['TaskOut'];
@@ -108,6 +108,7 @@ export function useTaskMutations(projectId: string) {
   const api = useApi();
   const qc = useQueryClient();
   const undoToast = useUndoToast();
+  const record = useRecordUndo();
   const key = taskKeys.byProject(projectId);
   const pending = useRef(new Map<string, Promise<string>>());
   // Order-changing requests run one at a time so the server sees moves in the order made.
@@ -164,6 +165,7 @@ export function useTaskMutations(projectId: string) {
         body: { title: v.title, section_id: v.sectionId, after_id: afterId },
       });
       const real = res.data!.data;
+      record('Task created', res.data!.meta);
       qc.setQueryData<Task[]>(key, (old) => old?.map((t) => (t.id === id ? real : t)));
       onCreated?.(real.id);
       return real.id;
@@ -203,6 +205,7 @@ export function useTaskMutations(projectId: string) {
         })
       ).data!,
     onMutate: (v) => patchTask(qc, projectId, v.id, (t) => ({ ...t, title: v.title })),
+    onSuccess: (res) => record('Task renamed', res.meta),
     onError: (e) => {
       toastError(e, "Couldn't rename the task");
       void qc.invalidateQueries({ queryKey: key });
@@ -225,6 +228,7 @@ export function useTaskMutations(projectId: string) {
         undoToast(v.message, res.meta, () =>
           qc.invalidateQueries({ queryKey: ['projects', projectId, 'tasks'] }),
         );
+      else record('Task updated', res.meta);
     },
     onError: (e) => {
       toastError(e, "Couldn't update the task");
@@ -269,6 +273,7 @@ export function useTaskMutations(projectId: string) {
       const byId = new Map(latest.map((t) => [t.id, t]));
       qc.setQueryData<Task[]>(key, (old) => old?.map((t) => byId.get(t.id) ?? t));
       if (v.message) undoToast(v.message, res.meta, refetchAll);
+      else record('Task moved', res.meta, refetchAll);
       // completed tasks have their own list; its order is refreshed lazily
       void qc.invalidateQueries({ queryKey: taskKeys.byProject(projectId, true), refetchType: 'none' });
     },

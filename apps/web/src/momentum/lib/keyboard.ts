@@ -10,11 +10,21 @@ export function formatCombo(combo: Combo): string[] {
     if (k === 'mod') return isMac ? '⌘' : 'Ctrl';
     if (k === 'shift') return '⇧';
     if (k === 'alt') return isMac ? '⌥' : 'Alt';
+    const named: Record<string, string> = {
+      up: '↑',
+      down: '↓',
+      backspace: '⌫',
+      enter: 'Enter',
+      escape: 'Esc',
+      space: 'Space',
+      tab: 'Tab',
+    };
+    if (named[k]) return named[k];
     return k.length === 1 ? k.toUpperCase() : k;
   });
 }
 
-function isTypingTarget(el: EventTarget | null): boolean {
+export function isTypingTarget(el: EventTarget | null): boolean {
   if (!(el instanceof HTMLElement)) return false;
   return el.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName);
 }
@@ -54,7 +64,21 @@ export const SHORTCUTS: { combo: Combo; label: string; phase?: number }[] = [
   { combo: 'mod+j', label: 'Toggle Ask Mo' },
   { combo: 'mod+\\', label: 'Collapse sidebar' },
   { combo: '?', label: 'Keyboard shortcuts' },
-  { combo: 'q', label: 'Quick add task', phase: 1 },
-  { combo: 'mod+enter', label: 'Complete task', phase: 1 },
-  { combo: 'mod+z', label: 'Undo last action', phase: 1 },
+  { combo: 'mod+z', label: 'Undo last action' },
+  { combo: 'q', label: 'Quick add task', phase: 3 },
+  // list rows (focus a row first)
+  { combo: 'j', label: 'Next task (or ↓)' },
+  { combo: 'k', label: 'Previous task (or ↑)' },
+  { combo: 'shift+down', label: 'Extend selection' },
+  { combo: 'mod+a', label: 'Select all in section' },
+  { combo: 'enter', label: 'Edit name / new task below' },
+  { combo: 'space', label: 'Open details' },
+  { combo: 'mod+enter', label: 'Complete task(s)' },
+  { combo: 'mod+up', label: 'Move task up (⌘↓ down)' },
+  { combo: 'a', label: 'Assign' },
+  { combo: 'm', label: 'Assign to me' },
+  { combo: 'd', label: 'Set due date' },
+  { combo: 'mod+backspace', label: 'Delete selected' },
+  { combo: 'tab', label: 'New row → subtask (Shift+Tab back)' },
+  { combo: 'escape', label: 'Clear selection / close details' },
 ];
