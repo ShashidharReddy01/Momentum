@@ -4,7 +4,7 @@ API := apps/api
 WEB := apps/web
 COMPOSE := docker compose -f infra/compose/docker-compose.dev.yml
 
-.PHONY: help install db-up db-down dev dev-api dev-web migrate migration seed types e2e \
+.PHONY: help start install db-up db-down dev dev-api dev-web migrate migration seed types e2e \
         check check-api check-web test-api test-web fmt build docker-build
 
 help:
@@ -19,6 +19,13 @@ db-up: ## Start Postgres+pgvector in Docker (skip if you run Postgres natively)
 
 db-down: ## Stop the Docker Postgres
 	$(COMPOSE) down
+
+start: ## Just run it: install, database, migrate, seed, build, serve everything on :8000
+	$(MAKE) --no-print-directory install db-up
+	sleep 3
+	$(MAKE) --no-print-directory migrate seed
+	cd $(WEB) && pnpm build
+	cd $(API) && MOMENTUM_SPA_DIR=$(CURDIR)/$(WEB)/dist uv run momentum serve --host 127.0.0.1 --port 8000
 
 dev: ## Run API (reload, :8000) and web (Vite, :5173) together
 	@trap 'kill 0' EXIT; \

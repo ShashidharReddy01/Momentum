@@ -3,17 +3,17 @@
   Windows (PowerShell) equivalent of the Makefile's developer commands.
 
 .EXAMPLE
-  powershell -ExecutionPolicy Bypass -File tools\dev.ps1 setup    # first time: install, database, migrate, seed
-  powershell -ExecutionPolicy Bypass -File tools\dev.ps1 dev      # API :8000 (new window) + web :5173
+  .\start                                                          # just run it: everything, then opens the browser
+  powershell -ExecutionPolicy Bypass -File tools\dev.ps1 dev      # for coding: API :8000 (new window) + web :5173 with hot reload
 
-  Tasks: setup, install, db-up, db-down, migrate, seed, seed-perf, dev, dev-api, dev-web, check
+  Tasks: start, setup, install, db-up, db-down, migrate, seed, seed-perf, dev, dev-api, dev-web, check
   Needs: uv (Python), Node.js + pnpm, and Docker Desktop (for Postgres), all on PATH.
 #>
 param(
     [Parameter(Position = 0)]
-    [ValidateSet('help', 'setup', 'install', 'db-up', 'db-down', 'migrate', 'seed', 'seed-perf',
+    [ValidateSet('help', 'start', 'setup', 'install', 'db-up', 'db-down', 'migrate', 'seed', 'seed-perf',
         'dev', 'dev-api', 'dev-web', 'check')]
-    [string]$Task = 'help'
+    [string]$Task = 'start'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -58,6 +58,13 @@ function DbUp {
     throw 'Postgres did not become ready. Check: docker compose -f infra\compose\docker-compose.dev.yml logs postgres'
 }
 
+function Prepare {
+    Install
+    DbUp
+    Run $Api 'uv' @('run', 'momentum', 'migrate')
+    Run $Api 'uv' @('run', 'momentum', 'seed')  # safe to repeat: only adds what's missing
+}
+
 switch ($Task) {
     'help' { Get-Help $PSCommandPath -Detailed | Out-Host }
     'install' { Install }
@@ -66,11 +73,27 @@ switch ($Task) {
     'migrate' { Run $Api 'uv' @('run', 'momentum', 'migrate') }
     'seed' { Run $Api 'uv' @('run', 'momentum', 'seed') }
     'seed-perf' { Run $Api 'uv' @('run', 'momentum', 'seed', '--perf') }
+    'start' {
+        # One command to try the app: everything on http://localhost:8000 (no hot reload).
+        Prepare
+        Run $Web 'pnpm' @('build')
+        $env:MOMENTUM_SPA_DIR = Join-Path $Web 'dist'
+        # open the browser once the server answers
+        Start-Job -ScriptBlock {
+            for ($i = 0; $i -lt 60; $i++) {
+                try {
+                    Invoke-WebRequest 'http://localhost:8000/healthz' -UseBasicParsing -TimeoutSec 2 | Out-Null
+                    Start-Process 'http://localhost:8000'
+                    return
+                }
+                catch { Start-Sleep -Seconds 1 }
+            }
+        } | Out-Null
+        Write-Host "`nMomentum is starting on http://localhost:8000 (the browser opens by itself). Ctrl+C to stop." -ForegroundColor Green
+        Run $Api 'uv' @('run', 'momentum', 'serve', '--host', '127.0.0.1', '--port', '8000')
+    }
     'setup' {
-        Install
-        DbUp
-        Run $Api 'uv' @('run', 'momentum', 'migrate')
-        Run $Api 'uv' @('run', 'momentum', 'seed')
+        Prepare
         Write-Host "`nReady. Start the app with:  powershell -ExecutionPolicy Bypass -File tools\dev.ps1 dev" -ForegroundColor Green
     }
     'dev-api' { Run $Api 'uv' @('run', 'momentum', 'serve', '--reload', '--port', '8000') }

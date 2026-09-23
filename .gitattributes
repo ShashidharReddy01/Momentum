@@ -2,6 +2,7 @@
 # including on Windows checkouts with core.autocrlf=true.
 * text=auto eol=lf
 *.ps1 text eol=crlf
+*.cmd text eol=crlf
 *.png binary
 *.jpg binary
 *.ico binary

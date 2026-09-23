@@ -1,3 +1,8 @@
 # Supply-chain safety: never install a package version published less than a day ago
 # (matches newer pnpm defaults, so every pnpm version accepts this lockfile).
 minimumReleaseAge: 1440
+
+# Install scripts we deliberately don't run (newer pnpm stops on unreviewed ones).
+# msw: its postinstall only copies a browser service worker, which we don't use.
+ignoredBuiltDependencies:
+  - msw
