@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 from tests.helpers import Clients
 
@@ -19,7 +20,7 @@ async def _fixture(c):  # type: ignore[no-untyped-def]
     users = {
         u["email"].split("@")[0]: u["id"] for u in (await c.get(f"{BASE}/users")).json()["data"]
     }
-    today = datetime.now(UTC).date()
+    today = datetime.now(ZoneInfo("Asia/Kolkata")).date()  # Ravi's day, as the API sees it
     monday = today - timedelta(days=today.weekday())
     spec = {
         "past": {"assignee_id": users["ana"], "due_on": str(today - timedelta(days=3))},

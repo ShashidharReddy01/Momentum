@@ -2,3 +2,5 @@ dist
 node_modules
 pnpm-lock.yaml
 src/momentum/lib/api/schema.d.ts
+test-results
+playwright-report

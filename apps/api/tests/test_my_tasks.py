@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import text
 
@@ -71,7 +72,7 @@ async def test_assigned_task_appears_in_recently_assigned_right_away(as_user: Cl
 async def test_daily_pass_moves_unpinned_by_due_date(as_user: Clients, uow: UnitOfWork) -> None:
     ravi = await as_user("ravi")
     users, pid = await _setup(ravi)
-    today = datetime.now(UTC).date()
+    today = datetime.now(ZoneInfo("Asia/Kolkata")).date()  # Ravi's day, as the API sees it
 
     async def mk(title: str, due: object = None) -> str:
         t = (await ravi.post(f"{BASE}/projects/{pid}/tasks", json={"title": title})).json()["data"]

@@ -55,6 +55,8 @@
 | J9 | Rule: "when moved to Done, notify owner" fires | 4 |
 | J10 | Assign task to Teammate agent → result comment → review | 5 |
 
+**Running them:** `make e2e` builds the SPA and runs `apps/web/e2e/*.e2e.ts` with Playwright against a real API and Postgres. `tools/e2e/serve.sh` recreates a throwaway database whose name must end in `_e2e` (default `momentum_e2e`; override with `MOMENTUM_E2E_DATABASE_URL`), migrates, seeds the synthetic workspace, and serves on port 8123 (`E2E_PORT`). Set `MOMENTUM_E2E_CHROMIUM` to use an already-installed Chromium instead of `playwright install chromium`. Journeys run serially because they share the one seeded database. Phase 1 status: J1 and J3 pass; J2 passes up to inbox delivery (Phase 2), checking instead that the mentioned person follows the task and sees the comment.
+
 ## 5. Frontend testing conventions
 
 - MSW handlers in `src/momentum/mocks/handlers/*` are generated from the same OpenAPI types (typed responses).

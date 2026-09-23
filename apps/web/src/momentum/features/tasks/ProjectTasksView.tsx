@@ -411,6 +411,14 @@ export function ProjectTasksView({ projectId, canEdit }: { projectId: string; ca
       if (data?.kind === 'section-end' && data.sectionId) {
         return setDrop({ sectionId: data.sectionId, anchorId: null, placement: 'after' });
       }
+      if (data?.kind === 'section-head' && data.sectionId) {
+        const first = (bySectionRef.current.get(data.sectionId) ?? []).find((t) => !drag?.ids.includes(t.id));
+        return setDrop({
+          sectionId: data.sectionId,
+          anchorId: first?.id ?? null,
+          placement: first ? 'before' : 'after',
+        });
+      }
       if (data?.kind === 'task' && data.taskId && data.sectionId && e.over) {
         const r = e.active.rect.current.translated;
         const mid = r ? r.top + r.height / 2 : 0;

@@ -76,7 +76,8 @@ export function useCollapsed(projectId: string) {
 
 /**
  * Drag handlers for items other than sections (tasks) that share this list's DndContext.
- * Draggables/droppables mark themselves with `data.kind`: 'task' rows and 'section-end' zones.
+ * Draggables/droppables mark themselves with `data.kind`: 'task' rows, 'section-end' zones and
+ * 'section-head' headers (drop at the top).
  */
 export interface ItemDnd {
   onDragStart: (e: DragStartEvent) => void;
@@ -251,10 +252,13 @@ function SortableSection({
       disabled: !canEdit,
       data: {},
     });
-  // Dropping tasks on the header appends them to this section (works when collapsed too).
+  // Dropping tasks on the header puts them at the top of this section (collapsed: at the end,
+  // since the rows aren't visible to aim at).
   const head = useDroppable({
     id: `section-head:${section.id}`,
-    data: { kind: 'section-end', sectionId: section.id },
+    data: isCollapsed
+      ? { kind: 'section-end', sectionId: section.id }
+      : { kind: 'section-head', sectionId: section.id },
   });
   const draggingItem = isItem(useDndContext().active?.data.current);
   return (

@@ -4,7 +4,7 @@ API := apps/api
 WEB := apps/web
 COMPOSE := docker compose -f infra/compose/docker-compose.dev.yml
 
-.PHONY: help install db-up db-down dev dev-api dev-web migrate migration seed types \
+.PHONY: help install db-up db-down dev dev-api dev-web migrate migration seed types e2e \
         check check-api check-web test-api test-web fmt build docker-build
 
 help:
@@ -72,6 +72,9 @@ test-api:
 
 test-web:
 	cd $(WEB) && pnpm exec vitest run
+
+e2e: ## E2E journeys (real API + Postgres, throwaway *_e2e database, built SPA)
+	cd $(WEB) && pnpm build && pnpm exec playwright test
 
 fmt: ## Auto-format everything
 	cd $(API) && uv run ruff format momentum tests && uv run ruff check --fix momentum tests

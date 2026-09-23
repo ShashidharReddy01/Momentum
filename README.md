@@ -17,6 +17,7 @@ make db-up                    # Postgres 16 + pgvector in Docker (or native: see
 make migrate && make seed     # schema + synthetic "Acme Demo" workspace
 make dev                      # api http://localhost:8000 + web http://localhost:5173
 make check                    # the quality gate
+make e2e                      # E2E journeys (Playwright, throwaway *_e2e database)
 ```
 
 Open http://localhost:5173 and pick a seeded user on the dev login screen.

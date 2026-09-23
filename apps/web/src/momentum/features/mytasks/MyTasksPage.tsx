@@ -288,6 +288,15 @@ function MyTasksList() {
               { kind?: string; taskId?: string; sectionId?: string } | undefined;
             if (data?.kind === 'section-end' && data.sectionId)
               return setDrop({ bucket: data.sectionId as Bucket, anchorId: null, placement: 'after' });
+            if (data?.kind === 'section-head' && data.sectionId) {
+              // header of an expanded bucket: to the top
+              const first = (byBucket.get(data.sectionId as Bucket) ?? []).find((t) => t.id !== drag?.id);
+              return setDrop({
+                bucket: data.sectionId as Bucket,
+                anchorId: first?.id ?? null,
+                placement: first ? 'before' : 'after',
+              });
+            }
             if (data?.kind === 'task' && data.taskId && e.over) {
               const over = (open.data ?? []).find((t) => t.id === data.taskId);
               const r = e.active.rect.current.translated;
@@ -326,7 +335,11 @@ function MyTasksList() {
             const isCollapsed = collapsed.has(b.id);
             return (
               <section key={b.id} aria-label={b.name} className="mb-3">
-                <BucketHeader bucket={b.id} active={drop?.bucket === b.id && !drop.anchorId && isCollapsed}>
+                <BucketHeader
+                  bucket={b.id}
+                  collapsed={isCollapsed}
+                  active={drop?.bucket === b.id && !drop.anchorId && isCollapsed}
+                >
                   <button
                     type="button"
                     onClick={() => toggleBucket(b.id)}
@@ -386,16 +399,18 @@ function MyTasksList() {
 
 function BucketHeader({
   bucket,
+  collapsed,
   active,
   children,
 }: {
   bucket: Bucket;
+  collapsed: boolean;
   active: boolean;
   children: ReactNode;
 }) {
   const { setNodeRef, isOver } = useDroppable({
     id: `bucket-head:${bucket}`,
-    data: { kind: 'section-end', sectionId: bucket },
+    data: { kind: collapsed ? 'section-end' : 'section-head', sectionId: bucket },
   });
   const dragging = useDndContext().active !== null;
   return (
