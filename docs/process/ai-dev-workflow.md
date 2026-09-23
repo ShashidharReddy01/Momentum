@@ -21,7 +21,7 @@ How the human (product owner, reviewer, and committer) and the AI (implementer) 
 ## 3. Slice lifecycle
 
 ```
-┌ 1. Pick ─ STATUS "Next up" → the slice in phase-N.md
+┌ 1. Pick ─ STATUS "Next up" → the slice in phase-N.md (check its model in model-guide.md)
 ├ 2. Restate ─ goal, ACs, out-of-scope, files to touch, questions  → (human OK if questions)
 ├ 3. Build ─ migration → model → schema → service → router → tools → web api/queries → UI
 ├ 4. Test ─ per testing-strategy §3; make check green

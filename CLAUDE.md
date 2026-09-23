@@ -8,7 +8,8 @@ This file is the entry point for every AI coding session. Read it fully before d
 1. Read `docs/progress/STATUS.md`: the current phase, current slice, what's done, what's next, open questions.
 2. Read the current phase file `docs/roadmap/phase-N.md`, and in it the slice you'll work on.
 3. Read the architecture docs the slice touches (the slice spec lists them under **Read first**).
-4. Run `make check` before changing anything. If it's red, fix or report that first. Never build on a red baseline.
+4. Check the recommended model for the next slice in `docs/process/model-guide.md` (also shown in STATUS). If you know you're running on a different model than recommended, say so in one line and let the human choose to switch or continue.
+5. Run `make check` before changing anything. If it's red, fix or report that first. Never build on a red baseline.
 
 If `STATUS.md` and the code disagree, **the code is the truth about what exists** and **the docs are the truth about what should exist**. Report the mismatch and fix the doc or the code in the same slice.
 
@@ -85,6 +86,9 @@ One slice at a time. Don't start the next slice without the human's go-ahead unl
 | Discovers that the plan was wrong or incomplete | Fix the phase file and note it in the STATUS "Plan changes" log |
 
 ## 6. When to stop and ask the human
+
+(For when to suggest switching to Opus 5.5, see the escalation rules in `docs/process/model-guide.md` §3.)
+
 
 - Acceptance criteria are ambiguous or conflict with another doc.
 - A change needs a new architectural dependency or deviates from an ADR.

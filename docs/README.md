@@ -32,6 +32,7 @@ Docs are the **source of truth for intent**. Code must match them, and when the 
 | Engineering | `engineering/coding-standards.md` | Backend and frontend conventions with templates |
 | Engineering | `engineering/testing-strategy.md` | Test pyramid, fixtures, AI evals, what to test per slice |
 | Process | `process/ai-dev-workflow.md` | Slice lifecycle, doc rules, handoffs, commits |
+| Process | `process/model-guide.md` | Which model (Opus 5.5 / Sonnet 5) for each slice, and when to escalate |
 | Roadmap | `roadmap/roadmap.md` | Phases, dependencies, milestones |
 | Roadmap | `roadmap/phase-0.md` … `phase-9.md` | Epics → slices with acceptance criteria and tests |
 | Progress | `progress/STATUS.md` | Live tracker (updated every slice) |

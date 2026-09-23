@@ -5,6 +5,7 @@
 ## Current focus
 - **Phase:** 0: Foundations. **Complete** except the items noted below
 - **Next slice:** Phase 1 kickoff → S1.1.1 Teams
+- **Model:** kickoff on **Opus 5.5**, then S1.1.1 on **Sonnet 5** (see `docs/process/model-guide.md`)
 - **Blockers:** the GitHub repo `shashidharreddy01/momentum` must be created and connected so the code can be pushed
 
 ## Handoff notes (latest session: 2026-09-23)
