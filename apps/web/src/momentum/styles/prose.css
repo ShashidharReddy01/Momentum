@@ -93,3 +93,15 @@
   height: 0;
   pointer-events: none;
 }
+.momentum-root .mo-prose.mo-prose-compact {
+  min-height: 0;
+}
+.momentum-root .mo-mention {
+  color: var(--info);
+  background: var(--info-tint);
+  border-radius: var(--r-sm);
+  padding: 0 0.25em;
+  font-weight: 500;
+  text-decoration: none;
+  white-space: nowrap;
+}

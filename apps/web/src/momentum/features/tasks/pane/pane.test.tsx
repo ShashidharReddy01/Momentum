@@ -126,6 +126,34 @@ describe('Task pane', () => {
     await waitFor(() => expect(within(collab).queryByRole('button', { name: 'Ana Souza' })).toBeNull());
   });
 
+  it('comments: shows them, reacts, deletes with undo, and restores an unsent draft', async () => {
+    const user = await boot();
+    const doc = (text: string) => ({
+      type: 'doc',
+      content: [{ type: 'paragraph', content: [{ type: 'text', text }] }],
+    });
+    await fetch('http://localhost:3000/api/v1/tasks/task-1/comments', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ body: doc('First thoughts') }),
+    });
+    localStorage.setItem('momentum.draft.comment.task-1', JSON.stringify(doc('Half-written reply')));
+    await user.click(await screen.findByRole('button', { name: 'Open details for First' }));
+    const comments = await within(pane()).findByRole('region', { name: 'Comments' });
+    expect(await within(comments).findByText('First thoughts')).toBeInTheDocument();
+    // the draft comes back in the composer
+    expect(await within(comments).findByText('Half-written reply')).toBeInTheDocument();
+    await user.click(within(comments).getByRole('button', { name: 'Add reaction' }));
+    await user.click(await screen.findByRole('button', { name: 'React 🎉' }));
+    const chip = await within(comments).findByRole('button', { name: /🎉 1/ });
+    expect(chip).toHaveAttribute('aria-pressed', 'true');
+    await user.click(chip); // toggle off
+    await waitFor(() => expect(within(comments).queryByRole('button', { name: /🎉 1/ })).toBeNull());
+    await user.click(within(comments).getByRole('button', { name: 'Delete comment' }));
+    await waitFor(() => expect(within(comments).queryByText('First thoughts')).toBeNull());
+    expect(await screen.findByText('Comment deleted')).toBeInTheDocument();
+  });
+
   it('a missing task says so instead of failing', async () => {
     await boot('/projects/seed-1?task=gone');
     expect(await screen.findByText(/deleted, or you don't have access/)).toBeInTheDocument();

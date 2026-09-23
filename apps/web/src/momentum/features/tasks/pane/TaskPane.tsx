@@ -39,6 +39,8 @@ import { DatePicker } from '../DatePicker';
 import { useTaskDetail, useTaskDetailMutations, type TaskDetail } from '../detail';
 import { SubtaskList } from '../SubtaskList';
 import { Collaborators } from './Collaborators';
+// the comment editor (Tiptap) loads with the pane, not the app
+const Comments = lazy(() => import('./Comments').then((m) => ({ default: m.Comments })));
 import { useDescriptionAutosave, type SaveState } from './useDescriptionAutosave';
 
 const EDITABLE = 'input, textarea, [contenteditable="true"]';
@@ -347,6 +349,9 @@ function PaneBody({
           onOpen={onOpenTask ? (sub) => onOpenTask(sub.id) : undefined}
         />
 
+        <Suspense fallback={<Skeleton className="mt-8 h-24" />}>
+          <Comments task={task} />
+        </Suspense>
         <Collaborators task={task} />
         <p className="mt-3 text-xs text-muted">
           Created by {nameOf(task.created_by) ?? 'someone'} · {formatDay(task.created_at.slice(0, 10))}

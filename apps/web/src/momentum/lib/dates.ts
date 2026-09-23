@@ -106,3 +106,15 @@ export function nextWeek(now = new Date()): Date {
   const daysToMonday = (8 - now.getDay()) % 7 || 7;
   return addDays(now, daysToMonday);
 }
+
+/** "just now", "5m ago", "3h ago", "Yesterday", "Mon", "Sep 21" (for comments and activity). */
+export function formatRelative(iso: string, now = new Date()): string {
+  const then = new Date(iso);
+  const secs = Math.round((now.getTime() - then.getTime()) / 1000);
+  if (secs < 45) return 'just now';
+  if (secs < 3600) return `${Math.max(1, Math.round(secs / 60))}m ago`;
+  if (secs < 6 * 3600 && dayDiff(then, now) === 0) return `${Math.round(secs / 3600)}h ago`;
+  const label = formatDay(toISODate(then), now);
+  const time = formatTime(then);
+  return dayDiff(then, now) <= 1 ? `${label} ${time}` : label;
+}

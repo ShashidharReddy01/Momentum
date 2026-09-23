@@ -93,6 +93,20 @@ export function taskHandlers(
 
   const prefs = new Map<string, unknown>();
   const followers = new Map<string, string[]>();
+  type C = {
+    id: string;
+    task_id: string;
+    author_id: string;
+    body: unknown;
+    is_ai: boolean;
+    created_at: string;
+    edited_at: string | null;
+    reactions: { emoji: string; user_ids: string[] }[];
+    can_edit: boolean;
+    can_delete: boolean;
+  };
+  const comments: C[] = [];
+  const me = '01a0ccaf-8f68-77d2-a888-584ea1e80ea8';
   const childrenOf = (id: string) =>
     tasks.filter((t) => t.parent_id === id).sort((a, b) => (a.position < b.position ? -1 : 1));
   const withCounts = (t: T): T => {
@@ -216,6 +230,59 @@ export function taskHandlers(
       );
       return HttpResponse.json({ data: { followers: followers.get(id) }, meta });
     }),
+    http.get(`*${base}/api/v1/tasks/:id/comments`, ({ params }) =>
+      HttpResponse.json({
+        data: comments.filter((c) => c.task_id === params.id),
+        meta: { next_cursor: null },
+      }),
+    ),
+    http.post(`*${base}/api/v1/tasks/:id/comments`, async ({ params, request }) => {
+      const { body } = (await request.json()) as { body: unknown };
+      const c: C = {
+        id: `c-${comments.length + 1}`,
+        task_id: String(params.id),
+        author_id: me,
+        body,
+        is_ai: false,
+        created_at: new Date().toISOString(),
+        edited_at: null,
+        reactions: [],
+        can_edit: true,
+        can_delete: true,
+      };
+      comments.push(c);
+      return HttpResponse.json({ data: c, meta }, { status: 201 });
+    }),
+    http.patch(`*${base}/api/v1/comments/:cid`, async ({ params, request }) => {
+      const c = comments.find((x) => x.id === params.cid)!;
+      c.body = ((await request.json()) as { body: unknown }).body;
+      c.edited_at = new Date().toISOString();
+      return HttpResponse.json({ data: c, meta });
+    }),
+    http.delete(`*${base}/api/v1/comments/:cid`, ({ params }) => {
+      comments.splice(
+        comments.findIndex((x) => x.id === params.cid),
+        1,
+      );
+      return HttpResponse.json({ data: { ok: true }, meta });
+    }),
+    http.post(`*${base}/api/v1/comments/:cid/reactions`, async ({ params, request }) => {
+      const c = comments.find((x) => x.id === params.cid)!;
+      const { emoji, active } = (await request.json()) as { emoji: string; active: boolean };
+      const r = c.reactions.find((x) => x.emoji === emoji);
+      if (active && !r) c.reactions.push({ emoji, user_ids: [me] });
+      else if (active && r && !r.user_ids.includes(me)) r.user_ids.push(me);
+      else if (!active && r) r.user_ids = r.user_ids.filter((u) => u !== me);
+      c.reactions = c.reactions.filter((x) => x.user_ids.length);
+      return HttpResponse.json({ data: c, meta: {} });
+    }),
+    http.get(`*${base}/api/v1/mentions/search`, () =>
+      HttpResponse.json({
+        users: [{ id: me, name: 'Ravi Kumar', email: 'ravi@acme-demo.test' }],
+        tasks: [],
+        projects: [],
+      }),
+    ),
     http.get(`*${base}/api/v1/tasks/:id/subtasks`, ({ params }) =>
       HttpResponse.json({ data: childrenOf(String(params.id)).map(withCounts), meta: { next_cursor: null } }),
     ),

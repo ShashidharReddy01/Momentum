@@ -21,6 +21,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/comments/{comment_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete a comment */
+        delete: operations["delete_comment_api_v1_comments__comment_id__delete"];
+        options?: never;
+        head?: never;
+        /** Edit a comment */
+        patch: operations["edit_comment_api_v1_comments__comment_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/comments/{comment_id}/reactions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Add or remove a reaction */
+        post: operations["react_api_v1_comments__comment_id__reactions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/config": {
         parameters: {
             query?: never;
@@ -135,6 +170,26 @@ export interface paths {
         get: operations["get_view_prefs_api_v1_me_prefs_views__project_id__get"];
         /** Save my list view for a project */
         put: operations["put_view_prefs_api_v1_me_prefs_views__project_id__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/mentions/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * People, tasks, projects to @mention
+         * @description Only what the caller can see; a few of each kind.
+         */
+        get: operations["mention_search_api_v1_mentions_search_get"];
+        put?: never;
         post?: never;
         delete?: never;
         options?: never;
@@ -370,6 +425,24 @@ export interface paths {
         head?: never;
         /** Edit a task */
         patch: operations["patch_task_api_v1_tasks__task_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/tasks/{task_id}/comments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Comments */
+        get: operations["list_comments_api_v1_tasks__task_id__comments_get"];
+        put?: never;
+        /** Comment on a task */
+        post: operations["create_comment_api_v1_tasks__task_id__comments_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/tasks/{task_id}/complete": {
@@ -636,6 +709,50 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** CommentIn */
+        CommentIn: {
+            /**
+             * Body
+             * @description Rich text (Tiptap JSON); mention nodes notify people
+             */
+            body: {
+                [key: string]: unknown;
+            };
+        };
+        /** CommentOut */
+        CommentOut: {
+            /** Author Id */
+            author_id: string | null;
+            /** Body */
+            body: {
+                [key: string]: unknown;
+            };
+            /** Can Delete */
+            can_delete: boolean;
+            /** Can Edit */
+            can_edit: boolean;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Edited At */
+            edited_at: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Is Ai */
+            is_ai: boolean;
+            /** Reactions */
+            reactions: components["schemas"]["ReactionOut"][];
+            /**
+             * Task Id
+             * Format: uuid
+             */
+            task_id: string;
+        };
         /** DevLoginIn */
         DevLoginIn: {
             /**
@@ -673,6 +790,13 @@ export interface components {
         ListMeta: {
             /** Next Cursor */
             next_cursor?: string | null;
+        };
+        /** ListOut[CommentOut] */
+        ListOut_CommentOut_: {
+            /** Data */
+            data: components["schemas"]["CommentOut"][];
+            /** @default {} */
+            meta: components["schemas"]["ListMeta"];
         };
         /** ListOut[ProjectOut] */
         ListOut_ProjectOut_: {
@@ -719,6 +843,51 @@ export interface components {
             user: components["schemas"]["UserOut"];
             workspace: components["schemas"]["WorkspaceOut"];
         };
+        /** MentionProject */
+        MentionProject: {
+            /** Color */
+            color: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+        };
+        /** MentionSearchOut */
+        MentionSearchOut: {
+            /** Projects */
+            projects: components["schemas"]["MentionProject"][];
+            /** Tasks */
+            tasks: components["schemas"]["MentionTask"][];
+            /** Users */
+            users: components["schemas"]["MentionUser"][];
+        };
+        /** MentionTask */
+        MentionTask: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Key */
+            key: string;
+            /** Title */
+            title: string;
+        };
+        /** MentionUser */
+        MentionUser: {
+            /** Email */
+            email: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+        };
         /** MutationMeta */
         MutationMeta: {
             /** Activity Id */
@@ -727,6 +896,11 @@ export interface components {
             batch_id?: string | null;
             /** Version */
             version?: number | null;
+        };
+        /** MutationOut[CommentOut] */
+        MutationOut_CommentOut_: {
+            data: components["schemas"]["CommentOut"];
+            meta: components["schemas"]["MutationMeta"];
         };
         /** MutationOut[FollowersOut] */
         MutationOut_FollowersOut_: {
@@ -967,6 +1141,23 @@ export interface components {
              * @enum {string}
              */
             sort: "manual" | "due" | "assignee" | "created" | "title";
+        };
+        /** ReactionIn */
+        ReactionIn: {
+            /**
+             * Active
+             * @default true
+             */
+            active: boolean;
+            /** Emoji */
+            emoji: string;
+        };
+        /** ReactionOut */
+        ReactionOut: {
+            /** Emoji */
+            emoji: string;
+            /** User Ids */
+            user_ids: string[];
         };
         /** SectionBrief */
         SectionBrief: {
@@ -1444,6 +1635,107 @@ export interface operations {
             };
         };
     };
+    delete_comment_api_v1_comments__comment_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                comment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationOut_OkOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    edit_comment_api_v1_comments__comment_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                comment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CommentIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationOut_CommentOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    react_api_v1_comments__comment_id__reactions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                comment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReactionIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationOut_CommentOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     config_api_v1_config_get: {
         parameters: {
             query?: never;
@@ -1678,6 +1970,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProjectViewPrefs"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    mention_search_api_v1_mentions_search_get: {
+        parameters: {
+            query?: {
+                q?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MentionSearchOut"];
                 };
             };
             /** @description Validation Error */
@@ -2416,6 +2739,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MutationOut_TaskDetailOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_comments_api_v1_tasks__task_id__comments_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListOut_CommentOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_comment_api_v1_tasks__task_id__comments_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CommentIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationOut_CommentOut_"];
                 };
             };
             /** @description Validation Error */
