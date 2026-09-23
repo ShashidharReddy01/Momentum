@@ -52,6 +52,9 @@ export interface TaskRowProps {
   isOpen?: boolean;
   /** Open (or toggle) the details pane. */
   onOpen?: (task: Task) => void;
+  /** My Tasks: show which project the task is in, instead of the assignee. */
+  project?: { id: string; name: string; color: string | null } | null;
+  hideAssignee?: boolean;
   /** Subtasks shown inline under the row. */
   expanded?: boolean;
   onToggleExpand?: (task: Task) => void;
@@ -125,6 +128,8 @@ const RowBody = memo(function RowBody({
   onOpen,
   expanded = false,
   onToggleExpand,
+  project,
+  hideAssignee = false,
   onUpdate,
   onToggle,
   onRename,
@@ -356,12 +361,22 @@ const RowBody = memo(function RowBody({
           </button>
         ) : null}
       </div>
+      {project ? (
+        <span className="flex w-40 shrink-0 items-center gap-1.5 truncate text-xs text-muted @max-3xl:w-24">
+          <span
+            aria-hidden
+            className="h-2 w-2 shrink-0 rounded-sm"
+            style={{ background: project.color ? `var(--${project.color})` : 'var(--muted-2)' }}
+          />
+          <span className="truncate">{project.name}</span>
+        </span>
+      ) : null}
       <span className="w-14 shrink-0 text-right font-mono text-[11px] text-muted-2 opacity-0 group-hover/row:opacity-100 @max-3xl:hidden">
         {isTemp(task.id) ? '…' : task.key}
       </span>
       {/* Pickers and the menu mount only while open: most rows never open them, and each
           Radix root costs real time when hundreds of rows mount while scrolling. */}
-      {picker === 'assignee' ? (
+      {hideAssignee ? null : picker === 'assignee' ? (
         <AssigneePicker
           open
           onOpenChange={(o) => !o && closePicker(false)}
@@ -373,6 +388,7 @@ const RowBody = memo(function RowBody({
       ) : (
         assigneeCell
       )}
+      {/* (assignee hidden in My Tasks: it's always you) */}
       {picker === 'due' ? (
         <DatePicker
           open

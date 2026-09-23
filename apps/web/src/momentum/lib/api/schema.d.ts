@@ -177,6 +177,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/tasks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** My Tasks (open in buckets, or completed) */
+        get: operations["my_tasks_api_v1_me_tasks_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/tasks/{task_id}/move": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Move a task within My Tasks (pins it to that bucket) */
+        post: operations["move_my_task_api_v1_me_tasks__task_id__move_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/mentions/search": {
         parameters: {
             query?: never;
@@ -872,6 +906,13 @@ export interface components {
             /** @default {} */
             meta: components["schemas"]["ListMeta"];
         };
+        /** ListOut[MyTaskOut] */
+        ListOut_MyTaskOut_: {
+            /** Data */
+            data: components["schemas"]["MyTaskOut"][];
+            /** @default {} */
+            meta: components["schemas"]["ListMeta"];
+        };
         /** ListOut[ProjectOut] */
         ListOut_ProjectOut_: {
             /** Data */
@@ -1025,6 +1066,76 @@ export interface components {
         MutationOut_TeamOut_: {
             data: components["schemas"]["TeamOut"];
             meta: components["schemas"]["MutationMeta"];
+        };
+        /** MyTaskMoveIn */
+        MyTaskMoveIn: {
+            /** After Id */
+            after_id?: string | null;
+            /** Before Id */
+            before_id?: string | null;
+            /**
+             * Bucket
+             * @enum {string}
+             */
+            bucket: "recently_assigned" | "today" | "this_week" | "later";
+        };
+        /** MyTaskOut */
+        MyTaskOut: {
+            /** Assignee Id */
+            assignee_id: string | null;
+            /** Bucket */
+            bucket: ("recently_assigned" | "today" | "this_week" | "later") | null;
+            /** Completed At */
+            completed_at: string | null;
+            /**
+             * Completed Subtask Count
+             * @default 0
+             */
+            completed_subtask_count: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Due At */
+            due_at: string | null;
+            /** Due On */
+            due_on: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Key */
+            key: string;
+            /** My Position */
+            my_position: string | null;
+            /** Number */
+            number: number;
+            /** Parent Id */
+            parent_id: string | null;
+            /** Position */
+            position: string | null;
+            /** Priority */
+            priority: string | null;
+            project: components["schemas"]["ProjectRef"] | null;
+            /** Project Id */
+            project_id: string | null;
+            /** Section Id */
+            section_id: string | null;
+            /** Start On */
+            start_on: string | null;
+            /**
+             * Subtask Count
+             * @default 0
+             */
+            subtask_count: number;
+            /** Title */
+            title: string;
+            /** Type */
+            type: string;
+            /** Version */
+            version: number;
         };
         /** NamedRef */
         NamedRef: {
@@ -2044,6 +2155,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProjectViewPrefs"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    my_tasks_api_v1_me_tasks_get: {
+        parameters: {
+            query?: {
+                completed?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListOut_MyTaskOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    move_my_task_api_v1_me_tasks__task_id__move_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MyTaskMoveIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationOut_OkOut_"];
                 };
             };
             /** @description Validation Error */

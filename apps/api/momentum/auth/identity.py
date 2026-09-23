@@ -9,10 +9,12 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 from sqlalchemy import func, select
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from momentum.auth.base import Principal
 from momentum.core.errors import AccountDisabled, NotInvited
+from momentum.core.ids import new_id
 from momentum.core.settings import Settings
 from momentum.domain.users.models import User, UserIdentity
 from momentum.domain.workspace.models import Workspace
@@ -72,15 +74,29 @@ async def resolve_user(
         is_admin = principal.email.lower() in settings.bootstrap_admins or (
             settings.admin_role in principal.roles
         )
-        user = User(
-            workspace_id=workspace.id,
-            email=principal.email.lower(),
-            name=principal.name or principal.email.split("@")[0],
-            role="admin" if is_admin else "member",
-            status="active",
+        # Several first requests can arrive together: insert-or-keep, then read the winner.
+        await session.execute(
+            insert(User)
+            .values(
+                id=new_id(),
+                workspace_id=workspace.id,
+                email=principal.email.lower(),
+                name=principal.name or principal.email.split("@")[0],
+                role="admin" if is_admin else "member",
+                status="active",
+                timezone="UTC",
+                prefs={},
+                is_agent=False,
+            )
+            .on_conflict_do_nothing(index_elements=["workspace_id", "email"])
         )
-        session.add(user)
-        await session.flush()
+        user = (
+            await session.execute(
+                select(User).where(
+                    User.workspace_id == workspace.id, User.email == principal.email.lower()
+                )
+            )
+        ).scalar_one()
 
     if user.status == "disabled":
         raise AccountDisabled()
@@ -88,14 +104,27 @@ async def resolve_user(
         user.status = "active"
 
     if identity is None:
-        identity = UserIdentity(
-            user_id=user.id,
-            provider=principal.provider,
-            tenant_id=tenant,
-            subject=principal.subject,
-            email_at_link=principal.email,
+        await session.execute(
+            insert(UserIdentity)
+            .values(
+                id=new_id(),
+                user_id=user.id,
+                provider=principal.provider,
+                tenant_id=tenant,
+                subject=principal.subject,
+                email_at_link=principal.email,
+            )
+            .on_conflict_do_nothing(index_elements=["provider", "tenant_id", "subject"])
         )
-        session.add(identity)
+        identity = (
+            await session.execute(
+                select(UserIdentity).where(
+                    UserIdentity.provider == principal.provider,
+                    UserIdentity.tenant_id == tenant,
+                    UserIdentity.subject == principal.subject,
+                )
+            )
+        ).scalar_one()
     identity.last_login_at = now
 
     if settings.sync_admin_role and settings.admin_role in principal.roles and user.role != "admin":

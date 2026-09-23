@@ -1,9 +1,10 @@
-import { Inbox, ListChecks, MessagesSquare } from 'lucide-react';
+import { Inbox, MessagesSquare } from 'lucide-react';
 import type { RouteObject } from 'react-router';
 import { AuthGate, DevLoginPage } from '@/features/auth';
 import { HomePage } from '@/features/home';
 import { NotFoundPage, Placeholder } from '@/features/placeholders';
 import { ProjectPage } from '@/features/projects';
+import { MyTasksPage } from '@/features/mytasks';
 import { TaskPage } from '@/features/tasks';
 import { TeamPage } from '@/features/teams';
 import type { RuntimeConfig } from '@/lib/config';
@@ -30,7 +31,7 @@ export function buildRoutes(config: RuntimeConfig): RouteObject[] {
         { index: true, element: <HomePage />, handle: { crumb: 'Home' } },
         {
           path: 'my-tasks',
-          element: <Placeholder icon={ListChecks} title="My Tasks" phase={1} />,
+          element: <MyTasksPage />,
           handle: { crumb: 'My Tasks' },
         },
         { path: 'teams/:teamId', element: <TeamPage />, handle: { crumb: 'Team' } },

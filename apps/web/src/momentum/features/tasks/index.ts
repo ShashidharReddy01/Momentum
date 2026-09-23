@@ -3,3 +3,7 @@ export { useProjectTasks, useTaskMutations, type Task } from './queries';
 export { TaskNavProvider, useTaskNav } from './pane/nav';
 export { TaskPane } from './pane/TaskPane';
 export { TaskPage } from './pane/TaskPage';
+export { TaskRow } from './TaskRow';
+export { dropNeighbors, emptySelection, step, type DropPlacement, type Selection } from './selection';
+export { dropTask, syncTask } from './detail';
+export type { TaskPatch } from './queries';

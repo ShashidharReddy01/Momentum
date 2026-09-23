@@ -28,10 +28,15 @@ export const mockHash = (doc: unknown) =>
   doc ? `h${JSON.stringify(doc).length}-${JSON.stringify(doc).slice(-12)}` : '';
 
 /** In-memory tasks API with a small network delay (exercises optimistic UI and the create queue). */
+/** Moves made through the My Tasks mock (tests assert on them). */
+export const myMoves: { id: string; bucket: string; after_id?: string; before_id?: string }[] = [];
+
 export function taskHandlers(
   base = '',
   initial: Record<string, Record<string, string[]>> = {},
   latency = 15,
+  /** Titles assigned to the signed-in user from the start (My Tasks tests). */
+  assignedToMe: string[] = [],
 ) {
   const tasks: T[] = [];
   let n = 0;
@@ -63,6 +68,8 @@ export function taskHandlers(
       titles.forEach((title, i) => tasks.push(make(pid, sid, title, pos(i))));
     }
   }
+  for (const t of tasks)
+    if (assignedToMe.includes(t.title)) t.assignee_id = '01a0ccaf-8f68-77d2-a888-584ea1e80ea8';
   const inSection = (sid: string) =>
     tasks.filter((t) => t.section_id === sid).sort((a, b) => (a.position < b.position ? -1 : 1));
   const renumber = (ordered: T[]) => ordered.forEach((t, i) => (t.position = pos(i)));
@@ -107,6 +114,9 @@ export function taskHandlers(
   };
   const comments: C[] = [];
   const me = '01a0ccaf-8f68-77d2-a888-584ea1e80ea8';
+  const MY_BUCKETS = ['recently_assigned', 'today', 'this_week', 'later'];
+  const myPlacements = new Map<string, { bucket: string; pos: number }>();
+  let myTop = 0;
   const childrenOf = (id: string) =>
     tasks.filter((t) => t.parent_id === id).sort((a, b) => (a.position < b.position ? -1 : 1));
   const withCounts = (t: T): T => {
@@ -133,6 +143,48 @@ export function taskHandlers(
     updated_at: new Date().toISOString(),
   });
   return [
+    http.get(`*${base}/api/v1/me/tasks`, ({ request }) => {
+      const completed = new URL(request.url).searchParams.get('completed') === 'true';
+      const mine = tasks.filter((t) => t.assignee_id === me && !!t.completed_at === completed);
+      // same lazy sync as the API: new assignments go to the top of "Recently assigned"
+      for (const t of mine)
+        if (!myPlacements.has(t.id)) myPlacements.set(t.id, { bucket: 'recently_assigned', pos: -++myTop });
+      const rank = (b: string) => MY_BUCKETS.indexOf(b);
+      const rows = mine
+        .map((t) => ({ t, p: myPlacements.get(t.id)! }))
+        .sort((a, b) =>
+          completed
+            ? (b.t.completed_at ?? '').localeCompare(a.t.completed_at ?? '')
+            : rank(a.p.bucket) - rank(b.p.bucket) || a.p.pos - b.p.pos,
+        );
+      return HttpResponse.json({
+        data: rows.map(({ t, p }) => ({
+          ...withCounts(t),
+          bucket: p.bucket,
+          my_position: String(p.pos),
+          project: { id: t.project_id, name: 'Website Revamp', color: 'proj-6' },
+        })),
+        meta: {},
+      });
+    }),
+    http.post(`*${base}/api/v1/me/tasks/:id/move`, async ({ params, request }) => {
+      await delay(latency);
+      const body = (await request.json()) as { bucket: string; after_id?: string; before_id?: string };
+      const id = String(params.id);
+      const inBucket = [...myPlacements.entries()]
+        .filter(([tid, p]) => p.bucket === body.bucket && tid !== id)
+        .sort((a, b) => a[1].pos - b[1].pos)
+        .map(([tid]) => tid);
+      const i = body.after_id
+        ? inBucket.indexOf(body.after_id) + 1
+        : body.before_id
+          ? inBucket.indexOf(body.before_id)
+          : inBucket.length;
+      const order = [...inBucket.slice(0, i), id, ...inBucket.slice(i)];
+      order.forEach((tid, k) => myPlacements.set(tid, { bucket: body.bucket, pos: k }));
+      myMoves.push({ id, ...body });
+      return HttpResponse.json({ data: { ok: true }, meta });
+    }),
     http.get(`*${base}/api/v1/me/prefs/views/:pid`, ({ params }) =>
       HttpResponse.json(
         prefs.get(String(params.pid)) ?? {

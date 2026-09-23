@@ -116,8 +116,14 @@ export function Comments({ task }: { task: TaskDetail }) {
               />
             ),
           )}
-          {!entries.length && filter === 'comments' ? (
-            <li className="text-sm text-muted">No comments yet.</li>
+          {!entries.length ? (
+            <li className="text-sm text-muted">
+              {filter === 'comments'
+                ? 'No comments yet.'
+                : filter === 'activity'
+                  ? 'No changes yet.'
+                  : 'Nothing here yet.'}
+            </li>
           ) : null}
         </ol>
       )}

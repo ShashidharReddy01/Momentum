@@ -119,3 +119,48 @@ async def test_no_auto_provision_without_invite(uow: UnitOfWork) -> None:
             )
         count = len((await session.execute(select(User))).scalars().all())
     assert count == 0
+
+
+async def test_concurrent_first_requests_create_one_user_and_link(engine) -> None:  # type: ignore[no-untyped-def]
+    """A new person's first page load fires several requests at once; none may fail."""
+    import asyncio
+
+    from momentum.core.db import create_session_factory
+
+    s = make_settings()
+    factory = create_session_factory(engine)
+    principal = Principal(
+        provider="easyauth", subject="oid-race", tenant_id="t1", email="race@acme-demo.test"
+    )
+
+    async def first_request() -> str:
+        uow = UnitOfWork(factory())
+        try:
+            async with uow.transaction() as session:
+                user, _ = await resolve_user(session, s, principal)
+                return str(user.id)
+        finally:
+            await uow.close()
+
+    ids = await asyncio.gather(*(first_request() for _ in range(6)))
+    assert len(set(ids)) == 1
+    uow = UnitOfWork(factory())
+    try:
+        async with uow.transaction() as session:
+            users = (
+                (await session.execute(select(User).where(User.email == "race@acme-demo.test")))
+                .scalars()
+                .all()
+            )
+            links = (
+                (
+                    await session.execute(
+                        select(UserIdentity).where(UserIdentity.subject == "oid-race")
+                    )
+                )
+                .scalars()
+                .all()
+            )
+    finally:
+        await uow.close()
+    assert len(users) == 1 and len(links) == 1
