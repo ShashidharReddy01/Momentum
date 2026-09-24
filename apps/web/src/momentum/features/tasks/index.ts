@@ -13,3 +13,4 @@ export type { TaskDetail } from './detail';
 export { QuickAddDialog } from './QuickAddDialog';
 export { commentKey, feedKey } from './comments';
 export { subtaskKey } from './subtasks';
+export { useLastView, viewPrefsKey, type StoredViewPrefs, type ViewKey } from './viewPrefs';

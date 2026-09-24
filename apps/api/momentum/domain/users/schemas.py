@@ -37,7 +37,7 @@ ASSIGNEE_FILTER = rf"^(me|none|{_UUID})$"
 
 
 class ProjectViewPrefs(BaseModel):
-    """How one user last viewed a project's list (restored on revisit)."""
+    """How one user last viewed a project (restored on revisit)."""
 
     model_config = ConfigDict(extra="forbid")
     assignees: list[Annotated[str, StringConstraints(pattern=ASSIGNEE_FILTER)]] = Field(
@@ -47,3 +47,7 @@ class ProjectViewPrefs(BaseModel):
     show_completed: bool = False
     sort: Literal["manual", "due", "assignee", "created", "title"] = "manual"
     group: Literal["section", "assignee", "due"] = "section"
+    # S2.2.3: the tab this user last had open (list-view filter/sort/group above are unrelated
+    # to *which* view is showing). None = never chosen here yet: fall back to the project's
+    # default_view, distinct from explicitly picking "list".
+    view: Literal["list", "board", "calendar", "timeline", "overview", "dashboard"] | None = None

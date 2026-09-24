@@ -1,7 +1,9 @@
 import * as M from '@radix-ui/react-dropdown-menu';
+import { Check } from 'lucide-react';
 import type { ComponentProps, ReactNode } from 'react';
 import { cn } from '@/lib/cn';
 import { usePortalContainer } from '@/providers/portal';
+import { Icon } from './Icon';
 import { Kbd } from './Kbd';
 
 export const DropdownMenu = M.Root;
@@ -45,6 +47,31 @@ export function DropdownMenuItem({
 
 export function DropdownMenuSeparator() {
   return <M.Separator className="my-1 h-px bg-hair-soft" />;
+}
+
+export const DropdownMenuRadioGroup = M.RadioGroup;
+
+export function DropdownMenuRadioItem({
+  className,
+  children,
+  ...props
+}: ComponentProps<typeof M.RadioItem>) {
+  return (
+    <M.RadioItem
+      className={cn(
+        'flex cursor-pointer select-none items-center gap-2 rounded-md px-2 py-1.5 text-sm outline-none data-[disabled]:cursor-default data-[disabled]:text-muted-2 data-[highlighted]:bg-surface-2',
+        className,
+      )}
+      {...props}
+    >
+      <span className="flex w-4 shrink-0 items-center justify-center">
+        <M.ItemIndicator>
+          <Icon icon={Check} size={14} />
+        </M.ItemIndicator>
+      </span>
+      <span className="flex flex-1 items-center gap-2">{children}</span>
+    </M.RadioItem>
+  );
 }
 
 export function DropdownMenuLabel({ children }: { children: ReactNode }) {

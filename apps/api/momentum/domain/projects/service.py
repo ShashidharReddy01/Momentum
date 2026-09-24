@@ -29,8 +29,9 @@ from momentum.domain.teams.models import Team
 from momentum.domain.users.models import User
 
 DEFAULT_SECTION = "To do"
-DETAIL_FIELDS = ("name", "color", "default_view")  # editors
-ADMIN_FIELDS = ("privacy",)  # project admins
+DETAIL_FIELDS = ("name", "color")  # editors
+ADMIN_FIELDS = ("privacy", "default_view")  # project admins (S2.2.3: the roadmap AC says
+# "per-project default view (project admin)"; moved here from DETAIL_FIELDS)
 
 
 def _channels(project_id: uuid.UUID) -> list[str]:

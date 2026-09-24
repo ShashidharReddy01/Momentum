@@ -1,5 +1,5 @@
 import { Archive, ArchiveRestore, Lock, MoreHorizontal, Star, Trash2, Users } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { InlineText } from '@/components/common/InlineText';
 import { ErrorState } from '@/components/common/States';
@@ -9,6 +9,9 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/DropdownMenu';
@@ -27,7 +30,9 @@ import {
   ProjectTasksView,
   TaskNavProvider,
   TaskPane,
+  useLastView,
   useTaskNav,
+  type ViewKey,
 } from '@/features/tasks';
 
 const VIEWS = [
@@ -37,16 +42,45 @@ const VIEWS = [
   { key: 'timeline', label: 'Timeline', phase: 6 },
   { key: 'overview', label: 'Overview', phase: 6 },
 ] as const;
+type LiveView = Exclude<(typeof VIEWS)[number], { phase: number }>['key'];
+const LIVE_VIEWS: ReadonlySet<string> = new Set(
+  VIEWS.filter((v): v is Extract<(typeof VIEWS)[number], { key: LiveView }> => !('phase' in v)).map(
+    (v) => v.key,
+  ),
+);
+const isLiveView = (v: string | undefined): v is LiveView => !!v && LIVE_VIEWS.has(v);
 
 export function ProjectPage() {
-  const { projectId = '', view = 'list' } = useParams();
+  // No default here: `view === undefined` means the URL had no `/…/:view` segment at all,
+  // which is exactly when S2.2.3's "remembered last view" gets to redirect.
+  const { projectId = '', view } = useParams();
   const project = useProject(projectId);
   const update = useUpdateProject(projectId);
   const { archive, remove } = useProjectLifecycle(projectId);
   const favorite = useToggleFavorite();
+  const { lastView, ready: lastViewReady, save: saveLastView } = useLastView(projectId);
   const navigate = useNavigate();
   const [share, setShare] = useState(false);
   useCrumbs(project.data ? [project.data.team_name, project.data.name] : null);
+
+  // On a bare `/projects/:id` (no view segment), redirect once to this user's last view for
+  // this project, or the project's admin-set `default_view` for a project they've never opened.
+  const redirected = useRef(false);
+  useEffect(() => {
+    if (redirected.current || view || !lastViewReady || !project.data) return;
+    redirected.current = true;
+    const initial = lastView ?? project.data.default_view;
+    if (isLiveView(initial) && initial !== 'list')
+      navigate(`/projects/${project.data.id}/${initial}`, { replace: true });
+  }, [view, lastViewReady, lastView, project.data, navigate]);
+
+  // Remember whichever view is actually showing, once the redirect above (if any) has settled —
+  // `view` only becomes defined after that, so this never races the decision above with a
+  // premature "list" save.
+  useEffect(() => {
+    if (!view || !lastViewReady) return;
+    saveLastView(view as ViewKey);
+  }, [view, lastViewReady, saveLastView]);
 
   if (project.isPending) {
     return (
@@ -61,6 +95,7 @@ export function ProjectPage() {
   const p = project.data;
   const canEdit = p.my_role === 'admin' || p.my_role === 'editor';
   const isAdmin = p.my_role === 'admin';
+  const effectiveView = view ?? 'list';
 
   return (
     <div className="flex h-full flex-col">
@@ -113,6 +148,18 @@ export function ProjectPage() {
                   <IconButton icon={MoreHorizontal} label="Project actions" />
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
+                  <DropdownMenuLabel>Default view</DropdownMenuLabel>
+                  <DropdownMenuRadioGroup
+                    value={p.default_view}
+                    onValueChange={(v) => update.mutate({ default_view: v as ViewKey })}
+                  >
+                    {VIEWS.filter((v) => !('phase' in v)).map((v) => (
+                      <DropdownMenuRadioItem key={v.key} value={v.key}>
+                        {v.label}
+                      </DropdownMenuRadioItem>
+                    ))}
+                  </DropdownMenuRadioGroup>
+                  <DropdownMenuSeparator />
                   <DropdownMenuItem onSelect={() => archive.mutate(!p.archived_at)}>
                     <Icon icon={p.archived_at ? ArchiveRestore : Archive} />
                     {p.archived_at ? 'Unarchive project' : 'Archive project'}
@@ -143,10 +190,10 @@ export function ProjectPage() {
               <Link
                 key={v.key}
                 to={`/projects/${p.id}/${v.key}`}
-                aria-current={view === v.key ? 'page' : undefined}
+                aria-current={effectiveView === v.key ? 'page' : undefined}
                 className={cn(
                   '-mb-px border-b-2 pb-2 text-sm',
-                  view === v.key
+                  effectiveView === v.key
                     ? 'border-ink font-medium text-ink'
                     : 'border-transparent text-muted hover:text-ink',
                 )}
@@ -176,7 +223,12 @@ export function ProjectPage() {
         </div>
       ) : null}
       <TaskNavProvider>
-        <ProjectBody view={view} projectId={p.id} canEdit={canEdit && !p.archived_at} color={p.color} />
+        <ProjectBody
+          view={effectiveView}
+          projectId={p.id}
+          canEdit={canEdit && !p.archived_at}
+          color={p.color}
+        />
       </TaskNavProvider>
     </div>
   );

@@ -107,6 +107,7 @@ async def test_view_prefs_roundtrip_and_isolation(as_user: Clients) -> None:
         "show_completed": False,
         "sort": "manual",
         "group": "section",
+        "view": None,  # S2.2.3: the last tab (list/board/…) this user had open here; unset
     }
     view = {
         "assignees": ["me", "none"],
@@ -114,6 +115,7 @@ async def test_view_prefs_roundtrip_and_isolation(as_user: Clients) -> None:
         "show_completed": True,
         "sort": "due",
         "group": "assignee",
+        "view": "board",
     }
     assert (await ravi.put(url, json=view)).status_code == 200
     # a second project's prefs don't clobber the first
@@ -126,5 +128,6 @@ async def test_view_prefs_roundtrip_and_isolation(as_user: Clients) -> None:
     assert (await ravi.put(url, json={**view, "group": "color"})).status_code == 422
     assert (await ravi.put(url, json={**view, "assignees": ["x' OR 1=1"]})).status_code == 422
     assert (await ravi.put(url, json={**view, "extra": 1})).status_code == 422
+    assert (await ravi.put(url, json={**view, "view": "gantt"})).status_code == 422
     tom = await as_user("tom")
     assert (await tom.put(f"{BASE}/me/prefs/views/{other}", json=view)).status_code == 404

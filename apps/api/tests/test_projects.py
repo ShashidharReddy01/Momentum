@@ -57,6 +57,13 @@ async def test_roles_team_member_editor_explicit_admin(as_user: Clients) -> None
     r = await mei.patch(f"/api/v1/projects/{wr['id']}", json={"privacy": "private"})
     assert r.status_code == 403
     assert (await mei.post(f"/api/v1/projects/{wr['id']}/archive")).status_code == 403
+    # S2.2.3: the default view is admin-only too (roadmap AC: "per-project default view (project
+    # admin)") — editors used to be able to set it alongside name/color; not anymore.
+    r = await mei.patch(f"/api/v1/projects/{wr['id']}", json={"default_view": "board"})
+    assert r.status_code == 403
+    r = await ravi.patch(f"/api/v1/projects/{wr['id']}", json={"default_view": "board"})
+    assert r.status_code == 200
+    assert r.json()["data"]["default_view"] == "board"
 
 
 async def test_create_requires_team_membership_and_adds_default_section(as_user: Clients) -> None:

@@ -1363,7 +1363,7 @@ export interface components {
         };
         /**
          * ProjectViewPrefs
-         * @description How one user last viewed a project's list (restored on revisit).
+         * @description How one user last viewed a project (restored on revisit).
          */
         ProjectViewPrefs: {
             /** Assignees */
@@ -1391,6 +1391,8 @@ export interface components {
              * @enum {string}
              */
             sort: "manual" | "due" | "assignee" | "created" | "title";
+            /** View */
+            view?: ("list" | "board" | "calendar" | "timeline" | "overview" | "dashboard") | null;
         };
         /** ReactionIn */
         ReactionIn: {
