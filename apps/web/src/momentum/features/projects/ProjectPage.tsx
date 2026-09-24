@@ -21,12 +21,19 @@ import { cn } from '@/lib/cn';
 import { useCrumbs } from '@/lib/crumbs';
 import { useProject, useProjectLifecycle, useToggleFavorite, useUpdateProject } from './queries';
 import { ShareDialog } from './ShareDialog';
-import { BoardView, ProjectTasksView, TaskNavProvider, TaskPane, useTaskNav } from '@/features/tasks';
+import {
+  BoardView,
+  CalendarView,
+  ProjectTasksView,
+  TaskNavProvider,
+  TaskPane,
+  useTaskNav,
+} from '@/features/tasks';
 
 const VIEWS = [
   { key: 'list', label: 'List' },
   { key: 'board', label: 'Board' },
-  { key: 'calendar', label: 'Calendar', phase: 2 },
+  { key: 'calendar', label: 'Calendar' },
   { key: 'timeline', label: 'Timeline', phase: 6 },
   { key: 'overview', label: 'Overview', phase: 6 },
 ] as const;
@@ -193,13 +200,15 @@ function ProjectBody({
       <div
         className={cn(
           'min-w-0 flex-1 px-4 py-5 md:px-8',
-          view === 'board' ? 'overflow-hidden' : 'overflow-auto',
+          view === 'board' || view === 'calendar' ? 'overflow-hidden' : 'overflow-auto',
         )}
       >
         {view === 'list' ? (
           <ProjectTasksView key={projectId} projectId={projectId} canEdit={canEdit} />
         ) : view === 'board' ? (
           <BoardView key={projectId} projectId={projectId} canEdit={canEdit} color={color} />
+        ) : view === 'calendar' ? (
+          <CalendarView key={projectId} projectId={projectId} canEdit={canEdit} color={color} />
         ) : null}
       </div>
       {nav.openId ? (
