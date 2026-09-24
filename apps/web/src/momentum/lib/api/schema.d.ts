@@ -142,6 +142,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/fields": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The workspace's field library */
+        get: operations["list_fields_api_v1_fields_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/home": {
         parameters: {
             query?: never;
@@ -300,6 +317,110 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}/fields": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Fields attached to a project, in order */
+        get: operations["list_project_fields_api_v1_projects__project_id__fields_get"];
+        put?: never;
+        /** Create a field and attach it to this project */
+        post: operations["create_field_api_v1_projects__project_id__fields_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}/fields/attach": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Attach an existing library field to this project */
+        post: operations["attach_field_api_v1_projects__project_id__fields_attach_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}/fields/{field_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove a field from this project only */
+        delete: operations["detach_field_api_v1_projects__project_id__fields__field_id__delete"];
+        options?: never;
+        head?: never;
+        /** Edit a field's name, description, or options */
+        patch: operations["patch_field_api_v1_projects__project_id__fields__field_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}/fields/{field_id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Archive a field (hides it everywhere; values are kept) */
+        post: operations["archive_field_api_v1_projects__project_id__fields__field_id__archive_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}/fields/{field_id}/move": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reorder a field within this project */
+        post: operations["move_field_api_v1_projects__project_id__fields__field_id__move_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}/fields/{field_id}/visibility": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Show or hide a field in this project's views */
+        patch: operations["set_field_visibility_api_v1_projects__project_id__fields__field_id__visibility_patch"];
         trace?: never;
     };
     "/api/v1/projects/{project_id}/members": {
@@ -523,6 +644,40 @@ export interface paths {
         /** Comments and activity, oldest first */
         get: operations["task_feed_api_v1_tasks__task_id__feed_get"];
         put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tasks/{task_id}/fields": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A task's custom field values */
+        get: operations["get_task_field_values_api_v1_tasks__task_id__fields_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tasks/{task_id}/fields/{field_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Set (or clear, with value: null) a task's value for a field */
+        put: operations["set_task_field_value_api_v1_tasks__task_id__fields__field_id__put"];
         post?: never;
         delete?: never;
         options?: never;
@@ -893,6 +1048,94 @@ export interface components {
             /** Title */
             title: string;
         };
+        /**
+         * FieldAttachIn
+         * @description Attach an existing library field to a project.
+         */
+        FieldAttachIn: {
+            /** After Id */
+            after_id?: string | null;
+            /** Before Id */
+            before_id?: string | null;
+            /**
+             * Field Id
+             * Format: uuid
+             */
+            field_id: string;
+        };
+        /**
+         * FieldCreateIn
+         * @description Create a brand-new field def (attached to a project by the endpoint it's posted to).
+         */
+        FieldCreateIn: {
+            /** Description */
+            description?: string | null;
+            /**
+             * Is Library
+             * @default true
+             */
+            is_library: boolean;
+            /** Name */
+            name: string;
+            /** Options */
+            options?: components["schemas"]["SelectOptionIn"][] | components["schemas"]["NumberOptions"] | null;
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "text" | "number" | "single_select" | "multi_select" | "date" | "people" | "checkbox" | "url" | "currency" | "percent";
+        };
+        /** FieldOut */
+        FieldOut: {
+            /** Created By */
+            created_by: string | null;
+            /** Description */
+            description: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Is Library */
+            is_library: boolean;
+            /** Name */
+            name: string;
+            /** Options */
+            options?: components["schemas"]["SelectOptionOut"][] | components["schemas"]["NumberOptions"] | null;
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "text" | "number" | "single_select" | "multi_select" | "date" | "people" | "checkbox" | "url" | "currency" | "percent";
+        };
+        /**
+         * FieldPatchIn
+         * @description Edit a field def's name/description/options. Present-but-empty ``options`` clears them
+         *     (only meaningful for select types, where it means "delete every option").
+         */
+        FieldPatchIn: {
+            /** Description */
+            description?: string | null;
+            /** Name */
+            name?: string | null;
+            /** Options */
+            options?: components["schemas"]["SelectOptionIn"][] | components["schemas"]["NumberOptions"] | null;
+        };
+        /** FieldValueIn */
+        FieldValueIn: {
+            /** Value */
+            value?: unknown | null;
+        };
+        /** FieldValueOut */
+        FieldValueOut: {
+            /**
+             * Field Id
+             * Format: uuid
+             */
+            field_id: string;
+            /** Value */
+            value: unknown | null;
+        };
         /** FollowerIn */
         FollowerIn: {
             /**
@@ -971,10 +1214,31 @@ export interface components {
             /** @default {} */
             meta: components["schemas"]["ListMeta"];
         };
+        /** ListOut[FieldOut] */
+        ListOut_FieldOut_: {
+            /** Data */
+            data: components["schemas"]["FieldOut"][];
+            /** @default {} */
+            meta: components["schemas"]["ListMeta"];
+        };
+        /** ListOut[FieldValueOut] */
+        ListOut_FieldValueOut_: {
+            /** Data */
+            data: components["schemas"]["FieldValueOut"][];
+            /** @default {} */
+            meta: components["schemas"]["ListMeta"];
+        };
         /** ListOut[MyTaskOut] */
         ListOut_MyTaskOut_: {
             /** Data */
             data: components["schemas"]["MyTaskOut"][];
+            /** @default {} */
+            meta: components["schemas"]["ListMeta"];
+        };
+        /** ListOut[ProjectFieldOut] */
+        ListOut_ProjectFieldOut_: {
+            /** Data */
+            data: components["schemas"]["ProjectFieldOut"][];
             /** @default {} */
             meta: components["schemas"]["ListMeta"];
         };
@@ -1080,6 +1344,11 @@ export interface components {
         /** MutationOut[CommentOut] */
         MutationOut_CommentOut_: {
             data: components["schemas"]["CommentOut"];
+            meta: components["schemas"]["MutationMeta"];
+        };
+        /** MutationOut[FieldOut] */
+        MutationOut_FieldOut_: {
+            data: components["schemas"]["FieldOut"];
             meta: components["schemas"]["MutationMeta"];
         };
         /** MutationOut[FollowersOut] */
@@ -1212,6 +1481,16 @@ export interface components {
             /** Name */
             name: string;
         };
+        /** NumberOptions */
+        NumberOptions: {
+            /**
+             * Precision
+             * @default 0
+             */
+            precision: number;
+            /** Unit */
+            unit?: string | null;
+        };
         /** OkOut */
         OkOut: {
             /**
@@ -1276,6 +1555,30 @@ export interface components {
             team_name: string;
             /** Version */
             version: number;
+        };
+        /** ProjectFieldMoveIn */
+        ProjectFieldMoveIn: {
+            /** After Id */
+            after_id?: string | null;
+            /** Before Id */
+            before_id?: string | null;
+        };
+        /**
+         * ProjectFieldOut
+         * @description A field as attached to one project: its definition plus this project's position/
+         *     visibility.
+         */
+        ProjectFieldOut: {
+            field: components["schemas"]["FieldOut"];
+            /** Is Visible */
+            is_visible: boolean;
+            /** Position */
+            position: string;
+        };
+        /** ProjectFieldVisibilityIn */
+        ProjectFieldVisibilityIn: {
+            /** Is Visible */
+            is_visible: boolean;
         };
         /** ProjectMemberIn */
         ProjectMemberIn: {
@@ -1462,6 +1765,39 @@ export interface components {
         SectionPatchIn: {
             /** Name */
             name: string;
+        };
+        /**
+         * SelectOptionIn
+         * @description An option offered when creating/editing a single_select or multi_select field. ``id`` is
+         *     omitted for a new option (the server assigns one) and required to edit or keep an existing
+         *     one — options not repeated in a PATCH are dropped, same as a full replace.
+         */
+        SelectOptionIn: {
+            /**
+             * Archived
+             * @default false
+             */
+            archived: boolean;
+            /**
+             * Color
+             * @default #94a3b8
+             */
+            color: string;
+            /** Id */
+            id?: string | null;
+            /** Label */
+            label: string;
+        };
+        /** SelectOptionOut */
+        SelectOptionOut: {
+            /** Archived */
+            archived: boolean;
+            /** Color */
+            color: string;
+            /** Id */
+            id: string;
+            /** Label */
+            label: string;
         };
         /** SubtaskCreateIn */
         SubtaskCreateIn: {
@@ -2155,6 +2491,26 @@ export interface operations {
             };
         };
     };
+    list_fields_api_v1_fields_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListOut_FieldOut_"];
+                };
+            };
+        };
+    };
     get_home_api_v1_home_get: {
         parameters: {
             query?: never;
@@ -2538,6 +2894,279 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MutationOut_ProjectOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_project_fields_api_v1_projects__project_id__fields_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListOut_ProjectFieldOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_field_api_v1_projects__project_id__fields_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FieldCreateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationOut_FieldOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    attach_field_api_v1_projects__project_id__fields_attach_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FieldAttachIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationOut_FieldOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    detach_field_api_v1_projects__project_id__fields__field_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+                field_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OkOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    patch_field_api_v1_projects__project_id__fields__field_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+                field_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FieldPatchIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationOut_FieldOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    archive_field_api_v1_projects__project_id__fields__field_id__archive_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+                field_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationOut_FieldOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    move_field_api_v1_projects__project_id__fields__field_id__move_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+                field_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProjectFieldMoveIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationOut_FieldOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_field_visibility_api_v1_projects__project_id__fields__field_id__visibility_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+                field_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProjectFieldVisibilityIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationOut_FieldOut_"];
                 };
             };
             /** @description Validation Error */
@@ -3211,6 +3840,73 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["FeedOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_task_field_values_api_v1_tasks__task_id__fields_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListOut_FieldValueOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_task_field_value_api_v1_tasks__task_id__fields__field_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+                field_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FieldValueIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FieldValueOut"];
                 };
             };
             /** @description Validation Error */

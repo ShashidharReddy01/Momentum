@@ -5,6 +5,7 @@ from momentum.core.db import Base
 from momentum.core.events import OutboxEvent
 from momentum.core.idempotency import IdempotencyKey
 from momentum.domain.comments.models import Comment, Mention, Reaction
+from momentum.domain.fields.models import FieldDef, FieldValue, ProjectField
 from momentum.domain.mytasks.models import MyTaskPlacement
 from momentum.domain.projects.models import Favorite, Project, ProjectMember
 from momentum.domain.sections.models import Section
@@ -20,12 +21,15 @@ __all__ = [
     "ApiToken",
     "Comment",
     "Favorite",
+    "FieldDef",
+    "FieldValue",
     "Follower",
     "IdempotencyKey",
     "Mention",
     "MyTaskPlacement",
     "OutboxEvent",
     "Project",
+    "ProjectField",
     "ProjectMember",
     "Reaction",
     "Section",

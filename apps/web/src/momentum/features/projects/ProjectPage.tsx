@@ -1,4 +1,13 @@
-import { Archive, ArchiveRestore, Lock, MoreHorizontal, Star, Trash2, Users } from 'lucide-react';
+import {
+  Archive,
+  ArchiveRestore,
+  Lock,
+  MoreHorizontal,
+  SlidersHorizontal,
+  Star,
+  Trash2,
+  Users,
+} from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { InlineText } from '@/components/common/InlineText';
@@ -22,6 +31,7 @@ import { Tooltip } from '@/components/ui/Tooltip';
 import { colorVar } from '@/features/teams';
 import { cn } from '@/lib/cn';
 import { useCrumbs } from '@/lib/crumbs';
+import { FieldsDialog } from '@/features/fields';
 import { useProject, useProjectLifecycle, useToggleFavorite, useUpdateProject } from './queries';
 import { ShareDialog } from './ShareDialog';
 import {
@@ -61,6 +71,7 @@ export function ProjectPage() {
   const { lastView, ready: lastViewReady, save: saveLastView } = useLastView(projectId);
   const navigate = useNavigate();
   const [share, setShare] = useState(false);
+  const [fieldsOpen, setFieldsOpen] = useState(false);
   useCrumbs(project.data ? [project.data.team_name, project.data.name] : null);
 
   // On a bare `/projects/:id` (no view segment), redirect once to this user's last view for
@@ -139,6 +150,7 @@ export function ProjectPage() {
                 />
               ))}
             </div>
+            <IconButton icon={SlidersHorizontal} label="Fields" onClick={() => setFieldsOpen(true)} />
             <Button size="sm" onClick={() => setShare(true)}>
               <Icon icon={p.privacy === 'private' ? Lock : Users} /> Share
             </Button>
@@ -217,6 +229,7 @@ export function ProjectPage() {
       ) : null}
 
       <ShareDialog project={p} open={share} onOpenChange={setShare} />
+      <FieldsDialog projectId={p.id} canEdit={canEdit} open={fieldsOpen} onOpenChange={setFieldsOpen} />
       {p.my_role === 'viewer' || p.my_role === 'commenter' ? (
         <div role="status" className="bg-info-tint px-4 md:px-8 py-1.5 text-xs text-ink-2">
           You have {p.my_role} access to this project.

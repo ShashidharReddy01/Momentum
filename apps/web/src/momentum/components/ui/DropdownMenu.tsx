@@ -51,11 +51,7 @@ export function DropdownMenuSeparator() {
 
 export const DropdownMenuRadioGroup = M.RadioGroup;
 
-export function DropdownMenuRadioItem({
-  className,
-  children,
-  ...props
-}: ComponentProps<typeof M.RadioItem>) {
+export function DropdownMenuRadioItem({ className, children, ...props }: ComponentProps<typeof M.RadioItem>) {
   return (
     <M.RadioItem
       className={cn(
