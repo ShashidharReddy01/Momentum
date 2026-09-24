@@ -138,6 +138,14 @@ export function fieldHandlers(base = '') {
       pf.is_visible = b.is_visible;
       return HttpResponse.json({ data: fields.find((f) => f.id === params.fid), meta });
     }),
+    // Not scoped by project (this mock doesn't track task->project) — fine for tests, which
+    // only ever use one project; the real backend's own scoping is covered in test_fields.py.
+    http.get(`*${base}/api/v1/projects/:pid/field-values`, () =>
+      HttpResponse.json({
+        data: values.map((v) => ({ task_id: v.task_id, field_id: v.field_id, value: v.value })),
+        meta: { next_cursor: null },
+      }),
+    ),
     http.get(`*${base}/api/v1/tasks/:tid/fields`, ({ params }) =>
       HttpResponse.json({
         data: values

@@ -17,6 +17,7 @@ from momentum.domain.fields.schemas import (
     ProjectFieldMoveIn,
     ProjectFieldOut,
     ProjectFieldVisibilityIn,
+    TaskFieldValueOut,
 )
 
 router = APIRouter(tags=["fields"])
@@ -47,6 +48,19 @@ async def list_project_fields(
                 for pf, f in rows
             ]
         )
+
+
+@router.get(
+    "/projects/{project_id}/field-values",
+    response_model=ListOut[TaskFieldValueOut],
+    summary="Every field value across a project's tasks, in one call",
+)
+async def list_project_field_values(
+    project_id: uuid.UUID, ctx: CtxDep, uow: UowDep
+) -> ListOut[TaskFieldValueOut]:
+    async with uow.transaction() as s:
+        values = await service.list_project_field_values(s, ctx, project_id)
+        return ListOut(data=[TaskFieldValueOut.model_validate(v) for v in values])
 
 
 @router.post(

@@ -219,6 +219,29 @@ async def test_field_values_set_get_and_clear(as_user: Clients) -> None:
     assert priority["id"] not in values2
 
 
+async def test_bulk_field_values_for_a_project_in_one_call(as_user: Clients) -> None:
+    ravi = await as_user("ravi")
+    pid = await _project(ravi)
+    effort = await _create(ravi, pid, name="Effort", type="number")
+    t1 = await _task(ravi, pid)
+    t2 = await _task(ravi, pid)
+    await ravi.put(f"/api/v1/tasks/{t1['id']}/fields/{effort['id']}", json={"value": 3})
+    await ravi.put(f"/api/v1/tasks/{t2['id']}/fields/{effort['id']}", json={"value": 5})
+
+    r = await ravi.get(f"/api/v1/projects/{pid}/field-values")
+    assert r.status_code == 200
+    by_task = {row["task_id"]: row["value"] for row in r.json()["data"]}
+    assert by_task[t1["id"]] == 3
+    assert by_task[t2["id"]] == 5
+
+    # a second project's task values don't leak in
+    other = await _project(ravi, "Mobile App v2")
+    ot = await _task(ravi, other)
+    await ravi.put(f"/api/v1/tasks/{ot['id']}/fields/{effort['id']}", json={"value": 99})
+    r2 = await ravi.get(f"/api/v1/projects/{pid}/field-values")
+    assert ot["id"] not in {row["task_id"] for row in r2.json()["data"]}
+
+
 async def test_field_value_validation_rejects_the_wrong_shape(as_user: Clients) -> None:
     ravi = await as_user("ravi")
     pid = await _project(ravi)

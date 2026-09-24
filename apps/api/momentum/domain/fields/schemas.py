@@ -123,3 +123,12 @@ class FieldValueOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     field_id: uuid.UUID
     value: Any | None
+
+
+class TaskFieldValueOut(BaseModel):
+    """One task's value for one field — the shape `list_project_field_values` returns in bulk."""
+
+    model_config = ConfigDict(from_attributes=True)
+    task_id: uuid.UUID
+    field_id: uuid.UUID
+    value: Any | None

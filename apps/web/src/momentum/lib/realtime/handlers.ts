@@ -1,4 +1,5 @@
 import type { QueryClient } from '@tanstack/react-query';
+import { fieldKeys } from '@/features/fields';
 import { homeKey } from '@/features/home';
 import { myTasksKey } from '@/features/mytasks';
 import { projectKeys } from '@/features/projects';
@@ -141,6 +142,10 @@ function applyTaskEvent(
     case 'task.follower_added':
     case 'task.follower_removed':
       void qc.invalidateQueries({ queryKey: taskKeys.detail(id) });
+      return;
+    case 'task.field_updated':
+      void qc.invalidateQueries({ queryKey: fieldKeys.valuesByTask(id) });
+      if (ctx.projectId) void qc.invalidateQueries({ queryKey: fieldKeys.valuesByProject(ctx.projectId) });
       return;
     default:
       return;

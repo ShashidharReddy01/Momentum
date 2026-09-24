@@ -25,6 +25,7 @@ import {
 import { Icon } from '@/components/ui/Icon';
 import { cn } from '@/lib/cn';
 import { formatDue } from '@/lib/dates';
+import { FieldValueChip, type ProjectField as ProjectFieldT } from '@/features/fields';
 import type { Person } from '@/features/people';
 import { AssigneePicker } from './AssigneePicker';
 import { DatePicker } from './DatePicker';
@@ -55,6 +56,10 @@ export interface TaskRowProps {
   /** My Tasks: show which project the task is in, instead of the assignee. */
   project?: { id: string; name: string; color: string | null } | null;
   hideAssignee?: boolean;
+  /** Custom fields visible in this view, and this task's own values — read-only chips (S2.3.2;
+   * editing happens in the pane). Omitted where the project has none, so most rows pay nothing. */
+  fields?: ProjectFieldT[];
+  fieldValues?: Map<string, unknown>;
   /** Subtasks shown inline under the row. */
   expanded?: boolean;
   onToggleExpand?: (task: Task) => void;
@@ -130,6 +135,8 @@ const RowBody = memo(function RowBody({
   onToggleExpand,
   project,
   hideAssignee = false,
+  fields,
+  fieldValues,
   onUpdate,
   onToggle,
   onRename,
@@ -408,6 +415,13 @@ const RowBody = memo(function RowBody({
       ) : (
         dueCell
       )}
+      {fields?.length ? (
+        <span className="flex min-w-0 shrink flex-wrap items-center gap-1 @max-3xl:hidden">
+          {fields.map((f) => (
+            <FieldValueChip key={f.field.id} field={f.field} value={fieldValues?.get(f.field.id) ?? null} />
+          ))}
+        </span>
+      ) : null}
       {detailsButton}
       {canEdit ? (
         menuOpen ? (

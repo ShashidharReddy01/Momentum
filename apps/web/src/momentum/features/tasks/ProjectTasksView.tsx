@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useMe } from '@/features/auth';
+import { useProjectFields, useProjectFieldValues } from '@/features/fields';
 import { usePeople, type Person } from '@/features/people';
 import { SectionList, useCollapsed, useSections, type ItemDnd, type Section } from '@/features/sections';
 import { cn } from '@/lib/cn';
@@ -65,6 +66,9 @@ export function ProjectTasksView({ projectId, canEdit }: { projectId: string; ca
   const open = useProjectTasks(projectId);
   const done = useProjectTasks(projectId, true, showCompleted);
   const sections = useSections(projectId).data;
+  const projectFields = useProjectFields(projectId).data;
+  const visibleFields = useMemo(() => (projectFields ?? []).filter((f) => f.is_visible), [projectFields]);
+  const fieldValuesByTask = useProjectFieldValues(projectId, !!visibleFields.length).data;
   const m = useTaskMutations(projectId);
   const { collapsed, toggle } = useCollapsed(projectId);
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -493,6 +497,8 @@ export function ProjectTasksView({ projectId, canEdit }: { projectId: string; ca
         onOpen={nav ? onOpen : undefined}
         expanded={canExpand && expanded.has(t.id)}
         onToggleExpand={canExpand ? toggleExpand : undefined}
+        fields={visibleFields}
+        fieldValues={fieldValuesByTask?.get(t.id)}
         onUpdate={onUpdate}
         onToggle={onToggle}
         onRename={onRename}

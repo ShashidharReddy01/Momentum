@@ -1,12 +1,11 @@
-"""S2.3.1: custom field definitions, the workspace library, and per-project attachment.
+"""S2.3.1/S2.3.2: custom field definitions, the workspace library, per-project attachment, and
+field values (get/set on a task, or in bulk for a whole project's list/board view).
 
-Field *values* (get/set on a task) are here too since the migration's ``field_values`` table
-demands a working store, but there's no inline-editor UI for them yet — that's S2.3.2's job,
-built on top of these same endpoints. Field management (create/edit/archive/attach/detach/
-reorder) is deliberately **not undoable** in this slice (unlike almost everything else in
-Momentum): each of those needs its own restore payload design, and none of them are the kind of
-frequent, easy-to-fat-finger action (like a rename or a drag) that undo mainly protects against.
-Documented here rather than silently different from the rest of the app.
+Field management (create/edit/archive/attach/detach/reorder) is deliberately **not undoable** in
+this slice (unlike almost everything else in Momentum): each of those needs its own restore
+payload design, and none of them are the kind of frequent, easy-to-fat-finger action (like a
+rename or a drag) that undo mainly protects against. Documented here rather than silently
+different from the rest of the app.
 """
 
 from __future__ import annotations
@@ -33,6 +32,7 @@ from momentum.domain.fields.schemas import (
     NumberOptions,
     SelectOptionIn,
 )
+from momentum.domain.tasks.models import TaskProject
 
 SELECT_TYPES = ("single_select", "multi_select")
 NUMERIC_TYPES = ("number", "currency", "percent")
@@ -432,10 +432,26 @@ async def get_task_field_values(
     return list(rows.scalars())
 
 
+async def list_project_field_values(
+    session: AsyncSession, ctx: Ctx, project_id: uuid.UUID
+) -> list[FieldValue]:
+    """Every field value across a project's tasks, in one query. The list/board views call this
+    once per project rather than once per visible task — the S2.3.2 AC (10 fields x 2,000 tasks
+    stays within the list's performance budget) depends on this being a single round trip, not
+    N of them."""
+    await get_visible_project(session, ctx, project_id)
+    rows = await session.execute(
+        select(FieldValue)
+        .join(TaskProject, TaskProject.task_id == FieldValue.task_id)
+        .where(TaskProject.project_id == project_id)
+    )
+    return list(rows.scalars())
+
+
 async def set_task_field_value(
     session: AsyncSession, ctx: Ctx, task_id: uuid.UUID, field_id: uuid.UUID, value: Any
 ) -> FieldValue | None:
-    _, _, role = await get_visible_task(session, ctx, task_id)
+    _, placement, role = await get_visible_task(session, ctx, task_id)
     require_project_role(role, "editor", "set field values")
     field = await session.get(FieldDef, field_id)
     if field is None or field.workspace_id != ctx.workspace_id or field.deleted_at is not None:
@@ -454,6 +470,11 @@ async def set_task_field_value(
         row.updated_by = ctx.actor.id
         result = row
     await session.flush()
+    # the task channel (pane) plus the project channel (list/board row chips — S2.3.2) so both
+    # stay live; a task with no placement (shouldn't normally happen) just gets the former.
+    channels = [f"task:{task_id}"]
+    if placement is not None:
+        channels.append(f"project:{placement.project_id}")
     await emit(
         session,
         ctx,
@@ -461,6 +482,6 @@ async def set_task_field_value(
         entity_type="task",
         entity_id=task_id,
         data={"field_id": str(field_id)},
-        channels=[f"task:{task_id}"],
+        channels=channels,
     )
     return result

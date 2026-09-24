@@ -30,6 +30,7 @@ import { Icon } from '@/components/ui/Icon';
 import { IconButton } from '@/components/ui/IconButton';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useMe } from '@/features/auth';
+import { FieldValueEditor, useProjectFields, useSetFieldValue, useTaskFieldValues } from '@/features/fields';
 import { usePeople } from '@/features/people';
 import { isNotFound } from '@/lib/api/errors';
 import { cn } from '@/lib/cn';
@@ -157,6 +158,9 @@ function PaneBody({
   const m = useTaskDetailMutations(task.id);
   const config = useMomentumConfig();
   const people = usePeople().data;
+  const projectFields = useProjectFields(task.project?.id ?? '', !!task.project);
+  const fieldValues = useTaskFieldValues(task.id);
+  const setFieldValue = useSetFieldValue(task.id);
   const meId = useMe().data?.user.id;
   const nameOf = (id: string | null | undefined) => (id ? people?.find((p) => p.id === id)?.name : undefined);
   const assignee = people?.find((p) => p.id === task.assignee_id);
@@ -342,6 +346,18 @@ function PaneBody({
               </span>
             </Field>
           ) : null}
+          {(projectFields.data ?? [])
+            .filter((pf) => pf.is_visible)
+            .map((pf) => (
+              <Field key={pf.field.id} label={pf.field.name}>
+                <FieldValueEditor
+                  field={pf.field}
+                  value={fieldValues.data?.get(pf.field.id) ?? null}
+                  disabled={!canEdit}
+                  onChange={(value) => setFieldValue.mutate({ fieldId: pf.field.id, value })}
+                />
+              </Field>
+            ))}
         </dl>
 
         <Description task={task} canEdit={canEdit} />
