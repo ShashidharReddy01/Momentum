@@ -21,11 +21,11 @@ import { cn } from '@/lib/cn';
 import { useCrumbs } from '@/lib/crumbs';
 import { useProject, useProjectLifecycle, useToggleFavorite, useUpdateProject } from './queries';
 import { ShareDialog } from './ShareDialog';
-import { ProjectTasksView, TaskNavProvider, TaskPane, useTaskNav } from '@/features/tasks';
+import { BoardView, ProjectTasksView, TaskNavProvider, TaskPane, useTaskNav } from '@/features/tasks';
 
 const VIEWS = [
   { key: 'list', label: 'List' },
-  { key: 'board', label: 'Board', phase: 2 },
+  { key: 'board', label: 'Board' },
   { key: 'calendar', label: 'Calendar', phase: 2 },
   { key: 'timeline', label: 'Timeline', phase: 6 },
   { key: 'overview', label: 'Overview', phase: 6 },
@@ -169,20 +169,37 @@ export function ProjectPage() {
         </div>
       ) : null}
       <TaskNavProvider>
-        <ProjectBody view={view} projectId={p.id} canEdit={canEdit && !p.archived_at} />
+        <ProjectBody view={view} projectId={p.id} canEdit={canEdit && !p.archived_at} color={p.color} />
       </TaskNavProvider>
     </div>
   );
 }
 
 /** The list (scrolls on its own) with the task pane docked on the right when `?task=` is set. */
-function ProjectBody({ view, projectId, canEdit }: { view: string; projectId: string; canEdit: boolean }) {
+function ProjectBody({
+  view,
+  projectId,
+  canEdit,
+  color,
+}: {
+  view: string;
+  projectId: string;
+  canEdit: boolean;
+  color: string | null;
+}) {
   const nav = useTaskNav()!;
   return (
     <div className="flex min-h-0 flex-1">
-      <div className="min-w-0 flex-1 overflow-auto px-4 md:px-8 py-5">
+      <div
+        className={cn(
+          'min-w-0 flex-1 px-4 py-5 md:px-8',
+          view === 'board' ? 'overflow-hidden' : 'overflow-auto',
+        )}
+      >
         {view === 'list' ? (
           <ProjectTasksView key={projectId} projectId={projectId} canEdit={canEdit} />
+        ) : view === 'board' ? (
+          <BoardView key={projectId} projectId={projectId} canEdit={canEdit} color={color} />
         ) : null}
       </div>
       {nav.openId ? (

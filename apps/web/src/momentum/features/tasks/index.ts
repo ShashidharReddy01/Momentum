@@ -1,3 +1,4 @@
+export { BoardView } from './BoardView';
 export { ProjectTasksView } from './ProjectTasksView';
 export { taskKeys, useProjectTasks, useTaskMutations, type Task } from './queries';
 export { TaskNavProvider, useTaskNav } from './pane/nav';
