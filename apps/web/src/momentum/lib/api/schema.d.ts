@@ -493,6 +493,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/{project_id}/task-tags": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Every tag across a project's tasks, in one call */
+        get: operations["list_project_task_tags_api_v1_projects__project_id__task_tags_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/{project_id}/tasks": {
         parameters: {
             query?: never;
@@ -574,6 +591,59 @@ export interface paths {
         put?: never;
         /** Move a section before/after another */
         post: operations["move_section_api_v1_sections__section_id__move_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tags": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The workspace's tag library */
+        get: operations["list_tags_api_v1_tags_get"];
+        put?: never;
+        /** Create a tag */
+        post: operations["create_tag_api_v1_tags_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tags/{tag_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete a tag */
+        delete: operations["delete_tag_api_v1_tags__tag_id__delete"];
+        options?: never;
+        head?: never;
+        /** Rename or recolor a tag */
+        patch: operations["patch_tag_api_v1_tags__tag_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/tags/{tag_id}/tasks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Tasks tagged with this tag, across every visible project */
+        get: operations["list_tag_tasks_api_v1_tags__tag_id__tasks_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -800,6 +870,41 @@ export interface paths {
         /** Add a subtask */
         post: operations["create_subtask_api_v1_tasks__task_id__subtasks_post"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tasks/{task_id}/tags": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A task's tags */
+        get: operations["get_task_tags_api_v1_tasks__task_id__tags_get"];
+        put?: never;
+        /** Tag a task (attach an existing tag, or create one inline by name) */
+        post: operations["add_task_tag_api_v1_tasks__task_id__tags_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tasks/{task_id}/tags/{tag_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove a tag from a task */
+        delete: operations["remove_task_tag_api_v1_tasks__task_id__tags__tag_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -1273,6 +1378,13 @@ export interface components {
             /** @default {} */
             meta: components["schemas"]["ListMeta"];
         };
+        /** ListOut[TagOut] */
+        ListOut_TagOut_: {
+            /** Data */
+            data: components["schemas"]["TagOut"][];
+            /** @default {} */
+            meta: components["schemas"]["ListMeta"];
+        };
         /** ListOut[TaskFieldValueOut] */
         ListOut_TaskFieldValueOut_: {
             /** Data */
@@ -1284,6 +1396,13 @@ export interface components {
         ListOut_TaskOut_: {
             /** Data */
             data: components["schemas"]["TaskOut"][];
+            /** @default {} */
+            meta: components["schemas"]["ListMeta"];
+        };
+        /** ListOut[TaskTagOut] */
+        ListOut_TaskTagOut_: {
+            /** Data */
+            data: components["schemas"]["TaskTagOut"][];
             /** @default {} */
             meta: components["schemas"]["ListMeta"];
         };
@@ -1403,6 +1522,11 @@ export interface components {
         /** MutationOut[SectionOut] */
         MutationOut_SectionOut_: {
             data: components["schemas"]["SectionOut"];
+            meta: components["schemas"]["MutationMeta"];
+        };
+        /** MutationOut[TagOut] */
+        MutationOut_TagOut_: {
+            data: components["schemas"]["TagOut"];
             meta: components["schemas"]["MutationMeta"];
         };
         /** MutationOut[TaskDetailOut] */
@@ -1718,6 +1842,8 @@ export interface components {
              * @enum {string}
              */
             sort: "manual" | "due" | "assignee" | "created" | "title";
+            /** Tags */
+            tags?: string[];
             /** View */
             view?: ("list" | "board" | "calendar" | "timeline" | "overview" | "dashboard") | null;
         };
@@ -1838,6 +1964,35 @@ export interface components {
             after_id?: string | null;
             /** Before Id */
             before_id?: string | null;
+        };
+        /** TagCreateIn */
+        TagCreateIn: {
+            /**
+             * Color
+             * @default #94a3b8
+             */
+            color: string;
+            /** Name */
+            name: string;
+        };
+        /** TagOut */
+        TagOut: {
+            /** Color */
+            color: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+        };
+        /** TagPatchIn */
+        TagPatchIn: {
+            /** Color */
+            color?: string | null;
+            /** Name */
+            name?: string | null;
         };
         /** TaskBatchCreateIn */
         TaskBatchCreateIn: {
@@ -2095,6 +2250,28 @@ export interface components {
             start_on?: string | null;
             /** Title */
             title?: string | null;
+        };
+        /**
+         * TaskTagIn
+         * @description Attach an existing tag, or create one inline by name (whichever the client has).
+         */
+        TaskTagIn: {
+            /** Name */
+            name?: string | null;
+            /** Tag Id */
+            tag_id?: string | null;
+        };
+        /**
+         * TaskTagOut
+         * @description One task's tag — the shape the bulk per-project endpoint returns.
+         */
+        TaskTagOut: {
+            tag: components["schemas"]["TagOut"];
+            /**
+             * Task Id
+             * Format: uuid
+             */
+            task_id: string;
         };
         /** TeamCreateIn */
         TeamCreateIn: {
@@ -3422,6 +3599,37 @@ export interface operations {
             };
         };
     };
+    list_project_task_tags_api_v1_projects__project_id__task_tags_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListOut_TaskTagOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_tasks_api_v1_projects__project_id__tasks_get: {
         parameters: {
             query?: {
@@ -3653,6 +3861,156 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MutationOut_SectionOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_tags_api_v1_tags_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListOut_TagOut_"];
+                };
+            };
+        };
+    };
+    create_tag_api_v1_tags_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TagCreateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationOut_TagOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_tag_api_v1_tags__tag_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tag_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OkOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    patch_tag_api_v1_tags__tag_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tag_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TagPatchIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationOut_TagOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_tag_tasks_api_v1_tags__tag_id__tasks_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tag_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListOut_TaskOut_"];
                 };
             };
             /** @description Validation Error */
@@ -4214,6 +4572,104 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MutationOut_TaskOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_task_tags_api_v1_tasks__task_id__tags_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListOut_TagOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_task_tag_api_v1_tasks__task_id__tags_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TaskTagIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationOut_TagOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_task_tag_api_v1_tasks__task_id__tags__tag_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+                tag_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OkOut"];
                 };
             };
             /** @description Validation Error */

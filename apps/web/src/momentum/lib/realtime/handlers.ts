@@ -1,5 +1,6 @@
 import type { QueryClient } from '@tanstack/react-query';
 import { fieldKeys } from '@/features/fields';
+import { tagKeys } from '@/features/tags';
 import { homeKey } from '@/features/home';
 import { myTasksKey } from '@/features/mytasks';
 import { projectKeys } from '@/features/projects';
@@ -146,6 +147,11 @@ function applyTaskEvent(
     case 'task.field_updated':
       void qc.invalidateQueries({ queryKey: fieldKeys.valuesByTask(id) });
       if (ctx.projectId) void qc.invalidateQueries({ queryKey: fieldKeys.valuesByProject(ctx.projectId) });
+      return;
+    case 'task.tagged':
+    case 'task.untagged':
+      void qc.invalidateQueries({ queryKey: tagKeys.byTask(id) });
+      if (ctx.projectId) void qc.invalidateQueries({ queryKey: tagKeys.byProject(ctx.projectId) });
       return;
     default:
       return;

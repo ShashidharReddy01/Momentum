@@ -42,12 +42,16 @@ describe('URL params', () => {
   it('round-trips, omits defaults and keeps unrelated params', () => {
     const view = {
       assignees: ['me', UUID],
+      tags: [UUID],
       due: 'today',
       show_completed: true,
       sort: 'due',
       group: 'assignee',
     } as const;
-    const params = viewToParams({ ...view, assignees: [...view.assignees] }, new URLSearchParams('task=abc'));
+    const params = viewToParams(
+      { ...view, assignees: [...view.assignees], tags: [...view.tags] },
+      new URLSearchParams('task=abc'),
+    );
     expect(params.get('task')).toBe('abc');
     expect(viewFromParams(params)).toEqual(view);
     expect(viewToParams(DEFAULT_VIEW, new URLSearchParams('sort=due&task=1')).toString()).toBe('task=1');
@@ -93,6 +97,20 @@ describe('due buckets and filters', () => {
     expect(
       [mine, ana, none].filter((t) => matches(t, v({ due: 'no_date' }), 'u-me', TODAY)).map((t) => t.id),
     ).toEqual(['none']);
+  });
+
+  it('tag filter matches any of the selected tags on the task', () => {
+    const urgent = task('urgent');
+    const other = task('other');
+    const none = task('none');
+    const v = { ...DEFAULT_VIEW, tags: ['tag-a', 'tag-b'] };
+    const tagsOf = new Map([
+      ['urgent', new Set(['tag-a'])],
+      ['other', new Set(['tag-c'])],
+    ]);
+    expect(
+      [urgent, other, none].filter((t) => matches(t, v, 'u-me', TODAY, tagsOf.get(t.id))).map((t) => t.id),
+    ).toEqual(['urgent']);
   });
 });
 

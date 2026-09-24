@@ -16,6 +16,7 @@ import { useMe } from '@/features/auth';
 import { useProjectFields, useProjectFieldValues } from '@/features/fields';
 import { usePeople, type Person } from '@/features/people';
 import { SectionList, useCollapsed, useSections, type ItemDnd, type Section } from '@/features/sections';
+import { useProjectTaskTags } from '@/features/tags';
 import { cn } from '@/lib/cn';
 import { formatDue } from '@/lib/dates';
 import { applyRealtimeEvent, useChannel } from '@/lib/realtime';
@@ -69,6 +70,7 @@ export function ProjectTasksView({ projectId, canEdit }: { projectId: string; ca
   const projectFields = useProjectFields(projectId).data;
   const visibleFields = useMemo(() => (projectFields ?? []).filter((f) => f.is_visible), [projectFields]);
   const fieldValuesByTask = useProjectFieldValues(projectId, !!visibleFields.length).data;
+  const tagsByTask = useProjectTaskTags(projectId).data;
   const m = useTaskMutations(projectId);
   const { collapsed, toggle } = useCollapsed(projectId);
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -112,9 +114,16 @@ export function ProjectTasksView({ projectId, canEdit }: { projectId: string; ca
   );
 
   const nameOf = useCallback((id: string) => peopleById.get(id)?.name, [peopleById]);
+  const tagIdsByTask = useMemo(() => {
+    if (!tagsByTask) return undefined;
+    const map = new Map<string, Set<string>>();
+    for (const [taskId, tags] of tagsByTask) map.set(taskId, new Set(tags.map((t) => t.id)));
+    return map;
+  }, [tagsByTask]);
   const bySection = useMemo(() => {
     const today = todayLocal();
-    const shown = (t: Task) => isTemp(t.id) || sticky.has(t.id) || matches(t, view, meId, today);
+    const shown = (t: Task) =>
+      isTemp(t.id) || sticky.has(t.id) || matches(t, view, meId, today, tagIdsByTask?.get(t.id));
     const map = new Map<string, Task[]>();
     const visible = (open.data ?? []).filter(
       (t) => (!t.completed_at || fading.has(t.id) || showCompleted) && shown(t),
@@ -136,7 +145,7 @@ export function ProjectTasksView({ projectId, canEdit }: { projectId: string; ca
     }
     if (view.sort !== 'manual') for (const [k, list] of map) map.set(k, sortTasks(list, view.sort, nameOf));
     return map;
-  }, [open.data, done.data, fading, showCompleted, view, meId, sticky, nameOf]);
+  }, [open.data, done.data, fading, showCompleted, view, meId, sticky, nameOf, tagIdsByTask]);
 
   // Non-section groupings (assignee / due) regroup the same filtered, sorted rows.
   const groups = useMemo(() => {
@@ -499,6 +508,7 @@ export function ProjectTasksView({ projectId, canEdit }: { projectId: string; ca
         onToggleExpand={canExpand ? toggleExpand : undefined}
         fields={visibleFields}
         fieldValues={fieldValuesByTask?.get(t.id)}
+        tags={tagsByTask?.get(t.id)}
         onUpdate={onUpdate}
         onToggle={onToggle}
         onRename={onRename}

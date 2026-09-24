@@ -7,7 +7,7 @@ export { TaskPane } from './pane/TaskPane';
 export { TaskPage } from './pane/TaskPage';
 export { TaskRow } from './TaskRow';
 export { dropNeighbors, emptySelection, step, type DropPlacement, type Selection } from './selection';
-export { dropTask, isTaskList, syncTask } from './detail';
+export { dropTask, isTaskList, syncTask, useTaskDetailMutations } from './detail';
 export type { TaskPatch } from './queries';
 export type { TaskDetail } from './detail';
 export { QuickAddDialog } from './QuickAddDialog';

@@ -16,6 +16,7 @@ export const viewPrefsKey = (projectId: string) => ['view-prefs', projectId] as 
 
 const EMPTY_LIST_PREFS: Omit<StoredViewPrefs, 'view'> = {
   assignees: [],
+  tags: [],
   due: 'any',
   show_completed: false,
   sort: 'manual',

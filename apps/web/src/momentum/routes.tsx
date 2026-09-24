@@ -6,6 +6,7 @@ import { NotFoundPage, Placeholder } from '@/features/placeholders';
 import { ProjectPage } from '@/features/projects';
 import { MyTasksPage } from '@/features/mytasks';
 import { TaskPage } from '@/features/tasks';
+import { TagPage } from '@/features/tags';
 import { TeamPage } from '@/features/teams';
 import type { RuntimeConfig } from '@/lib/config';
 import { Layout } from '@/shell/Layout';
@@ -37,6 +38,7 @@ export function buildRoutes(config: RuntimeConfig): RouteObject[] {
         { path: 'teams/:teamId', element: <TeamPage />, handle: { crumb: 'Team' } },
         { path: 'projects/:projectId/:view?', element: <ProjectPage />, handle: { crumb: 'Project' } },
         { path: 'task/:taskId', element: <TaskPage />, handle: { crumb: 'Task' } },
+        { path: 'tags/:tagId', element: <TagPage />, handle: { crumb: 'Tag' } },
         {
           path: 'inbox',
           element: <Placeholder icon={Inbox} title="Inbox" phase={2} />,

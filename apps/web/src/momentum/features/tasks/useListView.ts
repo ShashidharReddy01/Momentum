@@ -15,6 +15,7 @@ const SAVE_DELAY_MS = 600;
 const asListView = (v: StoredViewPrefs | undefined): ListView | undefined =>
   v && {
     assignees: v.assignees ?? DEFAULT_VIEW.assignees,
+    tags: v.tags ?? DEFAULT_VIEW.tags,
     due: v.due ?? DEFAULT_VIEW.due,
     show_completed: v.show_completed ?? DEFAULT_VIEW.show_completed,
     sort: v.sort ?? DEFAULT_VIEW.sort,

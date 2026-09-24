@@ -103,6 +103,7 @@ async def test_view_prefs_roundtrip_and_isolation(as_user: Clients) -> None:
     url = f"{BASE}/me/prefs/views/{pid}"
     assert (await ravi.get(url)).json() == {
         "assignees": [],
+        "tags": [],
         "due": "any",
         "show_completed": False,
         "sort": "manual",
@@ -111,6 +112,7 @@ async def test_view_prefs_roundtrip_and_isolation(as_user: Clients) -> None:
     }
     view = {
         "assignees": ["me", "none"],
+        "tags": ["01a0ccaf-8f68-77d2-a888-584ea1e80ea8"],
         "due": "this_week",
         "show_completed": True,
         "sort": "due",

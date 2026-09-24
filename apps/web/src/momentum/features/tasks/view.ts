@@ -8,6 +8,7 @@ export type GroupKey = 'section' | 'assignee' | 'due';
 
 export interface ListView {
   assignees: string[]; // user ids, 'me', 'none'
+  tags: string[]; // tag ids, OR-ed like assignees
   due: DueFilter;
   show_completed: boolean;
   sort: SortKey;
@@ -16,6 +17,7 @@ export interface ListView {
 
 export const DEFAULT_VIEW: ListView = {
   assignees: [],
+  tags: [],
   due: 'any',
   show_completed: false,
   sort: 'manual',
@@ -26,7 +28,8 @@ const DUE: readonly DueFilter[] = ['any', 'overdue', 'today', 'this_week', 'next
 const SORT: readonly SortKey[] = ['manual', 'due', 'assignee', 'created', 'title'];
 const GROUP: readonly GroupKey[] = ['section', 'assignee', 'due'];
 const TOKEN = /^(me|none|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i;
-const VIEW_PARAMS = ['assignee', 'due', 'completed', 'sort', 'group'];
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const VIEW_PARAMS = ['assignee', 'tag', 'due', 'completed', 'sort', 'group'];
 
 export const DUE_LABEL: Record<DueFilter, string> = {
   any: 'Any time',
@@ -56,6 +59,7 @@ export function viewFromParams(params: URLSearchParams): ListView | null {
     v && (allowed as readonly string[]).includes(v) ? (v as T) : fallback;
   return {
     assignees: [...new Set(params.getAll('assignee').filter((a) => TOKEN.test(a)))].slice(0, 50),
+    tags: [...new Set(params.getAll('tag').filter((t) => UUID.test(t)))].slice(0, 50),
     due: pick(params.get('due'), DUE, 'any'),
     show_completed: params.get('completed') === '1',
     sort: pick(params.get('sort'), SORT, 'manual'),
@@ -68,6 +72,7 @@ export function viewToParams(view: ListView, current: URLSearchParams): URLSearc
   const next = new URLSearchParams(current);
   VIEW_PARAMS.forEach((k) => next.delete(k));
   view.assignees.forEach((a) => next.append('assignee', a));
+  view.tags.forEach((t) => next.append('tag', t));
   if (view.due !== 'any') next.set('due', view.due);
   if (view.show_completed) next.set('completed', '1');
   if (view.sort !== 'manual') next.set('sort', view.sort);
@@ -77,11 +82,13 @@ export function viewToParams(view: ListView, current: URLSearchParams): URLSearc
 
 export const isDefaultView = (v: ListView) =>
   v.assignees.length === 0 &&
+  v.tags.length === 0 &&
   v.due === 'any' &&
   !v.show_completed &&
   v.sort === 'manual' &&
   v.group === 'section';
-export const filterCount = (v: ListView) => (v.assignees.length ? 1 : 0) + (v.due !== 'any' ? 1 : 0);
+export const filterCount = (v: ListView) =>
+  (v.assignees.length ? 1 : 0) + (v.tags.length ? 1 : 0) + (v.due !== 'any' ? 1 : 0);
 /** Manual order is only meaningful (and draggable) when sorted by drag order and grouped by section. */
 export const isManualOrder = (v: ListView) => v.sort === 'manual' && v.group === 'section';
 
@@ -99,7 +106,13 @@ export function dueBucket(dueOn: string | null, today: Date): DueBucket {
   return 'later';
 }
 
-export function matches(task: Task, view: ListView, meId: string | undefined, today: Date): boolean {
+export function matches(
+  task: Task,
+  view: ListView,
+  meId: string | undefined,
+  today: Date,
+  taskTagIds?: ReadonlySet<string>,
+): boolean {
   if (view.assignees.length) {
     const ok = view.assignees.some((a) =>
       a === 'none'
@@ -109,6 +122,9 @@ export function matches(task: Task, view: ListView, meId: string | undefined, to
           : task.assignee_id === a,
     );
     if (!ok) return false;
+  }
+  if (view.tags.length) {
+    if (!view.tags.some((t) => taskTagIds?.has(t))) return false;
   }
   if (view.due !== 'any') {
     const bucket = dueBucket(task.due_on, today);

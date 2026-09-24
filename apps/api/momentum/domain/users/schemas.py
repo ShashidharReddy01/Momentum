@@ -43,6 +43,10 @@ class ProjectViewPrefs(BaseModel):
     assignees: list[Annotated[str, StringConstraints(pattern=ASSIGNEE_FILTER)]] = Field(
         default_factory=list, max_length=50
     )
+    # S2.3.3: tag ids to filter by (OR-ed, like assignees).
+    tags: list[Annotated[str, StringConstraints(pattern=_UUID)]] = Field(
+        default_factory=list, max_length=50
+    )
     due: Literal["any", "overdue", "today", "this_week", "next_week", "no_date"] = "any"
     show_completed: bool = False
     sort: Literal["manual", "due", "assignee", "created", "title"] = "manual"

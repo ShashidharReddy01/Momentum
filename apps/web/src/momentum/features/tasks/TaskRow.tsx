@@ -27,6 +27,7 @@ import { cn } from '@/lib/cn';
 import { formatDue } from '@/lib/dates';
 import { FieldValueChip, type ProjectField as ProjectFieldT } from '@/features/fields';
 import type { Person } from '@/features/people';
+import { TagChip, type Tag } from '@/features/tags';
 import { AssigneePicker } from './AssigneePicker';
 import { DatePicker } from './DatePicker';
 import { isTemp, type Task, type TaskPatch } from './queries';
@@ -60,6 +61,8 @@ export interface TaskRowProps {
    * editing happens in the pane). Omitted where the project has none, so most rows pay nothing. */
   fields?: ProjectFieldT[];
   fieldValues?: Map<string, unknown>;
+  /** This task's tags — read-only chips (editing happens in the pane), same as `fields`. */
+  tags?: Tag[];
   /** Subtasks shown inline under the row. */
   expanded?: boolean;
   onToggleExpand?: (task: Task) => void;
@@ -137,6 +140,7 @@ const RowBody = memo(function RowBody({
   hideAssignee = false,
   fields,
   fieldValues,
+  tags,
   onUpdate,
   onToggle,
   onRename,
@@ -415,9 +419,12 @@ const RowBody = memo(function RowBody({
       ) : (
         dueCell
       )}
-      {fields?.length ? (
+      {fields?.length || tags?.length ? (
         <span className="flex min-w-0 shrink flex-wrap items-center gap-1 @max-3xl:hidden">
-          {fields.map((f) => (
+          {tags?.map((t) => (
+            <TagChip key={t.id} tag={t} />
+          ))}
+          {fields?.map((f) => (
             <FieldValueChip key={f.field.id} field={f.field} value={fieldValues?.get(f.field.id) ?? null} />
           ))}
         </span>

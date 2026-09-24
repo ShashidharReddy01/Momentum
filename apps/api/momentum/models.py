@@ -9,6 +9,7 @@ from momentum.domain.fields.models import FieldDef, FieldValue, ProjectField
 from momentum.domain.mytasks.models import MyTaskPlacement
 from momentum.domain.projects.models import Favorite, Project, ProjectMember
 from momentum.domain.sections.models import Section
+from momentum.domain.tags.models import Tag, TaskTag
 from momentum.domain.tasks.models import Follower, Task, TaskProject
 from momentum.domain.teams.models import Team, TeamMember
 from momentum.domain.users.models import ApiToken, User, UserIdentity
@@ -33,8 +34,10 @@ __all__ = [
     "ProjectMember",
     "Reaction",
     "Section",
+    "Tag",
     "Task",
     "TaskProject",
+    "TaskTag",
     "Team",
     "TeamMember",
     "User",

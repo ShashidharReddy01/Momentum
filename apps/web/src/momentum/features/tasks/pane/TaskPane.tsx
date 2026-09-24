@@ -32,6 +32,7 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { useMe } from '@/features/auth';
 import { FieldValueEditor, useProjectFields, useSetFieldValue, useTaskFieldValues } from '@/features/fields';
 import { usePeople } from '@/features/people';
+import { TagList, useTaskTagMutations, useTaskTags } from '@/features/tags';
 import { isNotFound } from '@/lib/api/errors';
 import { cn } from '@/lib/cn';
 import { useMomentumConfig } from '@/lib/config';
@@ -161,6 +162,8 @@ function PaneBody({
   const projectFields = useProjectFields(task.project?.id ?? '', !!task.project);
   const fieldValues = useTaskFieldValues(task.id);
   const setFieldValue = useSetFieldValue(task.id);
+  const taskTags = useTaskTags(task.id);
+  const tagMutations = useTaskTagMutations(task.id);
   const meId = useMe().data?.user.id;
   const nameOf = (id: string | null | undefined) => (id ? people?.find((p) => p.id === id)?.name : undefined);
   const assignee = people?.find((p) => p.id === task.assignee_id);
@@ -346,6 +349,15 @@ function PaneBody({
               </span>
             </Field>
           ) : null}
+          <Field label="Tags">
+            <TagList
+              tags={taskTags.data ?? []}
+              canEdit={canEdit}
+              onAdd={(tag) => tagMutations.add.mutate({ tagId: tag.id })}
+              onCreate={(name) => tagMutations.add.mutate({ name })}
+              onRemove={(tagId) => tagMutations.remove.mutate(tagId)}
+            />
+          </Field>
           {(projectFields.data ?? [])
             .filter((pf) => pf.is_visible)
             .map((pf) => (

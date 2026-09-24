@@ -11,6 +11,7 @@ import {
 import { Icon } from '@/components/ui/Icon';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/Popover';
 import { usePeople } from '@/features/people';
+import { useTagLibrary } from '@/features/tags';
 import { cn } from '@/lib/cn';
 import {
   DEFAULT_VIEW,
@@ -125,12 +126,18 @@ function FilterPopover({
 }) {
   const [q, setQ] = useState('');
   const people = usePeople().data ?? [];
+  const tags = useTagLibrary().data ?? [];
   const toggle = (token: string) =>
     onChange({
       ...view,
       assignees: view.assignees.includes(token)
         ? view.assignees.filter((a) => a !== token)
         : [...view.assignees, token],
+    });
+  const toggleTag = (id: string) =>
+    onChange({
+      ...view,
+      tags: view.tags.includes(id) ? view.tags.filter((t) => t !== id) : [...view.tags, id],
     });
   const shown = people.filter((p) => !q || `${p.name} ${p.email}`.toLowerCase().includes(q.toLowerCase()));
   // a render helper, not a component: a nested component would remount (and drop focus) on each toggle
@@ -189,6 +196,28 @@ function FilterPopover({
             ))}
           </div>
         </fieldset>
+        {tags.length ? (
+          <fieldset className="mt-2 border-t border-hair-soft pt-2">
+            <legend className="section-label px-2 pb-1">Tags</legend>
+            <div className="flex max-h-32 flex-wrap gap-1 overflow-auto px-1">
+              {tags.map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  aria-pressed={view.tags.includes(t.id)}
+                  onClick={() => toggleTag(t.id)}
+                  className={cn(
+                    'h-7 rounded-md px-2 text-xs font-medium',
+                    view.tags.includes(t.id) ? 'bg-accent text-on-accent' : 'bg-surface-2',
+                  )}
+                  style={view.tags.includes(t.id) ? undefined : { color: t.color }}
+                >
+                  {t.name}
+                </button>
+              ))}
+            </div>
+          </fieldset>
+        ) : null}
       </PopoverContent>
     </Popover>
   );

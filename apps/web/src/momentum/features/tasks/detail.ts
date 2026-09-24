@@ -17,7 +17,10 @@ export function useTaskDetail(taskId: string | null) {
   });
 }
 
-export const isTaskList = (key: readonly unknown[]) => key[0] === 'projects' && key[2] === 'tasks';
+/** Any cached task-list query a single task's fields/completion should stay in sync with — a
+ * project's list (`['projects', id, 'tasks']`) or a tag page (`['tags', id, 'tasks']`). */
+export const isTaskList = (key: readonly unknown[]) =>
+  (key[0] === 'projects' || key[0] === 'tags') && key[2] === 'tasks';
 
 /**
  * Apply a task change everywhere it's cached (the open pane and any project list), so the list and
