@@ -153,6 +153,14 @@ function applyTaskEvent(
       void qc.invalidateQueries({ queryKey: tagKeys.byTask(id) });
       if (ctx.projectId) void qc.invalidateQueries({ queryKey: tagKeys.byProject(ctx.projectId) });
       return;
+    case 'task.added_to_project':
+    case 'task.removed_from_project':
+      void qc.invalidateQueries({ queryKey: taskKeys.projects(id) });
+      if (ctx.projectId) {
+        void qc.invalidateQueries({ queryKey: ['projects', ctx.projectId, 'tasks'] });
+        void qc.invalidateQueries({ queryKey: taskKeys.otherPlacements(ctx.projectId) });
+      }
+      return;
     default:
       return;
   }

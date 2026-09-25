@@ -4,6 +4,7 @@ import { setupServer } from 'msw/node';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { MomentumApp } from '@/MomentumApp';
 import { authHandlers } from '@/mocks/handlers';
+import { multiHomingHandlers } from '@/mocks/multiHoming';
 import { projectHandlers } from '@/mocks/projects';
 import { sectionHandlers } from '@/mocks/sections';
 import { taskHandlers } from '@/mocks/tasks';
@@ -24,6 +25,16 @@ async function boot(path = '/projects/seed-1') {
     ...projectHandlers('', undefined, [{ name: 'Website Revamp', my_role: 'admin' }]),
     ...sectionHandlers('', { 'seed-1': ['Backlog', 'Done'] }),
     ...taskHandlers('', { 'seed-1': { 'sec-1': ['First', 'Second', 'Third'] } }),
+    ...multiHomingHandlers(
+      '',
+      [{ id: 'seed-1', name: 'Website Revamp', color: null }],
+      ['task-1', 'task-2', 'task-3'].map((task_id) => ({
+        task_id,
+        project_id: 'seed-1',
+        section_id: 'sec-1',
+        position: '100000',
+      })),
+    ),
   );
   window.history.replaceState(null, '', path);
   render(<MomentumApp />);
@@ -41,7 +52,7 @@ describe('Task pane', () => {
     await waitFor(() => expect(paneTitle()).toHaveValue('Second'));
     expect(window.location.search).toContain('task=');
     expect(row('Second')).toHaveAttribute('data-open');
-    expect(within(pane()).getByText('Website Revamp')).toBeInTheDocument();
+    await waitFor(() => expect(within(pane()).getByText('Website Revamp')).toBeInTheDocument());
     act(() => pane().focus());
     await user.keyboard('{Escape}');
     expect(screen.queryByRole('complementary', { name: 'Task details' })).toBeNull();

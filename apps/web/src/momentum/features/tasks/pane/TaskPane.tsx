@@ -43,6 +43,7 @@ import { DatePicker } from '../DatePicker';
 import { useTaskDetail, useTaskDetailMutations, type TaskDetail } from '../detail';
 import { SubtaskList } from '../SubtaskList';
 import { Collaborators } from './Collaborators';
+import { TaskProjects } from './TaskProjects';
 // the comment editor (Tiptap) loads with the pane, not the app
 const Comments = lazy(() => import('./Comments').then((m) => ({ default: m.Comments })));
 import { useDescriptionAutosave, type SaveState } from './useDescriptionAutosave';
@@ -333,20 +334,8 @@ function PaneBody({
             </DatePicker>
           </Field>
           {task.project ? (
-            <Field label="Project">
-              <span className="flex h-8 items-center gap-2 px-2">
-                <span
-                  aria-hidden
-                  className="h-2.5 w-2.5 rounded-sm"
-                  style={{
-                    background: task.project.color ? `var(--${task.project.color})` : 'var(--muted-2)',
-                  }}
-                />
-                <Link to={`/projects/${task.project.id}`} className="hover:underline">
-                  {task.project.name}
-                </Link>
-                {task.section ? <span className="text-muted">· {task.section.name}</span> : null}
-              </span>
+            <Field label="Projects">
+              <TaskProjects taskId={task.id} canEdit={canEdit} />
             </Field>
           ) : null}
           <Field label="Tags">

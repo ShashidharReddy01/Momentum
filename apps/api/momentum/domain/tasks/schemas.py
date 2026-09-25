@@ -149,3 +149,27 @@ class FollowerIn(BaseModel):
 
 class FollowersOut(BaseModel):
     followers: list[uuid.UUID]
+
+
+class TaskProjectOut(BaseModel):
+    """One of a task's placements (S2.4.1 multi-homing): which project, which section, where."""
+
+    project: ProjectRef
+    section: NamedRef
+    position: str
+
+
+class TaskProjectAddIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    project_id: uuid.UUID
+    section_id: uuid.UUID | None = None
+    after_id: uuid.UUID | None = None
+    before_id: uuid.UUID | None = None
+
+
+class OtherPlacementOut(BaseModel):
+    """One task's placement in a project other than the one being listed — the shape the bulk
+    per-project endpoint returns, for list-row "also in" chips."""
+
+    task_id: uuid.UUID
+    project: ProjectRef

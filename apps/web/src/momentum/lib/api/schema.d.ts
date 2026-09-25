@@ -475,6 +475,23 @@ export interface paths {
         patch: operations["set_member_role_api_v1_projects__project_id__members__user_id__patch"];
         trace?: never;
     };
+    "/api/v1/projects/{project_id}/other-placements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Every other project each of this project's tasks is also placed in, in one call */
+        get: operations["list_other_placements_api_v1_projects__project_id__other_placements_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/{project_id}/sections": {
         parameters: {
             query?: never;
@@ -835,6 +852,41 @@ export interface paths {
         /** Move a subtask up one level (to its grandparent, or into the parent's section) */
         post: operations["outdent_subtask_api_v1_tasks__task_id__outdent_post"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tasks/{task_id}/projects": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Every project this task is placed in (S2.4.1 multi-homing) */
+        get: operations["list_task_projects_api_v1_tasks__task_id__projects_get"];
+        put?: never;
+        /** Add a task to another project (multi-homing) */
+        post: operations["add_task_to_project_api_v1_tasks__task_id__projects_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tasks/{task_id}/projects/{project_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove a task from one project (it must stay in at least one other) */
+        delete: operations["remove_task_from_project_api_v1_tasks__task_id__projects__project_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -1357,6 +1409,13 @@ export interface components {
             /** @default {} */
             meta: components["schemas"]["ListMeta"];
         };
+        /** ListOut[OtherPlacementOut] */
+        ListOut_OtherPlacementOut_: {
+            /** Data */
+            data: components["schemas"]["OtherPlacementOut"][];
+            /** @default {} */
+            meta: components["schemas"]["ListMeta"];
+        };
         /** ListOut[ProjectFieldOut] */
         ListOut_ProjectFieldOut_: {
             /** Data */
@@ -1396,6 +1455,13 @@ export interface components {
         ListOut_TaskOut_: {
             /** Data */
             data: components["schemas"]["TaskOut"][];
+            /** @default {} */
+            meta: components["schemas"]["ListMeta"];
+        };
+        /** ListOut[TaskProjectOut] */
+        ListOut_TaskProjectOut_: {
+            /** Data */
+            data: components["schemas"]["TaskProjectOut"][];
             /** @default {} */
             meta: components["schemas"]["ListMeta"];
         };
@@ -1539,6 +1605,11 @@ export interface components {
             data: components["schemas"]["TaskOut"];
             meta: components["schemas"]["MutationMeta"];
         };
+        /** MutationOut[TaskProjectOut] */
+        MutationOut_TaskProjectOut_: {
+            data: components["schemas"]["TaskProjectOut"];
+            meta: components["schemas"]["MutationMeta"];
+        };
         /** MutationOut[TeamDetailOut] */
         MutationOut_TeamDetailOut_: {
             data: components["schemas"]["TeamDetailOut"];
@@ -1646,6 +1717,19 @@ export interface components {
              * @default true
              */
             ok: boolean;
+        };
+        /**
+         * OtherPlacementOut
+         * @description One task's placement in a project other than the one being listed — the shape the bulk
+         *     per-project endpoint returns, for list-row "also in" chips.
+         */
+        OtherPlacementOut: {
+            project: components["schemas"]["ProjectRef"];
+            /**
+             * Task Id
+             * Format: uuid
+             */
+            task_id: string;
         };
         /** ProjectCreateIn */
         ProjectCreateIn: {
@@ -2250,6 +2334,30 @@ export interface components {
             start_on?: string | null;
             /** Title */
             title?: string | null;
+        };
+        /** TaskProjectAddIn */
+        TaskProjectAddIn: {
+            /** After Id */
+            after_id?: string | null;
+            /** Before Id */
+            before_id?: string | null;
+            /**
+             * Project Id
+             * Format: uuid
+             */
+            project_id: string;
+            /** Section Id */
+            section_id?: string | null;
+        };
+        /**
+         * TaskProjectOut
+         * @description One of a task's placements (S2.4.1 multi-homing): which project, which section, where.
+         */
+        TaskProjectOut: {
+            /** Position */
+            position: string;
+            project: components["schemas"]["ProjectRef"];
+            section: components["schemas"]["NamedRef"];
         };
         /**
          * TaskTagIn
@@ -3533,6 +3641,37 @@ export interface operations {
             };
         };
     };
+    list_other_placements_api_v1_projects__project_id__other_placements_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListOut_OtherPlacementOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_sections_api_v1_projects__project_id__sections_get: {
         parameters: {
             query?: never;
@@ -4471,6 +4610,104 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MutationOut_TaskOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_task_projects_api_v1_tasks__task_id__projects_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListOut_TaskProjectOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_task_to_project_api_v1_tasks__task_id__projects_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TaskProjectAddIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationOut_TaskProjectOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_task_from_project_api_v1_tasks__task_id__projects__project_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationOut_OkOut_"];
                 };
             };
             /** @description Validation Error */

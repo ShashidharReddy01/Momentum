@@ -19,6 +19,7 @@ from momentum.domain.tasks.schemas import (
     FollowerIn,
     FollowersOut,
     NamedRef,
+    OtherPlacementOut,
     ProjectRef,
     SubtaskCreateIn,
     SubtaskMoveIn,
@@ -29,6 +30,8 @@ from momentum.domain.tasks.schemas import (
     TaskMoveIn,
     TaskOut,
     TaskPatchIn,
+    TaskProjectAddIn,
+    TaskProjectOut,
 )
 
 router = APIRouter(tags=["tasks"])
@@ -368,3 +371,88 @@ async def remove_follower(
         return MutationOut(
             data=FollowersOut(followers=m.entity), meta=MutationMeta(activity_id=m.activity_id)
         )
+
+
+@router.get(
+    "/tasks/{task_id}/projects",
+    response_model=ListOut[TaskProjectOut],
+    summary="Every project this task is placed in (S2.4.1 multi-homing)",
+)
+async def list_task_projects(
+    task_id: uuid.UUID, ctx: CtxDep, uow: UowDep
+) -> ListOut[TaskProjectOut]:
+    async with uow.transaction() as s:
+        rows = await service.list_task_projects(s, ctx, task_id)
+        return ListOut(
+            data=[
+                TaskProjectOut(
+                    project=ProjectRef(id=p.id, name=p.name, color=p.color),
+                    section=NamedRef(id=sec.id, name=sec.name),
+                    position=tp.position,
+                )
+                for tp, p, sec in rows
+            ]
+        )
+
+
+@router.get(
+    "/projects/{project_id}/other-placements",
+    response_model=ListOut[OtherPlacementOut],
+    summary="Every other project each of this project's tasks is also placed in, in one call",
+)
+async def list_other_placements(
+    project_id: uuid.UUID, ctx: CtxDep, uow: UowDep
+) -> ListOut[OtherPlacementOut]:
+    async with uow.transaction() as s:
+        rows = await service.list_other_placements(s, ctx, project_id)
+        return ListOut(
+            data=[
+                OtherPlacementOut(
+                    task_id=task_id, project=ProjectRef(id=p.id, name=p.name, color=p.color)
+                )
+                for task_id, p in rows
+            ]
+        )
+
+
+@router.post(
+    "/tasks/{task_id}/projects",
+    response_model=MutationOut[TaskProjectOut],
+    status_code=status.HTTP_201_CREATED,
+    summary="Add a task to another project (multi-homing)",
+)
+async def add_task_to_project(
+    task_id: uuid.UUID, body: TaskProjectAddIn, ctx: CtxDep, uow: UowDep
+) -> MutationOut[TaskProjectOut]:
+    async with uow.transaction() as s:
+        m = await service.add_task_to_project(
+            s,
+            ctx,
+            task_id,
+            body.project_id,
+            section_id=body.section_id,
+            after_id=body.after_id,
+            before_id=body.before_id,
+        )
+        tp, p, sec = m.entity
+        return MutationOut(
+            data=TaskProjectOut(
+                project=ProjectRef(id=p.id, name=p.name, color=p.color),
+                section=NamedRef(id=sec.id, name=sec.name),
+                position=tp.position,
+            ),
+            meta=MutationMeta(activity_id=m.activity_id),
+        )
+
+
+@router.delete(
+    "/tasks/{task_id}/projects/{project_id}",
+    response_model=MutationOut[OkOut],
+    summary="Remove a task from one project (it must stay in at least one other)",
+)
+async def remove_task_from_project(
+    task_id: uuid.UUID, project_id: uuid.UUID, ctx: CtxDep, uow: UowDep
+) -> MutationOut[OkOut]:
+    async with uow.transaction() as s:
+        m = await service.remove_task_from_project(s, ctx, task_id, project_id)
+    return MutationOut(data=OkOut(), meta=MutationMeta(activity_id=m.activity_id))

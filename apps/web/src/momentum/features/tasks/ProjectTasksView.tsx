@@ -22,7 +22,14 @@ import { formatDue } from '@/lib/dates';
 import { applyRealtimeEvent, useChannel } from '@/lib/realtime';
 import { BulkBar, type BulkPicker } from './BulkBar';
 import { ListToolbar } from './ListToolbar';
-import { isTemp, useProjectTasks, useTaskMutations, type Task, type TaskPatch } from './queries';
+import {
+  isTemp,
+  useOtherPlacements,
+  useProjectTasks,
+  useTaskMutations,
+  type Task,
+  type TaskPatch,
+} from './queries';
 import {
   clickRow,
   dropNeighbors,
@@ -71,6 +78,7 @@ export function ProjectTasksView({ projectId, canEdit }: { projectId: string; ca
   const visibleFields = useMemo(() => (projectFields ?? []).filter((f) => f.is_visible), [projectFields]);
   const fieldValuesByTask = useProjectFieldValues(projectId, !!visibleFields.length).data;
   const tagsByTask = useProjectTaskTags(projectId).data;
+  const otherPlacementsByTask = useOtherPlacements(projectId).data;
   const m = useTaskMutations(projectId);
   const { collapsed, toggle } = useCollapsed(projectId);
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -509,6 +517,7 @@ export function ProjectTasksView({ projectId, canEdit }: { projectId: string; ca
         fields={visibleFields}
         fieldValues={fieldValuesByTask?.get(t.id)}
         tags={tagsByTask?.get(t.id)}
+        otherProjects={otherPlacementsByTask?.get(t.id)}
         onUpdate={onUpdate}
         onToggle={onToggle}
         onRename={onRename}

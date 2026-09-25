@@ -17,6 +17,8 @@ export const taskKeys = {
   byProject: (projectId: string, completed = false) =>
     ['projects', projectId, 'tasks', { completed }] as const,
   detail: (id: string) => ['tasks', id] as const,
+  projects: (taskId: string) => ['tasks', taskId, 'projects'] as const,
+  otherPlacements: (projectId: string) => ['projects', projectId, 'other-placements'] as const,
 };
 
 export const isTemp = (id: string) => id.startsWith('tmp-');
@@ -369,4 +371,102 @@ export function useTaskMutations(projectId: string) {
   });
 
   return { create, createMany, rename, update, move, bulk, setCompleted, remove };
+}
+
+export type TaskProjectPlacement = components['schemas']['TaskProjectOut'];
+export type OtherPlacement = components['schemas']['OtherPlacementOut'];
+
+// Local duplicate of `detail.ts`'s `isTaskList` (same reason `subtasks.ts` has its own): a
+// same-directory import cycle between the two modules is avoidable by not creating one.
+const isTaskListKey = (key: readonly unknown[]) =>
+  (key[0] === 'projects' || key[0] === 'tags') && key[2] === 'tasks';
+
+/** Every project a task is placed in (S2.4.1 multi-homing) — for the pane's "Projects" row. */
+export function useTaskProjects(taskId: string, enabled = true) {
+  const api = useApi();
+  return useQuery({
+    queryKey: taskKeys.projects(taskId),
+    enabled: enabled && !!taskId,
+    queryFn: async () =>
+      (await api.GET('/api/v1/tasks/{task_id}/projects', { params: { path: { task_id: taskId } } })).data!
+        .data,
+  });
+}
+
+/** For a project's own task list: every *other* project each visible task is also placed in, in
+ * one request — mirrors `useProjectFieldValues`/`useProjectTaskTags` so the virtualized list
+ * still pays one round trip, not one per row. Keyed by task id. */
+export function useOtherPlacements(projectId: string, enabled = true) {
+  const api = useApi();
+  return useQuery({
+    queryKey: taskKeys.otherPlacements(projectId),
+    enabled: enabled && !!projectId,
+    queryFn: async () =>
+      (
+        await api.GET('/api/v1/projects/{project_id}/other-placements', {
+          params: { path: { project_id: projectId } },
+        })
+      ).data!.data,
+    select: (rows) => {
+      const byTask = new Map<string, OtherPlacement['project'][]>();
+      for (const r of rows) {
+        const list = byTask.get(r.task_id);
+        if (list) list.push(r.project);
+        else byTask.set(r.task_id, [r.project]);
+      }
+      return byTask;
+    },
+  });
+}
+
+/** Add/remove a task's project placements. Invalidates the task's own placement list, any
+ * mounted project-level bulk "other placements" query (this task's old and new project, plus any
+ * other project whose bulk query happens to include it — cheap and simple beats precise here),
+ * and both projects' task lists so the row appears/disappears where it should. */
+export function useTaskProjectMutations(taskId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  const undoToast = useUndoToast();
+  const settle = () => {
+    void qc.invalidateQueries({ queryKey: taskKeys.projects(taskId) });
+    void qc.invalidateQueries({ predicate: (q) => isTaskListKey(q.queryKey) });
+    void qc.invalidateQueries({ predicate: (q) => q.queryKey[2] === 'other-placements' });
+  };
+
+  const add = useMutation({
+    mutationFn: async (v: {
+      projectId: string;
+      sectionId?: string | null;
+      afterId?: string | null;
+      beforeId?: string | null;
+    }) =>
+      (
+        await api.POST('/api/v1/tasks/{task_id}/projects', {
+          params: { path: { task_id: taskId } },
+          body: {
+            project_id: v.projectId,
+            section_id: v.sectionId ?? null,
+            after_id: v.afterId ?? null,
+            before_id: v.beforeId ?? null,
+          },
+        })
+      ).data!,
+    onSuccess: (res) => undoToast(`Added to ${res.data.project.name}`, res.meta, settle),
+    onError: (e) => toastError(e, "Couldn't add this task to that project"),
+    onSettled: settle,
+  });
+
+  const remove = useMutation({
+    mutationFn: async (projectId: string) =>
+      (
+        await api.DELETE('/api/v1/tasks/{task_id}/projects/{project_id}', {
+          params: { path: { task_id: taskId, project_id: projectId } },
+        })
+      ).data!,
+    onSuccess: (res) => undoToast('Removed from project', res.meta, settle),
+    onError: (e) => toastError(e, "Couldn't remove this task from that project"),
+    onSettled: settle,
+  });
+
+  return { add, remove };
 }

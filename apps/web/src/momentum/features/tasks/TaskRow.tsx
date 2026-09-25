@@ -63,6 +63,9 @@ export interface TaskRowProps {
   fieldValues?: Map<string, unknown>;
   /** This task's tags — read-only chips (editing happens in the pane), same as `fields`. */
   tags?: Tag[];
+  /** S2.4.1 multi-homing: other projects this task is also placed in, already filtered to ones
+   * the viewer can see (a private co-placement never reaches this prop in the first place). */
+  otherProjects?: { id: string; name: string; color: string | null }[];
   /** Subtasks shown inline under the row. */
   expanded?: boolean;
   onToggleExpand?: (task: Task) => void;
@@ -141,6 +144,7 @@ const RowBody = memo(function RowBody({
   fields,
   fieldValues,
   tags,
+  otherProjects,
   onUpdate,
   onToggle,
   onRename,
@@ -419,8 +423,22 @@ const RowBody = memo(function RowBody({
       ) : (
         dueCell
       )}
-      {fields?.length || tags?.length ? (
+      {fields?.length || tags?.length || otherProjects?.length ? (
         <span className="flex min-w-0 shrink flex-wrap items-center gap-1 @max-3xl:hidden">
+          {otherProjects?.map((p) => (
+            <span
+              key={p.id}
+              title={`Also in ${p.name}`}
+              className="inline-flex h-6 items-center gap-1 rounded-md bg-surface-2 px-1.5 text-xs text-muted"
+            >
+              <span
+                aria-hidden
+                className="h-2 w-2 shrink-0 rounded-sm"
+                style={{ background: p.color ? `var(--${p.color})` : 'var(--muted-2)' }}
+              />
+              {p.name}
+            </span>
+          ))}
           {tags?.map((t) => (
             <TagChip key={t.id} tag={t} />
           ))}

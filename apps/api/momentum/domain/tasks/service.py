@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from momentum.core.activity import Activity, Diff, jsonable_diff, record_activity
 from momentum.core.context import Ctx
-from momentum.core.errors import NotFound, ValidationFailed, VersionConflict
+from momentum.core.errors import Conflict, NotFound, ValidationFailed, VersionConflict
 from momentum.core.events import emit
 from momentum.core.mutation import Mutation
 from momentum.core.ordering import even_keys, key_between, keys_between, needs_rebalance
@@ -22,9 +22,12 @@ from momentum.domain.access import (
     MAX_TASK_DEPTH,
     get_visible_project,
     get_visible_task,
+    project_role,
     require_project_role,
     task_ancestors,
+    visible_projects_clause,
 )
+from momentum.domain.projects.models import Project
 from momentum.domain.sections.models import Section
 from momentum.domain.sections.service import list_sections, on_section_delete, on_section_restore
 from momentum.domain.tasks.models import Follower, Task, TaskProject
@@ -1123,6 +1126,167 @@ async def set_following(
     return Mutation(await list_followers(session, task.id), act.id)
 
 
+# ---------- multi-homing (S2.4.1) ----------
+
+
+async def list_task_projects(
+    session: AsyncSession, ctx: Ctx, task_id: uuid.UUID
+) -> list[tuple[TaskProject, Project, Section]]:
+    """Every project this task's top-level ancestor is placed in that the caller can see —
+    filtered the same way `list_other_placements` filters list-row chips, so a private
+    co-placement is never revealed to someone who isn't a member of it (S2.4.1 AC)."""
+    task, _, _ = await get_visible_task(session, ctx, task_id)
+    ancestors = await task_ancestors(session, task)
+    root = ancestors[-1] if ancestors else task
+    rows = await session.execute(
+        select(TaskProject, Project, Section)
+        .join(Project, Project.id == TaskProject.project_id)
+        .join(Section, Section.id == TaskProject.section_id)
+        .where(TaskProject.task_id == root.id)
+        .order_by(Project.name)
+    )
+    out = []
+    for tp, project, section in rows.all():
+        if await project_role(session, ctx, project) is not None:
+            out.append((tp, project, section))
+    return out
+
+
+async def list_other_placements(
+    session: AsyncSession, ctx: Ctx, project_id: uuid.UUID
+) -> list[tuple[uuid.UUID, Project]]:
+    """For a project's own task list: every *other* project each of its tasks is also placed in,
+    filtered to projects the caller can see — mirrors the fields/tags bulk-endpoint pattern (one
+    round trip for the whole list, not one per row) and never leaks a private co-placement to a
+    viewer who isn't a member of it."""
+    await get_visible_project(session, ctx, project_id)
+    in_this_project = select(TaskProject.task_id).where(TaskProject.project_id == project_id)
+    rows = await session.execute(
+        select(TaskProject.task_id, Project)
+        .join(Project, Project.id == TaskProject.project_id)
+        .where(
+            TaskProject.project_id != project_id,
+            TaskProject.task_id.in_(in_this_project),
+            visible_projects_clause(ctx),
+        )
+    )
+    return [(task_id, project) for task_id, project in rows.all()]
+
+
+async def add_task_to_project(
+    session: AsyncSession,
+    ctx: Ctx,
+    task_id: uuid.UUID,
+    project_id: uuid.UUID,
+    *,
+    section_id: uuid.UUID | None = None,
+    after_id: uuid.UUID | None = None,
+    before_id: uuid.UUID | None = None,
+    record_undo: bool = True,
+) -> Mutation[tuple[TaskProject, Project, Section]]:
+    """Place a task in another project too, independent of its other placements' section/order."""
+    task, _, _ = await get_visible_task(session, ctx, task_id)
+    if task.parent_id is not None:
+        raise ValidationFailed("Subtasks can't be placed in a project directly")
+    _, role = await get_visible_project(session, ctx, project_id)
+    require_project_role(role, "editor", "add tasks to this project")
+    if await session.get(TaskProject, (task_id, project_id)) is not None:
+        raise Conflict("This task is already in that project", code="already_placed")
+    section = await _section_for(session, project_id, section_id)
+    (position,) = await _keys_for(
+        session, project_id, section.id, 1, after_id=after_id, before_id=before_id
+    )
+    placement = TaskProject(
+        task_id=task_id,
+        project_id=project_id,
+        section_id=section.id,
+        position=position,
+        added_by=ctx.actor.id,
+    )
+    session.add(placement)
+    await session.flush()
+    project = await session.get(Project, project_id)
+    assert project is not None
+    act = await record_activity(
+        session,
+        ctx,
+        entity_type="task",
+        entity_id=task_id,
+        verb="task.added_to_project",
+        changes={"project_id": (None, project_id)},
+        undo=undo_op("tasks.remove_from_project", task_id=task_id, project_id=project_id)
+        if record_undo
+        else None,
+    )
+    await emit(
+        session,
+        ctx,
+        type="task.added_to_project",
+        entity_type="task",
+        entity_id=task_id,
+        data={"project_id": str(project_id), "section_id": str(section.id), "position": position},
+        channels=[*channels(task, None), f"project:{project_id}"],
+        activity_id=act.id,
+    )
+    return Mutation((placement, project, section), act.id)
+
+
+async def remove_task_from_project(
+    session: AsyncSession,
+    ctx: Ctx,
+    task_id: uuid.UUID,
+    project_id: uuid.UUID,
+    *,
+    record_undo: bool = True,
+) -> Mutation[None]:
+    """Remove a task from one project, keeping it (and its other placements) untouched. A task
+    must stay in at least one project — this isn't the same operation as deleting it."""
+    task, _, _ = await get_visible_task(session, ctx, task_id)
+    _, role = await get_visible_project(session, ctx, project_id)
+    require_project_role(role, "editor", "remove tasks from this project")
+    placement = await session.get(TaskProject, (task_id, project_id))
+    if placement is None:
+        raise NotFound("This task isn't in that project")
+    count = (
+        await session.execute(
+            select(func.count()).select_from(TaskProject).where(TaskProject.task_id == task_id)
+        )
+    ).scalar_one()
+    if count <= 1:
+        raise ValidationFailed("A task must stay in at least one project", code="last_placement")
+    section_id, position = placement.section_id, placement.position
+    await session.delete(placement)
+    await session.flush()
+    act = await record_activity(
+        session,
+        ctx,
+        entity_type="task",
+        entity_id=task_id,
+        verb="task.removed_from_project",
+        changes={"project_id": (project_id, None)},
+        undo=undo_op(
+            "tasks.add_to_project",
+            task_id=task_id,
+            project_id=project_id,
+            section_id=section_id,
+            position=position,
+        )
+        if record_undo
+        else None,
+    )
+    await emit(
+        session,
+        ctx,
+        type="task.removed_from_project",
+        entity_type="task",
+        entity_id=task_id,
+        data={"project_id": str(project_id)},
+        channels=[*channels(task, None), f"project:{project_id}"],
+        activity_id=act.id,
+    )
+    return Mutation(None, act.id)
+
+
 # ---------- section hooks ----------
 
 
@@ -1262,6 +1426,50 @@ async def _undo_follow(session: AsyncSession, ctx: Ctx, args: dict[str, Any]) ->
         uuid.UUID(str(args["user_id"])),
         bool(args["follow"]),
         record_undo=False,
+    )
+
+
+@undo_handler("tasks.remove_from_project")
+async def _undo_add_to_project(session: AsyncSession, ctx: Ctx, args: dict[str, Any]) -> None:
+    await remove_task_from_project(
+        session, ctx, _tid(args), uuid.UUID(str(args["project_id"])), record_undo=False
+    )
+
+
+@undo_handler("tasks.add_to_project")
+async def _undo_remove_from_project(session: AsyncSession, ctx: Ctx, args: dict[str, Any]) -> None:
+    task_id = _tid(args)
+    project_id = uuid.UUID(str(args["project_id"]))
+    task, _, _ = await get_visible_task(session, ctx, task_id)
+    _, role = await get_visible_project(session, ctx, project_id)
+    require_project_role(role, "editor", "add tasks to this project")
+    if await session.get(TaskProject, (task_id, project_id)) is not None:
+        raise UndoConflict("This task is already back in that project")
+    section_id = uuid.UUID(str(args["section_id"]))
+    section = await session.get(Section, section_id)
+    if section is None or section.deleted_at is not None or section.project_id != project_id:
+        raise UndoConflict("The original section no longer exists")
+    placement = TaskProject(
+        task_id=task_id,
+        project_id=project_id,
+        section_id=section_id,
+        position=str(args["position"]),
+        added_by=ctx.actor.id,
+    )
+    session.add(placement)
+    await session.flush()
+    await emit(
+        session,
+        ctx,
+        type="task.added_to_project",
+        entity_type="task",
+        entity_id=task_id,
+        data={
+            "project_id": str(project_id),
+            "section_id": str(section_id),
+            "position": placement.position,
+        },
+        channels=[*channels(task, None), f"project:{project_id}"],
     )
 
 
