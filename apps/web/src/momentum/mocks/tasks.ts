@@ -433,6 +433,12 @@ export function taskHandlers(
       t.completed_at = null;
       return HttpResponse.json({ data: t, meta });
     }),
+    http.post(`*${base}/api/v1/tasks/:id/convert`, async ({ params, request }) => {
+      const t = tasks.find((x) => x.id === params.id)!;
+      const b = (await request.json()) as { type: string };
+      t.type = b.type;
+      return HttpResponse.json({ data: t, meta });
+    }),
     http.post(`*${base}/api/v1/undo`, () => {
       // emulate undo of the last completion in tests
       const t = [...tasks].reverse().find((x) => x.completed_at);

@@ -89,6 +89,13 @@ class TaskMoveIn(BaseModel):
     before_id: uuid.UUID | None = None
 
 
+class TaskConvertIn(BaseModel):
+    """Convert a task to a milestone, or back (S2.4.3)."""
+
+    model_config = ConfigDict(extra="forbid")
+    type: Literal["task", "milestone"]
+
+
 class TaskBulkIn(BaseModel):
     """One action on many tasks, all-or-nothing, undoable as one batch.
 

@@ -101,5 +101,23 @@ export function useTaskDetailMutations(taskId: string) {
     },
   });
 
-  return { update, setCompleted, remove };
+  const convert = useMutation({
+    mutationFn: async (type: 'task' | 'milestone') =>
+      (
+        await api.POST('/api/v1/tasks/{task_id}/convert', {
+          params: { path: { task_id: taskId } },
+          body: { type },
+        })
+      ).data!,
+    onSuccess: (res, type) => {
+      syncTask(qc, taskId, res.data);
+      undoToast(type === 'milestone' ? 'Converted to milestone' : 'Converted to task', res.meta, refetch);
+    },
+    onError: (e) => {
+      toastError(e, "Couldn't convert this task");
+      refetch();
+    },
+  });
+
+  return { update, setCompleted, remove, convert };
 }

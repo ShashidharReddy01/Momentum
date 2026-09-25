@@ -28,6 +28,7 @@ from momentum.domain.tasks.schemas import (
     SubtaskMoveIn,
     TaskBatchCreateIn,
     TaskBulkIn,
+    TaskConvertIn,
     TaskCreateIn,
     TaskDetailOut,
     TaskMoveIn,
@@ -264,6 +265,23 @@ async def move_task(
         t, p = m.entity[0]
         return MutationOut(
             data=task_out(t, p), meta=MutationMeta(activity_id=m.activity_id, version=t.version)
+        )
+
+
+@router.post(
+    "/tasks/{task_id}/convert",
+    response_model=MutationOut[TaskOut],
+    summary="Convert a task to a milestone, or back",
+)
+async def convert_task(
+    task_id: uuid.UUID, body: TaskConvertIn, ctx: CtxDep, uow: UowDep
+) -> MutationOut[TaskOut]:
+    async with uow.transaction() as s:
+        m = await service.convert_task_type(s, ctx, task_id, body.type)
+        _, p, _ = await service.get_task(s, ctx, task_id)
+        return MutationOut(
+            data=task_out(m.entity, p),
+            meta=MutationMeta(activity_id=m.activity_id, version=m.version),
         )
 
 

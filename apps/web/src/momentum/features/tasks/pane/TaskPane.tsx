@@ -5,6 +5,7 @@ import {
   CornerLeftUp,
   CircleCheck,
   Copy,
+  Diamond,
   Maximize2,
   MoreHorizontal,
   Trash2,
@@ -216,6 +217,12 @@ function PaneBody({
             <DropdownMenuContent align="end">
               <DropdownMenuItem onSelect={() => void copyLink()}>
                 <Icon icon={Copy} /> Copy link
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onSelect={() => m.convert.mutate(task.type === 'milestone' ? 'task' : 'milestone')}
+              >
+                <Icon icon={Diamond} />{' '}
+                {task.type === 'milestone' ? 'Convert to task' : 'Convert to milestone'}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem

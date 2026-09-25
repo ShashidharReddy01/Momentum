@@ -4,7 +4,7 @@
 
 ## Current focus
 - **Phase:** 2: Daily-Use Parity (in progress; started without a Phase 1 sign-off gate, per explicit product-owner instruction to proceed autonomously — see plan-changes log)
-- **Next slice:** S2.4.3 Milestones
+- **Next slice:** S2.5.1 Notification generation (S2.4 Multi-homing, dependencies, milestones is complete)
 - **Model:** Opus 5.5 for Phase 1; **switched to Sonnet 5 mid-Phase-2** by product owner instruction (Phase 2 was never designated an Opus-only phase — see `docs/process/model-guide.md`)
 - **Blockers:** none
 
@@ -71,6 +71,13 @@
   - **A gap worth naming, not fixing this slice:** the confirm-before-complete flow only covers the two call sites this slice touched (the pane header button and the project list row's checkbox, via `queries.ts`/`detail.ts`). `subtasks.ts`, `features/home/queries.ts` and `features/mytasks/queries.ts` each have their own `/complete` call that still goes through a plain mutation — completing a blocked task from a subtask row, Home, or My Tasks gets a bare error toast instead of the confirm dialog. Same root cause each time (no shared "complete a task" primitive existed before this slice), not fixed everywhere in one pass because each of those call sites has its own optimistic-update shape to preserve.
   - Verified: `test_dependencies.py` (12 backend tests: add/list both directions, self-dependency rejected, duplicate conflict, direct and transitive cycle rejection, remove, complete-needs-confirmation and force bypasses it, completing the blocker first needs no confirmation, permissions, the bulk "waiting on" endpoint, the picker search, undo of both add and remove) plus `dependencies.test.tsx` (3 frontend tests: add a blocker and see it from both tasks' panes plus the row's "waiting on" icon, confirm-and-force-complete, remove a blocker). Full backend gate (219/219) and full frontend suite (178/178) both green.
 
+- **S2.4.3 Milestones (done, smallest slice of the phase — the schema was already there):** `tasks.type`'s check constraint has included `'milestone'` (and `'approval'`) since Phase 0/1 (`domain/tasks/models.py`), so **no migration at all** — this slice is purely a conversion endpoint plus the UI to reach it. New `convert_task_type` in `domain/tasks/service.py` (same "extend the existing tasks service" pattern as S2.4.1/S2.4.2), a dedicated `POST /tasks/{id}/convert` endpoint (rather than folding `type` into the general `PATCH`, which doesn't validate it and would widen an already-broad endpoint for one enum flip), undoable (`tasks.convert_type`), activity-logged, a no-op (no activity, `activity_id: null`) when converting to the type it already is.
+  - **`approval` is deliberately not offered**, even though the DB constraint and `TaskOut.type: str` both already allow it: `TaskConvertIn.type` is a `Literal["task", "milestone"]`, not the full three-way type — converting *to* `approval` has no UI, no behavior, and nothing else in the app understands it yet, so exposing it here would just create an orphaned state. Covered by `test_approval_type_is_not_a_valid_conversion_target` (422).
+  - Frontend: `CompleteCheck` (the shared round checkbox used in both the list row and — conceptually — the pane) gained a `variant: 'round' | 'diamond'` prop rather than a separate component, since it's the same control with a different shape (a rotated, rounded square, with the check icon counter-rotated to stay upright) — `TaskRow` picks the variant from `task.type`. The pane's "More actions" menu gained "Convert to milestone"/"Convert to task", wired through a new `convert` mutation alongside `update`/`setCompleted`/`remove` in the pane's existing `useTaskDetailMutations`, not a separate hook.
+  - Verified: `test_milestones.py` (5 backend tests: convert both directions, same-type is a no-op, `approval` rejected, permissions, undo) plus `milestones.test.tsx` (2 frontend tests: convert via the pane menu and see the menu label flip, the list row's check becomes diamond-shaped). Full backend gate (224/224) and full frontend suite (180/180) both green.
+
+**Phase 2's E2.4 (S2.4.1 Multi-homing, S2.4.2 Dependencies, S2.4.3 Milestones) is now complete**, all three at full roadmap scope apart from S2.4.2's disclosed picker-search-scope and confirm-flow-coverage gaps above.
+
 ## Handoff notes (2026-09-23, Phase 1)
 - Phase 1 kickoff written (`docs/roadmap/phase-1-kickoff.md`). Project/team access rules live in `momentum/domain/access.py`.
 - Build container: Postgres must be restarted at session start (`su postgres -c "/usr/lib/postgresql/16/bin/pg_ctl -D /home/user/.pgdata -o '-p 5432 -k /tmp' -l /tmp/pg.log start"`). The web app uses **pnpm** (npm fails on the pnpm lockfile).
@@ -123,7 +130,7 @@
 - [x] S2.1.1 WS hub and outbox dispatcher (`momentum/realtime/*`, migration 0007; see handoff notes above) · [x] S2.1.2 Realtime frontend client (`lib/realtime/*`; wired into ProjectTasksView, TaskPane/TaskPage, MyTasksPage, HomePage; see handoff notes below)
 - [x] S2.2.1 Board view · [x] S2.2.2 Calendar view · [x] S2.2.3 View switcher and defaults
 - [x] S2.3.1 Field definitions and library · [x] S2.3.2 Fields in views (reduced scope: no filter/sort/group by field yet) · [x] S2.3.3 Tags
-- [x] S2.4.1 Multi-homing · [x] S2.4.2 Dependencies · [ ] S2.4.3 Milestones
+- [x] S2.4.1 Multi-homing · [x] S2.4.2 Dependencies · [x] S2.4.3 Milestones
 - [ ] S2.5.1 Notification generation · [ ] S2.5.2 Inbox UI · [ ] S2.5.3 Notification preferences
 - [ ] S2.6.1 Attachments · [ ] S2.6.2 Global search
 - [ ] S2.7.1 Asana importer · [ ] S2.7.2 CSV import · [ ] S2.7.3 Onboarding

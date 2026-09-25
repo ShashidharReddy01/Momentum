@@ -772,6 +772,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/tasks/{task_id}/convert": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Convert a task to a milestone, or back */
+        post: operations["convert_task_api_v1_tasks__task_id__convert_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tasks/{task_id}/dependencies": {
         parameters: {
             query?: never;
@@ -2223,6 +2240,17 @@ export interface components {
             section_id?: string | null;
             /** Task Ids */
             task_ids: string[];
+        };
+        /**
+         * TaskConvertIn
+         * @description Convert a task to a milestone, or back (S2.4.3).
+         */
+        TaskConvertIn: {
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "task" | "milestone";
         };
         /** TaskCreateIn */
         TaskCreateIn: {
@@ -4571,6 +4599,41 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationOut_TaskOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    convert_task_api_v1_tasks__task_id__convert_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TaskConvertIn"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {

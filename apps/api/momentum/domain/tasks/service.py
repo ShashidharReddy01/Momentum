@@ -601,6 +601,48 @@ def _apply_dates(task: Task, patch: dict[str, Any], ctx: Ctx, changes: Diff) -> 
             changes[field] = (getattr(task, field), new)
 
 
+CONVERTIBLE_TYPES = ("task", "milestone")
+
+
+async def convert_task_type(
+    session: AsyncSession, ctx: Ctx, task_id: uuid.UUID, new_type: str, *, record_undo: bool = True
+) -> Mutation[Task]:
+    """Convert a task to a milestone or back (S2.4.3). `approval` is a valid `type` at the schema
+    level (data-model.md) but isn't offered by this conversion — it has no UI or behavior of its
+    own yet, so exposing it here would just be a state nothing else understands."""
+    if new_type not in CONVERTIBLE_TYPES:
+        raise ValidationFailed(f"Can't convert to '{new_type}'")
+    task, placement, role = await get_visible_task(session, ctx, task_id)
+    require_project_role(role, "editor", "convert this task")
+    if task.type == new_type:
+        return Mutation(task, version=task.version)
+    old_type = task.type
+    task.type = new_type
+    task.version += 1
+    act = await record_activity(
+        session,
+        ctx,
+        entity_type="task",
+        entity_id=task.id,
+        verb="task.type_changed",
+        changes={"type": (old_type, new_type)},
+        undo=undo_op("tasks.convert_type", task_id=task.id, new_type=old_type)
+        if record_undo
+        else None,
+    )
+    await emit(
+        session,
+        ctx,
+        type="task.type_changed",
+        entity_type="task",
+        entity_id=task.id,
+        data={"type": new_type},
+        channels=channels(task, placement),
+        activity_id=act.id,
+    )
+    return Mutation(task, act.id, version=task.version)
+
+
 async def set_completed(
     session: AsyncSession,
     ctx: Ctx,
@@ -1708,6 +1750,11 @@ async def _undo_remove_dependency(session: AsyncSession, ctx: Ctx, args: dict[st
     await add_dependency(
         session, ctx, _tid(args), uuid.UUID(str(args["depends_on_id"])), record_undo=False
     )
+
+
+@undo_handler("tasks.convert_type")
+async def _undo_convert_type(session: AsyncSession, ctx: Ctx, args: dict[str, Any]) -> None:
+    await convert_task_type(session, ctx, _tid(args), str(args["new_type"]), record_undo=False)
 
 
 @undo_handler("tasks.set_completed")

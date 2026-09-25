@@ -340,6 +340,7 @@ const RowBody = memo(function RowBody({
         disabled={!canEdit}
         label={done ? `Mark ${task.title} incomplete` : `Complete ${task.title}`}
         onChange={() => onToggle(task)}
+        variant={task.type === 'milestone' ? 'diamond' : 'round'}
       />
       {/* The name button fits its text: the rest of the row is a click target for the pane. */}
       <div className="flex min-w-0 flex-1 items-center">
