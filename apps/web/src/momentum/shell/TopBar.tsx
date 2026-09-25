@@ -1,10 +1,11 @@
 import { Bell, PanelLeft, Search } from 'lucide-react';
-import { useMatches } from 'react-router';
+import { useMatches, useNavigate } from 'react-router';
 import { MoMark } from '@/components/common/MoMark';
 import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
 import { IconButton } from '@/components/ui/IconButton';
 import { Kbd } from '@/components/ui/Kbd';
+import { useUnreadCount } from '@/features/notifications';
 import { cn } from '@/lib/cn';
 import { useNarrow } from '@/lib/media';
 import { useUi } from '@/stores/ui';
@@ -14,6 +15,8 @@ export interface RouteHandle {
 }
 
 export function TopBar() {
+  const navigate = useNavigate();
+  const unread = useUnreadCount().data ?? 0;
   const toggleSidebar = useUi((s) => s.toggleSidebar);
   const drawerOpen = useUi((s) => s.drawerOpen);
   const setDrawerOpen = useUi((s) => s.setDrawerOpen);
@@ -70,7 +73,21 @@ export function TopBar() {
       >
         <MoMark size={14} /> <span className="max-sm:hidden">Ask Mo</span>
       </Button>
-      <IconButton icon={Bell} label="Notifications (Phase 2)" disabled />
+      <span className="relative">
+        <IconButton
+          icon={Bell}
+          label={unread ? `Notifications (${unread} unread)` : 'Notifications'}
+          onClick={() => void navigate('/inbox')}
+        />
+        {unread ? (
+          <span
+            aria-hidden
+            className="tabular absolute top-0.5 right-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-crit px-1 text-[10px] font-medium text-surface"
+          >
+            {unread > 9 ? '9+' : unread}
+          </span>
+        ) : null}
+      </span>
     </header>
   );
 }

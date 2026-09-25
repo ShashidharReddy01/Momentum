@@ -1,7 +1,8 @@
-import { Inbox, MessagesSquare } from 'lucide-react';
+import { MessagesSquare } from 'lucide-react';
 import type { RouteObject } from 'react-router';
 import { AuthGate, DevLoginPage } from '@/features/auth';
 import { HomePage } from '@/features/home';
+import { InboxPage } from '@/features/notifications';
 import { NotFoundPage, Placeholder } from '@/features/placeholders';
 import { ProjectPage } from '@/features/projects';
 import { MyTasksPage } from '@/features/mytasks';
@@ -39,11 +40,7 @@ export function buildRoutes(config: RuntimeConfig): RouteObject[] {
         { path: 'projects/:projectId/:view?', element: <ProjectPage />, handle: { crumb: 'Project' } },
         { path: 'task/:taskId', element: <TaskPage />, handle: { crumb: 'Task' } },
         { path: 'tags/:tagId', element: <TagPage />, handle: { crumb: 'Tag' } },
-        {
-          path: 'inbox',
-          element: <Placeholder icon={Inbox} title="Inbox" phase={2} />,
-          handle: { crumb: 'Inbox' },
-        },
+        { path: 'inbox', element: <InboxPage />, handle: { crumb: 'Inbox' } },
         {
           path: 'ask',
           element: <Placeholder icon={MessagesSquare} title="Ask Mo" phase={3} />,

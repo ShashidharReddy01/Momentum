@@ -25,9 +25,12 @@ function at(path: string) {
 describe('Realtime, wired into the app shell', () => {
   it('connects once signed in when the server has the feature on, and shows/hides the reconnecting banner', async () => {
     server.use(...authHandlers({ loggedIn: true, config: { features: { realtime: true } } }).handlers);
-    at('/inbox');
+    // A still-static Phase-3 placeholder route, chosen so this realtime-focused test doesn't
+    // need to mock teams/projects/notifications just to render the shell (the same reason
+    // /inbox was originally picked, before S2.5 made it a real, data-fetching page).
+    at('/ask');
     render(<MomentumApp />);
-    await screen.findByText(/Inbox arrives in Phase 2/);
+    await screen.findByText(/Ask Mo arrives in Phase 3/);
 
     await waitFor(() => expect(MockWebSocket.instances).toHaveLength(1));
     expect(MockWebSocket.latest().url).toMatch(/\/ws$/);
@@ -46,9 +49,9 @@ describe('Realtime, wired into the app shell', () => {
 
   it('never opens a websocket when the server has the feature off', async () => {
     server.use(...authHandlers({ loggedIn: true, config: { features: { realtime: false } } }).handlers);
-    at('/inbox');
+    at('/ask');
     render(<MomentumApp />);
-    await screen.findByText(/Inbox arrives in Phase 2/);
+    await screen.findByText(/Ask Mo arrives in Phase 3/);
     expect(MockWebSocket.instances).toHaveLength(0);
   });
 });

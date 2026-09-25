@@ -23,6 +23,7 @@ from momentum.domain.access import (
     require_project_role,
 )
 from momentum.domain.comments.models import Comment, Mention, Reaction
+from momentum.domain.notifications.service import notify
 from momentum.domain.tasks.models import Follower, Task
 from momentum.domain.users.models import User
 
@@ -218,6 +219,37 @@ async def create_comment(
         channels=channels,
         activity_id=act.id,
     )
+    snippet = preview(doc)
+    for user_id in mentioned:
+        await notify(
+            session,
+            ctx,
+            user_id=user_id,
+            kind="mentioned",
+            entity_type="task",
+            entity_id=task.id,
+            title=f'You were mentioned in "{task.title}"',
+            snippet=snippet,
+            activity_id=act.id,
+        )
+    followers = (
+        (await session.execute(select(Follower.user_id).where(Follower.task_id == task.id)))
+        .scalars()
+        .all()
+    )
+    # a mentioned follower already got the more specific notification above
+    for user_id in set(followers) - set(mentioned):
+        await notify(
+            session,
+            ctx,
+            user_id=user_id,
+            kind="commented",
+            entity_type="task",
+            entity_id=task.id,
+            title=f'New comment on "{task.title}"',
+            snippet=snippet,
+            activity_id=act.id,
+        )
     await session.flush()
     return Mutation(comment, act.id)
 

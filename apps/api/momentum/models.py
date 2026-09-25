@@ -7,6 +7,7 @@ from momentum.core.idempotency import IdempotencyKey
 from momentum.domain.comments.models import Comment, Mention, Reaction
 from momentum.domain.fields.models import FieldDef, FieldValue, ProjectField
 from momentum.domain.mytasks.models import MyTaskPlacement
+from momentum.domain.notifications.models import Notification
 from momentum.domain.projects.models import Favorite, Project, ProjectMember
 from momentum.domain.sections.models import Section
 from momentum.domain.tags.models import Tag, TaskTag
@@ -28,6 +29,7 @@ __all__ = [
     "IdempotencyKey",
     "Mention",
     "MyTaskPlacement",
+    "Notification",
     "OutboxEvent",
     "Project",
     "ProjectField",

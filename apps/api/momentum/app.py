@@ -36,6 +36,7 @@ def _api_router(settings: Settings) -> APIRouter:
     from momentum.domain.fields.router import router as fields_router
     from momentum.domain.home.router import router as home_router
     from momentum.domain.mytasks.router import router as mytasks_router
+    from momentum.domain.notifications.router import router as notifications_router
     from momentum.domain.projects.router import favorites_router
     from momentum.domain.projects.router import router as projects_router
     from momentum.domain.sections.router import router as sections_router
@@ -57,6 +58,7 @@ def _api_router(settings: Settings) -> APIRouter:
     api.include_router(fields_router)
     api.include_router(tags_router)
     api.include_router(mytasks_router)
+    api.include_router(notifications_router)
     api.include_router(home_router)
     api.include_router(undo_router)
     if settings.is_dev_auth:

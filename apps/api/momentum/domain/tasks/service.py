@@ -29,6 +29,7 @@ from momentum.domain.access import (
     task_ancestors,
     visible_projects_clause,
 )
+from momentum.domain.notifications.service import notify
 from momentum.domain.projects.models import Project
 from momentum.domain.sections.models import Section
 from momentum.domain.sections.service import list_sections, on_section_delete, on_section_restore
@@ -539,6 +540,16 @@ async def update_task(
             + ([f"user:{previous_assignee}"] if previous_assignee else []),
             activity_id=act.id,
         )
+        await notify(
+            session,
+            ctx,
+            user_id=task.assignee_id,
+            kind="assigned",
+            entity_type="task",
+            entity_id=task.id,
+            title=f'You were assigned "{task.title}"',
+            activity_id=act.id,
+        )
     return Mutation(task, act.id, batch_id=batch_id, version=task.version)
 
 
@@ -686,6 +697,17 @@ async def set_completed(
         channels=channels(task, placement),
         activity_id=act.id,
     )
+    if completed:
+        await notify(
+            session,
+            ctx,
+            user_id=task.created_by,
+            kind="completed",
+            entity_type="task",
+            entity_id=task.id,
+            title=f'"{task.title}" was completed',
+            activity_id=act.id,
+        )
     return Mutation(task, act.id, batch_id=batch_id, version=task.version)
 
 

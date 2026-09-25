@@ -185,6 +185,13 @@ function applyTaskEvent(
  * project list happens to be open elsewhere too.
  */
 export function applyUserChannelEvent(qc: QueryClient, event: RealtimeEvent): void {
+  if (event.entity_type === 'notification') {
+    // always mine (the channel is `user:<id>`) and never an echo of my own action — a
+    // notification is never about something I did to myself. One predicate catches both the
+    // inbox list and the bell's unread-count query (`['notifications', ...]`).
+    void qc.invalidateQueries({ predicate: (q) => q.queryKey[0] === 'notifications' });
+    return;
+  }
   if (event.entity_type !== 'task') return;
   if (isMine(event.activity_id)) return;
   applyRegardlessOfOwnEcho(qc, event, {});
