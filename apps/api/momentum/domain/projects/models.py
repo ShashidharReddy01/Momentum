@@ -7,6 +7,7 @@ from typing import Any
 from sqlalchemy import (
     Boolean,
     CheckConstraint,
+    Computed,
     Date,
     DateTime,
     ForeignKey,
@@ -16,12 +17,18 @@ from sqlalchemy import (
     Text,
     func,
 )
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import JSONB, TSVECTOR
 from sqlalchemy.orm import Mapped, mapped_column
 
 from momentum.core.db import Base, IdMixin, SoftDeleteMixin, TimestampMixin
 
 POSITION = String(64, collation="C")
+
+# S2.6.2: same weighted-tsvector pattern as `tasks.search_tsv` (name outweighs the brief).
+SEARCH_EXPR = (
+    "setweight(to_tsvector('simple', coalesce(name, '')), 'A') || "
+    "setweight(to_tsvector('simple', coalesce(brief_text, '')), 'B')"
+)
 
 
 class Project(IdMixin, TimestampMixin, SoftDeleteMixin, Base):
@@ -42,6 +49,7 @@ class Project(IdMixin, TimestampMixin, SoftDeleteMixin, Base):
     due_on: Mapped[date | None] = mapped_column(Date)
     archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     is_template: Mapped[bool] = mapped_column(Boolean, default=False)
+    search_tsv: Mapped[Any] = mapped_column(TSVECTOR, Computed(SEARCH_EXPR, persisted=True))
     version: Mapped[int] = mapped_column(Integer, default=1)
     created_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
     created_via: Mapped[str] = mapped_column(String(16), default="ui")
@@ -55,6 +63,13 @@ class Project(IdMixin, TimestampMixin, SoftDeleteMixin, Base):
         CheckConstraint(
             "status is null or status in ('on_track','at_risk','off_track','on_hold','complete')",
             name="status",
+        ),
+        Index("ix_projects_search", "search_tsv", postgresql_using="gin"),
+        Index(
+            "ix_projects_name_trgm",
+            "name",
+            postgresql_using="gin",
+            postgresql_ops={"name": "gin_trgm_ops"},
         ),
     )
 

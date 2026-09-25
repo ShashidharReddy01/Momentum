@@ -6,6 +6,7 @@ import { InboxPage, NotificationSettingsPage } from '@/features/notifications';
 import { NotFoundPage, Placeholder } from '@/features/placeholders';
 import { ProjectPage } from '@/features/projects';
 import { MyTasksPage } from '@/features/mytasks';
+import { SearchPage } from '@/features/search';
 import { TaskPage } from '@/features/tasks';
 import { TagPage } from '@/features/tags';
 import { TeamPage } from '@/features/teams';
@@ -41,6 +42,7 @@ export function buildRoutes(config: RuntimeConfig): RouteObject[] {
         { path: 'task/:taskId', element: <TaskPage />, handle: { crumb: 'Task' } },
         { path: 'tags/:tagId', element: <TagPage />, handle: { crumb: 'Tag' } },
         { path: 'inbox', element: <InboxPage />, handle: { crumb: 'Inbox' } },
+        { path: 'search', element: <SearchPage />, handle: { crumb: 'Search' } },
         {
           path: 'settings/notifications',
           element: <NotificationSettingsPage />,

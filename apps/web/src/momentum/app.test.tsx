@@ -7,6 +7,7 @@ import { MomentumApp } from './MomentumApp';
 import { authHandlers } from './mocks/handlers';
 import { notificationHandlers } from './mocks/notifications';
 import { projectHandlers } from './mocks/projects';
+import { searchHandlers } from './mocks/search';
 import { teamHandlers } from './mocks/teams';
 
 const server = setupServer();
@@ -28,6 +29,7 @@ describe('Momentum app shell', () => {
       ...teamHandlers(),
       ...projectHandlers(),
       ...notificationHandlers(),
+      ...searchHandlers(),
     );
     at('/');
     render(<MomentumApp />);
@@ -49,6 +51,7 @@ describe('Momentum app shell', () => {
       ...teamHandlers(),
       ...projectHandlers(),
       ...notificationHandlers(),
+      ...searchHandlers(),
     );
     at('/');
     render(<MomentumApp />);
@@ -69,6 +72,7 @@ describe('Momentum app shell', () => {
       ...teamHandlers(),
       ...projectHandlers(),
       ...notificationHandlers(),
+      ...searchHandlers(),
     );
     at('/');
     render(<MomentumApp />);
@@ -81,7 +85,13 @@ describe('Momentum app shell', () => {
 
   it('works when mounted under a base path (embeddable)', async () => {
     const { handlers, requests } = authHandlers({ base: '/x', loggedIn: true });
-    server.use(...handlers, ...teamHandlers('/x'), ...projectHandlers('/x'), ...notificationHandlers('/x'));
+    server.use(
+      ...handlers,
+      ...teamHandlers('/x'),
+      ...projectHandlers('/x'),
+      ...notificationHandlers('/x'),
+      ...searchHandlers('/x'),
+    );
     at('/x/');
     render(<MomentumApp basePath="/x" />);
     await screen.findByRole('heading', { name: /Ravi$/ });

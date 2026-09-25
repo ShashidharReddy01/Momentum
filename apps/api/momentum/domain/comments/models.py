@@ -7,6 +7,7 @@ from typing import Any
 from sqlalchemy import (
     Boolean,
     CheckConstraint,
+    Computed,
     DateTime,
     ForeignKey,
     Index,
@@ -15,10 +16,14 @@ from sqlalchemy import (
     UniqueConstraint,
     func,
 )
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import JSONB, TSVECTOR
 from sqlalchemy.orm import Mapped, mapped_column
 
 from momentum.core.db import Base, IdMixin
+
+# S2.6.2: `docs/architecture/data-model.md §11` names `comments.body_text` as the tsvector
+# source for keyword search — same unweighted `to_tsvector` pattern, one field, no A/B split.
+SEARCH_EXPR = "to_tsvector('simple', coalesce(body_text, ''))"
 
 
 class Comment(IdMixin, Base):
@@ -34,8 +39,12 @@ class Comment(IdMixin, Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     edited_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    search_tsv: Mapped[Any] = mapped_column(TSVECTOR, Computed(SEARCH_EXPR, persisted=True))
 
-    __table_args__ = (Index("ix_comments_task_created", "task_id", "created_at"),)
+    __table_args__ = (
+        Index("ix_comments_task_created", "task_id", "created_at"),
+        Index("ix_comments_search", "search_tsv", postgresql_using="gin"),
+    )
 
 
 class Mention(IdMixin, Base):
