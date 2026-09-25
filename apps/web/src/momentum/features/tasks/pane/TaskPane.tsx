@@ -44,6 +44,7 @@ import { DatePicker } from '../DatePicker';
 import { useTaskDetail, useTaskDetailMutations, type TaskDetail } from '../detail';
 import { SubtaskList } from '../SubtaskList';
 import { Collaborators } from './Collaborators';
+import { TaskAttachments } from './TaskAttachments';
 import { TaskDependencies } from './TaskDependencies';
 import { TaskProjects } from './TaskProjects';
 // the comment editor (Tiptap) loads with the pane, not the app
@@ -379,6 +380,8 @@ function PaneBody({
         />
 
         <TaskDependencies taskId={task.id} projectId={task.project?.id} canEdit={canEdit} />
+
+        <TaskAttachments taskId={task.id} canEdit={canEdit} />
 
         <Suspense fallback={<Skeleton className="mt-8 h-24" />}>
           <Comments task={task} />

@@ -5,6 +5,7 @@ test truncates the Momentum tables afterwards."""
 from __future__ import annotations
 
 import os
+import tempfile
 from collections.abc import AsyncIterator, Callable
 from typing import TYPE_CHECKING
 
@@ -43,6 +44,7 @@ def make_settings(**overrides: object) -> Settings:
         "secret_key": "test-secret",
         "allowed_email_domains": "acme-demo.test",
         "bootstrap_admin_emails": "admin@acme-demo.test",
+        "storage_local_dir": tempfile.mkdtemp(prefix="momentum-test-attachments-"),
         "_env_file": None,
     }
     base.update(overrides)

@@ -4,6 +4,40 @@
  */
 
 export interface paths {
+    "/api/v1/attachments/{attachment_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove an attachment */
+        delete: operations["delete_attachment_api_v1_attachments__attachment_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/attachments/{attachment_id}/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Download a file (task/comment visibility gated) */
+        get: operations["download_attachment_api_v1_attachments__attachment_id__download_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/logout": {
         parameters: {
             query?: never;
@@ -37,6 +71,24 @@ export interface paths {
         head?: never;
         /** Edit a comment */
         patch: operations["edit_comment_api_v1_comments__comment_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/comments/{comment_id}/attachments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A comment's files */
+        get: operations["list_comment_attachments_api_v1_comments__comment_id__attachments_get"];
+        put?: never;
+        /** Attach a file to a comment */
+        post: operations["upload_comment_attachment_api_v1_comments__comment_id__attachments_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/comments/{comment_id}/reactions": {
@@ -857,6 +909,24 @@ export interface paths {
         patch: operations["patch_task_api_v1_tasks__task_id__patch"];
         trace?: never;
     };
+    "/api/v1/tasks/{task_id}/attachments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A task's files */
+        get: operations["list_task_attachments_api_v1_tasks__task_id__attachments_get"];
+        put?: never;
+        /** Attach a file to a task */
+        post: operations["upload_task_attachment_api_v1_tasks__task_id__attachments_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tasks/{task_id}/comments": {
         parameters: {
             query?: never;
@@ -1337,6 +1407,41 @@ export interface components {
             /** Verb */
             verb: string;
         };
+        /** AttachmentOut */
+        AttachmentOut: {
+            /** Comment Id */
+            comment_id: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Extract Status
+             * @enum {string}
+             */
+            extract_status: "pending" | "done" | "skipped" | "failed";
+            /** Filename */
+            filename: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Mime */
+            mime: string;
+            /** Sha256 */
+            sha256: string;
+            /** Size Bytes */
+            size_bytes: number;
+            /** Task Id */
+            task_id: string | null;
+            /**
+             * Uploaded By
+             * Format: uuid
+             */
+            uploaded_by: string;
+        };
         /**
          * BlockedTaskOut
          * @description One task id with an incomplete blocker — the shape the bulk per-project endpoint returns,
@@ -1348,6 +1453,16 @@ export interface components {
              * Format: uuid
              */
             task_id: string;
+        };
+        /** Body_upload_comment_attachment_api_v1_comments__comment_id__attachments_post */
+        Body_upload_comment_attachment_api_v1_comments__comment_id__attachments_post: {
+            /** File */
+            file: string;
+        };
+        /** Body_upload_task_attachment_api_v1_tasks__task_id__attachments_post */
+        Body_upload_task_attachment_api_v1_tasks__task_id__attachments_post: {
+            /** File */
+            file: string;
         };
         /** CommentIn */
         CommentIn: {
@@ -1614,6 +1729,13 @@ export interface components {
             /** Next Cursor */
             next_cursor?: string | null;
         };
+        /** ListOut[AttachmentOut] */
+        ListOut_AttachmentOut_: {
+            /** Data */
+            data: components["schemas"]["AttachmentOut"][];
+            /** @default {} */
+            meta: components["schemas"]["ListMeta"];
+        };
         /** ListOut[BlockedTaskOut] */
         ListOut_BlockedTaskOut_: {
             /** Data */
@@ -1803,6 +1925,11 @@ export interface components {
             batch_id?: string | null;
             /** Version */
             version?: number | null;
+        };
+        /** MutationOut[AttachmentOut] */
+        MutationOut_AttachmentOut_: {
+            data: components["schemas"]["AttachmentOut"];
+            meta: components["schemas"]["MutationMeta"];
         };
         /** MutationOut[CommentOut] */
         MutationOut_CommentOut_: {
@@ -2952,6 +3079,68 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    delete_attachment_api_v1_attachments__attachment_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                attachment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationOut_OkOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    download_attachment_api_v1_attachments__attachment_id__download_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                attachment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     logout_api_v1_auth_logout_post: {
         parameters: {
             query?: never;
@@ -3025,6 +3214,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MutationOut_CommentOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_comment_attachments_api_v1_comments__comment_id__attachments_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                comment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListOut_AttachmentOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upload_comment_attachment_api_v1_comments__comment_id__attachments_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                comment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_upload_comment_attachment_api_v1_comments__comment_id__attachments_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationOut_AttachmentOut_"];
                 };
             };
             /** @description Validation Error */
@@ -4991,6 +5246,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MutationOut_TaskDetailOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_task_attachments_api_v1_tasks__task_id__attachments_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListOut_AttachmentOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upload_task_attachment_api_v1_tasks__task_id__attachments_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_upload_task_attachment_api_v1_tasks__task_id__attachments_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationOut_AttachmentOut_"];
                 };
             };
             /** @description Validation Error */

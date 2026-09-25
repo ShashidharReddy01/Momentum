@@ -37,6 +37,11 @@ class Settings(BaseSettings):
     serve_spa: bool = True
     spa_dir: str | None = None
 
+    # Storage (S2.6.1)
+    storage_backend: Literal["local", "azure_blob"] = "local"
+    storage_local_dir: str = "./.data/files"
+    max_upload_mb: int = 50
+
     # Database
     database_url: str = "postgresql+psycopg://momentum:momentum@localhost:5432/momentum"
     db_schema: str = Field(default="momentum", pattern=r"^[a-z_][a-z0-9_]{0,62}$")

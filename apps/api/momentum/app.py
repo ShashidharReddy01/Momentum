@@ -32,6 +32,7 @@ CSRF_EXEMPT = ("/api/v1/public/", "/webhooks/")
 
 def _api_router(settings: Settings) -> APIRouter:
     from momentum.api.undo import router as undo_router
+    from momentum.domain.attachments.router import router as attachments_router
     from momentum.domain.comments.router import router as comments_router
     from momentum.domain.fields.router import router as fields_router
     from momentum.domain.home.router import router as home_router
@@ -55,6 +56,7 @@ def _api_router(settings: Settings) -> APIRouter:
     api.include_router(sections_router)
     api.include_router(tasks_router)
     api.include_router(comments_router)
+    api.include_router(attachments_router)
     api.include_router(fields_router)
     api.include_router(tags_router)
     api.include_router(mytasks_router)
@@ -102,19 +104,24 @@ def create_app(
             )
         worker_task: asyncio.Task[None] | None = None
         job_app = None
-        if settings.worker_mode == "embedded":
+        # A job app is opened whenever a worker exists anywhere ("embedded" or "separate"),
+        # since even a web process running no worker of its own still needs to *defer* jobs
+        # (e.g. S2.6.1's text-extraction job) onto the queue a separate worker process reads.
+        # Only "off" (tests, by default) skips it entirely — deferring becomes a no-op then.
+        if settings.worker_mode != "off":
             from momentum.jobs.app import QUEUES, build_job_app
 
             job_app = build_job_app(settings)
             await job_app.open_async()
-            worker_task = asyncio.create_task(
-                job_app.run_worker_async(
-                    queues=QUEUES,
-                    concurrency=settings.worker_concurrency,
-                    install_signal_handlers=False,
-                )
-            )
             runtime.extras["job_app"] = job_app
+            if settings.worker_mode == "embedded":
+                worker_task = asyncio.create_task(
+                    job_app.run_worker_async(
+                        queues=QUEUES,
+                        concurrency=settings.worker_concurrency,
+                        install_signal_handlers=False,
+                    )
+                )
         log.info("momentum_started", env=settings.env, auth=settings.auth_mode, version=VERSION)
         try:
             yield

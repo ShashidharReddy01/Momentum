@@ -5,6 +5,7 @@ from __future__ import annotations
 import procrastinate
 
 from momentum.core.settings import Settings
+from momentum.jobs import attachments as _attachments  # noqa: F401 - registers `extract_text`
 from momentum.jobs.tasks import blueprint
 
 # Queue names are prefixed so they never collide with a host app using Procrastinate too.
