@@ -200,7 +200,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** My notification preferences (per kind, in-app on/off) */
+        /** My notification preferences (per kind: in_app/email/slack/off) and digest time */
         get: operations["get_prefs_api_v1_me_prefs_notifications_get"];
         /** Set my notification preferences */
         put: operations["set_prefs_api_v1_me_prefs_notifications_put"];
@@ -1998,70 +1998,90 @@ export interface components {
         NotificationPrefsIn: {
             /**
              * Assigned
-             * @default true
+             * @default in_app
+             * @enum {string}
              */
-            assigned: boolean;
+            assigned: "in_app" | "email" | "slack" | "off";
             /**
              * Commented
-             * @default true
+             * @default in_app
+             * @enum {string}
              */
-            commented: boolean;
+            commented: "in_app" | "email" | "slack" | "off";
             /**
              * Completed
-             * @default true
+             * @default in_app
+             * @enum {string}
              */
-            completed: boolean;
+            completed: "in_app" | "email" | "slack" | "off";
+            /** Digest Time */
+            digest_time?: string | null;
             /**
              * Due Soon
-             * @default true
+             * @default in_app
+             * @enum {string}
              */
-            due_soon: boolean;
+            due_soon: "in_app" | "email" | "slack" | "off";
             /**
              * Mentioned
-             * @default true
+             * @default in_app
+             * @enum {string}
              */
-            mentioned: boolean;
+            mentioned: "in_app" | "email" | "slack" | "off";
             /**
              * Overdue
-             * @default true
+             * @default in_app
+             * @enum {string}
              */
-            overdue: boolean;
+            overdue: "in_app" | "email" | "slack" | "off";
         };
         /**
          * NotificationPrefsOut
-         * @description Per-kind in-app on/off (default on). Digest time / email / Slack are S2.5.3.
+         * @description Per-kind channel choice (default in_app) plus a digest-time preference.
+         *
+         *     The digest time is stored only — nothing reads it yet. It's for the Pulse agent's
+         *     daily digest in Phase 5 (P5); persisting it now means users can set it once and have
+         *     it already in place when that consumer exists.
          */
         NotificationPrefsOut: {
             /**
              * Assigned
-             * @default true
+             * @default in_app
+             * @enum {string}
              */
-            assigned: boolean;
+            assigned: "in_app" | "email" | "slack" | "off";
             /**
              * Commented
-             * @default true
+             * @default in_app
+             * @enum {string}
              */
-            commented: boolean;
+            commented: "in_app" | "email" | "slack" | "off";
             /**
              * Completed
-             * @default true
+             * @default in_app
+             * @enum {string}
              */
-            completed: boolean;
+            completed: "in_app" | "email" | "slack" | "off";
+            /** Digest Time */
+            digest_time?: string | null;
             /**
              * Due Soon
-             * @default true
+             * @default in_app
+             * @enum {string}
              */
-            due_soon: boolean;
+            due_soon: "in_app" | "email" | "slack" | "off";
             /**
              * Mentioned
-             * @default true
+             * @default in_app
+             * @enum {string}
              */
-            mentioned: boolean;
+            mentioned: "in_app" | "email" | "slack" | "off";
             /**
              * Overdue
-             * @default true
+             * @default in_app
+             * @enum {string}
              */
-            overdue: boolean;
+            overdue: "in_app" | "email" | "slack" | "off";
         };
         /** NumberOptions */
         NumberOptions: {

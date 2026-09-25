@@ -48,9 +48,16 @@ def _today_for(tz: str) -> date:
 async def _prefs_for(session: AsyncSession, user_id: uuid.UUID) -> NotificationPrefsOut:
     user = await session.get(User, user_id)
     stored = ((user.prefs or {}).get("notifications") or {}) if user else {}
-    return NotificationPrefsOut(
-        **{k: v for k, v in stored.items() if k in NotificationPrefsOut.model_fields}
-    )
+    # S2.5.1 stored these as plain booleans, before S2.5.3 widened each kind to a channel
+    # choice. `users.prefs` is free-form JSONB (no schema migration touches it), so any row
+    # written before this slice still has old-shape booleans sitting in it — coerce them
+    # rather than let a still-live S2.5.1-era value fail validation here.
+    coerced = {
+        k: ("in_app" if v is True else "off") if isinstance(v, bool) else v
+        for k, v in stored.items()
+        if k in NotificationPrefsOut.model_fields
+    }
+    return NotificationPrefsOut(**coerced)
 
 
 async def get_prefs(session: AsyncSession, ctx: Ctx) -> NotificationPrefsOut:
@@ -153,7 +160,9 @@ async def notify(
     if user_id is None or user_id == ctx.actor.id:
         return
     prefs = await _prefs_for(session, user_id)
-    if not getattr(prefs, kind, True):
+    # Only "in_app" delivers anything today — "email"/"slack" are recorded intent, not yet
+    # active (see NotificationChannel's docstring), so they behave like "off" here.
+    if getattr(prefs, kind, "in_app") != "in_app":
         return
     await _create_or_coalesce(
         session,
@@ -191,7 +200,7 @@ async def sync_due_notifications(session: AsyncSession, ctx: Ctx) -> None:
     ).scalars()
     for t in rows:
         assert t.due_on is not None
-        if t.due_on == today and prefs.due_soon:
+        if t.due_on == today and prefs.due_soon == "in_app":
             await _create_or_coalesce(
                 session,
                 ctx,
@@ -201,7 +210,7 @@ async def sync_due_notifications(session: AsyncSession, ctx: Ctx) -> None:
                 entity_id=t.id,
                 title=f'"{t.title}" is due today',
             )
-        elif t.due_on < today and prefs.overdue:
+        elif t.due_on < today and prefs.overdue == "in_app":
             await _create_or_coalesce(
                 session,
                 ctx,

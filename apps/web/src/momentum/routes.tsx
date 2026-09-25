@@ -2,7 +2,7 @@ import { MessagesSquare } from 'lucide-react';
 import type { RouteObject } from 'react-router';
 import { AuthGate, DevLoginPage } from '@/features/auth';
 import { HomePage } from '@/features/home';
-import { InboxPage } from '@/features/notifications';
+import { InboxPage, NotificationSettingsPage } from '@/features/notifications';
 import { NotFoundPage, Placeholder } from '@/features/placeholders';
 import { ProjectPage } from '@/features/projects';
 import { MyTasksPage } from '@/features/mytasks';
@@ -41,6 +41,11 @@ export function buildRoutes(config: RuntimeConfig): RouteObject[] {
         { path: 'task/:taskId', element: <TaskPage />, handle: { crumb: 'Task' } },
         { path: 'tags/:tagId', element: <TagPage />, handle: { crumb: 'Tag' } },
         { path: 'inbox', element: <InboxPage />, handle: { crumb: 'Inbox' } },
+        {
+          path: 'settings/notifications',
+          element: <NotificationSettingsPage />,
+          handle: { crumb: 'Notification settings' },
+        },
         {
           path: 'ask',
           element: <Placeholder icon={MessagesSquare} title="Ask Mo" phase={3} />,

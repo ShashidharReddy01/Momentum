@@ -81,7 +81,7 @@ async def unarchive(notification_id: uuid.UUID, ctx: CtxDep, uow: UowDep) -> Not
 @router.get(
     "/me/prefs/notifications",
     response_model=NotificationPrefsOut,
-    summary="My notification preferences (per kind, in-app on/off)",
+    summary="My notification preferences (per kind: in_app/email/slack/off) and digest time",
 )
 async def get_prefs(ctx: CtxDep, uow: UowDep) -> NotificationPrefsOut:
     async with uow.transaction() as s:

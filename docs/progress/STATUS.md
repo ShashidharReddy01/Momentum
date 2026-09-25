@@ -4,7 +4,7 @@
 
 ## Current focus
 - **Phase:** 2: Daily-Use Parity (in progress; started without a Phase 1 sign-off gate, per explicit product-owner instruction to proceed autonomously — see plan-changes log)
-- **Next slice:** S2.5.3 Notification preferences (S2.5.1 Notification generation, S2.5.2 Inbox UI complete)
+- **Next slice:** S2.6.1 Attachments (local storage backend) (S2.5 Notifications and inbox is complete)
 - **Model:** Opus 5.5 for Phase 1; **switched to Sonnet 5 mid-Phase-2** by product owner instruction (Phase 2 was never designated an Opus-only phase — see `docs/process/model-guide.md`)
 - **Blockers:** none
 
@@ -92,6 +92,15 @@
 
 **Phase 2's S2.5.1/S2.5.2 (event-driven + due/overdue notification generation, and the Inbox UI to read them) is now complete.** S2.5.3 Notification preferences (a real settings page, plus a digest-time field for the future Pulse agent) is the one still-open piece of E2.5 — the backend prefs endpoint it will build on already exists and is tested.
 
+- **S2.5.3 Notification preferences (done), closing out E2.5:** widened `NotificationPrefsOut`/`In` (`domain/notifications/schemas.py`) from S2.5.1's plain 6-boolean shape to a per-kind `NotificationChannel` (`"in_app" | "email" | "slack" | "off"`, default `in_app`) plus a `digest_time: str | None` field (validated `HH:MM`, 24h, via a `field_validator`) — matching the roadmap's own "in-app / email-later / Slack-later / off" scope exactly. No migration: `users.prefs` is free-form JSONB, and the shape lives entirely in the Pydantic schema.
+  - **Only "in_app" delivers anything, disclosed in the schema's own docstring:** there's no email or Slack sender built yet, so `notify()`'s gate changed from a boolean check to `getattr(prefs, kind, "in_app") != "in_app"` → skip. Choosing "email" or "slack" records the user's intended channel (ready for whenever those senders exist) but behaves exactly like "off" today — covered by `test_email_and_slack_channel_choices_do_not_deliver_yet`, which sets `assigned` to `"email"` and asserts no notification is created. `sync_due_notifications` (`due_soon`/`overdue`) got the equivalent `== "in_app"` check.
+  - **Backward compatibility for the shape change, not a migration:** `_prefs_for` now coerces any still-live S2.5.1-era boolean value (`True`/`False`) to `"in_app"`/`"off"` before constructing `NotificationPrefsOut`, since `users.prefs` isn't versioned or migrated — a row written before this slice would otherwise fail Pydantic validation on read. `test_old_boolean_prefs_are_coerced_to_channel_strings` writes a raw boolean-shaped JSONB blob directly (mirroring the raw-SQL setup pattern `test_my_tasks.py`'s `test_daily_pass_moves_unpinned_by_due_date` already established) and confirms both the read-back shape and that notify() respects the coerced value.
+  - **Digest time is stored only** — nothing reads it yet, same disclosed pattern as fields'/tags' library-management gaps: it's for the Pulse agent's daily digest in a later phase (P5), and persisting it now means a user who sets it once won't need to reset it when that consumer eventually exists.
+  - Frontend: `NotificationSettingsPage.tsx` (new, `features/notifications/`) — a table of the 6 producible kinds, each with a `<select>` of the 4 channel options (native select, not a new component — no Switch/RadioGroup-outside-a-dropdown primitive exists yet in `components/ui/`, and building one for a single settings page felt disproportionate), plus a native `<input type="time">` for the digest time (no time-picker component exists anywhere in the codebase either — `DatePicker.tsx` only ever handles calendar dates, never a bare time-of-day, so there was no existing pattern to extend). Reachable at `/settings/notifications` (new route in `routes.tsx`) via a new "Notification settings" item in the sidebar's `UserMenu` (`shell/Sidebar.tsx`), between the theme toggle and Sign out.
+  - Verified: `test_notifications.py` gained 3 new backend tests (email/slack-doesn't-deliver, digest-time round-trip + 422 on bad format, boolean-to-channel-string coercion) — **20 total** in that file, and the S2.5.1-era `test_prefs_off_suppresses_that_kind` was updated in place for the new `"off"` string value rather than `False`. `settings.test.tsx` (2 new frontend tests: change a channel and save a digest time on the settings page, reach it from the sidebar's user menu). Full backend gate (**239/239** tests, ruff format/check, mypy 124 files clean, import-linter 2/2 contracts kept, frontend API types back in sync via `make types`) and full frontend suite (**185/185** tests across 39 files, prettier/eslint/tsc clean) both green, no regressions.
+
+**Phase 2's E2.5 (S2.5.1 Notification generation, S2.5.2 Inbox UI, S2.5.3 Notification preferences) is now fully complete.**
+
 ## Handoff notes (2026-09-23, Phase 1)
 - Phase 1 kickoff written (`docs/roadmap/phase-1-kickoff.md`). Project/team access rules live in `momentum/domain/access.py`.
 - Build container: Postgres must be restarted at session start (`su postgres -c "/usr/lib/postgresql/16/bin/pg_ctl -D /home/user/.pgdata -o '-p 5432 -k /tmp' -l /tmp/pg.log start"`). The web app uses **pnpm** (npm fails on the pnpm lockfile).
@@ -145,7 +154,7 @@
 - [x] S2.2.1 Board view · [x] S2.2.2 Calendar view · [x] S2.2.3 View switcher and defaults
 - [x] S2.3.1 Field definitions and library · [x] S2.3.2 Fields in views (reduced scope: no filter/sort/group by field yet) · [x] S2.3.3 Tags
 - [x] S2.4.1 Multi-homing · [x] S2.4.2 Dependencies · [x] S2.4.3 Milestones
-- [x] S2.5.1 Notification generation · [x] S2.5.2 Inbox UI · [ ] S2.5.3 Notification preferences
+- [x] S2.5.1 Notification generation · [x] S2.5.2 Inbox UI · [x] S2.5.3 Notification preferences
 - [ ] S2.6.1 Attachments · [ ] S2.6.2 Global search
 - [ ] S2.7.1 Asana importer · [ ] S2.7.2 CSV import · [ ] S2.7.3 Onboarding
 

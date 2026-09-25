@@ -14,12 +14,13 @@ type N = {
 };
 
 const DEFAULT_PREFS = {
-  assigned: true,
-  mentioned: true,
-  commented: true,
-  completed: true,
-  due_soon: true,
-  overdue: true,
+  assigned: 'in_app' as const,
+  mentioned: 'in_app' as const,
+  commented: 'in_app' as const,
+  completed: 'in_app' as const,
+  due_soon: 'in_app' as const,
+  overdue: 'in_app' as const,
+  digest_time: null as string | null,
 };
 
 /** In-memory S2.5 notifications API. Seeded with `initial` rows (most-recent-first is the

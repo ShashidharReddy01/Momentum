@@ -1,4 +1,5 @@
 export { InboxPage } from './InboxPage';
+export { NotificationSettingsPage } from './NotificationSettingsPage';
 export {
   notificationKeys,
   useNotificationMutations,

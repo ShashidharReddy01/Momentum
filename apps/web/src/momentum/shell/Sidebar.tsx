@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import {
+  Bell,
   ChevronDown,
   ChevronRight,
   ChevronsUpDown,
@@ -15,7 +16,7 @@ import {
   Sun,
   Users,
 } from 'lucide-react';
-import { NavLink, useLocation } from 'react-router';
+import { NavLink, useLocation, useNavigate } from 'react-router';
 import { BrandMark } from '@/components/common/BrandMark';
 import { MoMark } from '@/components/common/MoMark';
 import { Avatar } from '@/components/ui/Avatar';
@@ -232,6 +233,7 @@ function CreateMenu({
 function UserMenu() {
   const me = useMe();
   const logout = useLogout();
+  const navigate = useNavigate();
   const theme = useUi((s) => s.theme);
   const toggleTheme = useUi((s) => s.toggleTheme);
   const user = me.data?.user;
@@ -256,6 +258,9 @@ function UserMenu() {
         <DropdownMenuItem onSelect={toggleTheme}>
           <Icon icon={theme === 'dark' ? Sun : Moon} />{' '}
           {theme === 'dark' ? 'Light theme (Paper)' : 'Dark theme (Graphite)'}
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => navigate('/settings/notifications')}>
+          <Icon icon={Bell} /> Notification settings
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem onSelect={() => logout.mutate()}>

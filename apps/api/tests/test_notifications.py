@@ -6,6 +6,9 @@ from __future__ import annotations
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
+from sqlalchemy import text
+
+from momentum.core.db import UnitOfWork
 from tests.helpers import Clients
 
 
@@ -221,15 +224,78 @@ async def test_prefs_off_suppresses_that_kind(as_user: Clients) -> None:
     users = await _users(ravi)
 
     r = await ana.get("/api/v1/me/prefs/notifications")
-    assert r.status_code == 200 and r.json()["assigned"] is True
+    assert r.status_code == 200 and r.json()["assigned"] == "in_app"
     prefs = r.json()
-    prefs["assigned"] = False
+    prefs["assigned"] = "off"
     r2 = await ana.put("/api/v1/me/prefs/notifications", json=prefs)
-    assert r2.status_code == 200 and r2.json()["assigned"] is False
+    assert r2.status_code == 200 and r2.json()["assigned"] == "off"
 
     t = await _task(ravi, pid)
     await ravi.patch(f"/api/v1/tasks/{t['id']}", json={"assignee_id": users["ana"]})
     assert (await ana.get("/api/v1/notifications")).json()["data"] == []
+
+
+async def test_email_and_slack_channel_choices_do_not_deliver_yet(as_user: Clients) -> None:
+    ravi = await as_user("ravi")
+    ana = await as_user("ana")
+    pid = await _project(ravi)
+    users = await _users(ravi)
+
+    prefs = (await ana.get("/api/v1/me/prefs/notifications")).json()
+    prefs["assigned"] = "email"
+    r = await ana.put("/api/v1/me/prefs/notifications", json=prefs)
+    assert r.status_code == 200 and r.json()["assigned"] == "email"
+
+    t = await _task(ravi, pid)
+    await ravi.patch(f"/api/v1/tasks/{t['id']}", json={"assignee_id": users["ana"]})
+    # No sender exists for "email" yet, so choosing it stores the preference but the
+    # notification still isn't created — same as "off".
+    assert (await ana.get("/api/v1/notifications")).json()["data"] == []
+
+
+async def test_old_boolean_prefs_are_coerced_to_channel_strings(
+    as_user: Clients, uow: UnitOfWork
+) -> None:
+    ravi = await as_user("ravi")
+    ana = await as_user("ana")
+    pid = await _project(ravi)
+    users = await _users(ravi)
+
+    # S2.5.1 stored these as booleans; simulate a row written before S2.5.3 widened the shape.
+    async with uow.transaction() as s:
+        await s.execute(
+            text(
+                "UPDATE users SET prefs = jsonb_set(coalesce(prefs, '{}'::jsonb), "
+                "'{notifications}', '{\"assigned\": false, \"mentioned\": true}'::jsonb) "
+                "WHERE id = :uid"
+            ),
+            {"uid": users["ana"]},
+        )
+
+    r = await ana.get("/api/v1/me/prefs/notifications")
+    assert r.status_code == 200
+    assert r.json()["assigned"] == "off"
+    assert r.json()["mentioned"] == "in_app"
+
+    t = await _task(ravi, pid)
+    await ravi.patch(f"/api/v1/tasks/{t['id']}", json={"assignee_id": users["ana"]})
+    assert (await ana.get("/api/v1/notifications")).json()["data"] == []
+
+
+async def test_digest_time_roundtrips_and_rejects_bad_format(as_user: Clients) -> None:
+    ana = await as_user("ana")
+
+    prefs = (await ana.get("/api/v1/me/prefs/notifications")).json()
+    assert prefs["digest_time"] is None
+
+    prefs["digest_time"] = "09:00"
+    r = await ana.put("/api/v1/me/prefs/notifications", json=prefs)
+    assert r.status_code == 200 and r.json()["digest_time"] == "09:00"
+    assert (await ana.get("/api/v1/me/prefs/notifications")).json()["digest_time"] == "09:00"
+
+    prefs["digest_time"] = "9am"
+    r2 = await ana.put("/api/v1/me/prefs/notifications", json=prefs)
+    assert r2.status_code == 422
 
 
 async def test_due_today_and_overdue_tasks_are_synced_on_read(as_user: Clients) -> None:
