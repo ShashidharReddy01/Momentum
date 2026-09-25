@@ -1,5 +1,5 @@
 import { useDraggable, useDroppable } from '@dnd-kit/core';
-import { CalendarDays, MoreHorizontal, PanelRightOpen, Trash2, UserRound } from 'lucide-react';
+import { CalendarDays, Hourglass, MoreHorizontal, PanelRightOpen, Trash2, UserRound } from 'lucide-react';
 import {
   forwardRef,
   memo,
@@ -66,6 +66,8 @@ export interface TaskRowProps {
   /** S2.4.1 multi-homing: other projects this task is also placed in, already filtered to ones
    * the viewer can see (a private co-placement never reaches this prop in the first place). */
   otherProjects?: { id: string; name: string; color: string | null }[];
+  /** S2.4.2: this task has at least one incomplete blocker. */
+  blocked?: boolean;
   /** Subtasks shown inline under the row. */
   expanded?: boolean;
   onToggleExpand?: (task: Task) => void;
@@ -145,6 +147,7 @@ const RowBody = memo(function RowBody({
   fieldValues,
   tags,
   otherProjects,
+  blocked,
   onUpdate,
   onToggle,
   onRename,
@@ -364,6 +367,11 @@ const RowBody = memo(function RowBody({
             {task.title}
           </button>
         )}
+        {blocked ? (
+          <span title="Waiting on another task" className="ml-1.5 shrink-0 text-warn">
+            <Icon icon={Hourglass} size={13} />
+          </span>
+        ) : null}
         {task.subtask_count ? (
           <button
             type="button"

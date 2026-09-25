@@ -3,7 +3,7 @@ import type { components } from '@/lib/api/schema';
 import { toastError } from '@/lib/toast';
 import { useRecordUndo, useUndoToast } from '@/lib/undo';
 import { useApi } from '@/providers/api';
-import { taskKeys, type Task, type TaskPatch } from './queries';
+import { completeWithConfirm, taskKeys, type Task, type TaskPatch } from './queries';
 
 export type TaskDetail = components['schemas']['TaskDetailOut'];
 
@@ -75,12 +75,7 @@ export function useTaskDetailMutations(taskId: string) {
   });
 
   const setCompleted = useMutation({
-    mutationFn: async (completed: boolean) => {
-      const params = { params: { path: { task_id: taskId } } };
-      return completed
-        ? (await api.POST('/api/v1/tasks/{task_id}/complete', params)).data!
-        : (await api.POST('/api/v1/tasks/{task_id}/uncomplete', params)).data!;
-    },
+    mutationFn: async (completed: boolean) => completeWithConfirm(api, taskId, completed),
     onMutate: (completed) =>
       syncTask(qc, taskId, { completed_at: completed ? new Date().toISOString() : null }),
     onSuccess: (res, completed) => {

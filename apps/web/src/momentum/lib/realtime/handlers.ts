@@ -161,6 +161,16 @@ function applyTaskEvent(
         void qc.invalidateQueries({ queryKey: taskKeys.otherPlacements(ctx.projectId) });
       }
       return;
+    case 'task.dependency_added':
+    case 'task.dependency_removed': {
+      void qc.invalidateQueries({ queryKey: taskKeys.dependencies(id) });
+      // the event carries `entity_id: task_id` regardless of which of the two tasks' channels
+      // delivered it, so the *other* task's own pane needs its own query invalidated by id too.
+      const dependsOnId = str(data.depends_on_id);
+      if (dependsOnId) void qc.invalidateQueries({ queryKey: taskKeys.dependencies(dependsOnId) });
+      if (ctx.projectId) void qc.invalidateQueries({ queryKey: taskKeys.blockedTasks(ctx.projectId) });
+      return;
+    }
     default:
       return;
   }

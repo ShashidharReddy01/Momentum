@@ -101,3 +101,17 @@ class Follower(Base):
     task_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("tasks.id"), primary_key=True)
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), primary_key=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class TaskDependency(Base):
+    """``task_id`` is blocked by ``depends_on_id`` (S2.4.2). The service checks for cycles before
+    inserting a row; nothing at the DB level besides the same-task check does."""
+
+    __tablename__ = "task_dependencies"
+
+    task_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("tasks.id"), primary_key=True)
+    depends_on_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("tasks.id"), primary_key=True)
+    created_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (CheckConstraint("task_id <> depends_on_id", name="not_self"),)

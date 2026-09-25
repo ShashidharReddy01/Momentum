@@ -319,6 +319,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/{project_id}/blocked-tasks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Task ids in this project with at least one incomplete blocker */
+        get: operations["list_blocked_tasks_api_v1_projects__project_id__blocked_tasks_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/{project_id}/field-values": {
         parameters: {
             query?: never;
@@ -562,6 +579,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/{project_id}/tasks/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Find a task in this project (for the 'add a blocker' picker) */
+        get: operations["search_project_tasks_api_v1_projects__project_id__tasks_search_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/{project_id}/unarchive": {
         parameters: {
             query?: never;
@@ -733,6 +767,41 @@ export interface paths {
         /** Complete */
         post: operations["complete_api_v1_tasks__task_id__complete_post"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tasks/{task_id}/dependencies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Tasks this one is blocked by, and tasks blocked by this one */
+        get: operations["get_dependencies_api_v1_tasks__task_id__dependencies_get"];
+        put?: never;
+        /** Block this task on another completing first */
+        post: operations["add_dependency_api_v1_tasks__task_id__dependencies_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tasks/{task_id}/dependencies/{depends_on_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove a dependency */
+        delete: operations["remove_dependency_api_v1_tasks__task_id__dependencies__depends_on_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -1131,6 +1200,18 @@ export interface components {
             /** Verb */
             verb: string;
         };
+        /**
+         * BlockedTaskOut
+         * @description One task id with an incomplete blocker — the shape the bulk per-project endpoint returns,
+         *     for the list row's "waiting on" icon.
+         */
+        BlockedTaskOut: {
+            /**
+             * Task Id
+             * Format: uuid
+             */
+            task_id: string;
+        };
         /** CommentIn */
         CommentIn: {
             /**
@@ -1174,6 +1255,21 @@ export interface components {
              * Format: uuid
              */
             task_id: string;
+        };
+        /** DependenciesOut */
+        DependenciesOut: {
+            /** Blocked By */
+            blocked_by: components["schemas"]["TaskSummaryOut"][];
+            /** Blocking */
+            blocking: components["schemas"]["TaskSummaryOut"][];
+        };
+        /** DependencyIn */
+        DependencyIn: {
+            /**
+             * Depends On Id
+             * Format: uuid
+             */
+            depends_on_id: string;
         };
         /** DevLoginIn */
         DevLoginIn: {
@@ -1381,6 +1477,13 @@ export interface components {
             /** Next Cursor */
             next_cursor?: string | null;
         };
+        /** ListOut[BlockedTaskOut] */
+        ListOut_BlockedTaskOut_: {
+            /** Data */
+            data: components["schemas"]["BlockedTaskOut"][];
+            /** @default {} */
+            meta: components["schemas"]["ListMeta"];
+        };
         /** ListOut[CommentOut] */
         ListOut_CommentOut_: {
             /** Data */
@@ -1462,6 +1565,13 @@ export interface components {
         ListOut_TaskProjectOut_: {
             /** Data */
             data: components["schemas"]["TaskProjectOut"][];
+            /** @default {} */
+            meta: components["schemas"]["ListMeta"];
+        };
+        /** ListOut[TaskSummaryOut] */
+        ListOut_TaskSummaryOut_: {
+            /** Data */
+            data: components["schemas"]["TaskSummaryOut"][];
             /** @default {} */
             meta: components["schemas"]["ListMeta"];
         };
@@ -1608,6 +1718,11 @@ export interface components {
         /** MutationOut[TaskProjectOut] */
         MutationOut_TaskProjectOut_: {
             data: components["schemas"]["TaskProjectOut"];
+            meta: components["schemas"]["MutationMeta"];
+        };
+        /** MutationOut[TaskSummaryOut] */
+        MutationOut_TaskSummaryOut_: {
+            data: components["schemas"]["TaskSummaryOut"];
             meta: components["schemas"]["MutationMeta"];
         };
         /** MutationOut[TeamDetailOut] */
@@ -2358,6 +2473,23 @@ export interface components {
             position: string;
             project: components["schemas"]["ProjectRef"];
             section: components["schemas"]["NamedRef"];
+        };
+        /**
+         * TaskSummaryOut
+         * @description Just enough of a task to show it in a "blocked by" / "blocking" list (S2.4.2).
+         */
+        TaskSummaryOut: {
+            /** Completed At */
+            completed_at: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Key */
+            key: string;
+            /** Title */
+            title: string;
         };
         /**
          * TaskTagIn
@@ -3234,6 +3366,37 @@ export interface operations {
             };
         };
     };
+    list_blocked_tasks_api_v1_projects__project_id__blocked_tasks_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListOut_BlockedTaskOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_project_field_values_api_v1_projects__project_id__field_values_get: {
         parameters: {
             query?: never;
@@ -3878,6 +4041,40 @@ export interface operations {
             };
         };
     };
+    search_project_tasks_api_v1_projects__project_id__tasks_search_get: {
+        parameters: {
+            query?: {
+                q?: string;
+                exclude?: string | null;
+            };
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListOut_TaskSummaryOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     unarchive_api_v1_projects__project_id__unarchive_post: {
         parameters: {
             query?: never;
@@ -4363,7 +4560,10 @@ export interface operations {
     };
     complete_api_v1_tasks__task_id__complete_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Complete even if this task has incomplete blockers */
+                force?: boolean;
+            };
             header?: never;
             path: {
                 task_id: string;
@@ -4379,6 +4579,104 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MutationOut_TaskOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_dependencies_api_v1_tasks__task_id__dependencies_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DependenciesOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_dependency_api_v1_tasks__task_id__dependencies_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DependencyIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationOut_TaskSummaryOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_dependency_api_v1_tasks__task_id__dependencies__depends_on_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+                depends_on_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationOut_OkOut_"];
                 };
             };
             /** @description Validation Error */

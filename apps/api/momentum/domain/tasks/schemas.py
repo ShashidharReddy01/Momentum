@@ -173,3 +173,29 @@ class OtherPlacementOut(BaseModel):
 
     task_id: uuid.UUID
     project: ProjectRef
+
+
+class TaskSummaryOut(BaseModel):
+    """Just enough of a task to show it in a "blocked by" / "blocking" list (S2.4.2)."""
+
+    id: uuid.UUID
+    key: str
+    title: str
+    completed_at: datetime | None
+
+
+class DependenciesOut(BaseModel):
+    blocked_by: list[TaskSummaryOut]
+    blocking: list[TaskSummaryOut]
+
+
+class DependencyIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    depends_on_id: uuid.UUID
+
+
+class BlockedTaskOut(BaseModel):
+    """One task id with an incomplete blocker — the shape the bulk per-project endpoint returns,
+    for the list row's "waiting on" icon."""
+
+    task_id: uuid.UUID

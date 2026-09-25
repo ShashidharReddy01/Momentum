@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Sequence
 from datetime import UTC, date, datetime, timedelta
 from typing import Any, Literal
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import ColumnElement, delete, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import aliased
 
 from momentum.core.activity import Activity, Diff, jsonable_diff, record_activity
 from momentum.core.context import Ctx
@@ -30,7 +32,7 @@ from momentum.domain.access import (
 from momentum.domain.projects.models import Project
 from momentum.domain.sections.models import Section
 from momentum.domain.sections.service import list_sections, on_section_delete, on_section_restore
-from momentum.domain.tasks.models import Follower, Task, TaskProject
+from momentum.domain.tasks.models import Follower, Task, TaskDependency, TaskProject
 from momentum.domain.users.models import User
 from momentum.domain.workspace.models import Workspace
 
@@ -607,11 +609,14 @@ async def set_completed(
     *,
     record_undo: bool = True,
     batch_id: uuid.UUID | None = None,
+    force: bool = False,
 ) -> Mutation[Task]:
     task, placement, role = await get_visible_task(session, ctx, task_id)
     require_project_role(role, "editor", "complete this task")
     if (task.completed_at is not None) == completed:
         return Mutation(task, version=task.version)
+    if completed and not force and await _has_incomplete_blockers(session, task_id):
+        raise Conflict("This task has incomplete blockers", code="has_incomplete_blockers")
     old = task.completed_at
     task.completed_at = datetime.now(UTC) if completed else None
     task.completed_by = ctx.actor.id if completed else None
@@ -810,7 +815,12 @@ async def bulk(
             out.append((await update_task(session, ctx, tid, patch, batch_id=batch_id)).entity)
         elif action in ("complete", "uncomplete"):
             done = action == "complete"
-            out.append((await set_completed(session, ctx, tid, done, batch_id=batch_id)).entity)
+            # Bulk complete skips the confirm-if-blocked prompt — a per-task confirmation dialog
+            # doesn't make sense across a multi-select; the "waiting on" icon already tells you
+            # before you pick "Complete" from the bulk bar.
+            out.append(
+                (await set_completed(session, ctx, tid, done, batch_id=batch_id, force=True)).entity
+            )
         else:
             out.append((await delete_task(session, ctx, tid, batch_id=batch_id)).entity)
     return Mutation(out, batch_id=batch_id)
@@ -1287,6 +1297,219 @@ async def remove_task_from_project(
     return Mutation(None, act.id)
 
 
+# ---------- dependencies (S2.4.2) ----------
+
+
+async def _has_incomplete_blockers(session: AsyncSession, task_id: uuid.UUID) -> bool:
+    rows = await session.execute(
+        select(TaskDependency.depends_on_id)
+        .join(Task, Task.id == TaskDependency.depends_on_id)
+        .where(
+            TaskDependency.task_id == task_id,
+            Task.completed_at.is_(None),
+            Task.deleted_at.is_(None),
+        )
+        .limit(1)
+    )
+    return rows.first() is not None
+
+
+async def _would_cycle(session: AsyncSession, task_id: uuid.UUID, depends_on_id: uuid.UUID) -> bool:
+    """True if making `task_id` depend on `depends_on_id` would create a cycle — i.e.
+    `depends_on_id` already (transitively) depends on `task_id`. A recursive CTE walks the
+    existing chain of blockers starting at `depends_on_id`."""
+    if task_id == depends_on_id:
+        return True
+    base = select(TaskDependency.depends_on_id).where(TaskDependency.task_id == depends_on_id)
+    chain = base.cte(name="dep_chain", recursive=True)
+    chain = chain.union_all(
+        select(TaskDependency.depends_on_id).join(
+            chain, TaskDependency.task_id == chain.c.depends_on_id
+        )
+    )
+    rows = await session.execute(
+        select(chain.c.depends_on_id).where(chain.c.depends_on_id == task_id).limit(1)
+    )
+    return rows.first() is not None
+
+
+async def list_dependencies(
+    session: AsyncSession, ctx: Ctx, task_id: uuid.UUID
+) -> tuple[list[Task], list[Task]]:
+    """(blocked_by, blocking): tasks this one depends on, and tasks that depend on this one, each
+    filtered to what the caller can currently see. Dependency lists are small in practice, so this
+    checks visibility per related task rather than building a bulk-visibility SQL clause."""
+    await get_visible_task(session, ctx, task_id)
+    blocked_by_ids = (
+        (
+            await session.execute(
+                select(TaskDependency.depends_on_id).where(TaskDependency.task_id == task_id)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    blocking_ids = (
+        (
+            await session.execute(
+                select(TaskDependency.task_id).where(TaskDependency.depends_on_id == task_id)
+            )
+        )
+        .scalars()
+        .all()
+    )
+
+    async def _visible(ids: Sequence[uuid.UUID]) -> list[Task]:
+        out = []
+        for tid in ids:
+            try:
+                t, _, _ = await get_visible_task(session, ctx, tid)
+                out.append(t)
+            except NotFound:
+                continue
+        return out
+
+    return await _visible(blocked_by_ids), await _visible(blocking_ids)
+
+
+async def add_dependency(
+    session: AsyncSession,
+    ctx: Ctx,
+    task_id: uuid.UUID,
+    depends_on_id: uuid.UUID,
+    *,
+    record_undo: bool = True,
+) -> Mutation[Task]:
+    """Block `task_id` on `depends_on_id` completing first."""
+    if task_id == depends_on_id:
+        raise ValidationFailed("A task can't depend on itself")
+    task, placement, role = await get_visible_task(session, ctx, task_id)
+    require_project_role(role, "editor", "add a dependency")
+    blocker, _, _ = await get_visible_task(session, ctx, depends_on_id)
+    if await session.get(TaskDependency, (task_id, depends_on_id)) is not None:
+        raise Conflict("This dependency already exists", code="already_exists")
+    if await _would_cycle(session, task_id, depends_on_id):
+        raise ValidationFailed("That would create a dependency cycle", code="cycle")
+    session.add(
+        TaskDependency(task_id=task_id, depends_on_id=depends_on_id, created_by=ctx.actor.id)
+    )
+    await session.flush()
+    act = await record_activity(
+        session,
+        ctx,
+        entity_type="task",
+        entity_id=task_id,
+        verb="task.dependency_added",
+        changes={"depends_on_id": (None, depends_on_id)},
+        undo=undo_op("tasks.remove_dependency", task_id=task_id, depends_on_id=depends_on_id)
+        if record_undo
+        else None,
+    )
+    await emit(
+        session,
+        ctx,
+        type="task.dependency_added",
+        entity_type="task",
+        entity_id=task_id,
+        data={"depends_on_id": str(depends_on_id)},
+        channels=[*channels(task, placement), f"task:{depends_on_id}"],
+        activity_id=act.id,
+    )
+    return Mutation(blocker, act.id)
+
+
+async def remove_dependency(
+    session: AsyncSession,
+    ctx: Ctx,
+    task_id: uuid.UUID,
+    depends_on_id: uuid.UUID,
+    *,
+    record_undo: bool = True,
+) -> Mutation[None]:
+    task, placement, role = await get_visible_task(session, ctx, task_id)
+    require_project_role(role, "editor", "remove a dependency")
+    link = await session.get(TaskDependency, (task_id, depends_on_id))
+    if link is None:
+        raise NotFound("This dependency doesn't exist")
+    await session.delete(link)
+    await session.flush()
+    act = await record_activity(
+        session,
+        ctx,
+        entity_type="task",
+        entity_id=task_id,
+        verb="task.dependency_removed",
+        changes={"depends_on_id": (depends_on_id, None)},
+        undo=undo_op("tasks.add_dependency", task_id=task_id, depends_on_id=depends_on_id)
+        if record_undo
+        else None,
+    )
+    await emit(
+        session,
+        ctx,
+        type="task.dependency_removed",
+        entity_type="task",
+        entity_id=task_id,
+        data={"depends_on_id": str(depends_on_id)},
+        channels=[*channels(task, placement), f"task:{depends_on_id}"],
+        activity_id=act.id,
+    )
+    return Mutation(None, act.id)
+
+
+async def search_project_tasks(
+    session: AsyncSession,
+    ctx: Ctx,
+    project_id: uuid.UUID,
+    q: str,
+    *,
+    exclude: uuid.UUID | None = None,
+    limit: int = 20,
+) -> list[Task]:
+    """A minimal task finder for the "add a blocker" picker, scoped to one project (global search
+    across projects is S2.6, not built yet — this is intentionally small)."""
+    await get_visible_project(session, ctx, project_id)
+    query = (
+        select(Task)
+        .join(TaskProject, TaskProject.task_id == Task.id)
+        .where(
+            TaskProject.project_id == project_id,
+            Task.deleted_at.is_(None),
+            Task.parent_id.is_(None),
+        )
+    )
+    clean = q.strip()
+    if clean:
+        query = query.where(Task.title.ilike(f"%{clean}%"))
+    if exclude is not None:
+        query = query.where(Task.id != exclude)
+    rows = await session.execute(
+        query.order_by(Task.completed_at.is_not(None), Task.title).limit(limit)
+    )
+    return list(rows.scalars())
+
+
+async def list_blocked_tasks(
+    session: AsyncSession, ctx: Ctx, project_id: uuid.UUID
+) -> list[uuid.UUID]:
+    """Task ids in this project with at least one incomplete blocker — for the list row's
+    "waiting on" icon. One query for the whole list, not one per row."""
+    await get_visible_project(session, ctx, project_id)
+    Blocker = aliased(Task)
+    rows = await session.execute(
+        select(TaskDependency.task_id)
+        .join(TaskProject, TaskProject.task_id == TaskDependency.task_id)
+        .join(Blocker, Blocker.id == TaskDependency.depends_on_id)
+        .where(
+            TaskProject.project_id == project_id,
+            Blocker.completed_at.is_(None),
+            Blocker.deleted_at.is_(None),
+        )
+        .distinct()
+    )
+    return list(rows.scalars())
+
+
 # ---------- section hooks ----------
 
 
@@ -1473,9 +1696,25 @@ async def _undo_remove_from_project(session: AsyncSession, ctx: Ctx, args: dict[
     )
 
 
+@undo_handler("tasks.remove_dependency")
+async def _undo_add_dependency(session: AsyncSession, ctx: Ctx, args: dict[str, Any]) -> None:
+    await remove_dependency(
+        session, ctx, _tid(args), uuid.UUID(str(args["depends_on_id"])), record_undo=False
+    )
+
+
+@undo_handler("tasks.add_dependency")
+async def _undo_remove_dependency(session: AsyncSession, ctx: Ctx, args: dict[str, Any]) -> None:
+    await add_dependency(
+        session, ctx, _tid(args), uuid.UUID(str(args["depends_on_id"])), record_undo=False
+    )
+
+
 @undo_handler("tasks.set_completed")
 async def _undo_complete(session: AsyncSession, ctx: Ctx, args: dict[str, Any]) -> None:
-    await set_completed(session, ctx, _tid(args), bool(args["completed"]), record_undo=False)
+    await set_completed(
+        session, ctx, _tid(args), bool(args["completed"]), record_undo=False, force=True
+    )
 
 
 @undo_handler("tasks.restore")

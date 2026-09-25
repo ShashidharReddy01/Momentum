@@ -24,6 +24,7 @@ import { BulkBar, type BulkPicker } from './BulkBar';
 import { ListToolbar } from './ListToolbar';
 import {
   isTemp,
+  useBlockedTasks,
   useOtherPlacements,
   useProjectTasks,
   useTaskMutations,
@@ -79,6 +80,7 @@ export function ProjectTasksView({ projectId, canEdit }: { projectId: string; ca
   const fieldValuesByTask = useProjectFieldValues(projectId, !!visibleFields.length).data;
   const tagsByTask = useProjectTaskTags(projectId).data;
   const otherPlacementsByTask = useOtherPlacements(projectId).data;
+  const blockedTaskIds = useBlockedTasks(projectId).data;
   const m = useTaskMutations(projectId);
   const { collapsed, toggle } = useCollapsed(projectId);
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -518,6 +520,7 @@ export function ProjectTasksView({ projectId, canEdit }: { projectId: string; ca
         fieldValues={fieldValuesByTask?.get(t.id)}
         tags={tagsByTask?.get(t.id)}
         otherProjects={otherPlacementsByTask?.get(t.id)}
+        blocked={blockedTaskIds?.has(t.id)}
         onUpdate={onUpdate}
         onToggle={onToggle}
         onRename={onRename}

@@ -16,6 +16,9 @@ from momentum.domain.sections.models import Section
 from momentum.domain.tasks import service
 from momentum.domain.tasks.models import Task, TaskProject
 from momentum.domain.tasks.schemas import (
+    BlockedTaskOut,
+    DependenciesOut,
+    DependencyIn,
     FollowerIn,
     FollowersOut,
     NamedRef,
@@ -32,6 +35,7 @@ from momentum.domain.tasks.schemas import (
     TaskPatchIn,
     TaskProjectAddIn,
     TaskProjectOut,
+    TaskSummaryOut,
 )
 
 router = APIRouter(tags=["tasks"])
@@ -203,10 +207,10 @@ async def patch_task(
 
 
 async def _complete(
-    task_id: uuid.UUID, ctx: CtxDep, uow: UowDep, flag: bool
+    task_id: uuid.UUID, ctx: CtxDep, uow: UowDep, flag: bool, *, force: bool = False
 ) -> MutationOut[TaskOut]:
     async with uow.transaction() as s:
-        m = await service.set_completed(s, ctx, task_id, flag)
+        m = await service.set_completed(s, ctx, task_id, flag, force=force)
         _, p, _ = await service.get_task(s, ctx, task_id)
         return MutationOut(
             data=task_out(m.entity, p),
@@ -215,8 +219,15 @@ async def _complete(
 
 
 @router.post("/tasks/{task_id}/complete", response_model=MutationOut[TaskOut], summary="Complete")
-async def complete(task_id: uuid.UUID, ctx: CtxDep, uow: UowDep) -> MutationOut[TaskOut]:
-    return await _complete(task_id, ctx, uow, True)
+async def complete(
+    task_id: uuid.UUID,
+    ctx: CtxDep,
+    uow: UowDep,
+    force: bool = Query(
+        default=False, description="Complete even if this task has incomplete blockers"
+    ),
+) -> MutationOut[TaskOut]:
+    return await _complete(task_id, ctx, uow, True, force=force)
 
 
 @router.post(
@@ -456,3 +467,79 @@ async def remove_task_from_project(
     async with uow.transaction() as s:
         m = await service.remove_task_from_project(s, ctx, task_id, project_id)
     return MutationOut(data=OkOut(), meta=MutationMeta(activity_id=m.activity_id))
+
+
+def _summary(t: Task) -> TaskSummaryOut:
+    return TaskSummaryOut(
+        id=t.id, key=task_key(t.number), title=t.title, completed_at=t.completed_at
+    )
+
+
+@router.get(
+    "/tasks/{task_id}/dependencies",
+    response_model=DependenciesOut,
+    summary="Tasks this one is blocked by, and tasks blocked by this one",
+)
+async def get_dependencies(task_id: uuid.UUID, ctx: CtxDep, uow: UowDep) -> DependenciesOut:
+    async with uow.transaction() as s:
+        blocked_by, blocking = await service.list_dependencies(s, ctx, task_id)
+        return DependenciesOut(
+            blocked_by=[_summary(t) for t in blocked_by], blocking=[_summary(t) for t in blocking]
+        )
+
+
+@router.post(
+    "/tasks/{task_id}/dependencies",
+    response_model=MutationOut[TaskSummaryOut],
+    status_code=status.HTTP_201_CREATED,
+    summary="Block this task on another completing first",
+)
+async def add_dependency(
+    task_id: uuid.UUID, body: DependencyIn, ctx: CtxDep, uow: UowDep
+) -> MutationOut[TaskSummaryOut]:
+    async with uow.transaction() as s:
+        m = await service.add_dependency(s, ctx, task_id, body.depends_on_id)
+        return MutationOut(data=_summary(m.entity), meta=MutationMeta(activity_id=m.activity_id))
+
+
+@router.delete(
+    "/tasks/{task_id}/dependencies/{depends_on_id}",
+    response_model=MutationOut[OkOut],
+    summary="Remove a dependency",
+)
+async def remove_dependency(
+    task_id: uuid.UUID, depends_on_id: uuid.UUID, ctx: CtxDep, uow: UowDep
+) -> MutationOut[OkOut]:
+    async with uow.transaction() as s:
+        m = await service.remove_dependency(s, ctx, task_id, depends_on_id)
+    return MutationOut(data=OkOut(), meta=MutationMeta(activity_id=m.activity_id))
+
+
+@router.get(
+    "/projects/{project_id}/tasks/search",
+    response_model=ListOut[TaskSummaryOut],
+    summary="Find a task in this project (for the 'add a blocker' picker)",
+)
+async def search_project_tasks(
+    project_id: uuid.UUID,
+    ctx: CtxDep,
+    uow: UowDep,
+    q: str = Query(default=""),
+    exclude: uuid.UUID | None = Query(default=None),
+) -> ListOut[TaskSummaryOut]:
+    async with uow.transaction() as s:
+        rows = await service.search_project_tasks(s, ctx, project_id, q, exclude=exclude)
+        return ListOut(data=[_summary(t) for t in rows])
+
+
+@router.get(
+    "/projects/{project_id}/blocked-tasks",
+    response_model=ListOut[BlockedTaskOut],
+    summary="Task ids in this project with at least one incomplete blocker",
+)
+async def list_blocked_tasks(
+    project_id: uuid.UUID, ctx: CtxDep, uow: UowDep
+) -> ListOut[BlockedTaskOut]:
+    async with uow.transaction() as s:
+        ids = await service.list_blocked_tasks(s, ctx, project_id)
+        return ListOut(data=[BlockedTaskOut(task_id=i) for i in ids])

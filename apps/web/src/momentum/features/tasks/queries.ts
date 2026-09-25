@@ -1,5 +1,7 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { useRef } from 'react';
+import { ApiError } from '@/lib/api/errors';
+import type { MomentumClient } from '@/lib/api/client';
 import type { components } from '@/lib/api/schema';
 import { toastError } from '@/lib/toast';
 import { useRecordUndo, useUndoToast } from '@/lib/undo';
@@ -19,7 +21,36 @@ export const taskKeys = {
   detail: (id: string) => ['tasks', id] as const,
   projects: (taskId: string) => ['tasks', taskId, 'projects'] as const,
   otherPlacements: (projectId: string) => ['projects', projectId, 'other-placements'] as const,
+  dependencies: (taskId: string) => ['tasks', taskId, 'dependencies'] as const,
+  blockedTasks: (projectId: string) => ['projects', projectId, 'blocked-tasks'] as const,
 };
+
+async function completeTaskRequest(api: MomentumClient, taskId: string, completed: boolean, force = false) {
+  const path = { task_id: taskId };
+  return completed
+    ? (await api.POST('/api/v1/tasks/{task_id}/complete', { params: { path, query: { force } } })).data!
+    : (await api.POST('/api/v1/tasks/{task_id}/uncomplete', { params: { path } })).data!;
+}
+
+/** Complete a task, asking for confirmation (same native-confirm pattern as the "paste many
+ * lines" prompt elsewhere) if the backend says it has incomplete blockers (S2.4.2) — this mirrors
+ * the 409 `has_incomplete_blockers` response rather than duplicating the blocker check on the
+ * client, which would need its own request anyway. */
+export async function completeWithConfirm(api: MomentumClient, taskId: string, completed: boolean) {
+  if (!completed) return completeTaskRequest(api, taskId, false);
+  try {
+    return await completeTaskRequest(api, taskId, true);
+  } catch (e) {
+    if (
+      e instanceof ApiError &&
+      e.code === 'has_incomplete_blockers' &&
+      window.confirm('This task has incomplete blockers. Complete it anyway?')
+    ) {
+      return completeTaskRequest(api, taskId, true, true);
+    }
+    throw e;
+  }
+}
 
 export const isTemp = (id: string) => id.startsWith('tmp-');
 let tempSeq = 0;
@@ -329,12 +360,8 @@ export function useTaskMutations(projectId: string) {
   });
 
   const setCompleted = useMutation({
-    mutationFn: async (v: { id: string; completed: boolean }) => {
-      const path = { task_id: (await resolveId(v.id))! };
-      return v.completed
-        ? (await api.POST('/api/v1/tasks/{task_id}/complete', { params: { path } })).data!
-        : (await api.POST('/api/v1/tasks/{task_id}/uncomplete', { params: { path } })).data!;
-    },
+    mutationFn: async (v: { id: string; completed: boolean }) =>
+      completeWithConfirm(api, (await resolveId(v.id))!, v.completed),
     onMutate: (v) =>
       patchTask(qc, projectId, v.id, (t) => ({
         ...t,
@@ -465,6 +492,90 @@ export function useTaskProjectMutations(taskId: string) {
       ).data!,
     onSuccess: (res) => undoToast('Removed from project', res.meta, settle),
     onError: (e) => toastError(e, "Couldn't remove this task from that project"),
+    onSettled: settle,
+  });
+
+  return { add, remove };
+}
+
+export type TaskSummary = components['schemas']['TaskSummaryOut'];
+export type Dependencies = components['schemas']['DependenciesOut'];
+
+/** Tasks this one is blocked by, and tasks blocked by this one (S2.4.2). */
+export function useDependencies(taskId: string, enabled = true) {
+  const api = useApi();
+  return useQuery({
+    queryKey: taskKeys.dependencies(taskId),
+    enabled: enabled && !!taskId,
+    queryFn: async () =>
+      (await api.GET('/api/v1/tasks/{task_id}/dependencies', { params: { path: { task_id: taskId } } }))
+        .data!,
+  });
+}
+
+/** Task ids in a project with at least one incomplete blocker — for the list row's "waiting on"
+ * icon, one round trip for the whole list (mirrors the fields/tags/placements bulk pattern). */
+export function useBlockedTasks(projectId: string, enabled = true) {
+  const api = useApi();
+  return useQuery({
+    queryKey: taskKeys.blockedTasks(projectId),
+    enabled: enabled && !!projectId,
+    queryFn: async () =>
+      (
+        await api.GET('/api/v1/projects/{project_id}/blocked-tasks', {
+          params: { path: { project_id: projectId } },
+        })
+      ).data!.data,
+    select: (rows) => new Set(rows.map((r) => r.task_id)),
+  });
+}
+
+/** A minimal task finder for the "add a blocker" picker, scoped to one project. */
+export function useSearchProjectTasks(projectId: string, q: string, exclude?: string) {
+  const api = useApi();
+  return useQuery({
+    queryKey: ['projects', projectId, 'tasks', 'search', q, exclude] as const,
+    enabled: !!projectId,
+    queryFn: async () =>
+      (
+        await api.GET('/api/v1/projects/{project_id}/tasks/search', {
+          params: { path: { project_id: projectId }, query: { q, exclude } },
+        })
+      ).data!.data,
+  });
+}
+
+export function useDependencyMutations(taskId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  const undoToast = useUndoToast();
+  const settle = () => {
+    void qc.invalidateQueries({ queryKey: taskKeys.dependencies(taskId) });
+    void qc.invalidateQueries({ predicate: (q) => q.queryKey[2] === 'blocked-tasks' });
+  };
+
+  const add = useMutation({
+    mutationFn: async (dependsOnId: string) =>
+      (
+        await api.POST('/api/v1/tasks/{task_id}/dependencies', {
+          params: { path: { task_id: taskId } },
+          body: { depends_on_id: dependsOnId },
+        })
+      ).data!,
+    onSuccess: (res) => undoToast(`Blocked on ${res.data.title}`, res.meta, settle),
+    onError: (e) => toastError(e, "Couldn't add that dependency"),
+    onSettled: settle,
+  });
+
+  const remove = useMutation({
+    mutationFn: async (dependsOnId: string) =>
+      (
+        await api.DELETE('/api/v1/tasks/{task_id}/dependencies/{depends_on_id}', {
+          params: { path: { task_id: taskId, depends_on_id: dependsOnId } },
+        })
+      ).data!,
+    onSuccess: (res) => undoToast('Dependency removed', res.meta, settle),
+    onError: (e) => toastError(e, "Couldn't remove that dependency"),
     onSettled: settle,
   });
 
