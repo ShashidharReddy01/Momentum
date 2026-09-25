@@ -7,6 +7,7 @@ from momentum.core.idempotency import IdempotencyKey
 from momentum.domain.attachments.models import Attachment
 from momentum.domain.comments.models import Comment, Mention, Reaction
 from momentum.domain.fields.models import FieldDef, FieldValue, ProjectField
+from momentum.domain.integrations.models import ExternalLink, ImportJob
 from momentum.domain.mytasks.models import MyTaskPlacement
 from momentum.domain.notifications.models import Notification
 from momentum.domain.projects.models import Favorite, Project, ProjectMember
@@ -24,11 +25,13 @@ __all__ = [
     "ApiToken",
     "Attachment",
     "Comment",
+    "ExternalLink",
     "Favorite",
     "FieldDef",
     "FieldValue",
     "Follower",
     "IdempotencyKey",
+    "ImportJob",
     "Mention",
     "MyTaskPlacement",
     "Notification",

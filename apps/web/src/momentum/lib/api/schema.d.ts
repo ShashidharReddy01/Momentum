@@ -228,6 +228,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/integrations/asana/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Import a team's projects/tasks from Asana (synchronous; the PAT is never stored) */
+        post: operations["import_from_asana_api_v1_integrations_asana_import_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me": {
         parameters: {
             query?: never;
@@ -1424,6 +1441,19 @@ export interface components {
             /** Verb */
             verb: string;
         };
+        /** AsanaImportIn */
+        AsanaImportIn: {
+            /** Pat */
+            pat: string;
+            /** Project Gids */
+            project_gids?: string[] | null;
+            /** Team Gid */
+            team_gid: string;
+            /** Team Name */
+            team_name: string;
+            /** Workspace Gid */
+            workspace_gid: string;
+        };
         /** AttachmentOut */
         AttachmentOut: {
             /** Comment Id */
@@ -1757,6 +1787,39 @@ export interface components {
             team_id: string;
             /** Team Name */
             team_name: string;
+        };
+        /** ImportJobOut */
+        ImportJobOut: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Finished At */
+            finished_at: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Log */
+            log: {
+                [key: string]: unknown;
+            } | null;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "asana" | "csv";
+            /** Stats */
+            stats: {
+                [key: string]: unknown;
+            } | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "pending" | "running" | "done" | "failed";
         };
         /** ListMeta */
         ListMeta: {
@@ -3614,6 +3677,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HomeOut"];
+                };
+            };
+        };
+    };
+    import_from_asana_api_v1_integrations_asana_import_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AsanaImportIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportJobOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

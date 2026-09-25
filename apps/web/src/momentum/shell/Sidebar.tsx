@@ -4,6 +4,7 @@ import {
   ChevronDown,
   ChevronRight,
   ChevronsUpDown,
+  Download,
   Lock,
   Star,
   FolderPlus,
@@ -261,6 +262,9 @@ function UserMenu() {
         </DropdownMenuItem>
         <DropdownMenuItem onSelect={() => navigate('/settings/notifications')}>
           <Icon icon={Bell} /> Notification settings
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => navigate('/settings/import/asana')}>
+          <Icon icon={Download} /> Import from Asana
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem onSelect={() => logout.mutate()}>

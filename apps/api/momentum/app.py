@@ -47,6 +47,7 @@ def _api_router(settings: Settings) -> APIRouter:
     from momentum.domain.teams.router import router as teams_router
     from momentum.domain.users.router import dev_router
     from momentum.domain.users.router import router as users_router
+    from momentum.integrations.asana_import.router import router as asana_router
 
     api = APIRouter(prefix=API_PREFIX)
     api.include_router(config_router)
@@ -64,6 +65,7 @@ def _api_router(settings: Settings) -> APIRouter:
     api.include_router(notifications_router)
     api.include_router(home_router)
     api.include_router(search_router)
+    api.include_router(asana_router)
     api.include_router(undo_router)
     if settings.is_dev_auth:
         api.include_router(dev_router)
