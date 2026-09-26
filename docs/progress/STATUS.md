@@ -5,6 +5,8 @@
 ## Current focus
 - **Phase:** 3: AI Layer v1 ("Mo") — **in progress**. Kickoff done (`docs/roadmap/phase-3-kickoff.md`); S3.1.1–S3.1.5 done (E3.1 platform complete). Phase 2 is complete (exit criteria met; see below).
 - **Next slice:** S3.3.1 Ask Mo chat backend + panel (`ai_conversations`, `ai_messages`, `POST /ai/chat` SSE with citations, `/ask` page with history, feedback 👍/👎; J8), then S3.3.2 contextual entry points.
+- **Scope note (product owner, 2026-09-26):** the customer-operations capabilities (SQQ, pricing, contracts, invoices, pushes to internal systems as tools and assignable agents) will be done later in the product owner's own codebase, **not in this repo**. Finish the roadmap as written.
+- **Branch:** all Phase 3 work is on `claude/clever-hopper-pbv7yr` (ahead of `main`). Continue from that branch.
 - **Standing instruction (product owner, 2026-09-26):** "push it all and finish the remaining slices": continue slice by slice through Phase 3, committing and pushing each.
 - **Model:** Phase 3 is a whole-phase Opus 5.5 phase (`docs/process/model-guide.md` §2); S3.1.1–S3.1.5 were built on Opus 5.5. (Phase 1 Opus; Phase 2 switched to Sonnet 5 mid-phase by product-owner instruction.)
 - **Aliases (product owner, 2026-09-26):** keep the same Bedrock Sonnet 4 id for `fast`, `default` and `smart` for now. **Rerank:** approved for S3.1.4 as optional Cohere rerank, off by default.
@@ -242,7 +244,6 @@
 | 3 | Target host project for plugging in (stack/auth) | Before Phase 8 | open (INTEGRATION_GUIDE.md covers all modes) |
 | 4 | Add an optional Cohere rerank step (rerank-v3.5 via the gateway) to S3.1.4 hybrid retrieval, off by default? (kickoff Q2) | S3.1.4 | **answered 2026-09-26: yes**, off by default |
 | 5 | MCP server dropped. Keep personal API tokens (so internal scripts can call Momentum's API), or drop S7.1 entirely? | Phase 7 | open |
-| 6 | Capabilities platform (customer operations: SQQ, pricing, contracts, invoices, pushes to internal systems, 20–30 scripts/AI as tools and assignable agents): roadmap re-order and a capability SDK, proposed 2026-09-26 | Before Phase 4 | open, awaiting product owner |
 
 ## Progress
 
