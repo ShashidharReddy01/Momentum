@@ -1,6 +1,7 @@
 import {
   Archive,
   ArchiveRestore,
+  Download,
   Lock,
   MoreHorizontal,
   SlidersHorizontal,
@@ -31,6 +32,7 @@ import { Tooltip } from '@/components/ui/Tooltip';
 import { colorVar } from '@/features/teams';
 import { cn } from '@/lib/cn';
 import { useCrumbs } from '@/lib/crumbs';
+import { CsvImportDialog } from '@/features/csvImport';
 import { FieldsDialog } from '@/features/fields';
 import { useProject, useProjectLifecycle, useToggleFavorite, useUpdateProject } from './queries';
 import { ShareDialog } from './ShareDialog';
@@ -72,6 +74,7 @@ export function ProjectPage() {
   const navigate = useNavigate();
   const [share, setShare] = useState(false);
   const [fieldsOpen, setFieldsOpen] = useState(false);
+  const [csvImportOpen, setCsvImportOpen] = useState(false);
   useCrumbs(project.data ? [project.data.team_name, project.data.name] : null);
 
   // On a bare `/projects/:id` (no view segment), redirect once to this user's last view for
@@ -172,6 +175,9 @@ export function ProjectPage() {
                     ))}
                   </DropdownMenuRadioGroup>
                   <DropdownMenuSeparator />
+                  <DropdownMenuItem onSelect={() => setCsvImportOpen(true)}>
+                    <Icon icon={Download} /> Import from CSV
+                  </DropdownMenuItem>
                   <DropdownMenuItem onSelect={() => archive.mutate(!p.archived_at)}>
                     <Icon icon={p.archived_at ? ArchiveRestore : Archive} />
                     {p.archived_at ? 'Unarchive project' : 'Archive project'}
@@ -230,6 +236,7 @@ export function ProjectPage() {
 
       <ShareDialog project={p} open={share} onOpenChange={setShare} />
       <FieldsDialog projectId={p.id} canEdit={canEdit} open={fieldsOpen} onOpenChange={setFieldsOpen} />
+      <CsvImportDialog projectId={p.id} open={csvImportOpen} onOpenChange={setCsvImportOpen} />
       {p.my_role === 'viewer' || p.my_role === 'commenter' ? (
         <div role="status" className="bg-info-tint px-4 md:px-8 py-1.5 text-xs text-ink-2">
           You have {p.my_role} access to this project.

@@ -43,6 +43,7 @@ def _api_router(settings: Settings) -> APIRouter:
     from momentum.domain.search.router import router as search_router
     from momentum.domain.sections.router import router as sections_router
     from momentum.domain.tags.router import router as tags_router
+    from momentum.domain.tasks.csv_import_router import router as csv_import_router
     from momentum.domain.tasks.router import router as tasks_router
     from momentum.domain.teams.router import router as teams_router
     from momentum.domain.users.router import dev_router
@@ -57,6 +58,7 @@ def _api_router(settings: Settings) -> APIRouter:
     api.include_router(favorites_router)
     api.include_router(sections_router)
     api.include_router(tasks_router)
+    api.include_router(csv_import_router)
     api.include_router(comments_router)
     api.include_router(attachments_router)
     api.include_router(fields_router)

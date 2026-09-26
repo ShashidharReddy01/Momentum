@@ -646,6 +646,40 @@ export interface paths {
         patch: operations["set_field_visibility_api_v1_projects__project_id__fields__field_id__visibility_patch"];
         trace?: never;
     };
+    "/api/v1/projects/{project_id}/import/csv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Import tasks from a CSV using a column mapping */
+        post: operations["commit_csv_import_api_v1_projects__project_id__import_csv_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}/import/csv/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Headers + a sample of rows, for the column-mapping UI */
+        post: operations["preview_csv_upload_api_v1_projects__project_id__import_csv_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/{project_id}/members": {
         parameters: {
             query?: never;
@@ -1501,6 +1535,21 @@ export interface components {
              */
             task_id: string;
         };
+        /** Body_commit_csv_import_api_v1_projects__project_id__import_csv_post */
+        Body_commit_csv_import_api_v1_projects__project_id__import_csv_post: {
+            /** File */
+            file: string;
+            /**
+             * Mapping
+             * @description CsvColumnMapping, JSON-encoded
+             */
+            mapping: string;
+        };
+        /** Body_preview_csv_upload_api_v1_projects__project_id__import_csv_preview_post */
+        Body_preview_csv_upload_api_v1_projects__project_id__import_csv_preview_post: {
+            /** File */
+            file: string;
+        };
         /** Body_upload_comment_attachment_api_v1_comments__comment_id__attachments_post */
         Body_upload_comment_attachment_api_v1_comments__comment_id__attachments_post: {
             /** File */
@@ -1571,6 +1620,24 @@ export interface components {
              * Format: uuid
              */
             task_id: string;
+        };
+        /** CsvImportResult */
+        CsvImportResult: {
+            /** Created */
+            created: number;
+            /** Errors */
+            errors: string[];
+            /** Skipped */
+            skipped: number;
+        };
+        /** CsvPreview */
+        CsvPreview: {
+            /** Headers */
+            headers: string[];
+            /** Row Count */
+            row_count: number;
+            /** Rows */
+            rows: string[][];
         };
         /** DependenciesOut */
         DependenciesOut: {
@@ -4640,6 +4707,76 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MutationOut_FieldOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    commit_csv_import_api_v1_projects__project_id__import_csv_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_commit_csv_import_api_v1_projects__project_id__import_csv_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CsvImportResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_csv_upload_api_v1_projects__project_id__import_csv_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_preview_csv_upload_api_v1_projects__project_id__import_csv_preview_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CsvPreview"];
                 };
             };
             /** @description Validation Error */
