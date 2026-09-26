@@ -37,7 +37,8 @@ class LLM:
 - Budget check **before** the call (workspace monthly + agent budget) → `BudgetExceeded`.
 - Error mapping: timeouts/5xx → retry with backoff (max `LLM_MAX_RETRIES`); 429 → retry with backoff honoring `Retry-After`; persistent failure → `AIUnavailable`.
 - **Mock mode** (`LLM_MODE=mock`): deterministic responses from `ai/evals/fixtures/mock_responses/*.yaml`, matched by feature + a hash of the key inputs, with a generic fallback per feature. `record` mode saves real responses as fixtures.
-- Embeddings (Cohere v3 via LiteLLM): `input_type` passed through `extra_body={"input_type": …}` (verify in `llm-check`). Batches of `LLM_EMBED_BATCH`.
+- Embeddings (Cohere v3 via the gateway): `input_type` passed through `extra_body={"input_type": …}` (verify in `llm-check`). Batches of `LLM_EMBED_BATCH`.
+- **As built (S3.1.1):** `ai/llm.py` (the `LLM` class) sits on a `Transport` (`ai/transport.py` real gateway, `ai/mock.py` mock + record). Transports only translate; retries, budget, logging and error mapping live in `LLM`, so they behave identically in every mode. Mock fixtures match by `{contains: …}` (handwritten) or `{key: …}` (recorded; `request_key` hashes non-system messages + tool names, so a changing date in the system prompt doesn't invalidate fixtures). Mock embeddings are a hashed bag of stemmed words: deterministic, unit length, and lexically meaningful, so retrieval can be exercised in mock mode. `stream()` retries only before the first event reaches the caller; after that a failure is `AIUnavailable` (no duplicated tokens). Failures expose only a `reason` (failure kind) to clients; the gateway's error text stays server-side. Works with any OpenAI-compatible gateway (LiteLLM, Portkey): the key header and extra routing headers are settings (ADR-0004 amendment).
 
 ## 3. Tool registry (`ai/tools/registry.py`)
 

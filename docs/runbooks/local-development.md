@@ -35,8 +35,20 @@ for db in momentum momentum_test; do psql -d $db -c "create extension if not exi
 - `MOMENTUM_AUTH_MODE=easyauth-sim`: same picker, but every request is converted into realistic `X-MS-CLIENT-PRINCIPAL` claims and parsed by the real Easy Auth provider. Use this regularly so the production path stays exercised.
 
 ## AI locally
-- Mock: `MOMENTUM_LLM_MODE=mock` (default). Deterministic fixtures.
-- Real: set `MOMENTUM_LLM_MODE=gateway`, `MOMENTUM_LLM_BASE_URL`, `MOMENTUM_LLM_API_KEY`, and the alias names; run `uv run momentum llm-check`.
+- Mock: `MOMENTUM_LLM_MODE=mock` (default). Deterministic fixtures from `momentum/ai/evals/fixtures/mock_responses/` (format in `momentum/ai/mock.py`'s docstring); anything unmatched answers with a visible "(mock)" text.
+- Real: set `MOMENTUM_LLM_MODE=gateway`, `MOMENTUM_LLM_BASE_URL`, `MOMENTUM_LLM_API_KEY`, and the alias names; run `uv run momentum llm-check`. It prints a pass/fail table (basic chat per alias, tool calling, streaming, streaming with tool calls, both embedding input types, latency) and exits 1 if anything fails.
+- Portkey instead of LiteLLM (example; use your own provider-config slug and model ids):
+  ```bash
+  MOMENTUM_LLM_MODE=gateway
+  MOMENTUM_LLM_BASE_URL=https://api.portkey.ai/v1
+  MOMENTUM_LLM_API_KEY=<your Portkey key>
+  MOMENTUM_LLM_API_KEY_HEADER=x-portkey-api-key
+  MOMENTUM_LLM_MODEL_DEFAULT=@<your-provider-config>/<bedrock claude sonnet model id>
+  MOMENTUM_LLM_MODEL_FAST=@<your-provider-config>/<a cheaper model id>
+  MOMENTUM_LLM_MODEL_SMART=@<your-provider-config>/<the strongest model id>
+  MOMENTUM_LLM_EMBED_MODEL=@<your-provider-config>/cohere.embed-english-v3
+  ```
+- Record: `MOMENTUM_LLM_MODE=record` calls the real gateway and saves each chat response as a mock fixture (keyed by `request_key`, system prompt excluded). Review recorded files before committing: synthetic data only.
 - Local LiteLLM: `docker compose --profile ai up litellm` with `infra/litellm/config.yaml` (copy from the example, add your own provider keys; never commit it).
 
 ## Useful commands

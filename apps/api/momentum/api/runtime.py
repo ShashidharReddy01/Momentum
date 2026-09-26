@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 from momentum.core.settings import Settings
 
 if TYPE_CHECKING:
+    from momentum.ai.llm import LLM
     from momentum.auth.base import AuthProvider
     from momentum.realtime.hub import Hub
 
@@ -28,4 +29,5 @@ class MomentumRuntime:
     session_factory: async_sessionmaker[AsyncSession]
     auth: AuthProvider
     realtime: RealtimeState | None = None
+    llm: LLM | None = None  # built in the lifespan (S3.1.1); None only outside a running app
     extras: dict[str, Any] = field(default_factory=dict)

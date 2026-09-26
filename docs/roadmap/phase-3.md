@@ -4,7 +4,7 @@
 
 **Read first:** ai/ai-architecture.md (all), engineering/testing-strategy.md §6.
 
-**Kickoff prerequisite:** confirm the LiteLLM model aliases (fast/default/smart) and the Cohere v3 variant (English vs. multilingual) for local testing, or run in mock mode plus a personal LiteLLM.
+**Kickoff prerequisite:** confirm the gateway model aliases (fast/default/smart) and the Cohere v3 variant (English vs. multilingual) for local testing, or run in mock mode plus a personal gateway. **Resolved at kickoff (2026-09-26):** built in mock mode; the product owner's gateway is Portkey (OpenAI-compatible), Cohere English. See `phase-3-kickoff.md` for the state check and refinements.
 
 **Exit criteria:** J7, J8 pass (mock); `EVALS_LIVE=1 make evals` passes the thresholds against a real LiteLLM; the AI-unavailable path degrades gracefully; the usage page shows accurate token counts.
 
@@ -16,6 +16,7 @@
 **Scope:** `ai/llm.py` (complete/stream/embed, alias resolution, retries, error mapping, budget check, `llm_calls` logging, price table), mock and record modes, `momentum llm-check` (verifies: basic chat, tool calling with a sample tool, streaming, streaming with tool calls, embeddings with `input_type` for both types and the expected dimension, latency). Migration `llm_calls`.
 **AC:** `llm-check` prints a pass/fail table and recommends `LLM_SUPPORTS_STREAMING_TOOLS` if streaming tool calls fail.
 **Size:** M
+**Built (2026-09-26):** as scoped, plus configurable key header / extra headers for Portkey-style gateways and `prompt_version` on `llm_calls` (see kickoff §3). Migration 0015.
 
 ### S3.1.2: Tool registry + sweep of existing services
 **Scope:** `@tool` decorator, schema export, `TaskRef` resolution, dry-run via SAVEPOINT with diff capture, `ToolResult`. Register all Phase 1–2 tools from the catalog (ai-architecture §3). Snapshot tests of JSON schemas.

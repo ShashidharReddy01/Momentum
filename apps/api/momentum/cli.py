@@ -95,6 +95,44 @@ def seed(
     typer.echo(run_async(_run()))
 
 
+@cli.command("llm-check")
+def llm_check() -> None:
+    """Verify the LLM gateway: chat, tool calls, streaming, embeddings, latency (S3.1.1)."""
+    from momentum.ai.check import recommendations, render, run_llm_check
+    from momentum.ai.llm import build_llm
+    from momentum.core.telemetry import configure_logging
+
+    settings = Settings()
+    configure_logging(settings)
+    if settings.llm_mode == "mock":
+        header = (
+            "Mode: mock (canned fixtures, no network). This checks the plumbing only; set "
+            "MOMENTUM_LLM_MODE=gateway to check a real gateway."
+        )
+    else:
+        header = f"Mode: {settings.llm_mode} · gateway {settings.llm_base_url}"
+    aliases = (
+        f"Aliases: fast={settings.llm_model_fast} · default={settings.llm_model_default} · "
+        f"smart={settings.llm_model_smart} · embed={settings.llm_embed_model} "
+        f"(dim {settings.llm_embed_dim})"
+    )
+
+    async def _run() -> tuple[str, bool]:
+        # llm-check probes the gateway, so the master switch doesn't apply here.
+        llm = build_llm(settings.model_copy(update={"ai_enabled": True}))
+        try:
+            results = await run_llm_check(llm)
+        finally:
+            await llm.aclose()
+        text = render(results, recommendations(results), header=f"{header}\n{aliases}")
+        return text, any(r.status == "fail" for r in results)
+
+    text, failed = run_async(_run())
+    typer.echo(text)
+    if failed:
+        raise typer.Exit(code=1)
+
+
 def main() -> None:
     cli()
 

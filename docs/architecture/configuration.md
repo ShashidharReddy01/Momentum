@@ -69,10 +69,12 @@ Frontend build-time variables use the `VITE_MOMENTUM_` prefix, but the SPA prefe
 | Setting | Default | Description |
 |---|---|---|
 | `MOMENTUM_AI_ENABLED` | `true` | Master switch (UI hides AI when false) |
-| `MOMENTUM_LLM_MODE` | `mock` (local/test) | `gateway` · `mock` · `record` (record real responses to fixtures) |
-| `MOMENTUM_LLM_BASE_URL` | `http://localhost:4000/v1` | LiteLLM (OpenAI-compatible) |
-| `MOMENTUM_LLM_API_KEY` | | Virtual key |
-| `MOMENTUM_LLM_MODEL_FAST` | `claude-fast` | Alias names as configured in LiteLLM |
+| `MOMENTUM_LLM_MODE` | `mock` (local/test) | `gateway` · `mock` · `record` (record real responses to fixtures). Production requires `gateway` while AI is enabled (startup fails otherwise: never a silent mock fallback) |
+| `MOMENTUM_LLM_BASE_URL` | `http://localhost:4000/v1` | Any OpenAI-compatible gateway (LiteLLM, Portkey, …) |
+| `MOMENTUM_LLM_API_KEY` | | Gateway key (LiteLLM virtual key, Portkey API key, …). Never printed by `llm-check` |
+| `MOMENTUM_LLM_API_KEY_HEADER` | `Authorization` | Header that carries the key. `Authorization` sends `Bearer <key>`; any other name (e.g. `x-portkey-api-key`) sends the raw key in that header |
+| `MOMENTUM_LLM_EXTRA_HEADERS` | `{}` | JSON object of extra **non-secret** headers on every gateway call (e.g. a provider/config routing header). Validated at startup |
+| `MOMENTUM_LLM_MODEL_FAST` | `claude-fast` | Model names as the gateway knows them (a LiteLLM alias, or a Portkey `@provider/model` id) |
 | `MOMENTUM_LLM_MODEL_DEFAULT` | `claude-default` | |
 | `MOMENTUM_LLM_MODEL_SMART` | `claude-smart` | |
 | `MOMENTUM_LLM_EMBED_MODEL` | `cohere-embed-v3` | |
@@ -81,8 +83,9 @@ Frontend build-time variables use the `VITE_MOMENTUM_` prefix, but the SPA prefe
 | `MOMENTUM_LLM_TIMEOUT_S` | `60` | |
 | `MOMENTUM_LLM_MAX_RETRIES` | `2` | |
 | `MOMENTUM_LLM_SUPPORTS_STREAMING_TOOLS` | `true` | Fall back to non-streaming tool steps if false |
-| `MOMENTUM_LLM_PRICE_TABLE` | `{}` | JSON `{model: {in_per_mtok, out_per_mtok}}` for cost estimates |
-| `MOMENTUM_AI_MONTHLY_BUDGET_USD` | `0` (= unlimited) | Workspace cap |
+| `MOMENTUM_LLM_PRICE_TABLE` | `{}` | JSON `{model: {in_per_mtok, out_per_mtok}}` (USD, keyed by the configured model name) for cost estimates; unlisted models cost 0 |
+| `MOMENTUM_LLM_FIXTURES_DIR` | (packaged) | Mock/record fixture directory; empty = `momentum/ai/evals/fixtures/mock_responses` |
+| `MOMENTUM_AI_MONTHLY_BUDGET_USD` | `0` (= unlimited) | Workspace cap on estimated cost (sum of `llm_calls.cost_usd` since 00:00 UTC on the 1st); checked before every call |
 | `MOMENTUM_AI_AUTO_APPLY_LOW_RISK` | `false` | Workspace default for ⌘K/chat |
 | `MOMENTUM_AI_DEBUG_CAPTURE` | `false` | Store prompts/responses for 7 days (never in prod by default) |
 

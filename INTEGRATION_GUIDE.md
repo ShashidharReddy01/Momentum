@@ -24,7 +24,7 @@
 | Database | PostgreSQL 16 + `pgvector`, `pg_trgm`, `citext`; **everything in one schema** (`MOMENTUM_DB_SCHEMA`, default `momentum`) | Migrations in `apps/api/momentum/migrations` |
 | Frontend | React 19, TypeScript, Vite, React Router 7, TanStack Query, Tailwind v4 (scoped), Radix | `apps/web/src/momentum` (embeddable module) |
 | Auth | Pluggable `AuthProvider`: `dev`, `easyauth-sim`, `easyauth` (Azure App Service), `oidc` (planned), **`host`** (your app authenticates) | `apps/api/momentum/auth` |
-| AI | OpenAI-compatible gateway (LiteLLM) with model aliases | `apps/api/momentum/ai` (Phase 3+) |
+| AI | OpenAI-compatible gateway (LiteLLM, Portkey, …) with model aliases | `apps/api/momentum/ai` (Phase 3+) |
 | Config | Environment variables with prefix `MOMENTUM_` (backend), runtime config endpoint for the SPA | `docs/architecture/configuration.md` |
 
 **Portability guarantees (enforced by tests in `make check`):**
@@ -158,7 +158,7 @@ Momentum runs in single-workspace mode (`MOMENTUM_DEFAULT_WORKSPACE_SLUG`). For 
 `StorageBackend` (`momentum/storage/`) with `local` and `azure_blob`. Add a new backend for S3/GCS without touching features.
 
 ### 6.4 AI gateway (Phase 3+)
-Any OpenAI-compatible endpoint: set `MOMENTUM_LLM_BASE_URL`, `MOMENTUM_LLM_API_KEY`, and map the aliases (`fast`, `default`, `smart`, `embed`). Run `momentum llm-check`.
+Any OpenAI-compatible endpoint: set `MOMENTUM_LLM_BASE_URL`, `MOMENTUM_LLM_API_KEY`, and map the aliases (`fast`, `default`, `smart`, `embed`). If the gateway wants its key in its own header (Portkey: `x-portkey-api-key`), set `MOMENTUM_LLM_API_KEY_HEADER`; put non-secret routing headers in `MOMENTUM_LLM_EXTRA_HEADERS`. Run `momentum llm-check` (prints a pass/fail table; exit code 1 on any failure). The gateway is built per app in the lifespan (`app.state.momentum.llm`), so a host running several Momentum sub-apps gets one gateway each. Every call writes an `llm_calls` row in Momentum's schema.
 
 ### 6.5 Look and feel
 Design tokens in `apps/web/src/momentum/styles/tokens.css` (scoped). To match a host brand, override the token values; component code never contains raw colors.
@@ -193,3 +193,4 @@ Design tokens in `apps/web/src/momentum/styles/tokens.css` (scoped). To match a 
 | 2026-09-23 | 1 | Migrations 0002-0006 in the `momentum` schema (teams, projects, sections, tasks, followers, comments, mentions, reactions, per-user My Tasks placements); all new API under `/api/v1` (`/home`, `/me/tasks`, `/me/prefs/views/*`, `/tasks/*`, `/comments/*`, `/mentions/search`, `/undo`). UI stores only per-device conveniences in `localStorage` under the `momentum.` prefix (drafts, collapsed sections, last quick-add project). Responsive shell: below 900px the sidebar is a drawer and panes go full-screen, so a host page embedding the UI should give it the full viewport width. E2E journeys runnable in the host via `make e2e` (V9). |
 | 2026-09-24 | 2 | S2.1.1 realtime: `GET /ws` (websocket), migration 0007 (`consumer_offsets`, an index on `events_outbox`); `MOMENTUM_REALTIME_ENABLED` (default true) controls it. See §6.6 and V10. |
 | 2026-09-24 | 2 | S2.1.2 realtime frontend client (`apps/web/src/momentum/lib/realtime/`). No new host-facing surface: it just talks to the `/ws` route from S2.1.1. A host embedding the UI only needs to keep forwarding websocket upgrades for that path (§6.6, V10) — nothing else changes. |
+| 2026-09-26 | 3 | S3.1.1 LLM gateway: migration 0015 (`llm_calls`, usage only, no prompt bodies); `momentum llm-check`; new settings `MOMENTUM_LLM_API_KEY_HEADER`, `MOMENTUM_LLM_EXTRA_HEADERS`, `MOMENTUM_LLM_FIXTURES_DIR` (plus the already-documented `LLM_EMBED_BATCH`/`TIMEOUT_S`/`MAX_RETRIES`/`SUPPORTS_STREAMING_TOOLS`/`PRICE_TABLE`, `AI_MONTHLY_BUDGET_USD`, now read). **Startup now fails in `MOMENTUM_ENV=production` unless `MOMENTUM_LLM_MODE=gateway` or `MOMENTUM_AI_ENABLED=false`.** New runtime dependencies: `openai` (ADR-0004; brings `httpx2`), `pyyaml` (was already transitive). See §6 (LLM gateway). |

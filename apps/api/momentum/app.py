@@ -94,6 +94,13 @@ def create_app(
             auth=build_auth_provider(settings, resolve_principal),
         )
         app.state.momentum = runtime
+        from momentum.ai.llm import build_llm
+        from momentum.ai.usage import DbUsageLog
+
+        llm = build_llm(
+            settings, DbUsageLog(runtime.session_factory, settings.ai_monthly_budget_usd)
+        )
+        runtime.llm = llm
         if settings.db_auto_migrate:
             from momentum.migrations_runner import upgrade_head
 
@@ -142,6 +149,7 @@ def create_app(
                     await worker_task
             if job_app is not None:
                 await job_app.close_async()
+            await llm.aclose()
             await engine.dispose()
 
     app = FastAPI(

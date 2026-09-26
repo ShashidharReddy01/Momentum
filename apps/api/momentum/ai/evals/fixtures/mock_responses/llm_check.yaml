@@ -1,0 +1,10 @@
+# Mock responses for `momentum llm-check` in mock mode (checks the plumbing, not a model).
+responses:
+  - match: {contains: "use the add tool"}
+    tool_calls:
+      - name: add
+        arguments: {a: 2, b: 3}
+  - match: {contains: "count from one to five"}
+    text: "(mock) one\ntwo\nthree\nfour\nfive"
+default:
+  text: "(mock) pong"

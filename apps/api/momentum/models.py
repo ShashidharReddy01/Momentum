@@ -1,5 +1,6 @@
 """Import every ORM model so ``metadata`` is complete (used by Alembic and tests)."""
 
+from momentum.ai.models import LlmCall
 from momentum.core.activity import Activity
 from momentum.core.db import Base
 from momentum.core.events import OutboxEvent
@@ -32,6 +33,7 @@ __all__ = [
     "Follower",
     "IdempotencyKey",
     "ImportJob",
+    "LlmCall",
     "Mention",
     "MyTaskPlacement",
     "Notification",

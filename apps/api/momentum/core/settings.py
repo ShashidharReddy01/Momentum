@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from typing import Literal
 
 from pydantic import Field, model_validator
@@ -18,6 +19,18 @@ DEV_SECRET = "dev-only-change-me"  # noqa: S105 - rejected in production by the 
 
 def _csv(value: str) -> list[str]:
     return [v.strip() for v in value.split(",") if v.strip()]
+
+
+def _json_str_map(value: str, name: str) -> dict[str, str]:
+    try:
+        parsed = json.loads(value or "{}")
+    except json.JSONDecodeError as e:
+        raise ValueError(f"{name} must be a JSON object") from e
+    if not isinstance(parsed, dict) or not all(
+        isinstance(k, str) and isinstance(v, str) for k, v in parsed.items()
+    ):
+        raise ValueError(f"{name} must be a JSON object of string values")
+    return parsed
 
 
 class Settings(BaseSettings):
@@ -81,6 +94,22 @@ class Settings(BaseSettings):
     llm_model_smart: str = "claude-smart"
     llm_embed_model: str = "cohere-embed-v3"
     llm_embed_dim: int = 1024
+    llm_embed_batch: int = Field(default=96, ge=1)
+    llm_timeout_s: float = Field(default=60, gt=0)
+    llm_max_retries: int = Field(default=2, ge=0)
+    llm_supports_streaming_tools: bool = True
+    # S3.1.1: gateways differ in how they take their key. LiteLLM uses the standard
+    # "Authorization: Bearer <key>"; some (e.g. Portkey) want it in their own header. Any other
+    # value sends the raw key in that header instead (the SDK's bearer header carries it too).
+    llm_api_key_header: str = "Authorization"
+    # JSON object of extra, non-secret headers sent on every gateway call (e.g. a gateway's
+    # provider/config routing header). Keep secrets in MOMENTUM_LLM_API_KEY, never here.
+    llm_extra_headers: str = "{}"
+    # JSON `{model: {in_per_mtok, out_per_mtok}}` (USD) used for llm_calls cost estimates.
+    llm_price_table: str = "{}"
+    # Mock/record fixture directory; empty = the packaged ai/evals/fixtures/mock_responses.
+    llm_fixtures_dir: str = ""
+    ai_monthly_budget_usd: float = Field(default=0, ge=0)  # 0 = unlimited
 
     # Integrations (S2.7.1) — overridable so J6's e2e journey can point this at a local recorded
     # fixture server instead of the real Asana API (see tools/e2e/asana_fixture_server.py).
@@ -93,6 +122,10 @@ class Settings(BaseSettings):
                 raise ValueError("MOMENTUM_AUTH_MODE dev/easyauth-sim is not allowed in production")
             if self.secret_key == DEV_SECRET or len(self.secret_key) < 32:
                 raise ValueError("MOMENTUM_SECRET_KEY must be set (>=32 chars) in production")
+            if self.ai_enabled and self.llm_mode != "gateway":
+                # Never a silent fallback to mock AI output in production (CLAUDE.md §3).
+                raise ValueError("MOMENTUM_LLM_MODE must be 'gateway' in production")
+        _json_str_map(self.llm_extra_headers, "MOMENTUM_LLM_EXTRA_HEADERS")
         self.base_path = self.base_path.rstrip("/")
         if self.base_path and not self.base_path.startswith("/"):
             raise ValueError("MOMENTUM_BASE_PATH must start with '/'")
@@ -118,6 +151,11 @@ class Settings(BaseSettings):
     @property
     def email_claims(self) -> list[str]:
         return _csv(self.easyauth_email_claims)
+
+    @property
+    def llm_headers(self) -> dict[str, str]:
+        """Parsed MOMENTUM_LLM_EXTRA_HEADERS (validated at startup)."""
+        return _json_str_map(self.llm_extra_headers, "MOMENTUM_LLM_EXTRA_HEADERS")
 
     @property
     def events_channel(self) -> str:

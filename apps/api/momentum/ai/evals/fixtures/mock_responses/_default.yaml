@@ -1,0 +1,4 @@
+# Generic fallback for any feature without its own fixture (or without a match in it).
+# Mock output must never pass for real AI output: keep the "(mock)" marker.
+default:
+  text: "(mock) This is a canned response: MOMENTUM_LLM_MODE=mock is on, so no model was called."

@@ -258,7 +258,7 @@ id, workspace_id, user_id (agent account), key (e.g., `daily_digest`), name, ava
 id, agent_id, workspace_id, trigger jsonb, status (`queued`,`running`,`succeeded`,`failed`,`cancelled`,`budget_exceeded`), steps int, input jsonb, output jsonb, trace jsonb (list of steps: thought summary, tool call, result digest), tokens_in, tokens_out, cost_usd, started_at, finished_at, error.
 
 ### `llm_calls`
-id, workspace_id, feature (`chat`,`command`,`summarize`,`status_draft`,`agent:<key>`,`embed`,…), alias, model, user_id null, agent_run_id null, tokens_in, tokens_out, cost_usd, latency_ms, status, error_code, created_at. (No prompt bodies. Optional debug capture goes to a separate table behind a flag with a TTL.)
+id, workspace_id, feature (`chat`,`command`,`summarize`,`status_draft`,`agent:<key>`,`embed`,…), alias (`fast`,`default`,`smart`,`embed`), model (as reported by the gateway), prompt_version null, user_id null (null for agents and system calls), agent_run_id null (FK added with `agent_runs` in Phase 5), tokens_in, tokens_out, cost_usd numeric(12,6), latency_ms, status (`ok`,`error`,`budget_exceeded`), error_code null (the failure kind: `timeout`,`connection`,`rate_limited`,`server_error`,`bad_request`,`auth`,`bad_response`), created_at. Index (workspace_id, created_at) for budgets and the usage page. Written in its own transaction, so usage of a rolled-back request still counts. (No prompt bodies. Optional debug capture goes to a separate table behind a flag with a TTL.) Migration 0015 (S3.1.1).
 
 ### `ai_memory`
 id, workspace_id, scope (`workspace`,`team`,`project`), scope_id, text, created_by, timestamps. Admin-editable facts injected into prompts.
