@@ -95,6 +95,7 @@
 ### S3.5.1: Eval harness
 **Scope:** `ai/evals` runner, scorers (structural, citation validity, schema validity, judge in live mode), fixtures for command, chat, status draft, subtasks, summarize, plan-my-day; `make evals`; report output.
 **Size:** M
+**Built (2026-09-26):** as scoped, for every Phase 3 AI feature (also writing help, quick add, project from brief): 118 cases, 21 of them with mock fixtures; an eval workspace built through the services; each case in a rolled-back transaction; judge in live mode; thresholds + regression check; `make evals` / `EVALS_LIVE=1 make evals`; reports in `reports/evals/` (git-ignored). New setting `MOMENTUM_EVALS_DATABASE_URL`. See testing-strategy §6 "As built".
 
 ### S3.5.2: AI usage and settings (admin)
 **Scope:** admin AI page: enable/disable, auto-apply policy, budget, usage by feature/user/day (from `llm_calls`), memory editor link, model alias display (read-only).

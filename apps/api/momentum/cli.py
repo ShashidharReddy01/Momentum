@@ -171,6 +171,38 @@ def llm_check() -> None:
         raise typer.Exit(code=1)
 
 
+@cli.command()
+def evals(
+    live: bool = typer.Option(
+        False, "--live", help="Call the configured gateway (default: mock fixtures only)"
+    ),
+    feature: list[str] = typer.Option([], "--feature", help="Only these features (repeatable)"),
+    case: str = typer.Option("", "--case", help="Only cases whose id contains this"),
+    report_dir: str = typer.Option("reports/evals", help="Where to write the JSON report"),
+    all_cases: bool = typer.Option(
+        False, "--all", help="Mock mode: also run the live-only cases (a plumbing check)"
+    ),
+) -> None:
+    """Run the AI evals on a throwaway *_evals database (S3.5.1). Exit code 1 on failure."""
+    from pathlib import Path
+
+    from momentum.ai.evals import main as evals_main
+
+    ok = run_async(
+        evals_main.run(
+            Settings(),
+            live=live or os.environ.get("EVALS_LIVE") == "1",
+            features=feature,
+            case=case or None,
+            report_dir=Path(report_dir),
+            echo=typer.echo,
+            all_cases=all_cases,
+        )
+    )
+    if not ok:
+        raise typer.Exit(code=1)
+
+
 def main() -> None:
     cli()
 

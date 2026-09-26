@@ -1,0 +1,26 @@
+# Minimum pass rate per feature (S3.5.1; testing-strategy §6). Mock mode runs only the cases
+# with handwritten fixtures, which are deterministic, so they must all pass. Live thresholds
+# follow the testing strategy (command target accuracy ≥ 90%, status citations 100%).
+# A drop of more than 5 points against the previous report of the same mode also fails.
+mock:
+  command: 1.0
+  chat: 1.0
+  summarize_thread: 1.0
+  summarize_inbox: 1.0
+  breakdown: 1.0
+  status_draft: 1.0
+  plan_day: 1.0
+  write: 1.0
+  quick_add: 1.0
+  from_brief: 1.0
+live:
+  command: 0.9
+  chat: 0.85
+  summarize_thread: 0.9
+  summarize_inbox: 0.9
+  breakdown: 0.9
+  status_draft: 1.0
+  plan_day: 0.85
+  write: 0.9
+  quick_add: 0.85
+  from_brief: 0.9

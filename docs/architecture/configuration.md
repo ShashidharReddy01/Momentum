@@ -87,6 +87,7 @@ Frontend build-time variables use the `VITE_MOMENTUM_` prefix, but the SPA prefe
 | `MOMENTUM_AI_RERANK` | `false` | Rerank hybrid-search candidates before the top k (S3.1.4). Turn on once `llm-check`'s rerank row passes |
 | `MOMENTUM_LLM_PRICE_TABLE` | `{}` | JSON `{model: {in_per_mtok, out_per_mtok}}` (USD, keyed by the configured model name) for cost estimates; unlisted models cost 0 |
 | `MOMENTUM_LLM_FIXTURES_DIR` | (packaged) | Mock/record fixture directory; empty = `momentum/ai/evals/fixtures/mock_responses` |
+| `MOMENTUM_EVALS_DATABASE_URL` | (empty) | S3.5.1: the throwaway database `momentum evals` drops and rebuilds on every run (migrate, seed, eval workspace, reindex). Its name must end in `_evals`. Empty = the main database's name + `_evals` on the same server (the role needs `CREATEDB`) |
 | `MOMENTUM_AI_MONTHLY_BUDGET_USD` | `0` (= unlimited) | Workspace cap on estimated cost (sum of `llm_calls.cost_usd` since 00:00 UTC on the 1st); checked before every call |
 | `MOMENTUM_AI_AUTO_APPLY_LOW_RISK` | `false` | Workspace default for ⌘K/chat |
 | `MOMENTUM_AI_DEBUG_CAPTURE` | `false` | Store prompts/responses for 7 days (never in prod by default) |

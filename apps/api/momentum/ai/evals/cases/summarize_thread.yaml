@@ -1,0 +1,33 @@
+# Thread summaries (S3.4.1): every [C#] must be a real comment of that thread.
+feature: summarize_thread
+cases:
+  - id: pricing_thread
+    mock: true
+    task: "Finalize pricing tiers"
+    expect: {citations_valid: true, min_citations: 1, not_empty: true}
+  - id: pricing_thread_content
+    task: "Finalize pricing tiers"
+    expect: {citations_valid: true, min_citations: 2, text_include_any: ["three tiers", "3 tiers"], text_include_all: ["trial"]}
+    judge: {rubric: "Covers the decision (three tiers, 14-day trial, annual = two months free), Mei updating the copy, and the open question (FAQ owner), citing comments."}
+  - id: open_question_surfaced
+    task: "Finalize pricing tiers"
+    expect: {citations_valid: true, text_include_any: ["FAQ"]}
+  - id: vendor_thread
+    task: "Sign vendor contract"
+    expect: {citations_valid: true, min_citations: 1, text_include_any: ["Friday"]}
+  - id: single_comment_thread
+    task: "Choose analytics tool"
+    expect: {citations_valid: true, text_include_any: ["Plausible"], max_chars: 500}
+  - id: no_comments_refused
+    mock: true
+    task: "Prepare press kit"
+    expect: {error: validation_failed}
+  - id: outsider_cannot_summarize
+    mock: true
+    user: tom
+    task: "Finalize pricing tiers"
+    expect: {error: not_found}
+  - id: owner_summarizes_private
+    user: priya
+    task: "Secret launch partner: Zenith Corp"
+    expect: {error: validation_failed}

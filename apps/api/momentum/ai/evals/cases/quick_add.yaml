@@ -1,0 +1,42 @@
+# Smart quick-add, the AI half (S3.2.1): names resolved to real people/projects; nothing made up.
+feature: quick_add
+cases:
+  - id: ana_budget_deck_mock
+    mock: true
+    input: "ana needs to prepare the Q4 budget deck by next friday"
+    expect: {fields: {assignee: "Ana Souza", title_includes: "budget deck"}}
+  - id: priya_vendor_contract_mock
+    mock: true
+    input: "priya should review the vendor contract asap, it's important"
+    expect: {fields: {assignee: "Priya Nair", project: "Vendor Onboarding", priority: high}}
+  - id: recurring_mock
+    mock: true
+    input: "water the office plants every monday and thursday"
+    expect: {fields: {recurrence_freq: weekly}}
+  - id: tomorrow_for_me
+    input: "remind me to call DataCo legal tomorrow"
+    expect: {fields: {assignee: "Ravi Kumar", due_in_days: 1, title_includes: "DataCo"}}
+  - id: in_three_days_for_mei
+    input: "mei to finish the pricing copy in 3 days"
+    expect: {fields: {assignee: "Mei Chen", due_in_days: 3, title_includes: "pricing copy"}}
+  - id: project_by_name
+    input: "add press release draft to the launch plan project for ana"
+    expect: {fields: {project: "Launch Plan", assignee: "Ana Souza"}}
+  - id: urgent_priority
+    input: "URGENT: fix the broken checkout for priya today"
+    expect: {fields: {priority: urgent, assignee: "Priya Nair", due_in_days: 0}}
+  - id: unknown_person_unresolved
+    input: "ask Bartholomew to review the logo by friday"
+    expect: {notes_include: ["Bartholomew"]}
+  - id: private_project_not_offered
+    input: "add due diligence notes to the Secret Roadmap project"
+    expect: {fields: {project: null}, notes_include: ["Secret Roadmap"]}
+  - id: every_other_week
+    input: "send the vendor status report every other friday"
+    expect: {fields: {recurrence_freq: weekly}}
+  - id: plain_title_untouched
+    input: "Order new badges for the team"
+    expect: {fields: {title_includes: "badges", assignee: null}}
+  - id: monthly_first
+    input: "pay the hosting invoice on the 1st of every month"
+    expect: {fields: {recurrence_freq: monthly}}

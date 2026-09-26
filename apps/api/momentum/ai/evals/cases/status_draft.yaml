@@ -1,0 +1,28 @@
+# Status drafts (S3.4.3): every remaining claim cites a task from the project's facts
+# (enforced server-side); the judge checks the claims are true to the facts.
+feature: status_draft
+cases:
+  - id: launch_plan_draft
+    mock: true
+    project: "Launch Plan"
+    expect: {items_cite_tasks: true, citations_valid: true}
+  - id: launch_plan_live
+    project: "Launch Plan"
+    expect: {items_cite_tasks: true, citations_valid: true, status_in: [at_risk, off_track], mentions_exclude: ["Zenith"]}
+    judge: {rubric: "Accurate to the facts: the overdue vendor contract and pricing tiers, the pushed announcement date, the blocked payment approval and pricing copy, what's due next. No invented progress."}
+  - id: mentions_the_slip
+    project: "Launch Plan"
+    expect: {items_cite_tasks: true, cites_include: ["Write launch announcement"]}
+  - id: mentions_blockers
+    project: "Launch Plan"
+    expect: {items_cite_tasks: true, cites_include: ["Payment provider approval"]}
+  - id: quiet_project
+    project: "Mobile App v2"
+    user: priya
+    expect: {citations_valid: true}
+    judge: {rubric: "If little happened, it says so plainly instead of inventing progress."}
+  - id: viewer_refused
+    mock: true
+    user: tom
+    project: "Launch Plan"
+    expect: {error: not_found}

@@ -21,3 +21,6 @@ infra/litellm/config.yaml
 .idea/
 .vscode/*
 !.vscode/extensions.json
+
+# AI eval reports (make evals)
+reports/

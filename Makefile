@@ -4,7 +4,7 @@ API := apps/api
 WEB := apps/web
 COMPOSE := docker compose -f infra/compose/docker-compose.dev.yml
 
-.PHONY: help start install db-up db-down dev dev-api dev-web migrate migration seed types e2e \
+.PHONY: help start install db-up db-down dev dev-api dev-web migrate migration seed types e2e evals \
         check check-api check-web test-api test-web fmt build docker-build
 
 help:
@@ -82,6 +82,9 @@ test-web:
 
 e2e: ## E2E journeys (real API + Postgres, throwaway *_e2e database, built SPA)
 	cd $(WEB) && pnpm build && pnpm exec playwright test
+
+evals: ## AI evals (mock by default; EVALS_LIVE=1 hits the configured gateway). Report in reports/evals/
+	cd $(API) && uv run momentum evals --report-dir ../../reports/evals
 
 fmt: ## Auto-format everything
 	cd $(API) && uv run ruff format momentum tests && uv run ruff check --fix momentum tests

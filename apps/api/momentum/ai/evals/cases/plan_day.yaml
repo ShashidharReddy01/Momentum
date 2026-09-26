@@ -1,0 +1,19 @@
+# Plan my day (S3.4.5): only the user's own open tasks, overdue first.
+feature: plan_day
+cases:
+  - id: ravi_default
+    mock: true
+    expect: {citations_valid: true, proposes: [plan_my_day]}
+  - id: ravi_overdue_first
+    expect: {today_first_any: ["{{key:Finalize pricing tiers}}"], today_exclude: ["{{key:QA the checkout flow}}", "{{key:Kickoff meeting notes}}"]}
+    judge: {rubric: "Puts the overdue pricing decision first and explains the order briefly with citations."}
+  - id: ana_overdue_first
+    user: ana
+    expect: {today_include: ["{{key:Sign vendor contract}}"], today_exclude: ["{{key:Payment provider approval}}"]}
+  - id: mei_blocked_later
+    user: mei
+    expect: {citations_valid: true}
+    judge: {rubric: "Doesn't put the blocked pricing copy first; explains it waits on the pricing decision."}
+  - id: no_private_leak
+    user: ravi
+    expect: {mentions_exclude: ["Zenith"], today_exclude: ["{{key:Secret launch partner: Zenith Corp}}"]}

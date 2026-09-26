@@ -1,0 +1,18 @@
+# Inbox catch-up (S3.4.1): task keys must be real and visible to the reader.
+feature: summarize_inbox
+cases:
+  - id: ana_catch_up
+    mock: true
+    user: ana
+    expect: {citations_valid: true, min_citations: 1}
+  - id: ana_catch_up_live
+    user: ana
+    expect: {citations_valid: true, cites_include: ["Sign vendor contract"]}
+    judge: {rubric: "Leads with what needs Ana (her assignments, the overdue vendor contract) and groups the rest; nothing invented."}
+  - id: mei_catch_up
+    user: mei
+    expect: {citations_valid: true, min_citations: 1, mentions_exclude: ["Zenith"]}
+  - id: nobody_unread
+    mock: true
+    user: noor
+    expect: {error: validation_failed}

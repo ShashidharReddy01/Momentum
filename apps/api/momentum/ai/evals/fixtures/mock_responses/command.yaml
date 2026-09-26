@@ -28,6 +28,17 @@ responses:
     tool_calls: [{name: delete_task, arguments: {task: {title_query: "Draft pricing FAQ"}}}]
   - match: {contains: "delete draft pricing faq", turn: 2}
     text: "Draft pricing FAQ will be deleted."
+  # S3.5.1 eval cases (the eval workspace's "Launch Plan")
+  - match: {contains: "assign all overdue tasks in launch plan to ana", turn: 1}
+    tool_calls: [{name: search_tasks, arguments: {project: "Launch Plan", overdue: true, limit: 50}}]
+  - match: {contains: "assign all overdue tasks in launch plan to ana", turn: 2}
+    tool_calls: [{name: bulk_update_tasks, arguments: {tasks: "$last.data.tasks[].key", assignee: "Ana"}}]
+  - match: {contains: "assign all overdue tasks in launch plan to ana", turn: 3}
+    text: "The overdue tasks in Launch Plan will be assigned to Ana Souza."
+  - match: {contains: "complete qa the checkout flow", turn: 1}
+    tool_calls: [{name: complete_task, arguments: {task: {title_query: "QA the checkout flow"}}}]
+  - match: {contains: "complete qa the checkout flow", turn: 2}
+    text: "QA the checkout flow will be marked complete."
   - match: {contains: "keep searching forever"}
     tool_calls: [{name: search_tasks, arguments: {text: "anything"}}]
 default:

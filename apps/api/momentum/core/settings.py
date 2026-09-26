@@ -113,6 +113,9 @@ class Settings(BaseSettings):
     llm_price_table: str = "{}"
     # Mock/record fixture directory; empty = the packaged ai/evals/fixtures/mock_responses.
     llm_fixtures_dir: str = ""
+    # S3.5.1: the throwaway database `momentum evals` resets (its name must end in _evals);
+    # empty = the main database's name + "_evals" on the same server
+    evals_database_url: str = ""
     ai_monthly_budget_usd: float = Field(default=0, ge=0)  # 0 = unlimited
 
     # Integrations (S2.7.1) — overridable so J6's e2e journey can point this at a local recorded
