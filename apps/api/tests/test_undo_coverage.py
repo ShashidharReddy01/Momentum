@@ -37,6 +37,11 @@ def test_every_recorded_undo_op_has_a_handler() -> None:
     for mod in pkgutil.walk_packages([str(root / "domain")], "momentum.domain."):
         if mod.name.endswith(".service"):
             importlib.import_module(mod.name)
+    # AI modules that record undoable changes (S3.1.5 memory); without this the check passed
+    # only when another test had imported them first
+    for mod in pkgutil.walk_packages([str(root / "ai")], "momentum.ai."):
+        if not mod.ispkg:
+            importlib.import_module(mod.name)
     ops = set()
     for path in root.rglob("*.py"):
         ops |= set(re.findall(r'undo_op\(\s*"([a-z_.]+)"', path.read_text()))
@@ -66,6 +71,12 @@ async def _roundtrip(
     u = await c.post(f"{BASE}/undo", json=body)
     assert u.status_code == 200, f"{label}: undo failed {u.text}"
     assert normalize(await snap()) == before, f"{label}: not restored"
+
+
+async def _status_snap(c: httpx.AsyncClient, pid: str) -> Any:
+    project = (await c.get(f"{BASE}/projects/{pid}")).json()
+    history = (await c.get(f"{BASE}/projects/{pid}/status-updates")).json()["data"]
+    return [project, history]
 
 
 async def test_undo_restores_every_phase_1_mutation(as_user: Clients) -> None:
@@ -131,6 +142,15 @@ async def test_undo_restores_every_phase_1_mutation(as_user: Clients) -> None:
     cases: list[
         tuple[str, Callable[[], Awaitable[Any]], Callable[[], Awaitable[httpx.Response]]]
     ] = [
+        # status updates (S3.4.3): the update and the project's status
+        (
+            "status update posted",
+            lambda: _status_snap(ravi, pid),
+            lambda: ravi.post(
+                f"{BASE}/projects/{pid}/status-updates",
+                json={"status": "at_risk", "title": "Late", "summary": "Copy is late"},
+            ),
+        ),
         # teams
         (
             "team rename",

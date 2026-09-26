@@ -1,0 +1,23 @@
+# S3.4.3 status drafts (mock). The user message holds the project's facts; {{$keys}} cites
+# every task key in them. The backend tests' project also gets claims the server must remove.
+responses:
+  - match: {contains: 'project="AI Tools Lab"'}
+    tool_calls:
+      - name: submit_result
+        arguments:
+          status: at_risk
+          title: "Pricing work slips"
+          summary: "Work continued on {{$keys}}; see also [T-999999]."
+          completed: [{text: "Moved forward on {{$keys}}"}]
+          slipped: [{text: "Something vague slipped"}, {text: "Invented delay on [T-999999]"}]
+          blockers: []
+          next: [{text: "Finish {{$keys}}"}]
+default:
+  tool_calls:
+    - name: submit_result
+      arguments:
+        status: on_track
+        title: "(mock) Steady progress"
+        summary: "(mock) Status drafted from this week's activity: {{$keys}}"
+        completed: [{text: "(mock) Progress on {{$keys}}"}]
+        next: [{text: "(mock) Keep going on {{$keys}}"}]

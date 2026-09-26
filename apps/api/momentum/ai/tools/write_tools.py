@@ -33,6 +33,8 @@ from momentum.domain.comments.service import create_comment
 from momentum.domain.projects.schemas import ProjectCreateIn
 from momentum.domain.projects.service import create_project
 from momentum.domain.sections.service import create_section, list_sections, rename_section
+from momentum.domain.status_updates import service as status_updates
+from momentum.domain.status_updates.schemas import StatusItem, StatusSections, StatusUpdateIn
 from momentum.domain.tasks import service as tasks
 from momentum.domain.tasks.models import Task
 from momentum.domain.teams.models import Team, TeamMember
@@ -309,6 +311,60 @@ async def add_comment(tc: ToolContext, args: AddCommentArgs) -> ToolResult:
     )
 
 
+# ---------------- create_status_update (S3.4.3) ----------------
+
+
+class CreateStatusUpdateArgs(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    project: str = Field(min_length=1, max_length=200, description="Project name or id")
+    status: Literal["on_track", "at_risk", "off_track", "on_hold", "complete"]
+    title: str = Field(
+        min_length=1, max_length=200, description="One line, e.g. 'Beta slips a week'"
+    )
+    summary: str = Field(default="", max_length=4000)
+    completed: list[str] = Field(default_factory=list, max_length=30)
+    slipped: list[str] = Field(default_factory=list, max_length=30)
+    blockers: list[str] = Field(default_factory=list, max_length=30)
+    next: list[str] = Field(default_factory=list, max_length=30)
+
+
+@tool(
+    name="create_status_update",
+    description=(
+        "Post a status update on a project (sets its status). Cite tasks in the text with keys "
+        "like [T-12]. Use get_project and get_project_activity first; never invent progress."
+    ),
+    risk="medium",
+    scopes=WRITE,
+)
+async def create_status_update(tc: ToolContext, args: CreateStatusUpdateArgs) -> ToolResult:
+    project, _ = await resolve_project(tc, args.project)
+
+    def items(texts: list[str]) -> list[StatusItem]:
+        return [StatusItem(text=t) for t in texts if t.strip()]
+
+    data = StatusUpdateIn(
+        status=args.status,
+        title=args.title,
+        summary=args.summary,
+        sections=StatusSections(
+            completed=items(args.completed),
+            slipped=items(args.slipped),
+            blockers=items(args.blockers),
+            next=items(args.next),
+        ),
+        generated_by_ai=True,
+    )
+    await status_updates.create_status_update(
+        tc.session, tc.ctx, project.id, data, batch_id=tc.batch_id
+    )
+    return ToolResult.success(
+        f"{tc.verb('Posted', 'Would post')} a status update on {project.name}: "
+        f"{args.status.replace('_', ' ')}, {args.title}",
+        targets=[{"type": "project", "id": str(project.id), "title": project.name}],
+    )
+
+
 # ---------------- create_subtasks ----------------
 
 
@@ -569,6 +625,7 @@ TOOLS = [
     move_task,
     add_comment,
     create_subtasks,
+    create_status_update,
     create_project_from_plan,
     bulk_update_tasks,
     delete_task,

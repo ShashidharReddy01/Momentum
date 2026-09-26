@@ -86,7 +86,7 @@ Registered in S3.1.2 unless noted. `semantic_search` arrives with S3.1.4 (embedd
 | `add_comment` | low | 3 | Always marked AI |
 | `create_subtasks` | low | 3 | Batch under a parent |
 | `create_project_from_plan` | medium | 3 | Sections + tasks (assignees, dates, descriptions); team defaults to the user's only team |
-| `create_status_update` | medium | 3 (S3.4.3) | Draft or publish (publish needs confirm) |
+| `create_status_update` | medium | 3 (S3.4.3) | Post a status update (sets the project status); medium risk, so always previewed and applied by the user. Drafting is the separate `POST /ai/projects/{id}/status-draft` |
 | `bulk_update_tasks` | medium (>25: high) | 3 | Same assignee/dates/completed change on up to 100 tasks, all or nothing |
 | `delete_task` | high | 3 | Soft delete, always confirm |
 | `create_rule` | medium | 4 | From NL rule compile |
@@ -176,6 +176,8 @@ Workspace memory:
 - **As built (S3.4.1):** `ai/summarize.py` summaries: plain `complete` calls (no tools), content wrapped in `<data source="comments|inbox">`, results cached in `ai_summaries` keyed by `(entity, kind, sha256(prompt version, model, content))` with insert-on-conflict so concurrent requests share one row.
 
 - **As built (S3.4.2):** inline features that change data (break down; later status drafts, plan my day, project from brief) use `structured.extract` for a typed proposal, **validate it server-side** against what the user may do (people on the project, date ranges, duplicates), and turn it into registry tool calls proposed through `ai/actions.py` (`source="inline"`), never a write path of their own.
+
+- **As built (S3.4.3):** `ai/status_draft.py` collects the window's facts on the server (completed; open and overdue; due date pushed later, from the activity trail; blocked by unfinished work; due in 7 days), each with its task key, and sends only those as data. The structured draft is checked: an item survives only if it cites at least one key from the facts; stray keys are stripped from the summary; every removal is a note. The draft is not stored; the user posts it through `POST /projects/{id}/status-updates` (`generated_by_ai`). Citation resolution moved to `domain/references.py` (the domain's status-update router needs it; `ai/citations.py` re-exports it).
 
 ## 8. Prompt-injection and data safety
 

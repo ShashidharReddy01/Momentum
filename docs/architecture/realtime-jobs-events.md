@@ -66,7 +66,8 @@ Event payloads share an envelope:
 | `reaction.added` / `reaction.removed` | 1 | |
 | `field_value.changed` | 2 | field_id, old/new |
 | `attachment.added` / `attachment.deleted` | 2 | |
-| `status_update.created` | 3 | status |
+| `status_update.created` | 3 | `project_id`, `status`, `version` (S3.4.3; channel `project:<id>`) |
+| `status_update.withdrawn` | 3 | `project_id`, `status` (the restored one), `version`: an undone update (S3.4.3) |
 | `ai_action.proposed` / `ai_action.applied` / `ai_action.rejected` / `ai_action.undone` | 3 | ai_action_id, summary |
 | `approval.requested` / `approval.decided` | 4 | state |
 | `form.submitted` | 4 | form_id, task_id |

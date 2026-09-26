@@ -13,6 +13,7 @@ from momentum.domain.mytasks.models import MyTaskPlacement
 from momentum.domain.notifications.models import Notification
 from momentum.domain.projects.models import Favorite, Project, ProjectMember
 from momentum.domain.sections.models import Section
+from momentum.domain.status_updates.models import StatusUpdate
 from momentum.domain.tags.models import Tag, TaskTag
 from momentum.domain.tasks.models import Follower, Task, TaskDependency, TaskProject
 from momentum.domain.teams.models import Team, TeamMember
@@ -47,6 +48,7 @@ __all__ = [
     "ProjectMember",
     "Reaction",
     "Section",
+    "StatusUpdate",
     "Tag",
     "Task",
     "TaskDependency",

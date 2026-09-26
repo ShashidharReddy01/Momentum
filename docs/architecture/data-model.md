@@ -177,6 +177,7 @@ id, workspace_id, task_id null, comment_id null, storage_key, filename, mime, si
 
 ### `status_updates`
 id, workspace_id, entity_type (`project`,`portfolio`,`goal`), entity_id, status (as project.status), title, body jsonb, body_text, author_id, generated_by_ai bool, ai_action_id null, created_at.
+**As built (S3.4.3, migration 0020):** plus `created_via` and `deleted_at` (an undone update is withdrawn, not erased); `body` = `{summary, sections: {completed, slipped, blockers, next: [{text}]}}`; `body_text` a plain rendering ("At risk: title", summary, "Slipped:" + "- item" lines); index (entity_type, entity_id, created_at). Posting sets `projects.status` and bumps the project's version in the same transaction; undo (`status_updates.withdraw`) restores the previous status unless it changed since. `[T-n]` keys in the text are resolved for each reader when listed.
 
 ## 6. Activity, events, notifications
 

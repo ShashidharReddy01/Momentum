@@ -2,7 +2,7 @@ export { PreviewCard } from './PreviewCard';
 export { AiActionPage } from './AiActionPage';
 export { AiSettingsPage } from './AiSettingsPage';
 export { AskPage } from './AskPage';
-export { SummaryButton } from './Summaries';
+export { errorText, SummaryButton } from './Summaries';
 export { BreakDownButton } from './BreakDown';
 export { MoComposer, MoText, MoThread } from './MoThread';
 export {

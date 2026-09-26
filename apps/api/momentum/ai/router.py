@@ -4,7 +4,7 @@ errors, ``{data}`` envelopes)."""
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from typing import Any, Literal
 
 from fastapi import APIRouter, status
@@ -12,7 +12,18 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from momentum.ai import actions, breakdown, chat, memory, prefs, quick_add, sse, summarize
+from momentum.ai import (
+    actions,
+    breakdown,
+    chat,
+    citations,
+    memory,
+    prefs,
+    quick_add,
+    sse,
+    status_draft,
+    summarize,
+)
 from momentum.ai.command import run_command
 from momentum.ai.context import Screen
 from momentum.ai.errors import AIUnavailable
@@ -23,6 +34,8 @@ from momentum.ai.prefs import AiPrefs
 from momentum.api.deps import CtxDep, RuntimeDep, UowDep
 from momentum.api.schemas import ListOut, MutationOut
 from momentum.core.errors import ValidationFailed
+from momentum.domain.status_updates.schemas import StatusUpdateIn
+from momentum.domain.status_updates.service import body_text as status_body_text
 
 router = APIRouter(prefix="/ai", tags=["ai"])
 
@@ -519,3 +532,44 @@ async def ai_breakdown(
         )
         assert r.action_id is not None
         return BreakdownOut(action_id=r.action_id, notes=r.notes, count=r.count)
+
+
+# ---------------- draft status update (S3.4.3) ----------------
+
+
+class StatusDraftIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    days: int = Field(default=7, ge=1, le=31, description="How far back to look")
+
+
+class StatusDraftOut(BaseModel):
+    draft: StatusUpdateIn
+    notes: list[str]
+    facts: dict[str, int]
+    since: date
+    citations: list[CitationOut]
+
+
+@router.post(
+    "/projects/{project_id}/status-draft",
+    response_model=StatusDraftOut,
+    summary="Draft a status update from the project's recent activity (stores nothing)",
+)
+async def ai_status_draft(
+    project_id: uuid.UUID, body: StatusDraftIn, ctx: CtxDep, uow: UowDep, rt: RuntimeDep
+) -> StatusDraftOut:
+    llm = require_llm(rt)
+    ctx = ctx.with_(via="ai")
+    async with uow.transaction() as s:
+        r = await status_draft.draft_status(
+            s, llm, ctx, project_id, now=datetime.now(UTC), days=body.days
+        )
+        text = status_body_text(r.draft)
+        cites = await citations.resolve(s, ctx, text)
+        return StatusDraftOut(
+            draft=r.draft,
+            notes=r.notes,
+            facts=r.facts,
+            since=r.since,
+            citations=[CitationOut(**c.to_json()) for c in cites],
+        )

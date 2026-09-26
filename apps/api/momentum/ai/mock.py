@@ -194,17 +194,31 @@ def _entry_matches(entry: dict[str, Any], key: str, last_user: str, turn: int = 
     return False
 
 
+def _fill_strings(value: Any, last: Any, user: str) -> Any:
+    """``{{…}}`` slots inside string arguments (structured-output fixtures)."""
+    if isinstance(value, str) and "{{" in value:
+        return _fill_text(value, last, user)
+    if isinstance(value, dict):
+        return {k: _fill_strings(v, last, user) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_fill_strings(v, last, user) for v in value]
+    return value
+
+
 def _entry_to_completion(entry: dict[str, Any], req: ChatRequest) -> RawCompletion:
     last = _last_tool_result(req.messages)
+    user = _last_user_text(req.messages)
     calls = [
         ToolCall(
             id=f"call_mock_{_turn(req.messages)}_{i}",
             name=str(tc["name"]),
-            arguments=json.dumps(_fill(tc.get("arguments") or {}, last), sort_keys=True),
+            arguments=json.dumps(
+                _fill_strings(_fill(tc.get("arguments") or {}, last), last, user), sort_keys=True
+            ),
         )
         for i, tc in enumerate(entry.get("tool_calls") or [])
     ]
-    text = _fill_text(str(entry.get("text") or ""), last, _last_user_text(req.messages))
+    text = _fill_text(str(entry.get("text") or ""), last, user)
     prompt = "".join(_content_text(m.get("content")) for m in req.messages)
     return RawCompletion(
         text=text,

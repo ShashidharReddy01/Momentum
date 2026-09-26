@@ -10,8 +10,9 @@ import {
   Users,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { AskMoButton } from '@/components/common/AI';
+import { MoMark } from '@/components/common/MoMark';
 import { InlineText } from '@/components/common/InlineText';
 import { ErrorState } from '@/components/common/States';
 import { Avatar } from '@/components/ui/Avatar';
@@ -35,6 +36,8 @@ import { cn } from '@/lib/cn';
 import { useCrumbs } from '@/lib/crumbs';
 import { CsvImportDialog } from '@/features/csvImport';
 import { FieldsDialog } from '@/features/fields';
+import { StatusChip, StatusOverview, type Status } from '@/features/status';
+import { useMomentumConfig } from '@/lib/config';
 import { useProject, useProjectLifecycle, useToggleFavorite, useUpdateProject } from './queries';
 import { ShareDialog } from './ShareDialog';
 import {
@@ -53,7 +56,7 @@ const VIEWS = [
   { key: 'board', label: 'Board' },
   { key: 'calendar', label: 'Calendar' },
   { key: 'timeline', label: 'Timeline', phase: 6 },
-  { key: 'overview', label: 'Overview', phase: 6 },
+  { key: 'overview', label: 'Overview' },
 ] as const;
 type LiveView = Exclude<(typeof VIEWS)[number], { phase: number }>['key'];
 const LIVE_VIEWS: ReadonlySet<string> = new Set(
@@ -73,6 +76,7 @@ export function ProjectPage() {
   const favorite = useToggleFavorite();
   const { lastView, ready: lastViewReady, save: saveLastView } = useLastView(projectId);
   const navigate = useNavigate();
+  const aiEnabled = useMomentumConfig().ai_enabled;
   const [share, setShare] = useState(false);
   const [fieldsOpen, setFieldsOpen] = useState(false);
   const [csvImportOpen, setCsvImportOpen] = useState(false);
@@ -155,6 +159,16 @@ export function ProjectPage() {
               ))}
             </div>
             <AskMoButton about={{ kind: 'project', projectId: p.id, label: p.name }} />
+            {canEdit && aiEnabled ? (
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => navigate(`/projects/${p.id}/overview?draft=mo`)}
+              >
+                <MoMark size={13} /> Draft status
+              </Button>
+            ) : null}
+            {p.status ? <StatusChip status={p.status as Status} /> : null}
             <IconButton icon={SlidersHorizontal} label="Fields" onClick={() => setFieldsOpen(true)} />
             <Button size="sm" onClick={() => setShare(true)}>
               <Icon icon={p.privacy === 'private' ? Lock : Users} /> Share
@@ -269,6 +283,7 @@ function ProjectBody({
   color: string | null;
 }) {
   const nav = useTaskNav()!;
+  const [searchParams] = useSearchParams();
   return (
     <div className="flex min-h-0 flex-1">
       <div
@@ -283,6 +298,13 @@ function ProjectBody({
           <BoardView key={projectId} projectId={projectId} canEdit={canEdit} color={color} />
         ) : view === 'calendar' ? (
           <CalendarView key={projectId} projectId={projectId} canEdit={canEdit} color={color} />
+        ) : view === 'overview' ? (
+          <StatusOverview
+            key={projectId}
+            projectId={projectId}
+            canEdit={canEdit}
+            startDraft={searchParams.get('draft') === 'mo'}
+          />
         ) : null}
       </div>
       {nav.openId ? (

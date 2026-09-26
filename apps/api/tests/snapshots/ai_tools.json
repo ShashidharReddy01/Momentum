@@ -1097,6 +1097,79 @@
   },
   {
     "function": {
+      "description": "Post a status update on a project (sets its status). Cite tasks in the text with keys like [T-12]. Use get_project and get_project_activity first; never invent progress.",
+      "name": "create_status_update",
+      "parameters": {
+        "additionalProperties": false,
+        "properties": {
+          "blockers": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 30,
+            "type": "array"
+          },
+          "completed": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 30,
+            "type": "array"
+          },
+          "next": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 30,
+            "type": "array"
+          },
+          "project": {
+            "description": "Project name or id",
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string"
+          },
+          "slipped": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 30,
+            "type": "array"
+          },
+          "status": {
+            "enum": [
+              "on_track",
+              "at_risk",
+              "off_track",
+              "on_hold",
+              "complete"
+            ],
+            "type": "string"
+          },
+          "summary": {
+            "default": "",
+            "maxLength": 4000,
+            "type": "string"
+          },
+          "title": {
+            "description": "One line, e.g. 'Beta slips a week'",
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "project",
+          "status",
+          "title"
+        ],
+        "type": "object"
+      }
+    },
+    "type": "function"
+  },
+  {
+    "function": {
       "description": "Create a new project with sections and tasks (assignees, dates, descriptions) from a plan. The user becomes its admin.",
       "name": "create_project_from_plan",
       "parameters": {
