@@ -72,6 +72,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/ai/chat": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Ask Mo (SSE: conversation, tool_call, tool_result, token, citation, action_proposed, action_applied, clarify, done, error) */
+        post: operations["ai_chat_api_v1_ai_chat_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/ai/command": {
         parameters: {
             query?: never;
@@ -83,6 +100,57 @@ export interface paths {
         put?: never;
         /** Run a natural-language command (SSE: tool_call, tool_result, token, action_proposed, action_applied, clarify, done, error) */
         post: operations["ai_command_api_v1_ai_command_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ai/conversations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** My Ask Mo conversations */
+        get: operations["list_ai_conversations_api_v1_ai_conversations_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ai/conversations/{conversation_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One of my conversations, with its messages (citations checked for me now) */
+        get: operations["get_ai_conversation_api_v1_ai_conversations__conversation_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ai/feedback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Rate an answer or action 👍/👎 */
+        put: operations["put_ai_feedback_api_v1_ai_feedback_put"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1855,6 +1923,77 @@ export interface components {
             /** File */
             file: string;
         };
+        /** ChatIn */
+        ChatIn: {
+            /** Conversation Id */
+            conversation_id?: string | null;
+            screen?: components["schemas"]["ScreenIn"] | null;
+            /** Text */
+            text: string;
+        };
+        /** ChatMessageOut */
+        ChatMessageOut: {
+            /** Action Id */
+            action_id?: string | null;
+            /** Candidates */
+            candidates?: {
+                [key: string]: unknown;
+            }[];
+            /** Citations */
+            citations?: components["schemas"]["CitationOut"][];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Grounded */
+            grounded?: boolean | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Rating */
+            rating?: (-1 | 1) | null;
+            /**
+             * Role
+             * @enum {string}
+             */
+            role: "user" | "assistant";
+            /** Steps */
+            steps?: components["schemas"]["ChatStepOut"][];
+            /** Text */
+            text: string;
+        };
+        /** ChatStepOut */
+        ChatStepOut: {
+            /** Name */
+            name: string;
+            /** Ok */
+            ok?: boolean | null;
+            /** Preview */
+            preview?: boolean | null;
+            /** Summary */
+            summary?: string | null;
+        };
+        /** CitationOut */
+        CitationOut: {
+            /** Id */
+            id?: string | null;
+            /** Key */
+            key?: string | null;
+            /** Ref */
+            ref: string;
+            /** Title */
+            title?: string | null;
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "task" | "project";
+            /** Valid */
+            valid: boolean;
+        };
         /** CommandIn */
         CommandIn: {
             screen?: components["schemas"]["ScreenIn"] | null;
@@ -1921,6 +2060,39 @@ export interface components {
              * Format: uuid
              */
             task_id: string;
+        };
+        /** ConversationDetailOut */
+        ConversationDetailOut: {
+            data: components["schemas"]["ConversationOut"];
+            /** Messages */
+            messages: components["schemas"]["ChatMessageOut"][];
+        };
+        /** ConversationOut */
+        ConversationOut: {
+            /** Context Id */
+            context_id: string | null;
+            /**
+             * Context Type
+             * @enum {string}
+             */
+            context_type: "global" | "task" | "project";
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Title */
+            title: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
         };
         /** CsvImportResult */
         CsvImportResult: {
@@ -2020,6 +2192,40 @@ export interface components {
             id: string;
             /** Title */
             title: string;
+        };
+        /** FeedbackIn */
+        FeedbackIn: {
+            /** Comment */
+            comment?: string | null;
+            /**
+             * Rating
+             * @enum {integer}
+             */
+            rating: -1 | 1;
+            /**
+             * Target Id
+             * Format: uuid
+             */
+            target_id: string;
+            /**
+             * Target Type
+             * @enum {string}
+             */
+            target_type: "ai_message" | "ai_action";
+        };
+        /** FeedbackOut */
+        FeedbackOut: {
+            /** Comment */
+            comment: string | null;
+            /** Rating */
+            rating: number;
+            /**
+             * Target Id
+             * Format: uuid
+             */
+            target_id: string;
+            /** Target Type */
+            target_type: string;
         };
         /**
          * FieldAttachIn
@@ -2231,6 +2437,13 @@ export interface components {
         ListOut_CommentOut_: {
             /** Data */
             data: components["schemas"]["CommentOut"][];
+            /** @default {} */
+            meta: components["schemas"]["ListMeta"];
+        };
+        /** ListOut[ConversationOut] */
+        ListOut_ConversationOut_: {
+            /** Data */
+            data: components["schemas"]["ConversationOut"][];
             /** @default {} */
             meta: components["schemas"]["ListMeta"];
         };
@@ -3951,6 +4164,37 @@ export interface operations {
             };
         };
     };
+    ai_chat_api_v1_ai_chat_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChatIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     ai_command_api_v1_ai_command_post: {
         parameters: {
             query?: never;
@@ -3970,6 +4214,90 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_ai_conversations_api_v1_ai_conversations_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListOut_ConversationOut_"];
+                };
+            };
+        };
+    };
+    get_ai_conversation_api_v1_ai_conversations__conversation_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationDetailOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_ai_feedback_api_v1_ai_feedback_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FeedbackIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FeedbackOut"];
+                };
             };
             /** @description Validation Error */
             422: {

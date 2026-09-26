@@ -1,5 +1,6 @@
 import { http, HttpResponse } from 'msw';
 import type { AiAction } from '@/features/ai';
+import type { components } from '@/lib/api/schema';
 
 const problem = (status: number, code: string, detail: string) =>
   HttpResponse.json(
@@ -170,4 +171,42 @@ export function aiCommandHandlers(scripts: ScriptedEvent[][], prefs = { auto_app
     }),
   ];
   return { handlers, requests, saved };
+}
+
+type ChatMessage = components['schemas']['ChatMessageOut'];
+type Conversation = components['schemas']['ConversationOut'];
+
+/** Ask Mo chat (S3.3.1): `POST /ai/chat` streams one scripted event list per request, in order;
+ * conversations and their messages are served from `stored`; feedback is recorded. */
+export function aiChatHandlers(
+  scripts: ScriptedEvent[][],
+  stored: { conversation: Conversation; messages: ChatMessage[] }[] = [],
+) {
+  const requests: { text: string; conversation_id?: string | null; screen?: unknown }[] = [];
+  const feedback: unknown[] = [];
+  const handlers = [
+    http.post('*/api/v1/ai/chat', async ({ request }) => {
+      requests.push((await request.json()) as { text: string });
+      const script = scripts.shift() ?? [['done', { steps: 0 }]];
+      const body = script
+        .map(([event, data]) => `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`)
+        .join('');
+      return new HttpResponse(body, { headers: { 'content-type': 'text/event-stream' } });
+    }),
+    http.get('*/api/v1/ai/conversations', () =>
+      HttpResponse.json({ data: stored.map((s) => s.conversation), meta: { next_cursor: null } }),
+    ),
+    http.get('*/api/v1/ai/conversations/:id', ({ params }) => {
+      const s = stored.find((x) => x.conversation.id === params.id);
+      return s
+        ? HttpResponse.json({ data: s.conversation, messages: s.messages })
+        : problem(404, 'not_found', 'Conversation not found');
+    }),
+    http.put('*/api/v1/ai/feedback', async ({ request }) => {
+      const b = (await request.json()) as Record<string, unknown>;
+      feedback.push(b);
+      return HttpResponse.json({ comment: null, ...b });
+    }),
+  ];
+  return { handlers, requests, feedback };
 }

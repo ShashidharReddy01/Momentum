@@ -3,6 +3,11 @@ import { createStore, useStore, type StoreApi } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
 export type Theme = 'light' | 'dark';
+export interface MoRequest {
+  id: number;
+  text: string;
+  kind: 'command' | 'chat';
+}
 
 export interface UiState {
   theme: Theme;
@@ -28,10 +33,11 @@ export interface UiState {
   /** Text the palette opens with (Edit on a Mo suggestion puts the request back, S3.2.2). */
   paletteQuery: string;
   openPalette: (query?: string) => void;
-  /** A request for Mo from elsewhere (⌘K "Ask Mo to do this"); the Ask Mo panel takes it. */
-  moRequest: { id: number; text: string } | null;
-  sendToMo: (text: string) => void;
-  takeMoRequest: () => { id: number; text: string } | null;
+  /** A request for Mo from elsewhere, taken by the Ask Mo panel: a ⌘K command ("Ask Mo to do
+   * this", S3.2.2) or a chat question ("Ask Mo about this", S3.3.2). */
+  moRequest: MoRequest | null;
+  sendToMo: (text: string, kind?: MoRequest['kind']) => void;
+  takeMoRequest: () => MoRequest | null;
 }
 
 function safeLocalStorage(): Storage {
@@ -84,7 +90,8 @@ export function createUiStore(storageKey = 'momentum.ui'): StoreApi<UiState> {
         paletteQuery: '',
         openPalette: (paletteQuery = '') => set({ paletteOpen: true, paletteQuery }),
         moRequest: null,
-        sendToMo: (text) => set({ askMoOpen: true, moRequest: { id: Date.now() + Math.random(), text } }),
+        sendToMo: (text, kind = 'command') =>
+          set({ askMoOpen: true, moRequest: { id: Date.now() + Math.random(), text, kind } }),
         takeMoRequest: () => {
           const req = get().moRequest;
           if (req) set({ moRequest: null });

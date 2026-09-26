@@ -1,0 +1,29 @@
+# Mock responses for S3.3.1 Ask Mo chat (feature "chat"). `turn` counts model calls since the
+# latest user message; `{{$last.<path>}}` in text takes values from the previous tool result.
+responses:
+  # J8 (e2e): the journey creates its own "Launch blocker: …" task first
+  - match: {contains: "what's blocking launch", turn: 1}
+    tool_calls: [{name: semantic_search, arguments: {query: "launch blocker", types: [task]}}]
+  - match: {contains: "what's blocking launch", turn: 2}
+    text: "Launch is blocked by {{$last.data.results[].cite}}. Nothing else is marked as a launch blocker."
+  # backend tests (their own "AI Tools Lab" project)
+  - match: {contains: "which tasks are about pricing", turn: 1}
+    tool_calls: [{name: semantic_search, arguments: {query: "pricing", types: [task]}}]
+  - match: {contains: "which tasks are about pricing", turn: 2}
+    text: "These tasks are about pricing:\n- {{$last.data.results[].cite}}"
+  - match: {contains: "and who owns them", turn: 1}
+    text: "None of them has an assignee yet."
+  - match: {contains: "zebra xylophone quarterly", turn: 1}
+    text: "I couldn't find anything about that in the workspace. I searched tasks, comments and project briefs."
+  - match: {contains: "please complete draft pricing faq", turn: 1}
+    tool_calls: [{name: complete_task, arguments: {task: {title_query: "Draft pricing FAQ"}}}]
+  - match: {contains: "please complete draft pricing faq", turn: 2}
+    text: "Draft pricing FAQ will be marked complete once you apply the preview."
+  - match: {contains: "cite something made up", turn: 1}
+    text: "See [T-999999] and [P:No Such Project] and [P:AI Tools Lab]."
+  - match: {contains: "cite only made up things", turn: 1}
+    text: "It's all in [T-999999]."
+  - match: {contains: "keep looking forever"}
+    tool_calls: [{name: search_tasks, arguments: {text: "anything"}}]
+default:
+  text: "(mock) I can only answer the demo questions in mock mode."

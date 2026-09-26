@@ -12,7 +12,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from momentum.ai import actions, memory, prefs, quick_add, sse
+from momentum.ai import actions, chat, memory, prefs, quick_add, sse
 from momentum.ai.command import run_command
 from momentum.ai.context import Screen
 from momentum.ai.errors import AIUnavailable
@@ -283,3 +283,153 @@ async def get_ai_prefs(ctx: CtxDep, uow: UowDep) -> AiPrefs:
 async def put_ai_prefs(body: AiPrefs, ctx: CtxDep, uow: UowDep) -> AiPrefs:
     async with uow.transaction() as s:
         return await prefs.set_prefs(s, ctx, body)
+
+
+# ---------------- Ask Mo chat (S3.3.1) ----------------
+
+
+class ChatIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    text: str = Field(min_length=1, max_length=4000)
+    conversation_id: uuid.UUID | None = None
+    screen: ScreenIn | None = None
+
+
+@router.post(
+    "/chat",
+    summary="Ask Mo (SSE: conversation, tool_call, tool_result, token, citation, "
+    "action_proposed, action_applied, clarify, done, error)",
+    response_class=StreamingResponse,
+)
+async def ai_chat(body: ChatIn, ctx: CtxDep, uow: UowDep, rt: RuntimeDep) -> StreamingResponse:
+    llm = require_llm(rt)
+    screen = (body.screen or ScreenIn()).to_screen()
+    ctx = ctx.with_(via="ai")
+    # the question is stored (and committed) before Mo starts, so it survives a failed answer
+    async with uow.transaction() as s:
+        turn = await chat.start_turn(
+            s, ctx, body.text, conversation_id=body.conversation_id, screen=screen
+        )
+        ids = (turn.conversation.id, turn.message.id)
+
+    async def work(session: AsyncSession, emit: Emit) -> None:
+        await chat.run_chat(
+            session, llm, ctx, rt.tools, ids, screen=screen, now=datetime.now(UTC), emit=emit
+        )
+
+    return sse.stream(rt, work)
+
+
+class ConversationOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    title: str
+    context_type: Literal["global", "task", "project"]
+    context_id: uuid.UUID | None
+    created_at: datetime
+    updated_at: datetime
+
+
+class CitationOut(BaseModel):
+    ref: str
+    type: Literal["task", "project"]
+    valid: bool
+    id: str | None = None
+    key: str | None = None
+    title: str | None = None
+
+
+class ChatStepOut(BaseModel):
+    name: str
+    ok: bool | None = None
+    summary: str | None = None
+    preview: bool | None = None
+
+
+class ChatMessageOut(BaseModel):
+    id: uuid.UUID
+    role: Literal["user", "assistant"]
+    text: str
+    steps: list[ChatStepOut] = Field(default_factory=list)
+    citations: list[CitationOut] = Field(default_factory=list)
+    action_id: uuid.UUID | None = None
+    candidates: list[dict[str, Any]] = Field(default_factory=list)
+    grounded: bool | None = None
+    rating: Literal[-1, 1] | None = None
+    created_at: datetime
+
+
+class ConversationDetailOut(BaseModel):
+    data: ConversationOut
+    messages: list[ChatMessageOut]
+
+
+@router.get(
+    "/conversations", response_model=ListOut[ConversationOut], summary="My Ask Mo conversations"
+)
+async def list_ai_conversations(ctx: CtxDep, uow: UowDep) -> ListOut[ConversationOut]:
+    async with uow.transaction() as s:
+        rows = await chat.list_conversations(s, ctx)
+        return ListOut(data=[ConversationOut.model_validate(c) for c in rows])
+
+
+@router.get(
+    "/conversations/{conversation_id}",
+    response_model=ConversationDetailOut,
+    summary="One of my conversations, with its messages (citations checked for me now)",
+)
+async def get_ai_conversation(
+    conversation_id: uuid.UUID, ctx: CtxDep, uow: UowDep
+) -> ConversationDetailOut:
+    async with uow.transaction() as s:
+        v = await chat.get_conversation(s, ctx, conversation_id)
+        messages = []
+        for m in v.messages:
+            c = m.content or {}
+            messages.append(
+                ChatMessageOut(
+                    id=m.id,
+                    role=m.role,
+                    text=str(c.get("text") or ""),
+                    steps=[ChatStepOut(**st) for st in c.get("steps") or []],
+                    citations=[CitationOut(**ci) for ci in c.get("citations") or []],
+                    action_id=c.get("action_id"),
+                    candidates=c.get("candidates") or [],
+                    grounded=c.get("grounded"),
+                    rating=v.ratings.get(m.id),
+                    created_at=m.created_at,
+                )
+            )
+        return ConversationDetailOut(
+            data=ConversationOut.model_validate(v.conversation), messages=messages
+        )
+
+
+class FeedbackIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    target_type: Literal["ai_message", "ai_action"]
+    target_id: uuid.UUID
+    rating: Literal[-1, 1]
+    comment: str | None = Field(default=None, max_length=2000)
+
+
+class FeedbackOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    target_type: str
+    target_id: uuid.UUID
+    rating: int
+    comment: str | None
+
+
+@router.put("/feedback", response_model=FeedbackOut, summary="Rate an answer or action 👍/👎")
+async def put_ai_feedback(body: FeedbackIn, ctx: CtxDep, uow: UowDep) -> FeedbackOut:
+    async with uow.transaction() as s:
+        fb = await chat.set_feedback(
+            s,
+            ctx,
+            target_type=body.target_type,
+            target_id=body.target_id,
+            rating=body.rating,
+            comment=body.comment,
+        )
+        return FeedbackOut.model_validate(fb)

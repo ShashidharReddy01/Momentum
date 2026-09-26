@@ -13,13 +13,11 @@ from datetime import datetime
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from momentum.ai import prompts
-from momentum.ai.actions import apply_action, propose
 from momentum.ai.context import Screen, screen_ctx, system_base, user_ctx
 from momentum.ai.context.tokens import safe
 from momentum.ai.llm import LLM
-from momentum.ai.loop import Emit, run_tool_loop
+from momentum.ai.loop import Emit, emit_proposals, run_tool_loop
 from momentum.ai.memory import memory_for
-from momentum.ai.prefs import get_prefs
 from momentum.ai.tools.registry import ToolRegistry
 from momentum.core.context import Ctx
 from momentum.domain.workspace.models import Workspace
@@ -68,29 +66,5 @@ async def run_command(
     )
     if result.text:
         await emit("token", {"text": result.text})
-    if result.proposals:
-        p = await propose(session, ctx, registry, result.proposals, source="command", summary=None)
-        if p.action is not None:
-            action = p.action
-            await emit(
-                "action_proposed",
-                {"action_id": str(action.id), "summary": action.summary, "risk": action.risk},
-            )
-            if action.risk == "low" and (await get_prefs(session, ctx)).auto_apply_low_risk:
-                applied = await apply_action(session, ctx, registry, action.id)
-                if applied.outcome == "applied":
-                    await emit(
-                        "action_applied",
-                        {
-                            "action_id": str(action.id),
-                            "batch_id": str(applied.action.applied_batch_id),
-                        },
-                    )
-        else:  # a preview passed in the loop but not on re-check (data changed meanwhile)
-            await emit(
-                "error",
-                {"reason": "stale", "message": "Things changed while I was working. Try again."},
-            )
-    elif result.candidates:
-        await emit("clarify", {"question": result.text, "candidates": result.candidates[:8]})
+    await emit_proposals(session, ctx, registry, result, emit, source="command")
     await emit("done", {"steps": result.steps})

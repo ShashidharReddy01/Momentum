@@ -1,3 +1,4 @@
+import { http, HttpResponse } from 'msw';
 import { render, screen, waitFor } from '@testing-library/react';
 import { setupServer } from 'msw/node';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -18,19 +19,25 @@ afterEach(() => {
 });
 afterAll(() => server.close());
 
+const noConversations = [
+  http.get('*/api/v1/ai/conversations', () => HttpResponse.json({ data: [], meta: { next_cursor: null } })),
+];
+
 function at(path: string) {
   window.history.replaceState(null, '', path);
 }
 
 describe('Realtime, wired into the app shell', () => {
   it('connects once signed in when the server has the feature on, and shows/hides the reconnecting banner', async () => {
-    server.use(...authHandlers({ loggedIn: true, config: { features: { realtime: true } } }).handlers);
-    // A still-static Phase-3 placeholder route, chosen so this realtime-focused test doesn't
-    // need to mock teams/projects/notifications just to render the shell (the same reason
-    // /inbox was originally picked, before S2.5 made it a real, data-fetching page).
+    server.use(
+      ...authHandlers({ loggedIn: true, config: { features: { realtime: true } } }).handlers,
+      ...noConversations,
+    );
+    // Ask Mo's page, chosen so this realtime-focused test doesn't need to mock
+    // teams/projects/notifications just to render the shell (it only lists conversations).
     at('/ask');
     render(<MomentumApp />);
-    await screen.findByText(/Ask Mo arrives in Phase 3/);
+    await screen.findByText('Ask Mo about your work');
 
     await waitFor(() => expect(MockWebSocket.instances).toHaveLength(1));
     expect(MockWebSocket.latest().url).toMatch(/\/ws$/);
@@ -48,10 +55,13 @@ describe('Realtime, wired into the app shell', () => {
   });
 
   it('never opens a websocket when the server has the feature off', async () => {
-    server.use(...authHandlers({ loggedIn: true, config: { features: { realtime: false } } }).handlers);
+    server.use(
+      ...authHandlers({ loggedIn: true, config: { features: { realtime: false } } }).handlers,
+      ...noConversations,
+    );
     at('/ask');
     render(<MomentumApp />);
-    await screen.findByText(/Ask Mo arrives in Phase 3/);
+    await screen.findByText('Ask Mo about your work');
     expect(MockWebSocket.instances).toHaveLength(0);
   });
 });

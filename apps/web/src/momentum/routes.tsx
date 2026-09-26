@@ -1,12 +1,11 @@
-import { MessagesSquare } from 'lucide-react';
 import type { RouteObject } from 'react-router';
-import { AiActionPage, AiSettingsPage } from '@/features/ai';
+import { AiActionPage, AiSettingsPage, AskPage } from '@/features/ai';
 import { AuthGate, DevLoginPage } from '@/features/auth';
 import { HomePage } from '@/features/home';
 import { AsanaImportPage } from '@/features/imports';
 import { MembersPage } from '@/features/members';
 import { InboxPage, NotificationSettingsPage } from '@/features/notifications';
-import { NotFoundPage, Placeholder } from '@/features/placeholders';
+import { NotFoundPage } from '@/features/placeholders';
 import { ProjectPage } from '@/features/projects';
 import { MyTasksPage } from '@/features/mytasks';
 import { SearchPage } from '@/features/search';
@@ -63,11 +62,8 @@ export function buildRoutes(config: RuntimeConfig): RouteObject[] {
           handle: { crumb: 'Members' },
         },
         { path: 'settings/ai', element: <AiSettingsPage />, handle: { crumb: 'AI settings' } },
-        {
-          path: 'ask',
-          element: <Placeholder icon={MessagesSquare} title="Ask Mo" phase={3} />,
-          handle: { crumb: 'Ask Mo' },
-        },
+        { path: 'ask', element: <AskPage />, handle: { crumb: 'Ask Mo' } },
+        { path: 'ask/:conversationId', element: <AskPage />, handle: { crumb: 'Ask Mo' } },
         ...galleryRoute.map((r) => ({ ...r, path: 'dev/ui', handle: { crumb: 'Component gallery' } })),
         { path: '*', element: <NotFoundPage />, handle: { crumb: 'Not found' } },
       ],

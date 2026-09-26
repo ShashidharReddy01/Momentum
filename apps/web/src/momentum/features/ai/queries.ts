@@ -59,3 +59,45 @@ export function useAiActionMutations(id: string) {
   });
   return { apply, reject, undo };
 }
+
+export type Conversation = components['schemas']['ConversationOut'];
+export type ChatMessage = components['schemas']['ChatMessageOut'];
+type FeedbackIn = components['schemas']['FeedbackIn'];
+
+export const chatKeys = {
+  list: ['ai', 'conversations'] as const,
+  one: (id: string) => ['ai', 'conversations', id] as const,
+};
+
+/** My Ask Mo conversations, most recent first (S3.3.1). */
+export function useConversations() {
+  const api = useApi();
+  return useQuery({
+    queryKey: chatKeys.list,
+    queryFn: async () => (await api.GET('/api/v1/ai/conversations')).data!.data,
+  });
+}
+
+/** One conversation with its messages (citations re-checked for me by the server). */
+export function useConversation(id: string | undefined) {
+  const api = useApi();
+  return useQuery({
+    queryKey: chatKeys.one(id ?? ''),
+    enabled: Boolean(id),
+    queryFn: async () =>
+      (
+        await api.GET('/api/v1/ai/conversations/{conversation_id}', {
+          params: { path: { conversation_id: id! } },
+        })
+      ).data!,
+  });
+}
+
+/** 👍/👎 on one of Mo's answers; a second rating replaces the first. */
+export function useFeedback() {
+  const api = useApi();
+  return useMutation({
+    mutationFn: async (body: FeedbackIn) => (await api.PUT('/api/v1/ai/feedback', { body })).data!,
+    onError: (e) => toastError(e, "Couldn't save your rating"),
+  });
+}

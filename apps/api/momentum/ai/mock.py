@@ -14,8 +14,10 @@
 Multi-step tool loops (S3.2.2) add ``turn`` (1 = the first model call of the conversation, 2 =
 after the first tool results, …) to ``match``, and may take argument values from the previous
 tool result with a ``$last.<path>`` string: ``$last.data.tasks[].key`` is the list of every
-task key in the last tool message's JSON (``[]`` maps over a list). This keeps handwritten loop
-fixtures independent of ids and keys, which differ per database.
+task key in the last tool message's JSON (``[]`` maps over a list). Fixture ``text`` may embed
+the same as ``{{$last.<path>}}`` (S3.3.1: an answer citing what the search found). This keeps
+handwritten loop fixtures independent of ids and keys, which differ per database. ``turn``
+counts from the latest user message, so earlier chat turns don't shift it.
 
 A feature with no file (or no match and no default) falls back to ``_default.yaml``. Every
 fallback text says it is mock output, so it can't pass for real AI output in a demo.
@@ -115,8 +117,15 @@ def _load(path: Path | None) -> dict[str, Any]:
 
 
 def _turn(messages: list[Msg]) -> int:
-    """1 for the first model call; +1 per assistant message already in the conversation."""
-    return 1 + sum(1 for m in messages if m.get("role") == "assistant")
+    """1 for the first model call after the latest user message; +1 per assistant message since
+    (so a chat's earlier turns don't shift the numbering of a new question)."""
+    turn = 1
+    for m in reversed(messages):
+        if m.get("role") == "user":
+            break
+        if m.get("role") == "assistant":
+            turn += 1
+    return turn
 
 
 def _last_tool_result(messages: list[Msg]) -> Any:
@@ -152,6 +161,22 @@ def _fill(args: Any, last: Any) -> Any:
     return args
 
 
+_TEXT_SLOT = re.compile(r"\{\{(\$last\.[^}]+)\}\}")
+
+
+def _fill_text(text: str, last: Any) -> str:
+    """``{{$last.<path>}}`` in fixture text → that value (a list joined with spaces, a missing
+    value as "(none)"), e.g. citations taken from the search the loop just ran."""
+
+    def one(m: re.Match[str]) -> str:
+        value = _fill(m.group(1), last)
+        if isinstance(value, list):
+            value = " ".join(str(v) for v in value if v is not None)
+        return "(none)" if value in (None, "") else str(value)
+
+    return _TEXT_SLOT.sub(one, text)
+
+
 def _entry_matches(entry: dict[str, Any], key: str, last_user: str, turn: int = 1) -> bool:
     match = entry.get("match") or {}
     if "turn" in match and int(match["turn"]) != turn:
@@ -173,7 +198,7 @@ def _entry_to_completion(entry: dict[str, Any], req: ChatRequest) -> RawCompleti
         )
         for i, tc in enumerate(entry.get("tool_calls") or [])
     ]
-    text = str(entry.get("text") or "")
+    text = _fill_text(str(entry.get("text") or ""), last)
     prompt = "".join(_content_text(m.get("content")) for m in req.messages)
     return RawCompletion(
         text=text,

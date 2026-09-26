@@ -171,6 +171,8 @@ Workspace memory:
 {memory_bullets}
 ```
 
+- **As built (S3.3.1):** `ai/chat.py` assembles `system_base` + `chat/v1` + `user_ctx` + `screen_ctx` + the deep block for what the chat is about (`task_ctx` for the task on screen or the conversation's task, else `project_ctx`) + `retrieval_ctx` for the question (and, when retrieval is empty, an explicit "say you couldn't find it" line), then the last 12 messages within ~3,000 tokens (the user's words wrapped in `<data source="chat">`, Mo's earlier answers as plain assistant text, tool traffic not replayed). `run_tool_loop(..., stream=True)` streams each step's text as `token` events (steps separated by a blank line). After the answer, `ai/citations.py` resolves every `[T-n]` / `[P:Name]` **as the reader** (`get_visible_task`; projects through `visible_projects_clause`): only existing, visible things are `valid` (links in the UI); the answer is `grounded` when at least one is. Proposed writes go through `emit_proposals` (shared with ⌘K) with `source="chat"`, `source_id` = the conversation.
+
 ## 8. Prompt-injection and data safety
 
 - All user/external content (task text, comments, attachments, Slack messages, emails) is wrapped in `<data source="…">…</data>` and the system prompt declares it non-instructional.

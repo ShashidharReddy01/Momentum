@@ -188,3 +188,79 @@ class AiMemory(IdMixin, Base):
         ),
         Index("ix_ai_memory_scope", "workspace_id", "scope", "scope_id"),
     )
+
+
+CONVERSATION_CONTEXTS = ("global", "task", "project")
+MESSAGE_ROLES = ("user", "assistant")
+
+
+class AiConversation(IdMixin, Base):
+    """S3.3.1: one Ask Mo chat. Private to ``user_id`` (nobody else, admins included, reads it).
+
+    ``context_type``/``context_id`` record where it was started (a task or project screen, or
+    anywhere else = ``global``); later turns may be about anything."""
+
+    __tablename__ = "ai_conversations"
+
+    workspace_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("workspaces.id"))
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"))
+    context_type: Mapped[str] = mapped_column(String(12), default="global")
+    context_id: Mapped[uuid.UUID | None]
+    title: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        CheckConstraint(f"context_type in {CONVERSATION_CONTEXTS}", name="context_type"),
+        Index("ix_ai_conversations_user_updated", "user_id", "updated_at"),
+    )
+
+
+class AiMessage(IdMixin, Base):
+    """S3.3.1: one chat message. ``content`` is ``{text}`` for the user and ``{text, steps,
+    citations, action_id, candidates, grounded}`` for Mo. Tool call arguments and results are
+    not kept: they are re-derivable and may hold content the user later loses access to."""
+
+    __tablename__ = "ai_messages"
+
+    workspace_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("workspaces.id"))
+    conversation_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("ai_conversations.id", ondelete="CASCADE")
+    )
+    role: Mapped[str] = mapped_column(String(12))
+    content: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
+    tokens_in: Mapped[int] = mapped_column(default=0)
+    tokens_out: Mapped[int] = mapped_column(default=0)
+    # llm_calls rows are written by the gateway in their own transaction and a turn makes several;
+    # the turn's token totals are kept here instead of one call's id.
+    llm_call_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("llm_calls.id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        CheckConstraint(f"role in {MESSAGE_ROLES}", name="role"),
+        Index("ix_ai_messages_conversation", "conversation_id", "created_at"),
+    )
+
+
+FEEDBACK_TARGETS = ("ai_message", "ai_action", "agent_run")
+
+
+class Feedback(IdMixin, Base):
+    """S3.3.1: 👍/👎 (+ optional comment) on something AI produced. One per person and target
+    (a second rating replaces the first)."""
+
+    __tablename__ = "feedback"
+
+    workspace_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("workspaces.id"))
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"))
+    target_type: Mapped[str] = mapped_column(String(16))
+    target_id: Mapped[uuid.UUID]
+    rating: Mapped[int] = mapped_column(Integer)
+    comment: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        CheckConstraint(f"target_type in {FEEDBACK_TARGETS}", name="target_type"),
+        CheckConstraint("rating in (-1, 1)", name="rating"),
+        UniqueConstraint("user_id", "target_type", "target_id"),
+    )

@@ -233,6 +233,7 @@ key text, user_id, method, path, response_status, response_body jsonb, created_a
 ### `ai_conversations`, `ai_messages`
 - conversations: id, workspace_id, user_id, context_type (`global`,`task`,`project`), context_id null, title, created_at, updated_at.
 - messages: id, conversation_id, role (`user`,`assistant`,`tool`), content jsonb (text parts, tool calls, citations), tokens_in, tokens_out, llm_call_id, created_at.
+- **As built (S3.3.1, migration 0019):** both carry `workspace_id`. Conversations: `context_type` in (`global`,`task`,`project`) set from the screen the chat started on (only if the user can see it), `title` = the first question (80 chars), index (user_id, updated_at). Messages: `role` in (`user`,`assistant`) only (tool traffic is not stored: it is re-derivable and could hold content the user later loses access to); `content` = `{text}` for the user, `{text, steps[{name, ok, summary, preview}], citations[{ref, type, valid, id, key, title}], action_id, candidates, grounded, retrieved}` for Mo; `tokens_in/out` = the turn's totals over all its model calls (so `llm_call_id` stays null: a turn makes several `llm_calls` rows, written in their own transaction); `ON DELETE CASCADE` from the conversation; index (conversation_id, created_at). Private to the owner. They record **no `activity`/outbox rows** (personal records like AI prefs, the same choice as `ai_actions`); changes Mo proposes are audited when applied.
 
 ### `ai_actions`
 | Column | Type | Notes |
@@ -291,6 +292,7 @@ id, workspace_id, entity_type, entity_id, kind (`thread`,`project_week`,`inbox`,
 
 ### `feedback`
 id, workspace_id, user_id, target_type (`ai_message`,`ai_action`,`agent_run`), target_id, rating (+1/−1), comment, created_at.
+**As built (S3.3.1, migration 0019):** unique (user_id, target_type, target_id): a second rating replaces the first. Only the owner of the conversation (messages) or the person an action was proposed for can rate it; `agent_run` arrives in Phase 5.
 
 ## 10. Integrations (Phase 7)
 
