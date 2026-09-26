@@ -53,7 +53,7 @@ The phase file asks for the model aliases and the Cohere variant to be confirmed
 ## 5. Questions for the human
 - **Q1 (Open question #1, narrowed):** model ids for `fast` and `smart`. Recommendation: `smart` = the strongest Claude on your Bedrock config; `fast` = a Haiku-class model if your config has one, else Sonnet for both until cost says otherwise. Not blocking: mock mode until then.
 - **Q2 (Open question #4):** add the optional rerank step to S3.1.4? Recommendation: yes, off by default, turned on once `llm-check` shows it works on your gateway.
-- **Q3:** run `uv run momentum llm-check` against your Portkey setup once S3.1.1 is pushed and paste the table back. That's the first real-gateway signal this phase gets.
+- **Q3:** run `uv run momentum llm-check` against your Portkey setup once S3.1.1 is pushed and paste the table back. **Answered 2026-09-26: 8/8 pass on Portkey** (see STATUS); a slow first streaming run (13 s) was a one-off; the re-run streamed in 1.5 s.
 
 ## 6. Exit criteria (confirmed)
 As in `phase-3.md`: J7, J8 pass (mock); `EVALS_LIVE=1 make evals` passes the thresholds against a real gateway (product owner runs it); the AI-unavailable path degrades gracefully; the usage page shows accurate token counts.

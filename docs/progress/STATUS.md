@@ -6,7 +6,7 @@
 - **Phase:** 3: AI Layer v1 ("Mo") — **in progress**. Kickoff done (`docs/roadmap/phase-3-kickoff.md`); S3.1.1 done. Phase 2 is complete (exit criteria met; see below).
 - **Next slice:** S3.1.2 Tool registry + sweep of existing services (`@tool` decorator, schema export, `TaskRef` resolution, dry-run via SAVEPOINT with diff capture, `ToolResult`, all Phase 1–2 catalog tools, JSON-schema snapshot tests).
 - **Model:** Phase 3 is a whole-phase Opus 5.5 phase (`docs/process/model-guide.md` §2); S3.1.1 was built on Opus 5.5. (Phase 1 Opus; Phase 2 switched to Sonnet 5 mid-phase by product-owner instruction.)
-- **AI mode:** everything is built and tested in **mock mode** (no LLM access in the build environment). The product owner's gateway is **Portkey**; first real-gateway check = the product owner running `uv run momentum llm-check` (kickoff Q3).
+- **AI mode:** everything is built and tested in **mock mode** (no LLM access in the build environment). The product owner's gateway is **Portkey**. **Real-gateway `llm-check` (product owner, 2026-09-26): 8/8 PASS** — chat on all three aliases (all currently the same Bedrock Sonnet 4 id), tool calling (1.4 s), streaming, streaming with tool calls (so `LLM_SUPPORTS_STREAMING_TOOLS` stays `true`), embeddings for both input types at 1024 dims (vectors differ, so Portkey passes `input_type` through). A first run's streaming probe took 13 s in 2 chunks; a second run the same day took 1.5 s in 3 chunks, so that was a one-off. Coarse chunks (a few words each) are normal for Bedrock on a reply that short, and streaming works through Portkey.
 - **Blockers:** none
 
 ## Handoff notes (latest session: 2026-09-26, Phase 3 start)
