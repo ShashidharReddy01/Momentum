@@ -95,6 +95,44 @@ def seed(
     typer.echo(run_async(_run()))
 
 
+@cli.command()
+def reindex(
+    entity: list[str] = typer.Option(
+        [], "--entity", help="task, comment, attachment or project (repeatable); default: all"
+    ),
+    since: str = typer.Option("", help="Only entities changed on/after this date (YYYY-MM-DD)"),
+) -> None:
+    """Rebuild the AI search index (embeddings). Unchanged content is skipped (S3.1.4)."""
+    from datetime import UTC, datetime
+
+    from momentum.ai.embeddings import INDEXED
+    from momentum.ai.embeddings import reindex as run_reindex
+    from momentum.ai.llm import build_llm
+    from momentum.ai.usage import DbUsageLog
+    from momentum.core.db import create_engine, create_session_factory
+
+    kinds = entity or list(INDEXED)
+    unknown = [k for k in kinds if k not in INDEXED]
+    if unknown:
+        raise typer.BadParameter(f"unknown entity type(s): {', '.join(unknown)}")
+    start = datetime.fromisoformat(since).replace(tzinfo=UTC) if since else None
+    settings = Settings()
+
+    async def _run() -> str:
+        engine = create_engine(settings)
+        factory = create_session_factory(engine)
+        llm = build_llm(settings, DbUsageLog(factory, settings.ai_monthly_budget_usd))
+        try:
+            async with factory() as session, session.begin():
+                run = await run_reindex(session, llm, entity_types=kinds, since=start)  # type: ignore[arg-type]
+        finally:
+            await llm.aclose()
+            await engine.dispose()
+        return f"Indexed {run.entities} entities ({run.chunks} chunks re-embedded)"
+
+    typer.echo(run_async(_run()))
+
+
 @cli.command("llm-check")
 def llm_check() -> None:
     """Verify the LLM gateway: chat, tool calls, streaming, embeddings, latency (S3.1.1)."""

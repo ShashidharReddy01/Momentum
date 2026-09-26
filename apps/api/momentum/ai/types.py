@@ -62,6 +62,24 @@ class EmbedRequest:
 
 
 @dataclass(frozen=True)
+class RerankRequest:
+    feature: str
+    model: str
+    query: str
+    documents: list[str]
+    top_n: int
+
+
+@dataclass(frozen=True)
+class RawRerank:
+    """``(index into documents, relevance score)``, best first."""
+
+    ranking: list[tuple[int, float]]
+    model: str
+    units: int = 1  # Cohere bills rerank per "search unit" (one query over ≤100 documents)
+
+
+@dataclass(frozen=True)
 class RawCompletion:
     """What a transport returns for one chat call (before the gateway adds accounting)."""
 

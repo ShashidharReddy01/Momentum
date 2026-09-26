@@ -47,6 +47,13 @@ PING = [{"role": "user", "content": "Reply with the single word: pong"}]
 STREAM_PROMPT = [{"role": "user", "content": "Count from one to five in words, one per line."}]
 EMBED_TEXT = "Draft the pricing page copy for the website revamp"
 CATALOG = "tool schemas (catalog)"
+RERANK = "rerank"
+RERANK_QUERY = "who is writing the pricing page text"
+RERANK_DOCS = [
+    "Book the venue for the team offsite",
+    "Draft pricing page copy (Ana is writing it)",
+    "Fix the login bug on mobile",
+]
 CATALOG_PROMPT = [
     {
         "role": "user",
@@ -229,6 +236,24 @@ async def run_llm_check(llm: LLM) -> list[CheckResult]:
         results.append(
             await _timed(f"embeddings ({input_type})", functools.partial(embed, input_type))
         )
+
+    async def rerank() -> tuple[Status, str]:
+        order = await llm.rerank(
+            RERANK_QUERY, RERANK_DOCS, top_n=len(RERANK_DOCS), feature=FEATURE, ctx=ctx
+        )
+        if not order:
+            raise _Fail("no ranking returned")
+        if order[0][0] != 1:
+            return "warn", f"ranked {RERANK_DOCS[order[0][0]]!r} first"
+        return "pass", f"{llm.settings.llm_rerank_model}: relevant document ranked first"
+
+    result = await _timed(RERANK, rerank)
+    if result.status == "fail" and not llm.settings.ai_rerank:
+        # rerank is optional and off: a gateway without it is fine, so this only warns
+        result = CheckResult(
+            result.name, "warn", result.latency_ms, f"(rerank is off) {result.detail}"
+        )
+    results.append(result)
     return results
 
 

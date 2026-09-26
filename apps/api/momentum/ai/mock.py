@@ -38,6 +38,8 @@ from momentum.ai.types import (
     Msg,
     RawCompletion,
     RawEmbedding,
+    RawRerank,
+    RerankRequest,
     TokenEvent,
     ToolCall,
     ToolCallDeltaEvent,
@@ -207,6 +209,16 @@ class MockTransport:
             model="mock/embed",
         )
 
+    async def rerank(self, req: RerankRequest) -> RawRerank:
+        """Deterministic stand-in: share of the query's (stemmed) words found in each document."""
+        words = {_stem(w) for w in _WORD.findall(req.query.lower())}
+        scored = []
+        for i, doc in enumerate(req.documents):
+            have = {_stem(w) for w in _WORD.findall(doc.lower())}
+            scored.append((i, len(words & have) / max(len(words), 1)))
+        scored.sort(key=lambda r: (-r[1], r[0]))
+        return RawRerank(ranking=scored[: req.top_n], model="mock/rerank")
+
     async def aclose(self) -> None:
         return None
 
@@ -252,6 +264,9 @@ class RecordingTransport:
 
     async def embed(self, req: EmbedRequest) -> RawEmbedding:
         return await self._inner.embed(req)
+
+    async def rerank(self, req: RerankRequest) -> RawRerank:
+        return await self._inner.rerank(req)
 
     async def aclose(self) -> None:
         await self._inner.aclose()

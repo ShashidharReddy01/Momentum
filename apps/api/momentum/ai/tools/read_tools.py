@@ -18,6 +18,8 @@ from zoneinfo import ZoneInfo
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import ColumnElement, and_, func, or_, select
 
+from momentum.ai import retrieval
+from momentum.ai.embeddings import INDEXED
 from momentum.ai.tools.base import ToolContext, ToolError, ToolResult, tool
 from momentum.ai.tools.refs import (
     TaskRef,
@@ -563,8 +565,49 @@ async def list_people(tc: ToolContext, args: ListPeopleArgs) -> ToolResult:
     return ToolResult.success(f"{len(people)} people", {"people": people})
 
 
+# ---------------- semantic_search ----------------
+
+
+class SemanticSearchArgs(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    query: str = Field(
+        min_length=1, max_length=500, description="What to look for, in the user's own words"
+    )
+    types: list[Literal["task", "comment", "attachment", "project"]] | None = Field(
+        default=None, description="Limit to some kinds of content; default: all"
+    )
+    limit: int = Field(default=8, ge=1, le=15)
+
+
+@tool(
+    name="semantic_search",
+    description=(
+        "Search tasks, comments, attached files and project briefs by meaning (not just exact "
+        "words). Returns snippets with citations like [T-123] to quote in answers."
+    ),
+    risk="read",
+    scopes=READ,
+)
+async def semantic_search(tc: ToolContext, args: SemanticSearchArgs) -> ToolResult:
+    if tc.llm is None:
+        raise ToolError("unavailable", "Semantic search isn't available here")
+    hits = await retrieval.search(
+        tc.session,
+        tc.llm,
+        tc.ctx,
+        args.query,
+        k=args.limit,
+        types=tuple(args.types or INDEXED),
+    )
+    return ToolResult.success(
+        f"{len(hits)} result(s)" if hits else "Nothing found for that",
+        {"results": [h.to_json() for h in hits]},
+    )
+
+
 TOOLS = [
     search_tasks,
+    semantic_search,
     get_task,
     get_project,
     get_section_tasks,

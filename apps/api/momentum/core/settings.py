@@ -98,6 +98,10 @@ class Settings(BaseSettings):
     llm_timeout_s: float = Field(default=60, gt=0)
     llm_max_retries: int = Field(default=2, ge=0)
     llm_supports_streaming_tools: bool = True
+    # S3.1.4: optional rerank after hybrid retrieval (Cohere rerank via the gateway), off by
+    # default; `llm-check` probes the model either way.
+    llm_rerank_model: str = "cohere-rerank-v3.5"
+    ai_rerank: bool = False
     # S3.1.1: gateways differ in how they take their key. LiteLLM uses the standard
     # "Authorization: Bearer <key>"; some (e.g. Portkey) want it in their own header. Any other
     # value sends the raw key in that header instead (the SDK's bearer header carries it too).

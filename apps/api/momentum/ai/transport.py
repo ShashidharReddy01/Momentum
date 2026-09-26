@@ -18,6 +18,8 @@ from momentum.ai.types import (
     FailureKind,
     RawCompletion,
     RawEmbedding,
+    RawRerank,
+    RerankRequest,
     TokenEvent,
     ToolCall,
     ToolCallAccumulator,
@@ -35,6 +37,8 @@ class Transport(Protocol):
         ...
 
     async def embed(self, req: EmbedRequest) -> RawEmbedding: ...
+
+    async def rerank(self, req: RerankRequest) -> RawRerank: ...
 
     async def aclose(self) -> None: ...
 
@@ -187,6 +191,35 @@ class GatewayTransport:
             tokens_in=resp.usage.prompt_tokens if resp.usage else 0,
             model=resp.model or req.model,
         )
+
+    async def rerank(self, req: RerankRequest) -> RawRerank:
+        """Cohere-style ``POST /rerank`` (served by Portkey and LiteLLM alike); the OpenAI SDK
+        has no rerank method, so this uses its generic request with the same auth/headers."""
+        try:
+            body: Any = await self._client.post(
+                "/rerank",
+                body={
+                    "model": req.model,
+                    "query": req.query,
+                    "documents": req.documents,
+                    "top_n": req.top_n,
+                },
+                cast_to=object,
+            )
+        except (openai.OpenAIError, httpx2.TransportError) as e:
+            raise _map_error(e) from e
+        try:
+            ranking = [(int(r["index"]), float(r["relevance_score"])) for r in body["results"]]
+        except (KeyError, TypeError, ValueError) as e:
+            raise TransportError("bad_response", "unexpected rerank response shape") from e
+        if any(not 0 <= i < len(req.documents) for i, _ in ranking):
+            raise TransportError("bad_response", "rerank returned an index out of range")
+        ranking.sort(key=lambda r: -r[1])
+        units = 1
+        meta = body.get("meta") if isinstance(body, dict) else None
+        if isinstance(meta, dict):
+            units = int((meta.get("billed_units") or {}).get("search_units") or 1)
+        return RawRerank(ranking=ranking, model=str(body.get("model") or req.model), units=units)
 
     async def aclose(self) -> None:
         await self._client.close()

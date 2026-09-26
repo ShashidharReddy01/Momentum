@@ -84,6 +84,7 @@ def test_catalog_covers_phase_1_2_tools_with_their_risks() -> None:
     risks = {t.spec.name: t.spec.risk for t in CATALOG}
     assert risks == {
         "search_tasks": "read",
+        "semantic_search": "read",
         "get_task": "read",
         "get_project": "read",
         "get_section_tasks": "read",

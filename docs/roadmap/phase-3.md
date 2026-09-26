@@ -34,6 +34,7 @@
 **Scope:** migration `embeddings` (vector(1024) + HNSW), `ai_summaries`; `ai/embeddings.py` (chunking, `input_type`, batching, content hash); consumer job on create/update events; `momentum reindex [--entity] [--since]`; `ai/retrieval.py` hybrid search with RRF + SQL permission filter; `semantic_search` tool.
 **AC:** search for a paraphrase finds the right task (fixture); private content never returned to non-members (test).
 **Size:** L
+**Built (2026-09-26):** as scoped plus the approved optional rerank (off by default, `llm-check` row) and recursive subtask visibility. Migration 0017. No UI in this slice (Ask Mo and ⌘K use it).
 
 ### S3.1.5: Workspace memory + context builders
 **Scope:** migration `ai_memory`; admin UI to edit memory bullets; context builders with token budgets (tiktoken-like estimate, conservative), golden snapshot tests.

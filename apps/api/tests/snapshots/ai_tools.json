@@ -100,6 +100,55 @@
   },
   {
     "function": {
+      "description": "Search tasks, comments, attached files and project briefs by meaning (not just exact words). Returns snippets with citations like [T-123] to quote in answers.",
+      "name": "semantic_search",
+      "parameters": {
+        "additionalProperties": false,
+        "properties": {
+          "limit": {
+            "default": 8,
+            "maximum": 15,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "query": {
+            "description": "What to look for, in the user's own words",
+            "maxLength": 500,
+            "minLength": 1,
+            "type": "string"
+          },
+          "types": {
+            "anyOf": [
+              {
+                "items": {
+                  "enum": [
+                    "task",
+                    "comment",
+                    "attachment",
+                    "project"
+                  ],
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Limit to some kinds of content; default: all"
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "type": "object"
+      }
+    },
+    "type": "function"
+  },
+  {
+    "function": {
       "description": "Details of one task: fields, description, subtasks, blockers and recent comments.",
       "name": "get_task",
       "parameters": {

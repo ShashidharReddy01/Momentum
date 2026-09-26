@@ -282,8 +282,10 @@ id, workspace_id, scope (`workspace`,`team`,`project`), scope_id, text, created_
 
 Index: HNSW (`embedding vector_cosine_ops`), (entity_type, entity_id). Unique (entity_type, entity_id, chunk_no, model).
 
+**As built (S3.1.4, migration 0017):** also indexed on `workspace_id`; `entity_type` check allows the five types above (`status_update` arrives with S3.4.3). `content_hash` = sha256(model + chunk text): an unchanged entity is never re-sent to the gateway. The column type is a local `vector(1024)` (`ai/vector.py`, no `pgvector` Python dependency). Rows are derived data: `momentum reindex` rebuilds them.
+
 ### `ai_summaries`
-id, workspace_id, entity_type, entity_id, kind (`thread`,`project_week`,`inbox`), content_hash, summary text, model, created_at. Unique (entity_type, entity_id, kind, content_hash). A cache that is safe to purge.
+id, workspace_id, entity_type, entity_id, kind (`thread`,`project_week`,`inbox`,`task`), content_hash, summary text, model, created_at. Unique (entity_type, entity_id, kind, content_hash). A cache that is safe to purge. Created in S3.1.4 (migration 0017); filled from S3.4.1.
 
 ### `feedback`
 id, workspace_id, user_id, target_type (`ai_message`,`ai_action`,`agent_run`), target_id, rating (+1/−1), comment, created_at.

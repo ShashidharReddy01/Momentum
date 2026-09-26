@@ -83,6 +83,8 @@ Frontend build-time variables use the `VITE_MOMENTUM_` prefix, but the SPA prefe
 | `MOMENTUM_LLM_TIMEOUT_S` | `60` | |
 | `MOMENTUM_LLM_MAX_RETRIES` | `2` | |
 | `MOMENTUM_LLM_SUPPORTS_STREAMING_TOOLS` | `true` | Fall back to non-streaming tool steps if false |
+| `MOMENTUM_LLM_RERANK_MODEL` | `cohere-rerank-v3.5` | Rerank model name as the gateway knows it (Cohere-style `/rerank`). Probed by `llm-check`. For cost estimates, its `LLM_PRICE_TABLE` `in_per_mtok` is the price per search unit |
+| `MOMENTUM_AI_RERANK` | `false` | Rerank hybrid-search candidates before the top k (S3.1.4). Turn on once `llm-check`'s rerank row passes |
 | `MOMENTUM_LLM_PRICE_TABLE` | `{}` | JSON `{model: {in_per_mtok, out_per_mtok}}` (USD, keyed by the configured model name) for cost estimates; unlisted models cost 0 |
 | `MOMENTUM_LLM_FIXTURES_DIR` | (packaged) | Mock/record fixture directory; empty = `momentum/ai/evals/fixtures/mock_responses` |
 | `MOMENTUM_AI_MONTHLY_BUDGET_USD` | `0` (= unlimited) | Workspace cap on estimated cost (sum of `llm_calls.cost_usd` since 00:00 UTC on the 1st); checked before every call |

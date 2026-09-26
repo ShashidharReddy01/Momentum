@@ -15,15 +15,18 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     Index,
+    Integer,
     Numeric,
     String,
     Text,
+    UniqueConstraint,
     func,
     text,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
+from momentum.ai.vector import Vector
 from momentum.core.db import Base, IdMixin
 
 LLM_CALL_STATUSES = ("ok", "error", "budget_exceeded")
@@ -93,4 +96,64 @@ class AiAction(IdMixin, Base):
             "expires_at",
             postgresql_where=text("state = 'proposed'"),
         ),
+    )
+
+
+EMBED_ENTITY_TYPES = ("task", "comment", "attachment", "project", "status_update")
+EMBED_DIM = 1024  # must match MOMENTUM_LLM_EMBED_DIM; a different size needs a migration
+
+
+class Embedding(IdMixin, Base):
+    """S3.1.4: one chunk of an entity's text and its vector (``input_type=search_document``).
+
+    ``content_hash`` covers model + chunk text, so re-indexing unchanged content costs nothing.
+    Rows are derived data: safe to delete and rebuild with ``momentum reindex``."""
+
+    __tablename__ = "embeddings"
+
+    workspace_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("workspaces.id"))
+    entity_type: Mapped[str] = mapped_column(String(20))
+    entity_id: Mapped[uuid.UUID]
+    chunk_no: Mapped[int] = mapped_column(Integer)
+    content_hash: Mapped[str] = mapped_column(String(64))
+    text: Mapped[str] = mapped_column(Text)
+    model: Mapped[str] = mapped_column(String(200))
+    dim: Mapped[int] = mapped_column(Integer)
+    embedding: Mapped[list[float]] = mapped_column(Vector(EMBED_DIM))
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    __table_args__ = (
+        CheckConstraint(f"entity_type in {EMBED_ENTITY_TYPES}", name="entity_type"),
+        UniqueConstraint("entity_type", "entity_id", "chunk_no", "model"),
+        Index("ix_embeddings_entity", "entity_type", "entity_id"),
+        Index("ix_embeddings_workspace", "workspace_id"),
+        Index(
+            "ix_embeddings_hnsw",
+            "embedding",
+            postgresql_using="hnsw",
+            postgresql_ops={"embedding": "vector_cosine_ops"},
+        ),
+    )
+
+
+class AiSummary(IdMixin, Base):
+    """S3.1.4: cached summaries keyed by content hash (a cache: safe to purge). Filled by the
+    summary features (S3.4.1) and long-thread context building (S3.1.5)."""
+
+    __tablename__ = "ai_summaries"
+
+    workspace_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("workspaces.id"))
+    entity_type: Mapped[str] = mapped_column(String(20))
+    entity_id: Mapped[uuid.UUID]
+    kind: Mapped[str] = mapped_column(String(20))
+    content_hash: Mapped[str] = mapped_column(String(64))
+    summary: Mapped[str] = mapped_column(Text)
+    model: Mapped[str] = mapped_column(String(200))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        CheckConstraint("kind in ('thread', 'project_week', 'inbox', 'task')", name="kind"),
+        UniqueConstraint("entity_type", "entity_id", "kind", "content_hash"),
     )

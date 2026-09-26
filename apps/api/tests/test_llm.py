@@ -124,6 +124,22 @@ class FakeGateway:
             return httpx2.Response(
                 200, json={"object": "list", "data": data, "model": body["model"], "usage": usage}
             )
+        if request.url.path.endswith("/rerank"):  # Cohere-style, as Portkey/LiteLLM serve it
+            query = set(body["query"].lower().split())
+            scores = [
+                (i, len(query & set(d.lower().split())) / max(len(query), 1))
+                for i, d in enumerate(body["documents"])
+            ]
+            scores.sort(key=lambda r: -r[1])
+            return httpx2.Response(
+                200,
+                json={
+                    "results": [
+                        {"index": i, "relevance_score": sc} for i, sc in scores[: body["top_n"]]
+                    ],
+                    "meta": {"billed_units": {"search_units": 1}},
+                },
+            )
         model = body["model"]
         wants_tool = bool(body.get("tools"))
         if body.get("stream"):
@@ -688,6 +704,7 @@ async def test_llm_check_passes_in_mock_mode() -> None:
         "tool schemas (catalog)",
         "embeddings (search_document)",
         "embeddings (search_query)",
+        "rerank",
     }
     assert all(r.status == "pass" for r in results), render(results, [], header="")
 
@@ -698,6 +715,7 @@ async def test_llm_check_against_a_gateway_recommends_disabling_streaming_tools(
     by_name = {r.name: r for r in results}
     assert by_name["tool calling"].status == "pass"
     assert by_name["tool schemas (catalog)"].status == "pass"
+    assert by_name["rerank"].status == "pass"
     assert by_name["streaming"].status == "pass"
     assert by_name["streaming with tool calls"].status == "fail"
     assert by_name["embeddings (search_query)"].status == "pass"
@@ -713,6 +731,22 @@ async def test_llm_check_flags_a_wrong_embedding_dimension() -> None:
     emb = [r for r in results if r.name.startswith("embeddings")]
     assert all(r.status == "fail" and "768" in r.detail for r in emb)
     assert any("dimension" in r.lower() for r in recommendations(results))
+
+
+async def test_llm_check_only_warns_when_optional_rerank_is_missing() -> None:
+    class NoRerank(FakeGateway):
+        def handler(self, request: httpx2.Request) -> httpx2.Response:
+            if request.url.path.endswith("/rerank"):
+                self.requests.append(request)
+                return httpx2.Response(404, json={"error": {"message": "no such route"}})
+            return super().handler(request)
+
+    s = gw_settings(llm_max_retries=0)
+    by_name = {r.name: r for r in await run_llm_check(gateway_llm(s, NoRerank()))}
+    assert by_name["rerank"].status == "warn" and "rerank is off" in by_name["rerank"].detail
+    s_on = gw_settings(llm_max_retries=0, ai_rerank=True)
+    by_name = {r.name: r for r in await run_llm_check(gateway_llm(s_on, NoRerank()))}
+    assert by_name["rerank"].status == "fail"
 
 
 def test_llm_check_cli_prints_a_table(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -35,6 +35,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import InstanceState
 
+from momentum.ai.llm import LLM
 from momentum.ai.tools.base import RISK_RANK, Mode, Risk, Tool, ToolContext, ToolError, ToolResult
 from momentum.ai.tools.schema import tool_schema
 from momentum.ai.types import ToolSchema
@@ -146,6 +147,7 @@ class ToolRegistry:
         mode: Mode = "dry_run",
         batch_id: uuid.UUID | None = None,
         allowed_scopes: Iterable[str] | None = None,
+        llm: LLM | None = None,
     ) -> ToolOutcome:
         """Run one tool call. Must be called inside the caller's ``uow.transaction()``.
 
@@ -170,7 +172,7 @@ class ToolRegistry:
             via=ctx.via if ctx.via in AI_VIAS else "ai",
         )
         batch = (batch_id or uuid.uuid4()) if spec.writes else None
-        tc = ToolContext(session=session, ctx=run_ctx, mode=mode, batch_id=batch)
+        tc = ToolContext(session=session, ctx=run_ctx, mode=mode, batch_id=batch, llm=llm)
         held = list(session.identity_map.values())
         savepoint = await session.begin_nested()
         try:

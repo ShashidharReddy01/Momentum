@@ -17,3 +17,23 @@ async def expire_ai_actions(timestamp: int) -> None:
     async with job_session() as session:
         n = await expire_actions(session)
     log.info("ai_actions_expired", count=n, timestamp=timestamp)
+
+
+@blueprint.periodic(cron="* * * * *", periodic_id="index_embeddings")
+@blueprint.task(name="index_embeddings", queue="momentum_ai", queueing_lock="index_embeddings")
+async def index_embeddings(timestamp: int) -> None:
+    """Keep the embeddings index in step with changes (S3.1.4): an outbox consumer run."""
+    from momentum.ai.embeddings import index_changes
+    from momentum.jobs.db import job_llm, job_session
+
+    async with job_session() as session:
+        run = await index_changes(session, job_llm())
+    if run.events or run.stopped:
+        log.info(
+            "embeddings_indexed",
+            events=run.events,
+            entities=run.entities,
+            chunks=run.chunks,
+            stopped=run.stopped,
+            timestamp=timestamp,
+        )

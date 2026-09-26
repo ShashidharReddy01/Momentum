@@ -48,6 +48,7 @@ for db in momentum momentum_test; do psql -d $db -c "create extension if not exi
   MOMENTUM_LLM_MODEL_SMART=@<your-provider-config>/<the strongest model id>
   MOMENTUM_LLM_EMBED_MODEL=@<your-provider-config>/cohere.embed-english-v3
   ```
+- Search index (S3.1.4): the worker keeps embeddings current (`index_embeddings`, every minute). After loading data by hand, or switching `MOMENTUM_LLM_EMBED_MODEL`, run `uv run momentum reindex` (all) or `--entity task --since 2026-09-01`; unchanged content is skipped.
 - Record: `MOMENTUM_LLM_MODE=record` calls the real gateway and saves each chat response as a mock fixture (keyed by `request_key`, system prompt excluded). Review recorded files before committing: synthetic data only.
 - Local LiteLLM: `docker compose --profile ai up litellm` with `infra/litellm/config.yaml` (copy from the example, add your own provider keys; never commit it).
 

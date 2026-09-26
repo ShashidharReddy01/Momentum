@@ -37,6 +37,7 @@ from momentum.ai.types import (
     InputType,
     Msg,
     RawCompletion,
+    RerankRequest,
     StreamEvent,
     TokenEvent,
     ToolCallDeltaEvent,
@@ -214,6 +215,34 @@ class LLM:
             ),
         )
         return vectors
+
+    # --- rerank ----------------------------------------------------------------------------
+    async def rerank(
+        self, query: str, documents: list[str], *, top_n: int, feature: str, ctx: Ctx
+    ) -> list[tuple[int, float]]:
+        """``(index, score)`` of the ``top_n`` most relevant documents, best first (S3.1.4's
+        optional retrieval step; model from ``MOMENTUM_LLM_RERANK_MODEL``)."""
+        model = self.settings.llm_rerank_model
+        rec = _RecordBase(feature, "rerank", model, None, None)
+        await self._preflight(ctx, rec)
+        if not documents:
+            return []
+        req = RerankRequest(feature, model, query, documents, min(top_n, len(documents)))
+        started = time.monotonic()
+        try:
+            raw = await self._with_retries(functools.partial(self.transport.rerank, req))
+        except TransportError as e:
+            raise await self._failed(ctx, rec, started, e) from e
+        await self.usage.record(
+            ctx,
+            rec.to_record(
+                "ok",
+                model=raw.model,
+                cost_usd=self.prices.cost(model, raw.units * 1_000_000, 0),
+                latency_ms=_ms_since(started),
+            ),
+        )
+        return raw.ranking
 
     async def aclose(self) -> None:
         await self.transport.aclose()

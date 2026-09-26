@@ -19,6 +19,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from momentum.core.context import Ctx
 
+if typing.TYPE_CHECKING:
+    from momentum.ai.llm import LLM
+
 Risk = Literal["read", "low", "medium", "high"]
 RISK_RANK: dict[str, int] = {"read": 0, "low": 1, "medium": 2, "high": 3}
 Mode = Literal["dry_run", "apply"]
@@ -86,6 +89,7 @@ class ToolContext:
     ctx: Ctx
     mode: Mode
     batch_id: uuid.UUID | None = None
+    llm: LLM | None = None  # for tools that call the gateway themselves (semantic_search)
 
     @property
     def preview(self) -> bool:
