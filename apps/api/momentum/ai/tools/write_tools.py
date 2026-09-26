@@ -30,6 +30,7 @@ from momentum.ai.tools.refs import (
 from momentum.ai.tools.views import target, task_brief
 from momentum.core.ids import task_key
 from momentum.domain.comments.service import create_comment
+from momentum.domain.mytasks import service as my_tasks
 from momentum.domain.projects.schemas import ProjectCreateIn
 from momentum.domain.projects.service import create_project
 from momentum.domain.sections.service import create_section, list_sections, rename_section
@@ -365,6 +366,64 @@ async def create_status_update(tc: ToolContext, args: CreateStatusUpdateArgs) ->
     )
 
 
+# ---------------- plan_my_day (S3.4.5) ----------------
+
+
+class PlanMyDayArgs(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    today: list[TaskRef] = Field(
+        default_factory=list,
+        max_length=25,
+        description="My tasks for today, in the order to do them",
+    )
+    later: list[TaskRef] = Field(
+        default_factory=list, max_length=50, description="My tasks to move out of today, to Later"
+    )
+
+
+@tool(
+    name="plan_my_day",
+    description=(
+        "Rearrange the user's own My Tasks: put tasks in Today in the given order and move "
+        "others to Later. Only the user's own assigned tasks. Personal: nobody else sees it."
+    ),
+    risk="low",
+    scopes=WRITE,
+)
+async def plan_my_day(tc: ToolContext, args: PlanMyDayArgs) -> ToolResult:
+    s, ctx = tc.session, tc.ctx
+    if not args.today and not args.later:
+        raise ToolError("invalid_arguments", "Give tasks for today or for later")
+    seen: set[uuid.UUID] = set()
+    moved: list[Task] = []
+    prev: uuid.UUID | None = None
+    for bucket, refs in (("today", args.today), ("later", args.later)):
+        prev = None
+        for ref in refs:
+            task, _, _ = await resolve_task(tc, ref)
+            if task.id in seen:
+                raise ToolError("invalid_arguments", f"{task_key(task.number)} is listed twice")
+            seen.add(task.id)
+            if task.assignee_id != ctx.actor.id or task.completed_at is not None:
+                raise ToolError(
+                    "not_found", f"{task_key(task.number)} isn't an open task in your My Tasks"
+                )
+            if bucket == "today" and prev is None:
+                # the plan goes first in Today, ahead of anything already there
+                first = await my_tasks.first_in_bucket(s, ctx, "today")
+                before = first if first is not None and first != task.id else None
+                await my_tasks.move_my_task(s, ctx, task.id, bucket, before_id=before)
+            else:
+                await my_tasks.move_my_task(s, ctx, task.id, bucket, after_id=prev)
+            prev = task.id if bucket == "today" else None
+            moved.append(task)
+    return ToolResult.success(
+        f"{tc.verb('Planned', 'Would plan')} your day: {len(args.today)} for today, "
+        f"{len(args.later)} to later",
+        targets=[target(t) for t in moved],
+    )
+
+
 # ---------------- create_subtasks ----------------
 
 
@@ -626,6 +685,7 @@ TOOLS = [
     add_comment,
     create_subtasks,
     create_status_update,
+    plan_my_day,
     create_project_from_plan,
     bulk_update_tasks,
     delete_task,

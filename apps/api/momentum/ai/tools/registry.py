@@ -267,6 +267,8 @@ async def capture_diff(session: AsyncSession, request_id: str) -> list[DiffRow]:
     for r in rows:
         if r.entity_type in ids:
             ids[r.entity_type].add(r.entity_id)
+        elif r.entity_type == "my_task":  # a My Tasks placement is labelled by its task
+            ids["task"].add(r.entity_id)
         for fld, pair in (r.diff or {}).items():
             kind = _ID_FIELDS.get(fld)
             if kind is not None:
@@ -283,7 +285,8 @@ async def capture_diff(session: AsyncSession, request_id: str) -> list[DiffRow]:
     names = await _names(session, ids)
     out: list[DiffRow] = []
     for r in rows:
-        label = names.get(("task" if r.entity_type == "task" else r.entity_type, r.entity_id))
+        label_kind = "task" if r.entity_type in ("task", "my_task") else r.entity_type
+        label = names.get((label_kind, r.entity_id))
         if r.entity_type == "comment":
             on = names.get(("task", comment_tasks.get(r.entity_id)))  # type: ignore[arg-type]
             label = f"Comment on {on}" if on else "Comment"

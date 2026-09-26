@@ -5,6 +5,7 @@ export { AskPage } from './AskPage';
 export { SummaryButton } from './Summaries';
 export { errorText } from './errors';
 export { BreakDownButton } from './BreakDown';
+export { PlanMyDayButton } from './PlanMyDay';
 export { MoComposer, MoText, MoThread } from './MoThread';
 export {
   aiKeys,

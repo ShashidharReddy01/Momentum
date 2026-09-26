@@ -149,3 +149,12 @@ export function useWriteHelp(): ((req: components['schemas']['WriteIn']) => Prom
     [api, aiEnabled],
   );
 }
+
+/** S3.4.5: Mo's plan for today, as a previewed change to My Tasks (`action_id` null when the
+ * day already matches it). */
+export function usePlanMyDay() {
+  const api = useApi();
+  return useMutation({
+    mutationFn: async () => (await api.POST('/api/v1/ai/plan-my-day')).data!,
+  });
+}

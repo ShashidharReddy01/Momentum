@@ -1,0 +1,17 @@
+# S3.4.5 plan my day (mock). The user message lists the user's open tasks as data; {{$keys}}
+# lists every key in it. Tests use a fixture with keys the server must reject.
+responses:
+  - match: {contains: "Test plan with outsiders"}
+    tool_calls:
+      - name: submit_result
+        arguments:
+          today: ["T-999999", "{{$keys}}"]
+          later: []
+          rationale: "(mock) Keys include one that isn't yours."
+default:
+  tool_calls:
+    - name: submit_result
+      arguments:
+        today: ["{{$keys}}"]
+        later: []
+        rationale: "(mock) Plan for {{$keys}}"

@@ -193,6 +193,23 @@ export interface paths {
         patch: operations["update_ai_memory_api_v1_ai_memory__memory_id__patch"];
         trace?: never;
     };
+    "/api/v1/ai/plan-my-day": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Propose today's order for my tasks (a previewed change to My Tasks) */
+        post: operations["ai_plan_my_day_api_v1_ai_plan_my_day_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/ai/prefs": {
         parameters: {
             query?: never;
@@ -3152,6 +3169,24 @@ export interface components {
             /** Name */
             name: string;
         };
+        /** PlanDayOut */
+        PlanDayOut: {
+            /**
+             * Action Id
+             * @description null when the day already matches the plan
+             */
+            action_id: string | null;
+            /** Citations */
+            citations: components["schemas"]["CitationOut"][];
+            /** Later */
+            later: string[];
+            /** Notes */
+            notes: string[];
+            /** Rationale */
+            rationale: string;
+            /** Today */
+            today: string[];
+        };
         /** ProjectCreateIn */
         ProjectCreateIn: {
             /** Color */
@@ -4734,6 +4769,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ai_plan_my_day_api_v1_ai_plan_my_day_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlanDayOut"];
                 };
             };
         };

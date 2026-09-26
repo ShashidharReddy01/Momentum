@@ -211,6 +211,14 @@ async def list_my_tasks(
     return rows
 
 
+async def first_in_bucket(session: AsyncSession, ctx: Ctx, bucket: str) -> uuid.UUID | None:
+    """The task at the top of one of my buckets, if any (S3.4.5 puts a day plan first)."""
+    await sync_my_tasks(session, ctx)
+    assert ctx.actor.id is not None
+    ordered = _ordered(await _placements(session, ctx.actor.id), bucket)
+    return ordered[0].task_id if ordered else None
+
+
 async def move_my_task(
     session: AsyncSession,
     ctx: Ctx,

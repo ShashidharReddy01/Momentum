@@ -18,6 +18,7 @@ from momentum.ai import (
     chat,
     citations,
     memory,
+    plan_day,
     prefs,
     quick_add,
     sse,
@@ -611,3 +612,36 @@ async def ai_write(body: WriteIn, ctx: CtxDep, rt: RuntimeDep) -> WriteOut:
         language=body.language,
     )
     return WriteOut(text=text)
+
+
+# ---------------- plan my day (S3.4.5) ----------------
+
+
+class PlanDayOut(BaseModel):
+    action_id: uuid.UUID | None = Field(description="null when the day already matches the plan")
+    rationale: str
+    today: list[str]
+    later: list[str]
+    notes: list[str]
+    citations: list[CitationOut]
+
+
+@router.post(
+    "/plan-my-day",
+    response_model=PlanDayOut,
+    summary="Propose today's order for my tasks (a previewed change to My Tasks)",
+)
+async def ai_plan_my_day(ctx: CtxDep, uow: UowDep, rt: RuntimeDep) -> PlanDayOut:
+    llm = require_llm(rt)
+    ctx = ctx.with_(via="ai")
+    async with uow.transaction() as s:
+        r = await plan_day.plan_day(s, llm, ctx, rt.tools, now=datetime.now(UTC))
+        cites = await citations.resolve(s, ctx, r.rationale)
+        return PlanDayOut(
+            action_id=r.action_id,
+            rationale=r.rationale,
+            today=r.today,
+            later=r.later,
+            notes=r.notes,
+            citations=[CitationOut(**c.to_json()) for c in cites],
+        )

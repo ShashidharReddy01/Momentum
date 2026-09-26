@@ -1170,6 +1170,149 @@
   },
   {
     "function": {
+      "description": "Rearrange the user's own My Tasks: put tasks in Today in the given order and move others to Later. Only the user's own assigned tasks. Personal: nobody else sees it.",
+      "name": "plan_my_day",
+      "parameters": {
+        "additionalProperties": false,
+        "properties": {
+          "later": {
+            "description": "My tasks to move out of today, to Later",
+            "items": {
+              "additionalProperties": false,
+              "description": "Exactly one of ``id``, ``key`` or ``title_query``. A bare string is accepted too:\n``\"T-12\"`` is read as a key, a UUID as an id, anything else as a title query.",
+              "properties": {
+                "id": {
+                  "anyOf": [
+                    {
+                      "format": "uuid",
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "Task id, when known exactly"
+                },
+                "key": {
+                  "anyOf": [
+                    {
+                      "pattern": "^[Tt]-\\d{1,9}$",
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "Task key such as \"T-123\""
+                },
+                "project": {
+                  "anyOf": [
+                    {
+                      "maxLength": 200,
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "Project name or id to narrow a title_query"
+                },
+                "title_query": {
+                  "anyOf": [
+                    {
+                      "maxLength": 200,
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "Words from the task title, when neither the id nor the key is known"
+                }
+              },
+              "type": "object"
+            },
+            "maxItems": 50,
+            "type": "array"
+          },
+          "today": {
+            "description": "My tasks for today, in the order to do them",
+            "items": {
+              "additionalProperties": false,
+              "description": "Exactly one of ``id``, ``key`` or ``title_query``. A bare string is accepted too:\n``\"T-12\"`` is read as a key, a UUID as an id, anything else as a title query.",
+              "properties": {
+                "id": {
+                  "anyOf": [
+                    {
+                      "format": "uuid",
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "Task id, when known exactly"
+                },
+                "key": {
+                  "anyOf": [
+                    {
+                      "pattern": "^[Tt]-\\d{1,9}$",
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "Task key such as \"T-123\""
+                },
+                "project": {
+                  "anyOf": [
+                    {
+                      "maxLength": 200,
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "Project name or id to narrow a title_query"
+                },
+                "title_query": {
+                  "anyOf": [
+                    {
+                      "maxLength": 200,
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "Words from the task title, when neither the id nor the key is known"
+                }
+              },
+              "type": "object"
+            },
+            "maxItems": 25,
+            "type": "array"
+          }
+        },
+        "type": "object"
+      }
+    },
+    "type": "function"
+  },
+  {
+    "function": {
       "description": "Create a new project with sections and tasks (assignees, dates, descriptions) from a plan. The user becomes its admin.",
       "name": "create_project_from_plan",
       "parameters": {

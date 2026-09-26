@@ -19,6 +19,7 @@ import { EmptyState, ErrorState } from '@/components/common/States';
 import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { PlanMyDayButton } from '@/features/ai';
 import { useMe } from '@/features/auth';
 import {
   dropNeighbors,
@@ -55,9 +56,12 @@ function MyTasksBody() {
   return (
     <div className="flex h-full min-h-0">
       <div className="min-w-0 flex-1 overflow-auto px-4 md:px-8 py-6">
-        <h1 className="page-title mb-4 flex items-center gap-2">
-          <Icon icon={ListChecks} size={20} /> My Tasks
-        </h1>
+        <div className="mb-4 flex flex-wrap items-center gap-3">
+          <h1 className="page-title flex flex-1 items-center gap-2">
+            <Icon icon={ListChecks} size={20} /> My Tasks
+          </h1>
+          <PlanMyDayButton />
+        </div>
         <MyTasksList />
       </div>
       {nav.openId ? (

@@ -99,6 +99,7 @@ def test_catalog_covers_phase_1_2_tools_with_their_risks() -> None:
         "add_comment": "low",
         "create_subtasks": "low",
         "create_status_update": "medium",  # S3.4.3
+        "plan_my_day": "low",  # S3.4.5
         "create_project_from_plan": "medium",
         "bulk_update_tasks": "medium",
         "delete_task": "high",

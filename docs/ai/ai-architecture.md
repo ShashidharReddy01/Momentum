@@ -87,6 +87,7 @@ Registered in S3.1.2 unless noted. `semantic_search` arrives with S3.1.4 (embedd
 | `create_subtasks` | low | 3 | Batch under a parent |
 | `create_project_from_plan` | medium | 3 | Sections + tasks (assignees, dates, descriptions); team defaults to the user's only team |
 | `create_status_update` | medium | 3 (S3.4.3) | Post a status update (sets the project status); medium risk, so always previewed and applied by the user. Drafting is the separate `POST /ai/projects/{id}/status-draft` |
+| `plan_my_day` | low | 3 (S3.4.5) | Put my own open tasks in Today (in order, first in the section) or Later, via `move_my_task` (personal) |
 | `bulk_update_tasks` | medium (>25: high) | 3 | Same assignee/dates/completed change on up to 100 tasks, all or nothing |
 | `delete_task` | high | 3 | Soft delete, always confirm |
 | `create_rule` | medium | 4 | From NL rule compile |

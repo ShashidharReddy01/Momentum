@@ -86,6 +86,8 @@
 
 **S3.4.4 built (2026-09-26):** `ai/write.py` + `POST /ai/write {action: improve|shorten|fix_grammar|tone|translate, text ≤ 8000, tone?, language?}` → `{text}` (fast alias, prompt `write/v1`; text sent as data with line breaks kept and `<` escaped; wrapping quotes/fences removed; an empty reply is `bad_response`; language names validated). UI: a **"Mo" menu in the editor's toolbar** (not a floating bubble menu: that needs a floating-UI dependency the toolbar doesn't) on the task description: it works on the selection, or the whole text when nothing is selected, and shows the rewrite as a suggestion (Replace / Try again / Reject). Replace inserts it as Markdown, and is refused if the text changed since asking. The comment editor doesn't have it yet (it has its own small editor).
 
+**S3.4.5 built (2026-09-26):** `ai/plan_day.py` + `POST /ai/plan-my-day` (default alias, prompt `plan_day/v1`): the model sees my open tasks (key, My Tasks section, due/overdue, priority, blocked) and submits keys for Today (ordered) and Later; the server keeps only my open tasks' keys, drops duplicates, caps Today at 8, only moves to Later what is in Today (notes for each), and proposes nothing when the day already matches. Applied through the new tool `plan_my_day` (low risk) → `mytasks.move_my_task` (the plan goes first in Today, pinned, one undo); `mytasks.first_in_bucket` added. UI: "Plan my day" on My Tasks → reasons with citations, notes, PreviewCard. No estimates field exists yet and calendar time is Phase 7, so neither is considered.
+
 ## E3.5 Quality and admin
 
 ### S3.5.1: Eval harness
