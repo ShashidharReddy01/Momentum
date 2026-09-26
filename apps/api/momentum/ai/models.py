@@ -8,8 +8,20 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 from decimal import Decimal
+from typing import Any
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, Numeric, String, func
+from sqlalchemy import (
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Index,
+    Numeric,
+    String,
+    Text,
+    func,
+    text,
+)
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from momentum.core.db import Base, IdMixin
@@ -39,4 +51,46 @@ class LlmCall(IdMixin, Base):
     __table_args__ = (
         CheckConstraint(f"status in {LLM_CALL_STATUSES}", name="status"),
         Index("ix_llm_calls_workspace_created", "workspace_id", "created_at"),
+    )
+
+
+AI_ACTION_SOURCES = ("chat", "command", "inline", "agent", "rule")
+AI_ACTION_STATES = ("proposed", "approved", "applied", "rejected", "expired", "undone", "failed")
+AI_ACTION_RISKS = ("low", "medium", "high")
+
+
+class AiAction(IdMixin, Base):
+    """S3.1.3: an AI-proposed change, previewed and waiting for (or done with) a human decision.
+
+    ``operations`` is ``[{tool, args, summary, risk, diff, watch}]``: the tool call, what its dry
+    run showed, and the version of every existing entity it touches (``watch``) for the stale
+    check before applying. ai-architecture §4."""
+
+    __tablename__ = "ai_actions"
+
+    workspace_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("workspaces.id"))
+    source: Mapped[str] = mapped_column(String(16))
+    source_id: Mapped[uuid.UUID | None]
+    proposed_for: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"))
+    summary: Mapped[str] = mapped_column(Text)
+    operations: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, default=list)
+    risk: Mapped[str] = mapped_column(String(8))
+    state: Mapped[str] = mapped_column(String(12), default="proposed")
+    decided_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    applied_batch_id: Mapped[uuid.UUID | None]
+    error: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+    __table_args__ = (
+        CheckConstraint(f"source in {AI_ACTION_SOURCES}", name="source"),
+        CheckConstraint(f"state in {AI_ACTION_STATES}", name="state"),
+        CheckConstraint(f"risk in {AI_ACTION_RISKS}", name="risk"),
+        Index("ix_ai_actions_proposed_for_state", "proposed_for", "state"),
+        Index(
+            "ix_ai_actions_expiring",
+            "expires_at",
+            postgresql_where=text("state = 'proposed'"),
+        ),
     )

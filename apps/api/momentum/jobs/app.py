@@ -5,6 +5,7 @@ from __future__ import annotations
 import procrastinate
 
 from momentum.core.settings import Settings
+from momentum.jobs import ai as _ai  # noqa: F401 - registers `expire_ai_actions`
 from momentum.jobs import attachments as _attachments  # noqa: F401 - registers `extract_text`
 from momentum.jobs.tasks import blueprint
 

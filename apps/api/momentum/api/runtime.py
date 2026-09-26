@@ -11,6 +11,7 @@ from momentum.core.settings import Settings
 
 if TYPE_CHECKING:
     from momentum.ai.llm import LLM
+    from momentum.ai.tools.registry import ToolRegistry
     from momentum.auth.base import AuthProvider
     from momentum.realtime.hub import Hub
 
@@ -22,6 +23,12 @@ class RealtimeState:
     hub: Hub
 
 
+def _default_tools() -> ToolRegistry:
+    from momentum.ai.tools.catalog import build_registry
+
+    return build_registry()
+
+
 @dataclass
 class MomentumRuntime:
     settings: Settings
@@ -30,4 +37,5 @@ class MomentumRuntime:
     auth: AuthProvider
     realtime: RealtimeState | None = None
     llm: LLM | None = None  # built in the lifespan (S3.1.1); None only outside a running app
+    tools: ToolRegistry = field(default_factory=_default_tools)  # S3.1.2 catalog
     extras: dict[str, Any] = field(default_factory=dict)

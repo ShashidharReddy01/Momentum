@@ -185,7 +185,7 @@ class ToolRegistry:
                 )
                 diff = await capture_diff(session, run_ctx.request_id)
         except ToolError as e:
-            await _rollback(session, savepoint, held)
+            await rollback_savepoint(session, savepoint, held)
             return ToolOutcome(
                 name,
                 mode,
@@ -193,10 +193,10 @@ class ToolRegistry:
                 ToolResult.failure(e.code, e.message, candidates=e.candidates),
             )
         except DomainError as e:
-            await _rollback(session, savepoint, held)
+            await rollback_savepoint(session, savepoint, held)
             return _failed(name, mode, spec.risk, e.code, e.detail)
         except IntegrityError:
-            await _rollback(session, savepoint, held)
+            await rollback_savepoint(session, savepoint, held)
             return _failed(
                 name, mode, spec.risk, "conflict", "The change conflicts with existing data"
             )
@@ -204,7 +204,7 @@ class ToolRegistry:
             await savepoint.rollback()
             raise
         if mode == "dry_run" or not result.ok:
-            await _rollback(session, savepoint, held)
+            await rollback_savepoint(session, savepoint, held)
         else:
             await savepoint.commit()
         risk = spec.risk
@@ -214,7 +214,7 @@ class ToolRegistry:
         return ToolOutcome(name, mode, risk, result, diff, batch if applied else None)
 
 
-async def _rollback(session: AsyncSession, savepoint: Any, held: list[object]) -> None:
+async def rollback_savepoint(session: AsyncSession, savepoint: Any, held: list[object]) -> None:
     """Roll the savepoint back and re-load what it expired.
 
     SQLAlchemy expires every object the savepoint changed (and expunges the ones it created).

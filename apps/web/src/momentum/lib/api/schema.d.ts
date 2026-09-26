@@ -4,6 +4,74 @@
  */
 
 export interface paths {
+    "/api/v1/ai/actions/{action_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A proposed AI action */
+        get: operations["get_ai_action_api_v1_ai_actions__action_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ai/actions/{action_id}/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Apply a proposed AI action (re-previews instead if its targets changed) */
+        post: operations["apply_ai_action_api_v1_ai_actions__action_id__apply_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ai/actions/{action_id}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Dismiss */
+        post: operations["reject_ai_action_api_v1_ai_actions__action_id__reject_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ai/actions/{action_id}/undo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Undo an applied action */
+        post: operations["undo_ai_action_api_v1_ai_actions__action_id__undo_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/attachments/{attachment_id}": {
         parameters: {
             query?: never;
@@ -1527,6 +1595,85 @@ export interface components {
             /** Verb */
             verb: string;
         };
+        /** AiActionEnvelope */
+        AiActionEnvelope: {
+            data: components["schemas"]["AiActionOut"];
+        };
+        /** AiActionOut */
+        AiActionOut: {
+            /** Applied Batch Id */
+            applied_batch_id: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Decided At */
+            decided_at: string | null;
+            /** Error */
+            error: string | null;
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Operations */
+            operations: components["schemas"]["AiOperationOut"][];
+            /**
+             * Risk
+             * @enum {string}
+             */
+            risk: "low" | "medium" | "high";
+            /** Source */
+            source: string;
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "proposed" | "approved" | "applied" | "rejected" | "expired" | "undone" | "failed";
+            /** Summary */
+            summary: string;
+        };
+        /** AiOperationOut */
+        AiOperationOut: {
+            /** Args */
+            args: {
+                [key: string]: unknown;
+            };
+            /** Diff */
+            diff: components["schemas"]["DiffRowOut"][];
+            /**
+             * Risk
+             * @enum {string}
+             */
+            risk: "low" | "medium" | "high";
+            /** Summary */
+            summary: string;
+            /** Tool */
+            tool: string;
+        };
+        /** ApplyIn */
+        ApplyIn: {
+            /**
+             * Confirm High Risk
+             * @default false
+             */
+            confirm_high_risk: boolean;
+        };
+        /** ApplyOut */
+        ApplyOut: {
+            data: components["schemas"]["AiActionOut"];
+            /**
+             * Outcome
+             * @enum {string}
+             */
+            outcome: "applied" | "repreviewed" | "failed";
+        };
         /** AsanaImportIn */
         AsanaImportIn: {
             /** Pat */
@@ -1713,6 +1860,25 @@ export interface components {
              * Format: uuid
              */
             user_id: string;
+        };
+        /** DiffRowOut */
+        DiffRowOut: {
+            /** Changes */
+            changes: {
+                [key: string]: unknown[];
+            };
+            /** Display */
+            display: {
+                [key: string]: unknown[];
+            };
+            /** Entity Id */
+            entity_id: string;
+            /** Entity Type */
+            entity_type: string;
+            /** Label */
+            label: string;
+            /** Verb */
+            verb: string;
         };
         /** FavoriteIn */
         FavoriteIn: {
@@ -3381,6 +3547,134 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    get_ai_action_api_v1_ai_actions__action_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                action_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiActionEnvelope"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    apply_ai_action_api_v1_ai_actions__action_id__apply_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                action_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApplyIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApplyOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reject_ai_action_api_v1_ai_actions__action_id__reject_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                action_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiActionEnvelope"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    undo_ai_action_api_v1_ai_actions__action_id__undo_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                action_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiActionEnvelope"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     delete_attachment_api_v1_attachments__attachment_id__delete: {
         parameters: {
             query?: never;

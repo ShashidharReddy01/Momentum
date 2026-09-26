@@ -74,7 +74,7 @@ Mo's text uses the same typography as everything else. Its identity comes from t
 | `ErrorState` | Human message + retry + request id (copyable) |
 | `AICallout` | Dashed amber border, left amber bar, ✦ "Mo" label, content, actions (Apply / Edit / Dismiss), feedback 👍/👎 |
 | `AIBadge` | Small ✦ marker on AI-authored comments, fields, status updates; tooltip "Drafted by Mo · why?" |
-| `PreviewCard` | List of proposed changes (diff rows: entity, field, old → new), risk indicator, Apply / Edit / Cancel |
+| `PreviewCard` | List of proposed changes (diff rows: entity, field, old → new), risk indicator, Apply / Edit / Cancel. **As built (S3.1.3, `features/ai/PreviewCard.tsx`):** an `AICallout` labeled "Mo suggests"; changes grouped by entity label (`T-12 Draft copy`) with one readable line per field (`Due: — → 2026-10-09`, ordering keys never shown); risk chip (ok / warn / crit tints); high risk opens a confirm `Dialog` ("Apply N changes?", Go back / Yes, apply) before anything is sent; a stale target shows a warn notice and the updated diff instead of applying; after applying, a toast with Undo for the whole action; decided suggestions keep their diff and show their state (Applied / Dismissed / expired / Undone / failed + reason) with no buttons. `Edit` appears only when the host passes `onEdit` (⌘K puts the request back in the input, S3.2.2). Also reachable at `/ai/actions/:id`. |
 | `MockBadge`, `MockOutline` | Purple, dev only |
 | `Ledger` / `StatStrip` | Hairline-separated numeric stats |
 | `BrandMark` | Momentum logo (accent square with M stroke: ink in light, lime in dark) |

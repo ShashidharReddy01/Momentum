@@ -251,6 +251,8 @@ key text, user_id, method, path, response_status, response_body jsonb, created_a
 | error | text null | |
 | created_at, expires_at | | |
 
+**As built (S3.1.3, migration 0016):** each operation is `{tool, args, summary, risk, diff, watch}`: `diff` is the registry's `DiffRow` list from the dry run, `watch` is `[{type: task|project, id, version}]` for every existing entity the operation changes (the stale check). `source_id` has no FK (its targets arrive with chat/agents). Indexes: `(proposed_for, state)`, and `expires_at` where `state = 'proposed'` (the expiry job). Applied operations' activity rows carry `ai_action_id`. `approved` is reserved for agent `confirm` flows (Phase 5); a human apply goes straight from `proposed` to `applied`.
+
 ### `agents`
 id, workspace_id, user_id (agent account), key (e.g., `daily_digest`), name, avatar, description, instructions text, tools text[], scope jsonb (`{projects:[..], teams:[..]}`), autonomy (`suggest`,`confirm`,`auto`), triggers jsonb (`[{type: schedule, cron}, {type: event, event: task.created, filter}, {type: assigned}, {type: mentioned}]`), model_alias, budget_monthly_usd numeric, enabled, version, created_by, timestamps.
 

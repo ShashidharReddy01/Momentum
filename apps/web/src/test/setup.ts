@@ -16,6 +16,9 @@ class RO {
 }
 globalThis.ResizeObserver ??= RO as unknown as typeof ResizeObserver;
 Element.prototype.scrollIntoView ??= function scrollIntoView() {};
+// sonner's toasts capture the pointer on press (clicking a toast action, e.g. Undo)
+Element.prototype.setPointerCapture ??= function setPointerCapture() {};
+Element.prototype.releasePointerCapture ??= function releasePointerCapture() {};
 window.matchMedia ??= ((query: string) => ({
   matches: false,
   media: query,

@@ -1,6 +1,6 @@
 """Import every ORM model so ``metadata`` is complete (used by Alembic and tests)."""
 
-from momentum.ai.models import LlmCall
+from momentum.ai.models import AiAction, LlmCall
 from momentum.core.activity import Activity
 from momentum.core.db import Base
 from momentum.core.events import OutboxEvent
@@ -23,6 +23,7 @@ metadata = Base.metadata
 
 __all__ = [
     "Activity",
+    "AiAction",
     "ApiToken",
     "Attachment",
     "Comment",

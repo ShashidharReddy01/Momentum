@@ -28,6 +28,7 @@
 **Scope:** migration `ai_actions`; `ai/actions.py` lifecycle incl. stale check, expiry job, batch apply, undo; API `GET /ai/actions/{id}`, `POST /ai/actions/{id}/apply|reject`; frontend `PreviewCard` (diff rows grouped by entity, risk indicator, Apply/Edit/Cancel, high-risk confirm dialog), undo toast.
 **AC:** applying a 30-item bulk requires high-risk confirmation; stale targets trigger re-preview.
 **Size:** L
+**Built (2026-09-26):** as scoped; migration 0016; also `POST /ai/actions/{id}/undo` (so an undone action's state is `undone`, not just its batch) and a `/ai/actions/:id` page. `Edit` is a host callback (wired by ⌘K in S3.2.2). No source creates actions yet from the UI: ⌘K (S3.2.2) and chat (S3.3.1) do.
 
 ### S3.1.4: Embeddings pipeline + hybrid retrieval
 **Scope:** migration `embeddings` (vector(1024) + HNSW), `ai_summaries`; `ai/embeddings.py` (chunking, `input_type`, batching, content hash); consumer job on create/update events; `momentum reindex [--entity] [--since]`; `ai/retrieval.py` hybrid search with RRF + SQL permission filter; `semantic_search` tool.
