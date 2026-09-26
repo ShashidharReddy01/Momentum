@@ -36,7 +36,7 @@ for db in momentum momentum_test; do psql -d $db -c "create extension if not exi
 
 ## AI locally
 - Mock: `MOMENTUM_LLM_MODE=mock` (default). Deterministic fixtures from `momentum/ai/evals/fixtures/mock_responses/` (format in `momentum/ai/mock.py`'s docstring); anything unmatched answers with a visible "(mock)" text.
-- Real: set `MOMENTUM_LLM_MODE=gateway`, `MOMENTUM_LLM_BASE_URL`, `MOMENTUM_LLM_API_KEY`, and the alias names; run `uv run momentum llm-check`. It prints a pass/fail table (basic chat per alias, tool calling, streaming, streaming with tool calls, both embedding input types, latency) and exits 1 if anything fails.
+- Real: set `MOMENTUM_LLM_MODE=gateway`, `MOMENTUM_LLM_BASE_URL`, `MOMENTUM_LLM_API_KEY`, and the alias names; run `uv run momentum llm-check`. It prints a pass/fail table (basic chat per alias, tool calling, the full tool catalog's schemas in one request with the arguments validated by the registry's own model, streaming, streaming with tool calls, both embedding input types, latency) and exits 1 if anything fails.
 - Portkey instead of LiteLLM (example; use your own provider-config slug and model ids):
   ```bash
   MOMENTUM_LLM_MODE=gateway

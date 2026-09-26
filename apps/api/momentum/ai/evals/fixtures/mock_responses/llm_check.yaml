@@ -4,6 +4,10 @@ responses:
     tool_calls:
       - name: add
         arguments: {a: 2, b: 3}
+  - match: {contains: "use the update_task tool"}
+    tool_calls:
+      - name: update_task
+        arguments: {task: {key: T-12}, due_on: "2026-10-09"}
   - match: {contains: "count from one to five"}
     text: "(mock) one\ntwo\nthree\nfour\nfive"
 default:

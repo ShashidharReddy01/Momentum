@@ -167,10 +167,15 @@ class FakeGateway:
                 200, content=_sse(chunks), headers={"content-type": "text/event-stream"}
             )
         if wants_tool:
-            return httpx2.Response(
-                200,
-                json=_chat_json(model, tool_calls=[{"name": "add", "arguments": {"a": 2, "b": 3}}]),
-            )
+            forced = (body.get("tool_choice") or {}).get("function", {}).get("name")
+            if forced == "update_task":  # llm-check's catalog-schema probe
+                call = {
+                    "name": "update_task",
+                    "arguments": {"task": "T-12", "due_on": "2026-10-09"},
+                }
+            else:
+                call = {"name": "add", "arguments": {"a": 2, "b": 3}}
+            return httpx2.Response(200, json=_chat_json(model, tool_calls=[call]))
         return httpx2.Response(200, json=_chat_json(model, text="pong"))
 
 
@@ -680,6 +685,7 @@ async def test_llm_check_passes_in_mock_mode() -> None:
         "tool calling",
         "streaming",
         "streaming with tool calls",
+        "tool schemas (catalog)",
         "embeddings (search_document)",
         "embeddings (search_query)",
     }
@@ -691,6 +697,7 @@ async def test_llm_check_against_a_gateway_recommends_disabling_streaming_tools(
     results = await run_llm_check(gateway_llm(s, FakeGateway(streaming_tools=False)))
     by_name = {r.name: r for r in results}
     assert by_name["tool calling"].status == "pass"
+    assert by_name["tool schemas (catalog)"].status == "pass"
     assert by_name["streaming"].status == "pass"
     assert by_name["streaming with tool calls"].status == "fail"
     assert by_name["embeddings (search_query)"].status == "pass"

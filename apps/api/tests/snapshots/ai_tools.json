@@ -1,0 +1,1351 @@
+[
+  {
+    "function": {
+      "description": "Find tasks the user can see with structured filters (text, project, assignee, status, due range, overdue). Returns keys like T-123 to use with other tools.",
+      "name": "search_tasks",
+      "parameters": {
+        "additionalProperties": false,
+        "properties": {
+          "assignee": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "\"me\", a name, an email, or \"none\" for unassigned tasks"
+          },
+          "due_after": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Due on or after this date"
+          },
+          "due_before": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Due on or before this date"
+          },
+          "limit": {
+            "default": 20,
+            "maximum": 50,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "overdue": {
+            "default": false,
+            "description": "Only open tasks due before today",
+            "type": "boolean"
+          },
+          "project": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Project name or id"
+          },
+          "status": {
+            "default": "open",
+            "description": "Open tasks by default",
+            "enum": [
+              "open",
+              "completed",
+              "any"
+            ],
+            "type": "string"
+          },
+          "text": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Words to look for in titles and descriptions"
+          }
+        },
+        "type": "object"
+      }
+    },
+    "type": "function"
+  },
+  {
+    "function": {
+      "description": "Details of one task: fields, description, subtasks, blockers and recent comments.",
+      "name": "get_task",
+      "parameters": {
+        "additionalProperties": false,
+        "properties": {
+          "task": {
+            "additionalProperties": false,
+            "description": "Exactly one of ``id``, ``key`` or ``title_query``. A bare string is accepted too:\n``\"T-12\"`` is read as a key, a UUID as an id, anything else as a title query.",
+            "properties": {
+              "id": {
+                "anyOf": [
+                  {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "Task id, when known exactly"
+              },
+              "key": {
+                "anyOf": [
+                  {
+                    "pattern": "^[Tt]-\\d{1,9}$",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "Task key such as \"T-123\""
+              },
+              "project": {
+                "anyOf": [
+                  {
+                    "maxLength": 200,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "Project name or id to narrow a title_query"
+              },
+              "title_query": {
+                "anyOf": [
+                  {
+                    "maxLength": 200,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "Words from the task title, when neither the id nor the key is known"
+              }
+            },
+            "type": "object"
+          }
+        },
+        "required": [
+          "task"
+        ],
+        "type": "object"
+      }
+    },
+    "type": "function"
+  },
+  {
+    "function": {
+      "description": "Overview of a project: sections with task counts, overdue count and members.",
+      "name": "get_project",
+      "parameters": {
+        "additionalProperties": false,
+        "properties": {
+          "project": {
+            "description": "Project name or id",
+            "maxLength": 200,
+            "type": "string"
+          }
+        },
+        "required": [
+          "project"
+        ],
+        "type": "object"
+      }
+    },
+    "type": "function"
+  },
+  {
+    "function": {
+      "description": "Tasks in one section of a project, in their board/list order.",
+      "name": "get_section_tasks",
+      "parameters": {
+        "additionalProperties": false,
+        "properties": {
+          "limit": {
+            "default": 50,
+            "maximum": 100,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "project": {
+            "description": "Project name or id",
+            "maxLength": 200,
+            "type": "string"
+          },
+          "section": {
+            "description": "Section name or id",
+            "maxLength": 200,
+            "type": "string"
+          },
+          "status": {
+            "default": "open",
+            "enum": [
+              "open",
+              "completed",
+              "any"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "project",
+          "section"
+        ],
+        "type": "object"
+      }
+    },
+    "type": "function"
+  },
+  {
+    "function": {
+      "description": "The user's own tasks from My Tasks, in bucket order (recently assigned, today, this week, later), or their recently completed tasks.",
+      "name": "list_my_tasks",
+      "parameters": {
+        "additionalProperties": false,
+        "properties": {
+          "limit": {
+            "default": 50,
+            "maximum": 100,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "status": {
+            "default": "open",
+            "enum": [
+              "open",
+              "completed"
+            ],
+            "type": "string"
+          }
+        },
+        "type": "object"
+      }
+    },
+    "type": "function"
+  },
+  {
+    "function": {
+      "description": "Tasks assigned to a person, limited to projects the user can see.",
+      "name": "list_user_tasks",
+      "parameters": {
+        "additionalProperties": false,
+        "properties": {
+          "limit": {
+            "default": 30,
+            "maximum": 100,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "person": {
+            "description": "A name, email, or \"me\"",
+            "maxLength": 200,
+            "type": "string"
+          },
+          "status": {
+            "default": "open",
+            "enum": [
+              "open",
+              "completed",
+              "any"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "person"
+        ],
+        "type": "object"
+      }
+    },
+    "type": "function"
+  },
+  {
+    "function": {
+      "description": "What changed in a project over a date range (created, completed, moved, edited tasks and comments), oldest first. Use it for status reports.",
+      "name": "get_project_activity",
+      "parameters": {
+        "additionalProperties": false,
+        "properties": {
+          "limit": {
+            "default": 100,
+            "maximum": 200,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "project": {
+            "description": "Project name or id",
+            "maxLength": 200,
+            "type": "string"
+          },
+          "since": {
+            "description": "First day to include (the user's timezone)",
+            "format": "date",
+            "type": "string"
+          },
+          "until": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Last day to include; default today"
+          }
+        },
+        "required": [
+          "project",
+          "since"
+        ],
+        "type": "object"
+      }
+    },
+    "type": "function"
+  },
+  {
+    "function": {
+      "description": "Find people in the workspace by name or email (to assign or mention them).",
+      "name": "list_people",
+      "parameters": {
+        "additionalProperties": false,
+        "properties": {
+          "limit": {
+            "default": 20,
+            "maximum": 50,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "project": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Only explicit members of this project"
+          },
+          "query": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Part of a name or email"
+          }
+        },
+        "type": "object"
+      }
+    },
+    "type": "function"
+  },
+  {
+    "function": {
+      "description": "Create a task in a project (optionally in a section, assigned and dated).",
+      "name": "create_task",
+      "parameters": {
+        "additionalProperties": false,
+        "properties": {
+          "assignee": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "A name, email, \"me\", or \"none\" to unassign"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "maxLength": 20000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Plain text; replaces the description"
+          },
+          "due_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "project": {
+            "description": "Project name or id",
+            "maxLength": 200,
+            "type": "string"
+          },
+          "section": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Section name or id; default: the first one"
+          },
+          "start_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "title": {
+            "maxLength": 500,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "project",
+          "title"
+        ],
+        "type": "object"
+      }
+    },
+    "type": "function"
+  },
+  {
+    "function": {
+      "description": "Change fields of a task the user can edit: title, assignee, start/due dates, description. Omit fields to keep them; null clears one.",
+      "name": "update_task",
+      "parameters": {
+        "additionalProperties": false,
+        "properties": {
+          "assignee": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "A name, email, \"me\", or \"none\" to unassign"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "maxLength": 20000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Plain text; replaces the description"
+          },
+          "due_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "start_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "task": {
+            "additionalProperties": false,
+            "description": "Exactly one of ``id``, ``key`` or ``title_query``. A bare string is accepted too:\n``\"T-12\"`` is read as a key, a UUID as an id, anything else as a title query.",
+            "properties": {
+              "id": {
+                "anyOf": [
+                  {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "Task id, when known exactly"
+              },
+              "key": {
+                "anyOf": [
+                  {
+                    "pattern": "^[Tt]-\\d{1,9}$",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "Task key such as \"T-123\""
+              },
+              "project": {
+                "anyOf": [
+                  {
+                    "maxLength": 200,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "Project name or id to narrow a title_query"
+              },
+              "title_query": {
+                "anyOf": [
+                  {
+                    "maxLength": 200,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "Words from the task title, when neither the id nor the key is known"
+              }
+            },
+            "type": "object"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          }
+        },
+        "required": [
+          "task"
+        ],
+        "type": "object"
+      }
+    },
+    "type": "function"
+  },
+  {
+    "function": {
+      "description": "Mark a task complete (or reopen it).",
+      "name": "complete_task",
+      "parameters": {
+        "additionalProperties": false,
+        "properties": {
+          "completed": {
+            "default": true,
+            "description": "false reopens a completed task",
+            "type": "boolean"
+          },
+          "ignore_blockers": {
+            "default": false,
+            "description": "Complete even if tasks it waits on are open (only if the user said so)",
+            "type": "boolean"
+          },
+          "task": {
+            "additionalProperties": false,
+            "description": "Exactly one of ``id``, ``key`` or ``title_query``. A bare string is accepted too:\n``\"T-12\"`` is read as a key, a UUID as an id, anything else as a title query.",
+            "properties": {
+              "id": {
+                "anyOf": [
+                  {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "Task id, when known exactly"
+              },
+              "key": {
+                "anyOf": [
+                  {
+                    "pattern": "^[Tt]-\\d{1,9}$",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "Task key such as \"T-123\""
+              },
+              "project": {
+                "anyOf": [
+                  {
+                    "maxLength": 200,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "Project name or id to narrow a title_query"
+              },
+              "title_query": {
+                "anyOf": [
+                  {
+                    "maxLength": 200,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "Words from the task title, when neither the id nor the key is known"
+              }
+            },
+            "type": "object"
+          }
+        },
+        "required": [
+          "task"
+        ],
+        "type": "object"
+      }
+    },
+    "type": "function"
+  },
+  {
+    "function": {
+      "description": "Move a top-level task to another section, or to another project (at the end of the section, the first section by default).",
+      "name": "move_task",
+      "parameters": {
+        "additionalProperties": false,
+        "properties": {
+          "project": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Target project, to move the task to another project"
+          },
+          "section": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Target section name or id"
+          },
+          "task": {
+            "additionalProperties": false,
+            "description": "Exactly one of ``id``, ``key`` or ``title_query``. A bare string is accepted too:\n``\"T-12\"`` is read as a key, a UUID as an id, anything else as a title query.",
+            "properties": {
+              "id": {
+                "anyOf": [
+                  {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "Task id, when known exactly"
+              },
+              "key": {
+                "anyOf": [
+                  {
+                    "pattern": "^[Tt]-\\d{1,9}$",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "Task key such as \"T-123\""
+              },
+              "project": {
+                "anyOf": [
+                  {
+                    "maxLength": 200,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "Project name or id to narrow a title_query"
+              },
+              "title_query": {
+                "anyOf": [
+                  {
+                    "maxLength": 200,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "Words from the task title, when neither the id nor the key is known"
+              }
+            },
+            "type": "object"
+          }
+        },
+        "required": [
+          "task"
+        ],
+        "type": "object"
+      }
+    },
+    "type": "function"
+  },
+  {
+    "function": {
+      "description": "Add a comment to a task. It is shown as written by AI on the user's behalf.",
+      "name": "add_comment",
+      "parameters": {
+        "additionalProperties": false,
+        "properties": {
+          "task": {
+            "additionalProperties": false,
+            "description": "Exactly one of ``id``, ``key`` or ``title_query``. A bare string is accepted too:\n``\"T-12\"`` is read as a key, a UUID as an id, anything else as a title query.",
+            "properties": {
+              "id": {
+                "anyOf": [
+                  {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "Task id, when known exactly"
+              },
+              "key": {
+                "anyOf": [
+                  {
+                    "pattern": "^[Tt]-\\d{1,9}$",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "Task key such as \"T-123\""
+              },
+              "project": {
+                "anyOf": [
+                  {
+                    "maxLength": 200,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "Project name or id to narrow a title_query"
+              },
+              "title_query": {
+                "anyOf": [
+                  {
+                    "maxLength": 200,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "Words from the task title, when neither the id nor the key is known"
+              }
+            },
+            "type": "object"
+          },
+          "text": {
+            "description": "Plain text",
+            "maxLength": 5000,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "task",
+          "text"
+        ],
+        "type": "object"
+      }
+    },
+    "type": "function"
+  },
+  {
+    "function": {
+      "description": "Create several subtasks under a task, in order (optionally assigned and dated).",
+      "name": "create_subtasks",
+      "parameters": {
+        "additionalProperties": false,
+        "properties": {
+          "parent": {
+            "additionalProperties": false,
+            "description": "Exactly one of ``id``, ``key`` or ``title_query``. A bare string is accepted too:\n``\"T-12\"`` is read as a key, a UUID as an id, anything else as a title query.",
+            "properties": {
+              "id": {
+                "anyOf": [
+                  {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "Task id, when known exactly"
+              },
+              "key": {
+                "anyOf": [
+                  {
+                    "pattern": "^[Tt]-\\d{1,9}$",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "Task key such as \"T-123\""
+              },
+              "project": {
+                "anyOf": [
+                  {
+                    "maxLength": 200,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "Project name or id to narrow a title_query"
+              },
+              "title_query": {
+                "anyOf": [
+                  {
+                    "maxLength": 200,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "Words from the task title, when neither the id nor the key is known"
+              }
+            },
+            "type": "object"
+          },
+          "subtasks": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "assignee": {
+                  "anyOf": [
+                    {
+                      "maxLength": 200,
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "A name, email or me"
+                },
+                "due_on": {
+                  "anyOf": [
+                    {
+                      "format": "date",
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null
+                },
+                "title": {
+                  "maxLength": 500,
+                  "minLength": 1,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "title"
+              ],
+              "type": "object"
+            },
+            "maxItems": 20,
+            "minItems": 1,
+            "type": "array"
+          }
+        },
+        "required": [
+          "parent",
+          "subtasks"
+        ],
+        "type": "object"
+      }
+    },
+    "type": "function"
+  },
+  {
+    "function": {
+      "description": "Create a new project with sections and tasks (assignees, dates, descriptions) from a plan. The user becomes its admin.",
+      "name": "create_project_from_plan",
+      "parameters": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string"
+          },
+          "privacy": {
+            "default": "team",
+            "enum": [
+              "team",
+              "private"
+            ],
+            "type": "string"
+          },
+          "sections": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "name": {
+                  "maxLength": 200,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "tasks": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "assignee": {
+                        "anyOf": [
+                          {
+                            "maxLength": 200,
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "default": null,
+                        "description": "A name, email, \"me\", or \"none\" to unassign"
+                      },
+                      "description": {
+                        "anyOf": [
+                          {
+                            "maxLength": 20000,
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "default": null,
+                        "description": "Plain text; replaces the description"
+                      },
+                      "due_on": {
+                        "anyOf": [
+                          {
+                            "format": "date",
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "default": null
+                      },
+                      "start_on": {
+                        "anyOf": [
+                          {
+                            "format": "date",
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "default": null
+                      },
+                      "title": {
+                        "maxLength": 500,
+                        "minLength": 1,
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "title"
+                    ],
+                    "type": "object"
+                  },
+                  "maxItems": 100,
+                  "type": "array"
+                }
+              },
+              "required": [
+                "name"
+              ],
+              "type": "object"
+            },
+            "maxItems": 20,
+            "minItems": 1,
+            "type": "array"
+          },
+          "team": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Team name; default: the user's only team"
+          }
+        },
+        "required": [
+          "name",
+          "sections"
+        ],
+        "type": "object"
+      }
+    },
+    "type": "function"
+  },
+  {
+    "function": {
+      "description": "Apply the same change (assignee, dates, completed) to several tasks at once. All or nothing. More than 25 tasks needs the user's explicit confirmation.",
+      "name": "bulk_update_tasks",
+      "parameters": {
+        "additionalProperties": false,
+        "properties": {
+          "assignee": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "A name, email, \"me\", or \"none\" to unassign"
+          },
+          "completed": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "true completes, false reopens"
+          },
+          "due_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "start_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "tasks": {
+            "items": {
+              "additionalProperties": false,
+              "description": "Exactly one of ``id``, ``key`` or ``title_query``. A bare string is accepted too:\n``\"T-12\"`` is read as a key, a UUID as an id, anything else as a title query.",
+              "properties": {
+                "id": {
+                  "anyOf": [
+                    {
+                      "format": "uuid",
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "Task id, when known exactly"
+                },
+                "key": {
+                  "anyOf": [
+                    {
+                      "pattern": "^[Tt]-\\d{1,9}$",
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "Task key such as \"T-123\""
+                },
+                "project": {
+                  "anyOf": [
+                    {
+                      "maxLength": 200,
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "Project name or id to narrow a title_query"
+                },
+                "title_query": {
+                  "anyOf": [
+                    {
+                      "maxLength": 200,
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "Words from the task title, when neither the id nor the key is known"
+                }
+              },
+              "type": "object"
+            },
+            "maxItems": 100,
+            "minItems": 1,
+            "type": "array"
+          }
+        },
+        "required": [
+          "tasks"
+        ],
+        "type": "object"
+      }
+    },
+    "type": "function"
+  },
+  {
+    "function": {
+      "description": "Delete a task (it can be restored with undo). Always confirmed by the user.",
+      "name": "delete_task",
+      "parameters": {
+        "additionalProperties": false,
+        "properties": {
+          "task": {
+            "additionalProperties": false,
+            "description": "Exactly one of ``id``, ``key`` or ``title_query``. A bare string is accepted too:\n``\"T-12\"`` is read as a key, a UUID as an id, anything else as a title query.",
+            "properties": {
+              "id": {
+                "anyOf": [
+                  {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "Task id, when known exactly"
+              },
+              "key": {
+                "anyOf": [
+                  {
+                    "pattern": "^[Tt]-\\d{1,9}$",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "Task key such as \"T-123\""
+              },
+              "project": {
+                "anyOf": [
+                  {
+                    "maxLength": 200,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "Project name or id to narrow a title_query"
+              },
+              "title_query": {
+                "anyOf": [
+                  {
+                    "maxLength": 200,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "Words from the task title, when neither the id nor the key is known"
+              }
+            },
+            "type": "object"
+          }
+        },
+        "required": [
+          "task"
+        ],
+        "type": "object"
+      }
+    },
+    "type": "function"
+  }
+]

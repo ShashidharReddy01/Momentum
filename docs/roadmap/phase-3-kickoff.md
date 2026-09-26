@@ -38,7 +38,7 @@ The phase file asks for the model aliases and the Cohere variant to be confirmed
 | S3.1.1 | `llm_calls` gains `prompt_version` (ai-architecture §7 says the prompt version is recorded there; the data model omitted it). `agent_run_id` has no FK until `agent_runs` exists (Phase 5). `llm_calls` rows are written in their own transaction | Usage of a rolled-back request (a failed apply, a dry-run preview) was still spent and must count |
 | S3.1.1 | `momentum llm-check` also flags an embedding dimension mismatch and a gateway that drops `input_type` (query and document vectors identical) | Both fail silently otherwise: bad recall with no error |
 | S3.1.1 | Settings validation: production refuses `LLM_MODE` ≠ `gateway` while AI is enabled | CLAUDE.md: never a silent fallback to mock output in production |
-| S3.1.4 | **Proposed, needs product-owner OK:** an optional rerank step after RRF (top 40 → Cohere rerank → k=8) behind a `rerank` alias, off by default, verified by `llm-check`. The product owner's gateway already serves `rerank-v3.5` | Better retrieval precision for Ask Mo citations; it adds a model dependency, so it's asked, not assumed (Open question #4) |
+| S3.1.4 | **Approved 2026-09-26:** an optional rerank step after RRF (top 40 → Cohere rerank → k=8) behind a `rerank` alias, off by default, verified by `llm-check`. The product owner's gateway already serves `rerank-v3.5` | Better retrieval precision for Ask Mo citations; it adds a model dependency, so it's asked, not assumed (Open question #4) |
 
 ## 4. Risks
 
@@ -51,8 +51,8 @@ The phase file asks for the model aliases and the Cohere variant to be confirmed
 | Cost runaway | Budget check before every call; `llm_calls` on every call; max tool-loop steps |
 
 ## 5. Questions for the human
-- **Q1 (Open question #1, narrowed):** model ids for `fast` and `smart`. Recommendation: `smart` = the strongest Claude on your Bedrock config; `fast` = a Haiku-class model if your config has one, else Sonnet for both until cost says otherwise. Not blocking: mock mode until then.
-- **Q2 (Open question #4):** add the optional rerank step to S3.1.4? Recommendation: yes, off by default, turned on once `llm-check` shows it works on your gateway.
+- **Q1 (Open question #1, narrowed):** model ids for `fast` and `smart`. Recommendation: `smart` = the strongest Claude on your Bedrock config; `fast` = a Haiku-class model if your config has one, else Sonnet for both until cost says otherwise. Not blocking: mock mode until then. **Answered 2026-09-26:** keep the same Bedrock Sonnet 4 id for all three aliases for now (revisit when usage/cost data exists; S3.5.2's usage page will show it).
+- **Q2 (Open question #4):** add the optional rerank step to S3.1.4? Recommendation: yes, off by default, turned on once `llm-check` shows it works on your gateway. **Answered 2026-09-26: yes**, optional Cohere rerank in S3.1.4, off by default.
 - **Q3:** run `uv run momentum llm-check` against your Portkey setup once S3.1.1 is pushed and paste the table back. **Answered 2026-09-26: 8/8 pass on Portkey** (see STATUS); a slow first streaming run (13 s) was a one-off; the re-run streamed in 1.5 s.
 
 ## 6. Exit criteria (confirmed)

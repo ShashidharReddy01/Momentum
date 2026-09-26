@@ -22,6 +22,7 @@
 **Scope:** `@tool` decorator, schema export, `TaskRef` resolution, dry-run via SAVEPOINT with diff capture, `ToolResult`. Register all Phase 1–2 tools from the catalog (ai-architecture §3). Snapshot tests of JSON schemas.
 **AC:** every write tool has a dry-run test producing a correct diff, and permission is enforced when called with a principal lacking rights.
 **Size:** L
+**Built (2026-09-26):** `momentum/ai/tools/` (`base`, `refs`, `schema`, `registry`, `views`, `read_tools`, `write_tools`, `catalog`). 8 read + 9 write tools: every catalog tool whose services exist after Phase 2. `semantic_search` moves to S3.1.4 and `create_status_update` to S3.4.3 (their tables don't exist yet). Tools live in `momentum/ai/tools/`, not in a `tools.py` per domain module, so the domain never imports AI (coding-standards §2 updated). No migration, no endpoint, no domain change. Priority isn't settable because no service writes it yet. `llm-check` gained a `tool schemas (catalog)` row: all tool schemas in one request, with `update_task` forced and its arguments validated.
 
 ### S3.1.3: AI actions (preview → apply → undo)
 **Scope:** migration `ai_actions`; `ai/actions.py` lifecycle incl. stale check, expiry job, batch apply, undo; API `GET /ai/actions/{id}`, `POST /ai/actions/{id}/apply|reject`; frontend `PreviewCard` (diff rows grouped by entity, risk indicator, Apply/Edit/Cancel, high-risk confirm dialog), undo toast.

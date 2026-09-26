@@ -53,12 +53,14 @@ async def patch_task(task_id: UUID, body: TaskPatchIn, ctx: Ctx = Depends(get_ct
     m = await service.update_task(ctx, uow, task_id, body, expected_version=if_match)
     return MutationOut.of(m, TaskOut)
 
-# tools.py (AI exposure)
-@tool(name="update_task", risk="low", description="…")
-async def update_task_tool(ctx: Ctx, uow: UnitOfWork, task: TaskRef, patch: TaskPatchIn) -> ToolResult:
-    t = await resolve_task_ref(ctx, uow, task)
-    m = await service.update_task(ctx, uow, t.id, patch)
-    return ToolResult.changed(m)
+# AI exposure lives in momentum/ai/tools/write_tools.py (not in the domain module: the
+# domain never imports AI). A tool resolves references, calls the service, returns ToolResult.
+@tool(name="update_task", risk="low", scopes=("tasks:write",), description="…")
+async def update_task(tc: ToolContext, args: UpdateTaskArgs) -> ToolResult:
+    task, _, _ = await resolve_task(tc, args.task)            # TaskRef: id | key | title_query
+    m = await service.update_task(tc.session, tc.ctx, task.id, await args.to_patch(tc),
+                                  batch_id=tc.batch_id)
+    return ToolResult.success(f"{tc.verb('Updated', 'Would update')} …", targets=[target(task)])
 ```
 
 **Rules**

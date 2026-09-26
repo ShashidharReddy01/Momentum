@@ -57,26 +57,37 @@ async def update_task(ctx: Ctx, task_ref: TaskRef, patch: TaskPatchIn) -> ToolRe
 - `TaskRef` accepts `id`, `key` (`T-123`), or `{title_query, project}`. The tool resolves it and fails loudly on ambiguity (returns candidates).
 - Each write tool is implemented by calling the domain service. The registry runs it in **dry-run** (SAVEPOINT + rollback) to produce `preview_diff`, and in **apply** mode inside an activity batch.
 - `ToolResult` is compact, model-friendly JSON (ids, keys, titles, changed fields), never whole ORM dumps.
+- **As built (S3.1.2):** `momentum/ai/tools/`. `@tool` only builds a `Tool` object; `catalog.build_registry(*extra)` assembles a `ToolRegistry` explicitly (no import-time registration, so a host can add or drop tools). The arguments model is the tool function's second parameter; `schema.py` exports it with `$ref`s inlined and auto titles dropped (some gateways reject `$defs`), snapshot-tested in `tests/snapshots/ai_tools.json` (regenerate with `UPDATE_SNAPSHOTS=1` and review the diff). `ToolRegistry.invoke(session, ctx, name, arguments, mode="dry_run"|"apply", batch_id=None, allowed_scopes=None)`:
+  - Every call runs in a **SAVEPOINT** with its own `request_id`. Write tools run the real services with `ctx.dry_run` set (no outbox rows or NOTIFY); the **diff is read back from the activity rows the services recorded** (`DiffRow`: entity, label such as `T-12 Draft copy`, verb, raw `changes`, and `display` with ids replaced by names and ordering keys hidden), then the savepoint is rolled back (preview) or released (apply). Objects the caller already held that the rollback expired are re-loaded, so a preview never leaves the caller's session with objects that would lazy-load (MissingGreenlet in async).
+  - Every activity row of the call is stamped with the call's `batch_id` (one tool call = one undo; S3.1.3 passes one batch for all operations of an action). A tool that fails part-way is rolled back entirely in both modes.
+  - Failures the model can act on come back as a failed `ToolResult` with a code, never as exceptions: `unknown_tool`, `invalid_arguments` (Pydantic errors, for one repair), `scope_denied`, `not_found`, `ambiguous` (with `candidates`), `forbidden`, service codes such as `dates_out_of_order` or `has_incomplete_blockers`.
+  - Effective risk: a tool's `bulk_limit` (25 for `bulk_update_tasks`) escalates to `high` when the result has more targets.
+  - Writes are marked `via="ai"` (so `created_via="ai"`, comments `is_ai`) unless the caller is already `agent`/`mcp`.
+  - `ToolOutcome.message_content()` wraps the result as `<data source="tool:NAME">…</data>` with `<` escaped inside the JSON (§8).
+  - References (`refs.py`): `TaskRef` is `{id | key | title_query [+ project]}`, and a bare string works too (`"T-12"`, a UUID, or title words). Title matching prefers one exact title over partial matches, and more than one match returns `ambiguous` with up to 8 candidates. Every candidate is checked with `get_visible_task`, so a task the actor can't see looks exactly like one that doesn't exist. Projects, sections and teams resolve by id or name (exact, then contained). People resolve by `me`, id, email, full name, then first name.
+  - Bulk read listings scope visibility through project membership (`visible_projects_clause`), like the Phase 2 bulk endpoints. A task someone can see only personally is found by key but not listed (a gap disclosed at kickoff).
 
 ### Tool catalog
 
+Registered in S3.1.2 unless noted. `semantic_search` arrives with S3.1.4 (embeddings) and `create_status_update` with S3.4.3 (the `status_updates` table).
+
 | Tool | Risk | Phase | Purpose |
 |---|---|---|---|
-| `search_tasks` | read | 3 | Structured filters (assignee, project, due range, status, text) |
-| `semantic_search` | read | 3 | Hybrid search across tasks/comments/attachments with snippets |
+| `search_tasks` | read | 3 | Structured filters (assignee incl. "none", project, due range, overdue, status, text) |
+| `semantic_search` | read | 3 (S3.1.4) | Hybrid search across tasks/comments/attachments with snippets |
 | `get_task` / `get_project` / `get_section_tasks` | read | 3 | Details incl. recent activity |
 | `list_my_tasks` / `list_user_tasks` | read | 3 | |
 | `get_project_activity` | read | 3 | Changes in a time window (for status reports) |
 | `list_people` | read | 3 | Resolve names → users |
 | `create_task` | low | 3 | |
-| `update_task` | low | 3 | |
+| `update_task` | low | 3 | Title, assignee, start/due dates, description (priority: no service writes it yet) |
 | `complete_task` | low | 3 | |
-| `move_task` | low | 3 | Section/project placement |
+| `move_task` | low | 3 | Section, or another project (add there + remove here, one batch) |
 | `add_comment` | low | 3 | Always marked AI |
 | `create_subtasks` | low | 3 | Batch under a parent |
-| `create_project_from_plan` | medium | 3 | Sections + tasks + dates |
-| `create_status_update` | medium | 3 | Draft or publish (publish needs confirm) |
-| `bulk_update_tasks` | medium (>25: high) | 3 | |
+| `create_project_from_plan` | medium | 3 | Sections + tasks (assignees, dates, descriptions); team defaults to the user's only team |
+| `create_status_update` | medium | 3 (S3.4.3) | Draft or publish (publish needs confirm) |
+| `bulk_update_tasks` | medium (>25: high) | 3 | Same assignee/dates/completed change on up to 100 tasks, all or nothing |
 | `delete_task` | high | 3 | Soft delete, always confirm |
 | `create_rule` | medium | 4 | From NL rule compile |
 | `set_field_value` | low | 4 | |

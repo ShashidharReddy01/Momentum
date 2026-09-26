@@ -13,10 +13,15 @@ import time
 import uuid
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
+from datetime import date
 from typing import Literal
+
+from pydantic import ValidationError
 
 from momentum.ai.errors import AIUnavailable
 from momentum.ai.llm import LLM
+from momentum.ai.tools.catalog import build_registry
+from momentum.ai.tools.write_tools import UpdateTaskArgs
 from momentum.ai.types import CHAT_ALIASES, DoneEvent, ToolCallAccumulator, ToolCallDeltaEvent
 from momentum.core.context import Actor, Ctx
 
@@ -41,6 +46,13 @@ TOOL_PROMPT = [{"role": "user", "content": "Use the add tool to add 2 and 3."}]
 PING = [{"role": "user", "content": "Reply with the single word: pong"}]
 STREAM_PROMPT = [{"role": "user", "content": "Count from one to five in words, one per line."}]
 EMBED_TEXT = "Draft the pricing page copy for the website revamp"
+CATALOG = "tool schemas (catalog)"
+CATALOG_PROMPT = [
+    {
+        "role": "user",
+        "content": "Use the update_task tool to set the due date of task T-12 to 2026-10-09.",
+    }
+]
 
 
 @dataclass(frozen=True)
@@ -120,6 +132,36 @@ async def run_llm_check(llm: LLM) -> list[CheckResult]:
         return _add_call_ok(c.tool_calls[0].name, c.tool_calls[0].arguments)
 
     results.append(await _timed("tool calling", tools))
+
+    async def catalog_tools() -> tuple[Status, str]:
+        # Every real tool schema in one request: the gateway (and the provider behind it) must
+        # accept their shapes (nullable fields, dates, nested references), and the model's
+        # arguments must validate against the same Pydantic model the registry uses.
+        schemas = build_registry().schemas()
+        c = await llm.complete(
+            alias="default",
+            messages=CATALOG_PROMPT,
+            tools=schemas,
+            tool_choice={"type": "function", "function": {"name": "update_task"}},
+            feature=FEATURE,
+            ctx=ctx,
+            max_tokens=300,
+        )
+        if not c.tool_calls or c.tool_calls[0].name != "update_task":
+            raise _Fail("no update_task call returned")
+        try:
+            args = UpdateTaskArgs.model_validate(c.tool_calls[0].args())
+        except (ValueError, ValidationError) as e:
+            raise _Fail(f"arguments don't validate: {str(e)[:120]}") from e
+        if (args.task.key or "").upper() != "T-12" or args.due_on != date(2026, 10, 9):
+            return (
+                "warn",
+                f"{len(schemas)} schemas accepted; unexpected arguments "
+                f"{c.tool_calls[0].arguments[:80]}",
+            )
+        return "pass", f"{len(schemas)} schemas accepted; update_task(T-12, due_on=2026-10-09)"
+
+    results.append(await _timed(CATALOG, catalog_tools))
 
     async def streaming() -> tuple[Status, str]:
         tokens = 0
