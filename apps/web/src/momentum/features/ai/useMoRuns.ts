@@ -106,14 +106,28 @@ export function runsFromMessages(messages: ChatMessage[]): MoRun[] {
 
 /** What the user is looking at, from the route (sent as context; the server re-checks access).
  * Selected rows aren't included yet: selection state is local to each list view. */
-export function useScreen(): { kind: string; project_id?: string; task_id?: string; view?: string } {
-  const path = useLocation().pathname;
+export interface Screen {
+  kind: string;
+  project_id?: string;
+  task_id?: string;
+  view?: string;
+  selected_task_ids?: string[];
+}
+
+export function useScreen(): Screen {
+  const { pathname: path, search } = useLocation();
+  const paneTask = new URLSearchParams(search).get('task');
   const project = /^\/projects\/([^/]+)(?:\/([^/]+))?/.exec(path);
   if (project)
-    return { kind: 'project', project_id: project[1], ...(project[2] ? { view: project[2] } : {}) };
+    return {
+      kind: 'project',
+      project_id: project[1],
+      ...(project[2] ? { view: project[2] } : {}),
+      ...(paneTask ? { task_id: paneTask } : {}),
+    };
   const task = /^\/task\/([^/]+)/.exec(path);
   if (task) return { kind: 'task', task_id: task[1] };
-  if (path === '/my-tasks') return { kind: 'my_tasks' };
+  if (path === '/my-tasks') return { kind: 'my_tasks', ...(paneTask ? { task_id: paneTask } : {}) };
   if (path === '/inbox') return { kind: 'inbox' };
   if (path === '/search') return { kind: 'search' };
   if (path === '/') return { kind: 'home' };
@@ -140,12 +154,14 @@ export function describeStep(s: MoToolStep): string {
 /**
  * Mo's runs in the Ask Mo panel and on `/ask`: ⌘K commands (`POST /ai/command`, S3.2.2) and
  * chat questions (`POST /ai/chat`, S3.3.1), both streamed. Questions continue one conversation
- * until `newChat()`; `open(id, runs)` shows a stored one.
+ * until `newChat()`; `open(id, runs)` shows a stored one. `screen` (S3.3.2: a pinned "Ask Mo
+ * about this" context) replaces the one read from the route.
  */
-export function useMoRuns() {
+export function useMoRuns(opts: { screen?: Screen | null } = {}) {
   const config = useMomentumConfig();
   const qc = useQueryClient();
-  const screen = useScreen();
+  const routeScreen = useScreen();
+  const screen = opts.screen ?? routeScreen;
   const [runs, setRuns] = useState<MoRun[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const screenRef = useRef(screen);

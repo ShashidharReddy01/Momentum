@@ -13,5 +13,14 @@ export {
   type AiAction,
   type DiffRow,
 } from './queries';
-export { describeStep, runsFromMessages, useMoRuns, useScreen, type Citation, type MoRun } from './useMoRuns';
+export {
+  describeStep,
+  runsFromMessages,
+  useMoRuns,
+  useScreen,
+  type Citation,
+  type MoRun,
+  type Screen,
+} from './useMoRuns';
+export { contextScreen, suggestionsFor } from './suggestions';
 export { looksLikeInstruction } from './intent';

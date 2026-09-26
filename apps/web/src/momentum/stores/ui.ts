@@ -3,6 +3,16 @@ import { createStore, useStore, type StoreApi } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
 export type Theme = 'light' | 'dark';
+/** What an "Ask Mo about this" button pinned the chat to (S3.3.2). */
+export interface MoContext {
+  id: number;
+  kind: 'task' | 'project' | 'selection';
+  /** Shown on the chip: "T-12 Draft pricing copy", "Website Revamp", "3 selected tasks". */
+  label: string;
+  projectId?: string;
+  taskId?: string;
+  taskIds?: string[];
+}
 export interface MoRequest {
   id: number;
   text: string;
@@ -38,6 +48,10 @@ export interface UiState {
   moRequest: MoRequest | null;
   sendToMo: (text: string, kind?: MoRequest['kind']) => void;
   takeMoRequest: () => MoRequest | null;
+  /** "Ask Mo about this task/project/selection" (S3.3.2): opens a new chat pinned to it. */
+  moContext: MoContext | null;
+  askAbout: (c: Omit<MoContext, 'id'>) => void;
+  clearMoContext: () => void;
 }
 
 function safeLocalStorage(): Storage {
@@ -92,6 +106,9 @@ export function createUiStore(storageKey = 'momentum.ui'): StoreApi<UiState> {
         moRequest: null,
         sendToMo: (text, kind = 'command') =>
           set({ askMoOpen: true, moRequest: { id: Date.now() + Math.random(), text, kind } }),
+        moContext: null,
+        askAbout: (c) => set({ askMoOpen: true, moContext: { ...c, id: Date.now() + Math.random() } }),
+        clearMoContext: () => set({ moContext: null }),
         takeMoRequest: () => {
           const req = get().moRequest;
           if (req) set({ moRequest: null });

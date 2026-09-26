@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
+import { AskMoButton } from '@/components/common/AI';
 import { InlineText } from '@/components/common/InlineText';
 import { ErrorState } from '@/components/common/States';
 import { Avatar } from '@/components/ui/Avatar';
@@ -153,6 +154,7 @@ export function ProjectPage() {
                 />
               ))}
             </div>
+            <AskMoButton about={{ kind: 'project', projectId: p.id, label: p.name }} />
             <IconButton icon={SlidersHorizontal} label="Fields" onClick={() => setFieldsOpen(true)} />
             <Button size="sm" onClick={() => setShare(true)}>
               <Icon icon={p.privacy === 'private' ? Lock : Users} /> Share

@@ -66,6 +66,7 @@
 ### S3.3.2: Contextual entry points
 **Scope:** "Ask about this task/project/selection" buttons pre-loading context; suggested prompts per screen.
 **Size:** S
+**Built (2026-09-26):** `AskMoButton` (task pane header, project header, list bulk bar; hidden while AI is off) opens Ask Mo on a **new chat pinned** to that task / project / selection: a chip ("About T-12 Draft pricing copy", × to unpin) and every message sends that as the screen (`{kind: task, task_id}`, `{kind: project, project_id}`, or the project + `selected_task_ids`; the server drops ids the user can't see). Unpinned, the screen comes from the route, now including the task open in the pane (`?task=`). An empty chat offers starter questions for the pinned context or the current screen (`features/ai/suggestions.ts`, generic wording, no seeded names). With AI off the panel says so instead of taking messages. No backend change: the chat context builders already use the screen (task → `task_ctx`, project → `project_ctx`, selection → `screen_ctx`'s selected list).
 
 ## E3.4 Inline AI actions
 

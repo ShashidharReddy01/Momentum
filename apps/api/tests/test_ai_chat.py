@@ -391,3 +391,36 @@ async def test_ai_off_keeps_the_question_and_ends_with_an_error(
     async with uow.transaction() as s:
         (conv,) = (await s.execute(select(AiConversation))).scalars()
     assert [m.role for m in await messages(uow, conv.id)] == ["user"]
+
+
+async def test_pinned_task_and_selection_context_reach_the_prompt(
+    uow: UnitOfWork, world: World
+) -> None:
+    """S3.3.2: "Ask Mo about this task" sends the task as the screen (its deep context goes in
+    the prompt); "about these tasks" sends the selection, and ids the asker can't see are
+    dropped."""
+    llm, spy = spy_llm()
+    conv_id, _ = await ask(
+        uow,
+        world.ravi,
+        "zebra xylophone quarterly",
+        llm=llm,
+        screen=Screen(kind="task", task_id=world.faq.id),
+    )
+    system = spy.requests[0].messages[0]["content"]
+    assert f'<task key="{key(world.faq)}"' in system
+    async with uow.transaction() as s:
+        conv = await s.get(AiConversation, conv_id)
+        assert conv is not None and (conv.context_type, conv.context_id) == ("task", world.faq.id)
+
+    spy.requests.clear()
+    selection = Screen(
+        kind="project",
+        project_id=world.project.id,
+        selected_task_ids=[world.copy.id, world.faq.id, world.hidden.id],
+    )
+    await ask(uow, world.ravi, "zebra xylophone quarterly", llm=llm, screen=selection)
+    system = spy.requests[0].messages[0]["content"]
+    assert "Selected (2):" in system
+    assert f"[{key(world.copy)}]" in system and f"[{key(world.faq)}]" in system
+    assert key(world.hidden) not in system

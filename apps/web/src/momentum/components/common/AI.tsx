@@ -1,5 +1,8 @@
 import type { ReactNode } from 'react';
+import { Button } from '@/components/ui/Button';
 import { cn } from '@/lib/cn';
+import { useMomentumConfig } from '@/lib/config';
+import { useUi, type MoContext } from '@/stores/ui';
 import { MoMark } from './MoMark';
 
 /** Container for anything written or proposed by Mo or an agent (amber = AI only). */
@@ -39,5 +42,34 @@ export function AIBadge({ title = 'Drafted by Mo' }: { title?: string }) {
     <span title={title} className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-ink">
       <MoMark size={11} /> AI
     </span>
+  );
+}
+
+/** "Ask Mo about this" (S3.3.2): opens Ask Mo on a new chat pinned to a task, a project or a
+ * selection. Renders nothing while AI is off. */
+export function AskMoButton({
+  about,
+  label = 'Ask Mo',
+  className,
+}: {
+  about: Omit<MoContext, 'id'>;
+  label?: string;
+  className?: string;
+}) {
+  const aiEnabled = useMomentumConfig().ai_enabled;
+  const askAbout = useUi((s) => s.askAbout);
+  if (!aiEnabled) return null;
+  const what = about.kind === 'selection' ? 'these tasks' : `this ${about.kind}`;
+  return (
+    <Button
+      size="sm"
+      variant="ghost"
+      aria-label={`Ask Mo about ${what}`}
+      title={`Ask Mo about ${what}`}
+      className={className}
+      onClick={() => askAbout(about)}
+    >
+      <MoMark size={13} /> {label}
+    </Button>
   );
 }

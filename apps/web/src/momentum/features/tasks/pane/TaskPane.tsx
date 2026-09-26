@@ -16,6 +16,7 @@ import { lazy, Suspense, useEffect, useRef, useState, type KeyboardEvent, type R
 import { useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router';
 import { toast } from 'sonner';
+import { AskMoButton } from '@/components/common/AI';
 import { DueText } from '@/components/common/DueText';
 import { ErrorState } from '@/components/common/States';
 import { Avatar } from '@/components/ui/Avatar';
@@ -199,6 +200,7 @@ function PaneBody({
         </Button>
         <span className="flex-1" />
         <span className="mr-1 font-mono text-[11px] text-muted-2">{task.key}</span>
+        <AskMoButton about={{ kind: 'task', taskId: task.id, label: `${task.key} ${task.title}` }} label="" />
         <IconButton icon={Copy} label="Copy task link" size="icon-sm" onClick={() => void copyLink()} />
         {mode === 'pane' ? (
           <Link

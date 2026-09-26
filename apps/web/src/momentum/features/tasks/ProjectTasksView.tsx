@@ -711,6 +711,12 @@ export function ProjectTasksView({ projectId, canEdit }: { projectId: string; ca
           onComplete={() => bulkComplete(bulkIds)}
           onDelete={() => bulkDelete(bulkIds)}
           onClear={() => setSelection((s) => ({ ...s, selected: new Set() }))}
+          askAbout={{
+            kind: 'selection',
+            projectId,
+            taskIds: bulkIds,
+            label: `${plural(count, 'selected task')}`,
+          }}
         />
       ) : null}
     </div>

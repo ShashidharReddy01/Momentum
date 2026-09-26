@@ -1,4 +1,5 @@
 import { CalendarDays, CheckCircle2, FolderInput, Trash2, UserRound, X } from 'lucide-react';
+import { AskMoButton } from '@/components/common/AI';
 import { Button } from '@/components/ui/Button';
 import {
   DropdownMenu,
@@ -9,6 +10,7 @@ import {
 import { Icon } from '@/components/ui/Icon';
 import { IconButton } from '@/components/ui/IconButton';
 import type { DueValue } from '@/lib/dates';
+import type { MoContext } from '@/stores/ui';
 import { AssigneePicker } from './AssigneePicker';
 import { DatePicker } from './DatePicker';
 
@@ -26,6 +28,7 @@ export function BulkBar({
   onComplete,
   onDelete,
   onClear,
+  askAbout,
 }: {
   count: number;
   sections: { id: string; name: string }[];
@@ -37,6 +40,8 @@ export function BulkBar({
   onComplete: () => void;
   onDelete: () => void;
   onClear: () => void;
+  /** "Ask Mo about these tasks" (S3.3.2); hidden while AI is off. */
+  askAbout?: Omit<MoContext, 'id'>;
 }) {
   return (
     <div
@@ -89,6 +94,7 @@ export function BulkBar({
         <Icon icon={Trash2} /> Delete
       </Button>
       <span className="mx-1 h-5 w-px bg-hairline" />
+      {askAbout ? <AskMoButton about={askAbout} /> : null}
       <IconButton icon={X} label="Clear selection" shortcut="Esc" size="icon-sm" onClick={onClear} />
     </div>
   );
