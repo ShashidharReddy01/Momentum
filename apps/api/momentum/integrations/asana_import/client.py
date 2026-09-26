@@ -21,12 +21,14 @@ MAX_RETRIES = 5
 
 
 class AsanaClient:
-    def __init__(self, pat: str, *, http: httpx.AsyncClient | None = None) -> None:
+    def __init__(
+        self, pat: str, *, base_url: str = BASE_URL, http: httpx.AsyncClient | None = None
+    ) -> None:
         # The PAT lives only in this instance's memory for the lifetime of one import request —
         # never written to the database, a log, or a job queue (see `service.py`'s docstring for
         # why this importer runs synchronously rather than as a background job).
         self._http = http or httpx.AsyncClient(
-            base_url=BASE_URL,
+            base_url=base_url,
             headers={"Authorization": f"Bearer {pat}"},
             timeout=30.0,
         )

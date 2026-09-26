@@ -3,7 +3,7 @@ from __future__ import annotations
 import httpx
 from fastapi import APIRouter
 
-from momentum.api.deps import CtxDep, UowDep
+from momentum.api.deps import CtxDep, RuntimeDep, UowDep
 from momentum.core.errors import ValidationFailed
 from momentum.core.permissions import Action, require
 from momentum.integrations.asana_import.client import AsanaClient
@@ -18,9 +18,11 @@ router = APIRouter(tags=["integrations"])
     response_model=ImportJobOut,
     summary="Import a team's projects/tasks from Asana (synchronous; the PAT is never stored)",
 )
-async def import_from_asana(body: AsanaImportIn, ctx: CtxDep, uow: UowDep) -> ImportJobOut:
+async def import_from_asana(
+    body: AsanaImportIn, ctx: CtxDep, uow: UowDep, rt: RuntimeDep
+) -> ImportJobOut:
     require(ctx, Action.TEAM_CREATE)
-    client = AsanaClient(body.pat)
+    client = AsanaClient(body.pat, base_url=rt.settings.asana_base_url)
     try:
         async with uow.transaction() as s:
             job = await run_import(

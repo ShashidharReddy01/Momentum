@@ -11,4 +11,14 @@ cd "$ROOT/apps/api"
 uv run python "$ROOT/tools/e2e/reset_db.py"
 uv run momentum migrate
 uv run momentum seed
-exec uv run momentum serve --port "${E2E_PORT:-8123}"
+
+# J6's recorded-fixture Asana API (see asana_fixture_server.py's own docstring). Runs alongside
+# the app for the lifetime of this script; killed on exit since it's a throwaway per-run process.
+ASANA_FIXTURE_PORT="${MOMENTUM_ASANA_FIXTURE_PORT:-8129}"
+uv run uvicorn --app-dir "$ROOT/tools/e2e" asana_fixture_server:app \
+  --port "$ASANA_FIXTURE_PORT" --log-level warning &
+ASANA_FIXTURE_PID=$!
+trap 'kill "$ASANA_FIXTURE_PID" 2>/dev/null || true' EXIT
+export MOMENTUM_ASANA_BASE_URL="http://localhost:${ASANA_FIXTURE_PORT}"
+
+uv run momentum serve --port "${E2E_PORT:-8123}"

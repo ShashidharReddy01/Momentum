@@ -82,6 +82,10 @@ class Settings(BaseSettings):
     llm_embed_model: str = "cohere-embed-v3"
     llm_embed_dim: int = 1024
 
+    # Integrations (S2.7.1) — overridable so J6's e2e journey can point this at a local recorded
+    # fixture server instead of the real Asana API (see tools/e2e/asana_fixture_server.py).
+    asana_base_url: str = "https://app.asana.com/api/1.0"
+
     @model_validator(mode="after")
     def _validate(self) -> Settings:
         if self.env == "production":

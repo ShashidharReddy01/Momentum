@@ -2,9 +2,10 @@ import { expect, test } from '@playwright/test';
 import { login, row, settled } from './helpers';
 
 /**
- * J2 (Phase 1 part): open the task pane → edit the description → add a subtask → comment with
- * an @mention. Delivery to the other user's inbox arrives in Phase 2; here the mentioned person
- * becomes a follower and sees the comment on the task.
+ * J2 (full, Phase 2): open the task pane → edit the description → add a subtask → comment with
+ * an @mention → the mention arrives in the other user's inbox. The Phase 1 version of this test
+ * stopped at "becomes a follower and sees the comment" (S2.5's notifications/inbox didn't exist
+ * yet); this now also checks the inbox delivery the roadmap's J2 actually calls for.
  */
 test('J2: pane description, subtask and @mention comment', async ({ page }) => {
   await login(page);
@@ -67,4 +68,10 @@ test('J2: pane description, subtask and @mention comment', async ({ page }) => {
   const full = page.getByRole('complementary', { name: 'Task details' });
   await expect(full.getByRole('list', { name: 'Feed' }).getByText('Can you check this')).toBeVisible();
   await expect(full.getByRole('button', { name: 'Stop following' })).toBeVisible();
+
+  // and the mention shows up in Mei's Inbox
+  await page.goto('/inbox');
+  await expect(
+    page.getByRole('list', { name: 'Notifications' }).getByLabel(`You were mentioned in "${title}"`),
+  ).toBeVisible();
 });
