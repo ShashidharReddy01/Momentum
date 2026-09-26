@@ -1,0 +1,34 @@
+# Mock responses for S3.2.2 ⌘K commands (feature "command"). Multi-step: `turn` is the model call
+# number in the tool loop; `$last.<path>` takes values from the previous tool result.
+responses:
+  # J7 (e2e, seeded workspace)
+  - match: {contains: "assign all overdue tasks in website revamp to ana", turn: 1}
+    tool_calls: [{name: search_tasks, arguments: {project: "Website Revamp", overdue: true, limit: 50}}]
+  - match: {contains: "assign all overdue tasks in website revamp to ana", turn: 2}
+    tool_calls: [{name: bulk_update_tasks, arguments: {tasks: "$last.data.tasks[].key", assignee: "Ana"}}]
+  - match: {contains: "assign all overdue tasks in website revamp to ana", turn: 3}
+    text: "The overdue tasks in Website Revamp will be assigned to Ana Souza. Check the preview, then apply it."
+  # the same shape against the backend tests' own project
+  - match: {contains: "assign all overdue tasks in ai tools lab to ana", turn: 1}
+    tool_calls: [{name: search_tasks, arguments: {project: "AI Tools Lab", overdue: true, limit: 50}}]
+  - match: {contains: "assign all overdue tasks in ai tools lab to ana", turn: 2}
+    tool_calls: [{name: bulk_update_tasks, arguments: {tasks: "$last.data.tasks[].key", assignee: "Ana"}}]
+  - match: {contains: "assign all overdue tasks in ai tools lab to ana", turn: 3}
+    text: "The overdue tasks in AI Tools Lab will be assigned to Ana Souza."
+  # ambiguous target → a question, not a guess
+  - match: {contains: "assign the pricing task to ana", turn: 1}
+    tool_calls: [{name: update_task, arguments: {task: {title_query: "pricing"}, assignee: "Ana"}}]
+  - match: {contains: "assign the pricing task to ana", turn: 2}
+    text: "Several tasks match “pricing”. Which one do you mean?"
+  - match: {contains: "complete draft pricing faq", turn: 1}
+    tool_calls: [{name: complete_task, arguments: {task: {title_query: "Draft pricing FAQ"}}}]
+  - match: {contains: "complete draft pricing faq", turn: 2}
+    text: "Draft pricing FAQ will be marked complete."
+  - match: {contains: "delete draft pricing faq", turn: 1}
+    tool_calls: [{name: delete_task, arguments: {task: {title_query: "Draft pricing FAQ"}}}]
+  - match: {contains: "delete draft pricing faq", turn: 2}
+    text: "Draft pricing FAQ will be deleted."
+  - match: {contains: "keep searching forever"}
+    tool_calls: [{name: search_tasks, arguments: {text: "anything"}}]
+default:
+  text: "(mock) I can't do that in mock mode."

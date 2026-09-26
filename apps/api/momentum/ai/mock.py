@@ -11,6 +11,12 @@
     default:                                   # the feature's generic fallback
       text: "..."
 
+Multi-step tool loops (S3.2.2) add ``turn`` (1 = the first model call of the conversation, 2 =
+after the first tool results, …) to ``match``, and may take argument values from the previous
+tool result with a ``$last.<path>`` string: ``$last.data.tasks[].key`` is the list of every
+task key in the last tool message's JSON (``[]`` maps over a list). This keeps handwritten loop
+fixtures independent of ids and keys, which differ per database.
+
 A feature with no file (or no match and no default) falls back to ``_default.yaml``. Every
 fallback text says it is mock output, so it can't pass for real AI output in a demo.
 
@@ -108,8 +114,48 @@ def _load(path: Path | None) -> dict[str, Any]:
     return data
 
 
-def _entry_matches(entry: dict[str, Any], key: str, last_user: str) -> bool:
+def _turn(messages: list[Msg]) -> int:
+    """1 for the first model call; +1 per assistant message already in the conversation."""
+    return 1 + sum(1 for m in messages if m.get("role") == "assistant")
+
+
+def _last_tool_result(messages: list[Msg]) -> Any:
+    for m in reversed(messages):
+        if m.get("role") == "tool":
+            text = _content_text(m.get("content"))
+            body = re.sub(r"^<data[^>]*>|</data>$", "", text.strip())
+            try:
+                return json.loads(body)
+            except json.JSONDecodeError:
+                return None
+    return None
+
+
+def _pick(value: Any, path: list[str]) -> Any:
+    if not path:
+        return value
+    head, rest = path[0], path[1:]
+    if head.endswith("[]"):
+        items = value.get(head[:-2]) if isinstance(value, dict) else None
+        return [_pick(i, rest) for i in items or []]
+    return _pick(value.get(head) if isinstance(value, dict) else None, rest)
+
+
+def _fill(args: Any, last: Any) -> Any:
+    """Replace ``$last.<path>`` strings with values from the previous tool result."""
+    if isinstance(args, str) and args.startswith("$last."):
+        return _pick(last, args[len("$last.") :].split("."))
+    if isinstance(args, dict):
+        return {k: _fill(v, last) for k, v in args.items()}
+    if isinstance(args, list):
+        return [_fill(v, last) for v in args]
+    return args
+
+
+def _entry_matches(entry: dict[str, Any], key: str, last_user: str, turn: int = 1) -> bool:
     match = entry.get("match") or {}
+    if "turn" in match and int(match["turn"]) != turn:
+        return False
     if "key" in match:
         return bool(match["key"] == key)
     if "contains" in match:
@@ -118,11 +164,12 @@ def _entry_matches(entry: dict[str, Any], key: str, last_user: str) -> bool:
 
 
 def _entry_to_completion(entry: dict[str, Any], req: ChatRequest) -> RawCompletion:
+    last = _last_tool_result(req.messages)
     calls = [
         ToolCall(
-            id=f"call_mock_{i}",
+            id=f"call_mock_{_turn(req.messages)}_{i}",
             name=str(tc["name"]),
-            arguments=json.dumps(tc.get("arguments") or {}, sort_keys=True),
+            arguments=json.dumps(_fill(tc.get("arguments") or {}, last), sort_keys=True),
         )
         for i, tc in enumerate(entry.get("tool_calls") or [])
     ]
@@ -179,8 +226,9 @@ class MockTransport:
         key = request_key(req.messages, req.tools)
         last_user = _last_user_text(req.messages)
         data = _load(_feature_file(self._dir, req.feature))
+        turn = _turn(req.messages)
         for entry in data.get("responses") or []:
-            if isinstance(entry, dict) and _entry_matches(entry, key, last_user):
+            if isinstance(entry, dict) and _entry_matches(entry, key, last_user, turn):
                 return _entry_to_completion(entry, req)
         default = data.get("default") or _load(self._dir / f"{FALLBACK_FEATURE}.yaml").get(
             "default"

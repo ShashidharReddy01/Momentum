@@ -72,6 +72,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/ai/command": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Run a natural-language command (SSE: tool_call, tool_result, token, action_proposed, action_applied, clarify, done, error) */
+        post: operations["ai_command_api_v1_ai_command_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/ai/memory": {
         parameters: {
             query?: never;
@@ -106,6 +123,24 @@ export interface paths {
         head?: never;
         /** Edit a bullet */
         patch: operations["update_ai_memory_api_v1_ai_memory__memory_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/ai/prefs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** My AI preferences */
+        get: operations["get_ai_prefs_api_v1_ai_prefs_get"];
+        /** Set my AI preferences */
+        put: operations["put_ai_prefs_api_v1_ai_prefs_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/ai/quick-add": {
@@ -1710,6 +1745,14 @@ export interface components {
             /** Tool */
             tool: string;
         };
+        /** AiPrefs */
+        AiPrefs: {
+            /**
+             * Auto Apply Low Risk
+             * @default false
+             */
+            auto_apply_low_risk: boolean;
+        };
         /** ApplyIn */
         ApplyIn: {
             /**
@@ -1811,6 +1854,12 @@ export interface components {
         Body_upload_task_attachment_api_v1_tasks__task_id__attachments_post: {
             /** File */
             file: string;
+        };
+        /** CommandIn */
+        CommandIn: {
+            screen?: components["schemas"]["ScreenIn"] | null;
+            /** Text */
+            text: string;
         };
         /** CommentHit */
         CommentHit: {
@@ -3080,6 +3129,23 @@ export interface components {
              */
             workdays_only: boolean;
         };
+        /** ScreenIn */
+        ScreenIn: {
+            /**
+             * Kind
+             * @default other
+             * @enum {string}
+             */
+            kind: "home" | "my_tasks" | "inbox" | "project" | "task" | "search" | "other";
+            /** Project Id */
+            project_id?: string | null;
+            /** Selected Task Ids */
+            selected_task_ids?: string[];
+            /** Task Id */
+            task_id?: string | null;
+            /** View */
+            view?: string | null;
+        };
         /** SearchResultsOut */
         SearchResultsOut: {
             /** Comments */
@@ -3885,6 +3951,37 @@ export interface operations {
             };
         };
     };
+    ai_command_api_v1_ai_command_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CommandIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_ai_memory_api_v1_ai_memory_get: {
         parameters: {
             query?: {
@@ -4003,6 +4100,59 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MutationOut_MemoryOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_ai_prefs_api_v1_ai_prefs_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiPrefs"];
+                };
+            };
+        };
+    };
+    put_ai_prefs_api_v1_ai_prefs_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AiPrefs"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiPrefs"];
                 };
             };
             /** @description Validation Error */

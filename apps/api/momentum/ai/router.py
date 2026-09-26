@@ -8,12 +8,18 @@ from datetime import UTC, datetime
 from typing import Any, Literal
 
 from fastapi import APIRouter, status
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from momentum.ai import actions, memory, quick_add
+from momentum.ai import actions, memory, prefs, quick_add, sse
+from momentum.ai.command import run_command
+from momentum.ai.context import Screen
 from momentum.ai.errors import AIUnavailable
 from momentum.ai.llm import LLM
+from momentum.ai.loop import Emit
 from momentum.ai.models import AiAction
+from momentum.ai.prefs import AiPrefs
 from momentum.api.deps import CtxDep, RuntimeDep, UowDep
 from momentum.api.schemas import ListOut, MutationOut
 
@@ -219,3 +225,61 @@ def require_llm(rt: Any) -> LLM:
     if rt.llm is None:
         raise AIUnavailable(reason="not_configured")
     return rt.llm  # type: ignore[no-any-return]
+
+
+# ---------------- ⌘K natural-language commands (S3.2.2) ----------------
+
+
+class ScreenIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["home", "my_tasks", "inbox", "project", "task", "search", "other"] = "other"
+    project_id: uuid.UUID | None = None
+    task_id: uuid.UUID | None = None
+    view: str | None = Field(default=None, max_length=20)
+    selected_task_ids: list[uuid.UUID] = Field(default_factory=list, max_length=200)
+
+    def to_screen(self) -> Screen:
+        return Screen(
+            kind=self.kind,
+            project_id=self.project_id,
+            task_id=self.task_id,
+            view=self.view,
+            selected_task_ids=list(self.selected_task_ids),
+        )
+
+
+class CommandIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    text: str = Field(min_length=1, max_length=1000)
+    screen: ScreenIn | None = None
+
+
+@router.post(
+    "/command",
+    summary="Run a natural-language command (SSE: tool_call, tool_result, token, "
+    "action_proposed, action_applied, clarify, done, error)",
+    response_class=StreamingResponse,
+)
+async def ai_command(body: CommandIn, ctx: CtxDep, rt: RuntimeDep) -> StreamingResponse:
+    llm = require_llm(rt)
+    screen = (body.screen or ScreenIn()).to_screen()
+    ctx = ctx.with_(via="ai")
+
+    async def work(session: AsyncSession, emit: Emit) -> None:
+        await run_command(
+            session, llm, ctx, rt.tools, body.text, screen=screen, now=datetime.now(UTC), emit=emit
+        )
+
+    return sse.stream(rt, work)
+
+
+@router.get("/prefs", response_model=AiPrefs, summary="My AI preferences")
+async def get_ai_prefs(ctx: CtxDep, uow: UowDep) -> AiPrefs:
+    async with uow.transaction() as s:
+        return await prefs.get_prefs(s, ctx)
+
+
+@router.put("/prefs", response_model=AiPrefs, summary="Set my AI preferences")
+async def put_ai_prefs(body: AiPrefs, ctx: CtxDep, uow: UowDep) -> AiPrefs:
+    async with uow.transaction() as s:
+        return await prefs.set_prefs(s, ctx, body)

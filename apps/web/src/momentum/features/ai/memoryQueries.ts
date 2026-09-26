@@ -6,7 +6,27 @@ import { useApi } from '@/providers/api';
 
 export type MemoryBullet = components['schemas']['MemoryOut'];
 
-export const memoryKeys = { workspace: ['ai', 'memory', 'workspace'] as const };
+export const memoryKeys = {
+  workspace: ['ai', 'memory', 'workspace'] as const,
+  prefs: ['ai', 'prefs'] as const,
+};
+export type AiPrefs = components['schemas']['AiPrefs'];
+
+/** My AI preferences (S3.2.2). */
+export function useAiPrefs() {
+  const api = useApi();
+  const qc = useQueryClient();
+  const q = useQuery({
+    queryKey: memoryKeys.prefs,
+    queryFn: async () => (await api.GET('/api/v1/ai/prefs')).data!,
+  });
+  const save = useMutation({
+    mutationFn: async (body: AiPrefs) => (await api.PUT('/api/v1/ai/prefs', { body })).data!,
+    onSuccess: (p) => qc.setQueryData(memoryKeys.prefs, p),
+    onError: (e) => toastError(e, "Couldn't save that setting"),
+  });
+  return { prefs: q.data, save };
+}
 
 /** Workspace memory bullets (S3.1.5). */
 export function useWorkspaceMemory() {

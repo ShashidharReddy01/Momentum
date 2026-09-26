@@ -144,3 +144,30 @@ export function aiMemoryHandlers(initial: string[] = [], opts: { canEdit?: boole
   ];
   return { handlers, bullets };
 }
+
+export type ScriptedEvent = [string, Record<string, unknown>];
+
+/** `POST /ai/command` as an SSE stream of scripted events (S3.2.2); one script per request, in
+ * order. Records each request body. */
+export function aiCommandHandlers(scripts: ScriptedEvent[][], prefs = { auto_apply_low_risk: false }) {
+  const requests: { text: string; screen?: unknown }[] = [];
+  const saved: unknown[] = [];
+  const handlers = [
+    http.post('*/api/v1/ai/command', async ({ request }) => {
+      requests.push((await request.json()) as { text: string });
+      const script = scripts.shift() ?? [['done', { steps: 0 }]];
+      const body = script
+        .map(([event, data]) => `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`)
+        .join('');
+      return new HttpResponse(body, { headers: { 'content-type': 'text/event-stream' } });
+    }),
+    http.get('*/api/v1/ai/prefs', () => HttpResponse.json(prefs)),
+    http.put('*/api/v1/ai/prefs', async ({ request }) => {
+      const b = (await request.json()) as typeof prefs;
+      saved.push(b);
+      Object.assign(prefs, b);
+      return HttpResponse.json(prefs);
+    }),
+  ];
+  return { handlers, requests, saved };
+}

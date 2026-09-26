@@ -229,7 +229,15 @@ SEED_TASKS: dict[str, list[str]] = {
 
 async def _seed_tasks(session: AsyncSession, ws: Workspace) -> int:
     rng = random.Random(42)  # noqa: S311 - deterministic synthetic data, not security
-    users = list((await session.execute(select(User).where(User.workspace_id == ws.id))).scalars())
+    # ordered: the fixed-seed rng below must see users in the same order every run, or seeded
+    # assignments (and anything a journey reads from them) change between runs
+    users = list(
+        (
+            await session.execute(
+                select(User).where(User.workspace_id == ws.id).order_by(User.email)
+            )
+        ).scalars()
+    )
     today = date.today()
     created = 0
     for project_name, titles in SEED_TASKS.items():
@@ -354,7 +362,15 @@ async def seed_perf(session: AsyncSession, settings: Settings, n: int = 2000) ->
     )
     if exists.scalar_one_or_none() is not None:
         return {"perf_tasks_created": 0}
-    users = list((await session.execute(select(User).where(User.workspace_id == ws.id))).scalars())
+    # ordered: the fixed-seed rng below must see users in the same order every run, or seeded
+    # assignments (and anything a journey reads from them) change between runs
+    users = list(
+        (
+            await session.execute(
+                select(User).where(User.workspace_id == ws.id).order_by(User.email)
+            )
+        ).scalars()
+    )
     owner = next(u for u in users if u.email.startswith("ravi@"))
     team = (
         await session.execute(

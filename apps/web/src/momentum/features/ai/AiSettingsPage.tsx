@@ -8,7 +8,7 @@ import { IconButton } from '@/components/ui/IconButton';
 import { Input } from '@/components/ui/Input';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useMe } from '@/features/auth';
-import { useMemoryMutations, useWorkspaceMemory } from './memoryQueries';
+import { useAiPrefs, useMemoryMutations, useWorkspaceMemory } from './memoryQueries';
 
 const MAX = 300;
 
@@ -23,6 +23,7 @@ export function AiSettingsPage() {
   const memory = useWorkspaceMemory();
   const m = useMemoryMutations();
   const [draft, setDraft] = useState('');
+  const { prefs, save } = useAiPrefs();
 
   const add = () => {
     const text = draft.trim();
@@ -33,6 +34,27 @@ export function AiSettingsPage() {
   return (
     <div className="mx-auto w-full max-w-3xl px-4 py-6 md:px-8">
       <h1 className="page-title">AI settings</h1>
+      <section aria-labelledby="mine-title" className="mt-6">
+        <h2 id="mine-title" className="text-[15px] font-semibold">
+          For you
+        </h2>
+        <label className="mt-3 flex items-start gap-2 text-sm">
+          <input
+            type="checkbox"
+            className="mt-0.5"
+            checked={prefs?.auto_apply_low_risk ?? false}
+            disabled={!prefs || save.isPending}
+            onChange={(e) => save.mutate({ auto_apply_low_risk: e.target.checked })}
+          />
+          <span>
+            Apply low-risk changes from Mo without asking
+            <span className="block text-muted">
+              Small edits you ask for in ⌘K (a due date, an assignee, a completion) go through right away,
+              with Undo. Bigger or risky changes always show a preview first.
+            </span>
+          </span>
+        </label>
+      </section>
       <section aria-labelledby="memory-title" className="mt-6">
         <h2 id="memory-title" className="flex items-center gap-1.5 text-[15px] font-semibold">
           <MoMark size={14} /> Workspace memory

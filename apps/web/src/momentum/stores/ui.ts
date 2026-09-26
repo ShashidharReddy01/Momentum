@@ -25,6 +25,13 @@ export interface UiState {
   setAskMoOpen: (open: boolean) => void;
   setPaletteOpen: (open: boolean) => void;
   setShortcutsOpen: (open: boolean) => void;
+  /** Text the palette opens with (Edit on a Mo suggestion puts the request back, S3.2.2). */
+  paletteQuery: string;
+  openPalette: (query?: string) => void;
+  /** A request for Mo from elsewhere (⌘K "Ask Mo to do this"); the Ask Mo panel takes it. */
+  moRequest: { id: number; text: string } | null;
+  sendToMo: (text: string) => void;
+  takeMoRequest: () => { id: number; text: string } | null;
 }
 
 function safeLocalStorage(): Storage {
@@ -71,8 +78,18 @@ export function createUiStore(storageKey = 'momentum.ui'): StoreApi<UiState> {
         toggleTheme: () => set({ theme: get().theme === 'dark' ? 'light' : 'dark' }),
         toggleSidebar: () => set({ sidebarCollapsed: !get().sidebarCollapsed }),
         setAskMoOpen: (askMoOpen) => set({ askMoOpen }),
-        setPaletteOpen: (paletteOpen) => set({ paletteOpen }),
+        setPaletteOpen: (paletteOpen) =>
+          set(paletteOpen ? { paletteOpen } : { paletteOpen, paletteQuery: '' }),
         setShortcutsOpen: (shortcutsOpen) => set({ shortcutsOpen }),
+        paletteQuery: '',
+        openPalette: (paletteQuery = '') => set({ paletteOpen: true, paletteQuery }),
+        moRequest: null,
+        sendToMo: (text) => set({ askMoOpen: true, moRequest: { id: Date.now() + Math.random(), text } }),
+        takeMoRequest: () => {
+          const req = get().moRequest;
+          if (req) set({ moRequest: null });
+          return req;
+        },
       }),
       {
         name: storageKey,

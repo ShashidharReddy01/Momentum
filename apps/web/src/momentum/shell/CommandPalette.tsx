@@ -16,12 +16,14 @@ import type { LucideIcon } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { MoMark } from '@/components/common/MoMark';
+import { looksLikeInstruction } from '@/features/ai';
 import { Dialog } from '@/components/ui/Dialog';
 import { Icon } from '@/components/ui/Icon';
 import { Kbd } from '@/components/ui/Kbd';
 import { useLogout } from '@/features/auth';
 import { useMarkOnboarding, useOnboarding } from '@/features/members';
 import { useSearch } from '@/features/search';
+import { useMomentumConfig } from '@/lib/config';
 import { useUi } from '@/stores/ui';
 
 interface Action {
@@ -40,6 +42,14 @@ export function CommandPalette() {
   const logout = useLogout();
   const [query, setQuery] = useState('');
   const results = useSearch(query, { limit: 4 });
+  const paletteQuery = useUi((s) => s.paletteQuery);
+  const sendToMo = useUi((s) => s.sendToMo);
+  const aiEnabled = useMomentumConfig().ai_enabled;
+  // opened with text (Edit on a Mo suggestion): start from it
+  useEffect(() => {
+    if (open && paletteQuery) setQuery(paletteQuery);
+  }, [open, paletteQuery]);
+  const askMo = aiEnabled && looksLikeInstruction(query);
 
   // S2.7.3: the "try ⌘K" onboarding checklist step has no natural DB record (unlike "create a
   // project" or "import"), so it's pinged once, the first time the palette is actually opened.
@@ -131,9 +141,27 @@ export function CommandPalette() {
           className="h-12 w-full border-b border-hair-soft bg-transparent px-4 text-[15px] outline-none placeholder:text-muted-2"
         />
         <Command.List className="max-h-[360px] overflow-auto p-1.5">
-          <Command.Empty className="px-3 py-6 text-center text-sm text-muted">
-            No matches. Natural-language commands arrive with Mo in Phase 3.
-          </Command.Empty>
+          <Command.Empty className="px-3 py-6 text-center text-sm text-muted">No matches.</Command.Empty>
+          {askMo ? (
+            <Command.Group
+              heading="Mo"
+              className="[&_[cmdk-group-heading]]:section-label [&_[cmdk-group-heading]]:px-2.5 [&_[cmdk-group-heading]]:py-1.5"
+            >
+              <Command.Item
+                value={`ask-mo-${query}`}
+                onSelect={() => {
+                  setOpen(false);
+                  setQuery('');
+                  sendToMo(query.trim());
+                }}
+                className="flex h-9 cursor-pointer items-center gap-2.5 rounded-md px-2.5 text-sm text-amber-ink data-[selected=true]:bg-amber-2"
+              >
+                <MoMark size={16} />
+                <span className="flex-1 truncate">Ask Mo to do this</span>
+                <span className="text-xs text-muted-2">preview first</span>
+              </Command.Item>
+            </Command.Group>
+          ) : null}
           {visibleStatic.map((g) => (
             <Command.Group
               key={g.heading}

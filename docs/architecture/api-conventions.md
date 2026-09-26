@@ -87,7 +87,7 @@ The frontend shows **Undo** in the toast using `activity_id`/`batch_id`.
 
 ## 8. Streaming
 
-- AI chat and long AI operations use **SSE** over `POST` (`text/event-stream`) through `fetch` streaming: events `token`, `tool_call`, `tool_result`, `citation`, `action_proposed`, `done`, `error`.
+- AI chat and long AI operations use **SSE** over `POST` (`text/event-stream`) through `fetch` streaming: events `token`, `tool_call`, `tool_result`, `citation`, `action_proposed`, `done`, `error`. As built (S3.2.2): also `action_applied` (auto-applied low-risk action) and `clarify` (`{question, candidates}`); `error` carries `{reason, message}` (a failure kind, never gateway text) and ends the stream; the web client is `lib/sse.ts` `postSse`.
 - Realtime entity updates use WebSocket (`/ws`), see `realtime-jobs-events.md`.
 
 ## 9. Auth on the wire

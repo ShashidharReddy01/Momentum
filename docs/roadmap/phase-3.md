@@ -53,6 +53,7 @@
 **Scope:** intent detection (command vs search) in the palette; `POST /ai/command` SSE: tool loop (read tools) → proposed operations → `ai_actions` → PreviewCard in the Mo panel; "auto-apply low risk" user setting.
 **AC:** J7 passes; ambiguous targets produce a clarification question instead of a guess.
 **Size:** L
+**Built (2026-09-26):** `ai/loop.py` (shared tool loop: reads run, writes only preview), `ai/command.py` + `POST /ai/command` (SSE: `tool_call`, `tool_result`, `token`, `action_proposed`, `action_applied`, `clarify`, `done`, `error`), `ai/sse.py`, `GET/PUT /ai/prefs` (`auto_apply_low_risk`, never high risk), prompt `command/v1`. Palette: local intent heuristic → "✦ Ask Mo to do this" first; the Ask Mo panel shows runs (activity line, reply, PreviewCard, candidate chips, errors) and takes typed commands until chat (S3.3.1) extends it; Edit → ⌘K pre-filled. Mock fixtures gained `turn` and `$last.<path>` for multi-step loops. **J7 passes** (Playwright, real API + Postgres, mock LLM). Screen context comes from the route; list selections aren't sent yet.
 
 ## E3.3 Ask Mo
 

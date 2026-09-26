@@ -67,7 +67,9 @@ test('J1: from an empty team to done tasks, with undo', async ({ page }) => {
   // and Ana sees it in her My Tasks
   await page.context().clearCookies();
   await login(page, 'Ana Souza');
-  await page.getByRole('link', { name: 'My Tasks' }).click();
+  // the sidebar link (Home's "My priorities" widget also links to My Tasks, and its label depends
+  // on how many open tasks the user has)
+  await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'My Tasks' }).click();
   await expect(
     page.getByRole('list', { name: 'Tasks in Recently assigned' }).locator('[aria-label="Book the venue"]'),
   ).toBeVisible();
