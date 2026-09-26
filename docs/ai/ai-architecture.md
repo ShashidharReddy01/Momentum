@@ -152,6 +152,7 @@ recent_comments:
 - Stored in `momentum/ai/prompts/<feature>/v<N>.md` with front matter: `feature`, `version`, `alias`, `max_tokens`, `temperature`, `tools` (allowed), `output` (text | tool-structured).
 - Loaded by `prompts.load(feature, version="latest")`. The version used is recorded on `llm_calls`.
 - **Structured outputs use tool calling** (a "submit_result" tool with a Pydantic schema), validated. On a validation error, one repair retry with the error message, then fail gracefully.
+- **As built (S3.2.1):** `ai/prompts/__init__.py` (`load(feature, version=None)` → `Prompt` with `version` like `quick_add/v1`, recorded on `llm_calls` via `prompt_version`) and `ai/structured.py` (`extract(llm, ctx, prompt=, system=, user=, schema=)`: forced `submit_result`, schema exported like tool schemas, one repair turn carrying the validation error, then `AIUnavailable(reason="bad_response")`). First prompt: `prompts/quick_add/v1.md` (`fast`, temperature 0).
 - Changing a prompt means bumping the version + running `make evals` (the diff of scores goes in the slice report).
 
 ### Base system prompt skeleton (Mo)

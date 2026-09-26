@@ -7,6 +7,20 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 MAX_BATCH = 100
+Priority = Literal["urgent", "high", "medium", "low"]
+
+
+class RecurrenceIn(BaseModel):
+    """A repeat rule, stored as given (S3.2.1). Generating the next occurrence is Phase 4."""
+
+    model_config = ConfigDict(extra="forbid")
+    freq: Literal["daily", "weekly", "monthly", "yearly"]
+    interval: int = Field(default=1, ge=1, le=99)
+    by_weekday: list[int] | None = Field(
+        default=None, description="0 = Monday … 6 = Sunday (weekly rules)"
+    )
+    workdays_only: bool = False
+    text: str | None = Field(default=None, max_length=100, description="As the user wrote it")
 
 
 class TaskOut(BaseModel):
@@ -40,6 +54,8 @@ class TaskCreateIn(BaseModel):
     assignee_id: uuid.UUID | None = None
     due_on: date | None = None
     due_at: datetime | None = None
+    priority: Priority | None = None
+    recurrence: RecurrenceIn | None = None
 
 
 class TaskBatchCreateIn(BaseModel):
@@ -70,6 +86,7 @@ class TaskPatchIn(BaseModel):
         description="Due time (timezone-aware). Setting it without due_on derives due_on in the "
         "actor's timezone; clearing due_on clears due_at.",
     )
+    priority: Priority | None = None
 
 
 class TaskFieldsIn(BaseModel):
@@ -80,6 +97,7 @@ class TaskFieldsIn(BaseModel):
     start_on: date | None = None
     due_on: date | None = None
     due_at: datetime | None = None
+    priority: Priority | None = None
 
 
 class TaskMoveIn(BaseModel):
@@ -129,6 +147,9 @@ class TaskDetailOut(TaskOut):
     )
     description: dict[str, Any] | None
     description_hash: str
+    recurrence: dict[str, Any] | None = Field(
+        default=None, description="Repeat rule (stored; generating occurrences is Phase 4)"
+    )
     project: ProjectRef | None
     section: NamedRef | None
     created_by: uuid.UUID | None

@@ -485,6 +485,23 @@
             ],
             "default": null
           },
+          "priority": {
+            "anyOf": [
+              {
+                "enum": [
+                  "urgent",
+                  "high",
+                  "medium",
+                  "low"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
           "project": {
             "description": "Project name or id",
             "maxLength": 200,
@@ -532,7 +549,7 @@
   },
   {
     "function": {
-      "description": "Change fields of a task the user can edit: title, assignee, start/due dates, description. Omit fields to keep them; null clears one.",
+      "description": "Change fields of a task the user can edit: title, assignee, start/due dates, priority, description. Omit fields to keep them; null clears one.",
       "name": "update_task",
       "parameters": {
         "additionalProperties": false,
@@ -567,6 +584,23 @@
             "anyOf": [
               {
                 "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "priority": {
+            "anyOf": [
+              {
+                "enum": [
+                  "urgent",
+                  "high",
+                  "medium",
+                  "low"
+                ],
                 "type": "string"
               },
               {
@@ -1132,6 +1166,23 @@
                         ],
                         "default": null
                       },
+                      "priority": {
+                        "anyOf": [
+                          {
+                            "enum": [
+                              "urgent",
+                              "high",
+                              "medium",
+                              "low"
+                            ],
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "default": null
+                      },
                       "start_on": {
                         "anyOf": [
                           {
@@ -1193,7 +1244,7 @@
   },
   {
     "function": {
-      "description": "Apply the same change (assignee, dates, completed) to several tasks at once. All or nothing. More than 25 tasks needs the user's explicit confirmation.",
+      "description": "Apply the same change (assignee, dates, priority, completed) to several tasks at once. All or nothing. More than 25 tasks needs the user's explicit confirmation.",
       "name": "bulk_update_tasks",
       "parameters": {
         "additionalProperties": false,
@@ -1227,6 +1278,23 @@
             "anyOf": [
               {
                 "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "priority": {
+            "anyOf": [
+              {
+                "enum": [
+                  "urgent",
+                  "high",
+                  "medium",
+                  "low"
+                ],
                 "type": "string"
               },
               {

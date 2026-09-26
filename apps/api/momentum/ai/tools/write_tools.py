@@ -4,10 +4,9 @@ so validation, permissions, activity, undo payloads and outbox events are exactl
 Every write tool passes ``tc.batch_id`` to the services that accept one; the registry stamps the
 same batch on anything else the call recorded, so one tool call is one undo.
 
-Not registered here, by design: ``semantic_search`` (S3.1.4, needs embeddings) and
-``create_status_update`` (S3.4.3, needs the ``status_updates`` table). Priority is not
-settable: no service writes ``tasks.priority`` yet (Phase 1-2 never exposed it), and tools don't
-write around services.
+``semantic_search`` is a read tool (``read_tools.py``, S3.1.4); ``create_status_update`` is
+registered by S3.4.3 (it needs the ``status_updates`` table). Priority became settable in S3.2.1,
+when the task service started writing it.
 """
 
 from __future__ import annotations
@@ -77,6 +76,7 @@ class _TaskFields(BaseModel):
     )
     start_on: date | None = None
     due_on: date | None = None
+    priority: Literal["urgent", "high", "medium", "low"] | None = None
     description: str | None = Field(
         default=None, max_length=20_000, description="Plain text; replaces the description"
     )
@@ -89,7 +89,7 @@ class _TaskFields(BaseModel):
                 patch["assignee_id"] = None
             else:
                 patch["assignee_id"] = (await resolve_person(tc, self.assignee)).id
-        for f in ("start_on", "due_on"):
+        for f in ("start_on", "due_on", "priority"):
             if f in given:
                 patch[f] = getattr(self, f)
         if "description" in given:
@@ -159,7 +159,7 @@ class UpdateTaskArgs(_TaskFields):
     name="update_task",
     description=(
         "Change fields of a task the user can edit: title, assignee, start/due dates, "
-        "description. Omit fields to keep them; null clears one."
+        "priority, description. Omit fields to keep them; null clears one."
     ),
     risk="low",
     scopes=WRITE,
@@ -480,6 +480,7 @@ class BulkUpdateArgs(BaseModel):
     )
     start_on: date | None = None
     due_on: date | None = None
+    priority: Literal["urgent", "high", "medium", "low"] | None = None
     completed: bool | None = Field(default=None, description="true completes, false reopens")
 
     @model_validator(mode="after")
@@ -492,7 +493,8 @@ class BulkUpdateArgs(BaseModel):
 @tool(
     name="bulk_update_tasks",
     description=(
-        "Apply the same change (assignee, dates, completed) to several tasks at once. All or "
+        "Apply the same change (assignee, dates, priority, completed) to several tasks at once. "
+        "All or "
         "nothing. More than 25 tasks needs the user's explicit confirmation."
     ),
     risk="medium",
@@ -509,7 +511,7 @@ async def bulk_update_tasks(tc: ToolContext, args: BulkUpdateArgs) -> ToolResult
         {
             k: getattr(args, k)
             for k in args.model_fields_set
-            if k in ("assignee", "start_on", "due_on")
+            if k in ("assignee", "start_on", "due_on", "priority")
         }
     )
     patch = await fields.to_patch(tc)

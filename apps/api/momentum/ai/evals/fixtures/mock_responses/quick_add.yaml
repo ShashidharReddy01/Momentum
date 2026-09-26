@@ -1,0 +1,35 @@
+# Mock responses for S3.2.1 smart quick-add (feature "quick_add"). Synthetic phrases only.
+# Matched on the user's text; each answers with the submit_result tool, as the real prompt asks.
+responses:
+  - match: {contains: "ana needs to prepare the q4 budget deck"}
+    tool_calls:
+      - name: submit_result
+        arguments: {title: "Prepare the Q4 budget deck", assignee: "Ana", due_on: "2026-10-09"}
+  - match: {contains: "remind me to renew the domain"}
+    tool_calls:
+      - name: submit_result
+        arguments: {title: "Renew the domain", assignee: "me", due_on: "2026-10-03", priority: "urgent"}
+  - match: {contains: "priya should review the vendor contract"}
+    tool_calls:
+      - name: submit_result
+        arguments: {title: "Review the vendor contract", assignee: "Priya", project: "Vendor Onboarding", priority: "high"}
+  - match: {contains: "water the office plants"}
+    tool_calls:
+      - name: submit_result
+        arguments: {title: "Water the office plants", recurrence: {freq: weekly, interval: 1, by_weekday: [0, 3]}}
+  - match: {contains: "ask tom about the launch press list"}
+    tool_calls:
+      - name: submit_result
+        arguments: {title: "Ask Tom about the launch press list", assignee: "Tom", project: "marketing campaign"}
+  - match: {contains: "someone from product should look at the flaky login test"}
+    tool_calls:
+      - name: submit_result
+        arguments: {title: "Look at the flaky login test"}
+  - match: {contains: "mo breaks this one"}
+    tool_calls:
+      - name: submit_result
+        arguments: {title: "Broken", priority: "critical"}
+default:
+  tool_calls:
+    - name: submit_result
+      arguments: {title: "(mock) task"}

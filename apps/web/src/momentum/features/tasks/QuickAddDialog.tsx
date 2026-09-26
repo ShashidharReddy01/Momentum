@@ -1,7 +1,8 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { CalendarDays, UserRound } from 'lucide-react';
+import { CalendarDays, Repeat, UserRound, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { useLocation } from 'react-router';
+import { AIBadge } from '@/components/common/AI';
 import { DueText } from '@/components/common/DueText';
 import { Avatar } from '@/components/ui/Avatar';
 import { Button } from '@/components/ui/Button';
@@ -10,12 +11,45 @@ import { Icon } from '@/components/ui/Icon';
 import { useMe } from '@/features/auth';
 import { usePeople } from '@/features/people';
 import { useProjects } from '@/features/projects';
+import type { components } from '@/lib/api/schema';
+import { useMomentumConfig } from '@/lib/config';
 import type { DueValue } from '@/lib/dates';
 import { toastError } from '@/lib/toast';
 import { useUndoToast } from '@/lib/undo';
 import { useApi } from '@/providers/api';
 import { AssigneePicker } from './AssigneePicker';
 import { DatePicker } from './DatePicker';
+import { looksLikeMoreDetail, parseQuickAdd, type Priority, type Recurrence } from './quickAddParse';
+
+type MoParse = components['schemas']['QuickAddParseOut'];
+type Fields = {
+  title: string;
+  assignee: { id: string; name: string } | null;
+  projectId: string | null;
+  due: DueValue | null;
+  priority: Priority | null;
+  recurrence: RepeatRule | null;
+};
+type RepeatRule = Omit<Recurrence, 'by_weekday' | 'text'> & {
+  by_weekday?: number[] | null;
+  text?: string | null;
+};
+const PRIORITY_LABEL: Record<Priority, string> = {
+  urgent: 'Urgent',
+  high: 'High',
+  medium: 'Medium',
+  low: 'Low',
+};
+const DAY = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+function repeatLabel(r: RepeatRule): string {
+  if (r.text) return r.text;
+  const every = r.interval > 1 ? `every ${r.interval} ` : 'every ';
+  if (r.workdays_only) return 'every weekday';
+  if (r.by_weekday?.length) return `${every}${r.by_weekday.map((d) => DAY[d]).join(', ')}`;
+  const unit = { daily: 'day', weekly: 'week', monthly: 'month', yearly: 'year' }[r.freq];
+  return r.interval > 1 ? `${every}${unit}s` : `every ${unit}`;
+}
 
 const LAST_PROJECT = 'momentum.quickadd.project';
 
@@ -31,6 +65,12 @@ function readLast(): string | null {
  * Quick add (Create → Task, or `Q` anywhere): name, project, assignee (you by default) and due
  * date, created in one step with undo. Defaults to the project you're looking at, else the
  * last one you used.
+ *
+ * S3.2.1 smart quick-add: the name is parsed as you type (`Review deck @ana friday #website
+ * !high every monday`): recognized tokens leave the name and set the fields; anything picked by
+ * hand wins over what was typed. If the rest still reads like details ("for Ana by end of next
+ * week"), "✦ Let Mo fill in the details" asks the AI half; its result is shown, marked as Mo's,
+ * and nothing is created until you add the task.
  */
 export function QuickAddDialog({
   open,
@@ -57,6 +97,10 @@ export function QuickAddDialog({
   const [assignee, setAssignee] = useState<{ id: string; name: string } | null>(null);
   const [due, setDue] = useState<DueValue | null>(null);
   const [picker, setPicker] = useState<'assignee' | 'due' | null>(null);
+  const [touched, setTouched] = useState<{ assignee?: boolean; due?: boolean; project?: boolean }>({});
+  const [dismissed, setDismissed] = useState<{ priority?: boolean; recurrence?: boolean }>({});
+  const [mo, setMo] = useState<MoParse | null>(null);
+  const aiEnabled = useMomentumConfig().ai_enabled;
   const input = useRef<HTMLInputElement>(null);
 
   // fresh form each time it opens
@@ -68,6 +112,9 @@ export function QuickAddDialog({
     setTitle('');
     setDue(null);
     setPicker(null);
+    setTouched({});
+    setDismissed({});
+    setMo(null);
     setAssignee(me ? { id: me.id, name: me.name } : null);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only on open
   }, [open]);
@@ -85,20 +132,58 @@ export function QuickAddDialog({
     });
   }, [open, editable, routeProject]);
 
+  const parsed = useMemo(
+    () =>
+      parseQuickAdd(title, {
+        people: (people ?? []).map((p) => ({ id: p.id, name: p.name, email: p.email })),
+        projects: editable.map((p) => ({ id: p.id, name: p.name })),
+        me: me ? { id: me.id, name: me.name, email: me.email } : null,
+      }),
+    [title, people, editable, me],
+  );
+  // what will be created: a hand-picked value, else Mo's reading, else the parsed token, else
+  // the default
+  const moProject = mo?.project && editable.some((p) => p.id === mo.project!.id) ? mo.project.id : null;
+  const fields: Fields = {
+    title: mo?.title ?? parsed.title,
+    assignee: touched.assignee ? assignee : (mo?.assignee ?? parsed.assignee ?? assignee),
+    projectId: touched.project ? projectId : (moProject ?? parsed.project?.id ?? projectId),
+    due: touched.due ? due : mo?.due_on ? { date: mo.due_on, at: null } : (parsed.due ?? due),
+    priority: dismissed.priority ? null : (mo?.priority ?? parsed.priority),
+    recurrence: dismissed.recurrence ? null : (mo?.recurrence ?? parsed.recurrence),
+  };
+
+  const askMo = useMutation({
+    mutationFn: async () => (await api.POST('/api/v1/ai/quick-add', { body: { text: title.trim() } })).data!,
+    onSuccess: (r) => setMo(r),
+    onError: (e) => toastError(e, "Mo couldn't read that; set the details with the buttons below"),
+  });
+
   const create = useMutation({
     mutationFn: async () =>
       (
         await api.POST('/api/v1/projects/{project_id}/tasks', {
-          params: { path: { project_id: projectId } },
+          params: { path: { project_id: fields.projectId! } },
           body: {
-            title: title.trim(),
-            assignee_id: assignee?.id ?? null,
-            due_on: due?.at ? null : (due?.date ?? null),
-            due_at: due?.at ?? null,
+            title: fields.title,
+            assignee_id: fields.assignee?.id ?? null,
+            due_on: fields.due?.at ? null : (fields.due?.date ?? null),
+            due_at: fields.due?.at ?? null,
+            priority: fields.priority,
+            recurrence: fields.recurrence
+              ? {
+                  freq: fields.recurrence.freq,
+                  interval: fields.recurrence.interval,
+                  by_weekday: fields.recurrence.by_weekday ?? null,
+                  workdays_only: fields.recurrence.workdays_only ?? false,
+                  text: fields.recurrence.text ?? null,
+                }
+              : null,
           },
         })
       ).data!,
     onSuccess: (res) => {
+      const projectId = fields.projectId!;
       try {
         localStorage.setItem(LAST_PROJECT, projectId);
       } catch {
@@ -119,14 +204,16 @@ export function QuickAddDialog({
 
   const submit = (e?: FormEvent) => {
     e?.preventDefault();
-    if (!title.trim() || !projectId || create.isPending) return;
+    if (!fields.title || !fields.projectId || create.isPending) return;
     create.mutate();
   };
 
+  const shown = fields.assignee;
   const assigneeName =
-    assignee && assignee.id === me?.id
+    shown && shown.id === me?.id
       ? 'Me'
-      : (people?.find((p) => p.id === assignee?.id)?.name ?? assignee?.name ?? null);
+      : (people?.find((p) => p.id === shown?.id)?.name ?? shown?.name ?? null);
+  const canAskMo = aiEnabled && !mo && title.trim().length > 0 && looksLikeMoreDetail(parsed.title);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange} title="New task">
@@ -145,7 +232,10 @@ export function QuickAddDialog({
             placeholder="Task name"
             value={title}
             maxLength={500}
-            onChange={(e) => setTitle(e.target.value)}
+            onChange={(e) => {
+              setTitle(e.target.value);
+              setMo(null); // Mo's reading was of the old text
+            }}
             className="h-10 w-full rounded-md border border-hairline bg-surface px-3 text-[15px] outline-none placeholder:text-muted-2 focus:border-focus"
           />
           <div className="flex flex-wrap items-center gap-2 text-sm">
@@ -154,8 +244,11 @@ export function QuickAddDialog({
             </label>
             <select
               id="quick-add-project"
-              value={projectId}
-              onChange={(e) => setProjectId(e.target.value)}
+              value={fields.projectId ?? ''}
+              onChange={(e) => {
+                setProjectId(e.target.value);
+                setTouched((t) => ({ ...t, project: true }));
+              }}
               className="h-8 max-w-56 rounded-md border border-hairline bg-surface px-2 text-sm"
             >
               {editable.map((p) => (
@@ -167,9 +260,10 @@ export function QuickAddDialog({
             <AssigneePicker
               open={picker === 'assignee'}
               onOpenChange={(o) => setPicker(o ? 'assignee' : null)}
-              assigneeId={assignee?.id ?? null}
+              assigneeId={fields.assignee?.id ?? null}
               onChange={(u) => {
                 setAssignee(u && u.id === me?.id ? { id: me.id, name: me.name } : u);
+                setTouched((t) => ({ ...t, assignee: true }));
                 input.current?.focus();
               }}
             >
@@ -193,35 +287,54 @@ export function QuickAddDialog({
             <DatePicker
               open={picker === 'due'}
               onOpenChange={(o) => setPicker(o ? 'due' : null)}
-              dueOn={due?.date ?? null}
-              dueAt={due?.at ?? null}
+              dueOn={fields.due?.date ?? null}
+              dueAt={fields.due?.at ?? null}
               allowClear
               onChange={(v) => {
                 setDue(v);
+                setTouched((t) => ({ ...t, due: true }));
                 input.current?.focus();
               }}
             >
               <button
                 type="button"
-                aria-label={due ? 'Change due date' : 'Set due date'}
+                aria-label={fields.due ? 'Change due date' : 'Set due date'}
                 className="flex h-8 items-center gap-1.5 rounded-md border border-hairline px-2 hover:bg-surface-2"
               >
                 <Icon icon={CalendarDays} className="text-muted" />
-                {due ? (
-                  <DueText dueOn={due.date} dueAt={due.at} />
+                {fields.due ? (
+                  <DueText dueOn={fields.due.date} dueAt={fields.due.at} />
                 ) : (
                   <span className="text-muted">Due date</span>
                 )}
               </button>
             </DatePicker>
           </div>
-          <div className="flex justify-end gap-2">
+          <SmartLine
+            title={title}
+            fields={fields}
+            unresolved={mo ? (mo.unresolved ?? []) : parsed.unresolved}
+            fromMo={Boolean(mo)}
+            onDismiss={(k) => setDismissed((d) => ({ ...d, [k]: true }))}
+          />
+          <div className="flex items-center justify-end gap-2">
+            {canAskMo ? (
+              <Button
+                variant="ai"
+                size="sm"
+                className="mr-auto"
+                loading={askMo.isPending}
+                onClick={() => askMo.mutate()}
+              >
+                ✦ Let Mo fill in the details
+              </Button>
+            ) : null}
             <Button onClick={() => onOpenChange(false)}>Cancel</Button>
             <Button
               type="submit"
               variant="primary"
               loading={create.isPending}
-              disabled={!title.trim() || !projectId}
+              disabled={!fields.title || !fields.projectId}
             >
               Add task
             </Button>
@@ -229,5 +342,60 @@ export function QuickAddDialog({
         </form>
       )}
     </Dialog>
+  );
+}
+
+/** What typing produced beyond the pickers: the cleaned name, priority and repeat chips (each
+ * removable), names that matched nothing, and whether Mo filled this in. */
+function SmartLine({
+  title,
+  fields,
+  unresolved,
+  fromMo,
+  onDismiss,
+}: {
+  title: string;
+  fields: Fields;
+  unresolved: string[];
+  fromMo: boolean;
+  onDismiss: (k: 'priority' | 'recurrence') => void;
+}) {
+  const renamed = fields.title && fields.title !== title.trim();
+  if (!renamed && !fields.priority && !fields.recurrence && !unresolved.length && !fromMo) return null;
+  const chip = 'inline-flex h-6 items-center gap-1 rounded-md bg-surface-2 px-1.5 text-[13px]';
+  return (
+    <div
+      role="status"
+      aria-label="Understood from the name"
+      className="-mt-2 flex flex-wrap items-center gap-2 text-sm"
+    >
+      {fromMo ? <AIBadge title="Filled in by Mo from what you typed" /> : null}
+      {renamed ? (
+        <span className="text-muted">
+          Creates <span className="text-ink">“{fields.title}”</span>
+        </span>
+      ) : null}
+      {fields.priority ? (
+        <span className={chip}>
+          Priority: {PRIORITY_LABEL[fields.priority]}
+          <button type="button" aria-label="Remove priority" onClick={() => onDismiss('priority')}>
+            <Icon icon={X} size={12} />
+          </button>
+        </span>
+      ) : null}
+      {fields.recurrence ? (
+        <span className={chip}>
+          <Icon icon={Repeat} size={12} /> Repeats {repeatLabel(fields.recurrence)}
+          <button type="button" aria-label="Remove repeat" onClick={() => onDismiss('recurrence')}>
+            <Icon icon={X} size={12} />
+          </button>
+        </span>
+      ) : null}
+      {unresolved.map((u) => (
+        <span key={u} className="text-[13px] text-warn">
+          Couldn&apos;t match {u}
+        </span>
+      ))}
+    </div>
   );
 }

@@ -116,9 +116,9 @@ id, workspace_id, project_id, name, position, version, timestamps, deleted_at. I
 | completed_by | uuid null | |
 | parent_id | uuid null fk tasks | Subtask |
 | parent_position | text null | Order among siblings |
-| recurrence | jsonb null | RRULE-like spec (Phase 4) |
+| recurrence | jsonb null | RRULE-like spec (Phase 4). **Written since S3.2.1** (quick add, `POST …/tasks` `recurrence`): `{freq: daily|weekly|monthly|yearly, interval 1–99, by_weekday? [0=Mon…6], workdays_only?, text?}`, validated by the task service; nothing generates occurrences until Phase 4 |
 | estimate_minutes | int null | Effort (Phase 6 workload) |
-| priority | text null | Convenience built-in (`urgent`,`high`,`medium`,`low`) |
+| priority | text null | Convenience built-in (`urgent`,`high`,`medium`,`low`). Settable since S3.2.1 (create, `PATCH`, bulk, AI tools), undoable |
 | search_tsv | tsvector | Generated from title + description_text (weighted) |
 | version | int | |
 | created_by, created_via | | |

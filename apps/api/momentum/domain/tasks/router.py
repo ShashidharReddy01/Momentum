@@ -129,6 +129,8 @@ async def create_task(
             assignee_id=body.assignee_id,
             due_on=body.due_on,
             due_at=body.due_at,
+            priority=body.priority,
+            recurrence=body.recurrence.model_dump(exclude_none=True) if body.recurrence else None,
         )
         t, p = m.entity
         return MutationOut(
@@ -169,6 +171,7 @@ async def detail_out(
         my_role=role,
         description=t.description,
         description_hash=doc_hash(t.description),
+        recurrence=t.recurrence,
         project=ProjectRef(id=project.id, name=project.name, color=project.color)
         if project
         else None,

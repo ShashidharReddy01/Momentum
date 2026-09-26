@@ -102,7 +102,7 @@ Attachments (P2)
 - Empty state: recent items + actions ("Create task", "Go to My Tasks", "Toggle theme").
 - Typing searches tasks, projects, and people (fuzzy, trigram) and filters actions.
 - **Natural language (Phase 3):** if the input looks like an instruction ("assign all overdue design tasks to Ana"), the top result is `✦ Ask Mo to do this` → the Mo panel shows a `PreviewCard` with the proposed changes → Apply / Edit / Cancel.
-- Quick-add syntax (Phase 3, parsed locally first): `Review deck @ana tomorrow #marketing !high`.
+- Quick-add syntax (Phase 3, parsed locally first): `Review deck @ana tomorrow #marketing !high`. **As built (S3.2.1, in the quick-add dialog):** `@first`, `@"Full Name"`, `@first.last`, `@me`; `#project` (normalized prefix of an editable project); `!urgent|!high|!medium|!low`, `!p1`–`!p4`, `!!` high, `!!!` urgent; natural-language dates (the date picker's chrono setup); `every day|weekday|week|month|year|<weekday>[, and <weekday>]`, `every other …`, `every N weeks`, or a trailing `daily|weekly|monthly` (not as the first word). Recognized tokens leave the name ("Creates “Review deck”"), set the pickers, and show priority/repeat chips with ×; a hand-picked value always wins; ambiguous or unknown `@`/`#` show "Couldn't match …" (never guessed). When the rest still reads like details ("for Ana by end of next week"), an amber **✦ Let Mo fill in the details** button (only if AI is enabled) calls `POST /ai/quick-add`; Mo's reading is marked with the AI badge and nothing is created until the user adds the task.
 
 ## 8. Ask Mo panel (`⌘J`) and page (`/ask`)
 

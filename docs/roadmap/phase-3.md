@@ -47,6 +47,7 @@
 **Scope:** local parser for `@person`, `#project`, `!priority`, NL dates, "every …" (stored for P4); unparsed complex input → `fast` alias structured extraction.
 **AC:** 30 fixture phrases parse correctly (local + mock AI).
 **Size:** M
+**Built (2026-09-26):** 24 local phrases (`quickAddParse.test.ts`) + 6 AI phrases (`test_ai_quick_add.py`, mock fixtures `quick_add.yaml`) = 30, all passing. `POST /ai/quick-add` (creates nothing; resolves names to people/projects the user can add to). The task service now writes `priority` and `recurrence` (they had no write path), which also made `priority` available to the AI tools. First versioned prompt + the structured-output helper.
 
 ### S3.2.2: ⌘K natural-language commands
 **Scope:** intent detection (command vs search) in the palette; `POST /ai/command` SSE: tool loop (read tools) → proposed operations → `ai_actions` → PreviewCard in the Mo panel; "auto-apply low risk" user setting.

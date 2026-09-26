@@ -182,6 +182,43 @@ def _as_datetime(v: Any) -> datetime | None:
     return dt.astimezone(UTC)
 
 
+PRIORITIES = ("urgent", "high", "medium", "low")
+RECURRENCE_FREQS = ("daily", "weekly", "monthly", "yearly")
+
+
+def _check_priority(value: Any) -> str | None:
+    if value is None:
+        return None
+    if value not in PRIORITIES:
+        raise ValidationFailed(
+            "Priority must be urgent, high, medium or low", code="invalid_priority"
+        )
+    return str(value)
+
+
+def _check_recurrence(value: Any) -> dict[str, Any] | None:
+    """A repeat rule as stored in ``tasks.recurrence`` (generation arrives in Phase 4):
+    ``{freq, interval, by_weekday?, workdays_only?, text?}``."""
+    if value is None:
+        return None
+    if not isinstance(value, dict) or value.get("freq") not in RECURRENCE_FREQS:
+        raise ValidationFailed("Invalid repeat rule", code="invalid_recurrence")
+    interval = value.get("interval", 1)
+    if not isinstance(interval, int) or not 1 <= interval <= 99:
+        raise ValidationFailed("Invalid repeat interval", code="invalid_recurrence")
+    out: dict[str, Any] = {"freq": value["freq"], "interval": interval}
+    days = value.get("by_weekday")
+    if days:
+        if not isinstance(days, list) or not all(isinstance(d, int) and 0 <= d <= 6 for d in days):
+            raise ValidationFailed("Invalid repeat weekdays", code="invalid_recurrence")
+        out["by_weekday"] = sorted(set(days))
+    if value.get("workdays_only"):
+        out["workdays_only"] = True
+    if value.get("text"):
+        out["text"] = str(value["text"])[:100]
+    return out
+
+
 def _local_date(dt: datetime, tz: str) -> date:
     try:
         return dt.astimezone(ZoneInfo(tz)).date()
@@ -330,8 +367,11 @@ async def create_task(
     assignee_id: uuid.UUID | None = None,
     due_on: date | None = None,
     due_at: datetime | None = None,
+    priority: str | None = None,
+    recurrence: dict[str, Any] | None = None,
 ) -> Mutation[tuple[Task, TaskProject]]:
-    """Create a task (optionally already assigned and dated: quick add is one change, one undo)."""
+    """Create a task (optionally already assigned, dated, prioritized and with a repeat rule:
+    quick add is one change, one undo)."""
     _, role = await get_visible_project(session, ctx, project_id)
     require_project_role(role, "editor", "add tasks")
     title = " ".join(title.split())
@@ -343,17 +383,25 @@ async def create_task(
     (position,) = await _keys_for(
         session, project_id, section.id, 1, after_id=after_id, before_id=before_id
     )
+    priority = _check_priority(priority)
+    recurrence = _check_recurrence(recurrence)
     task = Task(
         workspace_id=ctx.workspace_id,
         number=await _next_number(session, ctx.workspace_id),
         title=title,
         assignee_id=assignee_id,
+        priority=priority,
+        recurrence=recurrence,
         created_by=ctx.actor.id,
         created_via=ctx.via,
     )
     created: Diff = {"title": (None, title)}
     if assignee_id is not None:
         created["assignee_id"] = (None, assignee_id)
+    if priority is not None:
+        created["priority"] = (None, priority)
+    if recurrence is not None:
+        created["recurrence"] = (None, recurrence)
     dates = {k: v for k, v in (("due_on", due_on), ("due_at", due_at)) if v is not None}
     _apply_dates(task, dates, ctx, created)  # same rules as editing (due_at → local due_on)
     for field in ("due_on", "due_at"):
@@ -477,6 +525,14 @@ async def update_task(
                 await _require_assignable(session, ctx, assignee)
                 await _follow(session, task.id, assignee)
             changes["assignee_id"] = (task.assignee_id, assignee)
+    if "priority" in patch:
+        priority = _check_priority(patch["priority"])
+        if priority != task.priority:
+            changes["priority"] = (task.priority, priority)
+    if "recurrence" in patch:
+        recurrence = _check_recurrence(patch["recurrence"])
+        if recurrence != task.recurrence:
+            changes["recurrence"] = (task.recurrence, recurrence)
     _apply_dates(task, patch, ctx, changes)
     if not changes:
         return Mutation(task, version=task.version)

@@ -108,6 +108,23 @@ export interface paths {
         patch: operations["update_ai_memory_api_v1_ai_memory__memory_id__patch"];
         trace?: never;
     };
+    "/api/v1/ai/quick-add": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Read task fields from free text (the AI half of quick add; creates nothing) */
+        post: operations["parse_quick_add_api_v1_ai_quick_add_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/attachments/{attachment_id}": {
         parameters: {
             query?: never;
@@ -2551,6 +2568,16 @@ export interface components {
             /** Version */
             version: number;
         };
+        /** Named */
+        Named: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+        };
         /** NamedRef */
         NamedRef: {
             /**
@@ -2960,6 +2987,28 @@ export interface components {
             /** View */
             view?: ("list" | "board" | "calendar" | "timeline" | "overview" | "dashboard") | null;
         };
+        /** QuickAddIn */
+        QuickAddIn: {
+            /** Text */
+            text: string;
+        };
+        /** QuickAddParseOut */
+        QuickAddParseOut: {
+            assignee?: components["schemas"]["Named"] | null;
+            /** Due On */
+            due_on?: string | null;
+            /** Priority */
+            priority?: ("urgent" | "high" | "medium" | "low") | null;
+            project?: components["schemas"]["Named"] | null;
+            recurrence?: components["schemas"]["RecurrenceRule"] | null;
+            /** Title */
+            title: string;
+            /**
+             * Unresolved
+             * @description Names Mo read but couldn't match, for the user to fix
+             */
+            unresolved?: string[];
+        };
         /** ReactionIn */
         ReactionIn: {
             /**
@@ -2976,6 +3025,60 @@ export interface components {
             emoji: string;
             /** User Ids */
             user_ids: string[];
+        };
+        /**
+         * RecurrenceIn
+         * @description A repeat rule, stored as given (S3.2.1). Generating the next occurrence is Phase 4.
+         */
+        RecurrenceIn: {
+            /**
+             * By Weekday
+             * @description 0 = Monday … 6 = Sunday (weekly rules)
+             */
+            by_weekday?: number[] | null;
+            /**
+             * Freq
+             * @enum {string}
+             */
+            freq: "daily" | "weekly" | "monthly" | "yearly";
+            /**
+             * Interval
+             * @default 1
+             */
+            interval: number;
+            /**
+             * Text
+             * @description As the user wrote it
+             */
+            text?: string | null;
+            /**
+             * Workdays Only
+             * @default false
+             */
+            workdays_only: boolean;
+        };
+        /** RecurrenceRule */
+        RecurrenceRule: {
+            /**
+             * By Weekday
+             * @description 0 = Monday … 6 = Sunday
+             */
+            by_weekday?: number[] | null;
+            /**
+             * Freq
+             * @enum {string}
+             */
+            freq: "daily" | "weekly" | "monthly" | "yearly";
+            /**
+             * Interval
+             * @default 1
+             */
+            interval: number;
+            /**
+             * Workdays Only
+             * @default false
+             */
+            workdays_only: boolean;
         };
         /** SearchResultsOut */
         SearchResultsOut: {
@@ -3172,6 +3275,9 @@ export interface components {
             due_at?: string | null;
             /** Due On */
             due_on?: string | null;
+            /** Priority */
+            priority?: ("urgent" | "high" | "medium" | "low") | null;
+            recurrence?: components["schemas"]["RecurrenceIn"] | null;
             /** Section Id */
             section_id?: string | null;
             /** Title */
@@ -3236,6 +3342,13 @@ export interface components {
             project: components["schemas"]["ProjectRef"] | null;
             /** Project Id */
             project_id: string | null;
+            /**
+             * Recurrence
+             * @description Repeat rule (stored; generating occurrences is Phase 4)
+             */
+            recurrence?: {
+                [key: string]: unknown;
+            } | null;
             section: components["schemas"]["NamedRef"] | null;
             /** Section Id */
             section_id: string | null;
@@ -3287,6 +3400,8 @@ export interface components {
             due_at?: string | null;
             /** Due On */
             due_on?: string | null;
+            /** Priority */
+            priority?: ("urgent" | "high" | "medium" | "low") | null;
             /** Start On */
             start_on?: string | null;
         };
@@ -3399,6 +3514,8 @@ export interface components {
             due_at?: string | null;
             /** Due On */
             due_on?: string | null;
+            /** Priority */
+            priority?: ("urgent" | "high" | "medium" | "low") | null;
             /** Start On */
             start_on?: string | null;
             /** Title */
@@ -3886,6 +4003,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MutationOut_MemoryOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    parse_quick_add_api_v1_ai_quick_add_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QuickAddIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuickAddParseOut"];
                 };
             };
             /** @description Validation Error */

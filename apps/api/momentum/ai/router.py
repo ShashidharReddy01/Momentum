@@ -4,13 +4,15 @@ errors, ``{data}`` envelopes)."""
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any, Literal
 
 from fastapi import APIRouter, status
 from pydantic import BaseModel, ConfigDict, Field
 
-from momentum.ai import actions, memory
+from momentum.ai import actions, memory, quick_add
+from momentum.ai.errors import AIUnavailable
+from momentum.ai.llm import LLM
 from momentum.ai.models import AiAction
 from momentum.api.deps import CtxDep, RuntimeDep, UowDep
 from momentum.api.schemas import ListOut, MutationOut
@@ -190,3 +192,30 @@ async def delete_ai_memory(
 ) -> MutationOut[MemoryOut]:
     async with uow.transaction() as s:
         return MutationOut.of(await memory.delete_memory(s, ctx, memory_id), MemoryOut)
+
+
+# ---------------- smart quick-add (S3.2.1) ----------------
+
+
+class QuickAddIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    text: str = Field(min_length=1, max_length=500)
+
+
+@router.post(
+    "/quick-add",
+    response_model=quick_add.QuickAddParseOut,
+    summary="Read task fields from free text (the AI half of quick add; creates nothing)",
+)
+async def parse_quick_add(
+    body: QuickAddIn, ctx: CtxDep, uow: UowDep, rt: RuntimeDep
+) -> quick_add.QuickAddParseOut:
+    llm = require_llm(rt)
+    async with uow.transaction() as s:
+        return await quick_add.parse(s, llm, ctx, body.text, now=datetime.now(UTC))
+
+
+def require_llm(rt: Any) -> LLM:
+    if rt.llm is None:
+        raise AIUnavailable(reason="not_configured")
+    return rt.llm  # type: ignore[no-any-return]
