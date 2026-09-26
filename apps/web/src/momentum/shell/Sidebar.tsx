@@ -33,10 +33,17 @@ import {
 import { Icon } from '@/components/ui/Icon';
 import { IconButton } from '@/components/ui/IconButton';
 import { useLogout, useMe } from '@/features/auth';
-import { NewProjectDialog, useFavorites, useProjects, type Project } from '@/features/projects';
+import {
+  NewProjectDialog,
+  ProjectFromBriefDialog,
+  useFavorites,
+  useProjects,
+  type Project,
+} from '@/features/projects';
 import { colorVar, NewTeamDialog, useTeams } from '@/features/teams';
 import { cn } from '@/lib/cn';
 import { useNarrow } from '@/lib/media';
+import { useMomentumConfig } from '@/lib/config';
 import { useUi } from '@/stores/ui';
 
 const NAV = [
@@ -54,6 +61,7 @@ export function Sidebar() {
   const location = useLocation();
   const [newTeam, setNewTeam] = useState(false);
   const [newProject, setNewProject] = useState(false);
+  const [fromBrief, setFromBrief] = useState(false);
   // the drawer closes when you go somewhere, or when the window gets wide again
   useEffect(() => setDrawerOpen(false), [location.pathname, narrow, setDrawerOpen]);
   useEffect(() => {
@@ -95,6 +103,7 @@ export function Sidebar() {
             onNewTask={() => setQuickAddOpen(true)}
             onNewTeam={() => setNewTeam(true)}
             onNewProject={() => setNewProject(true)}
+            onFromBrief={() => setFromBrief(true)}
           />
         </div>
         <ul className="flex flex-col gap-0.5 px-2">
@@ -120,6 +129,7 @@ export function Sidebar() {
         </div>
         <NewTeamDialog open={newTeam} onOpenChange={setNewTeam} />
         <NewProjectDialog open={newProject} onOpenChange={setNewProject} />
+        <ProjectFromBriefDialog open={fromBrief} onOpenChange={setFromBrief} />
       </nav>
     </>
   );
@@ -205,11 +215,14 @@ function CreateMenu({
   onNewTask,
   onNewTeam,
   onNewProject,
+  onFromBrief,
 }: {
   onNewTask: () => void;
   onNewTeam: () => void;
   onNewProject: () => void;
+  onFromBrief: () => void;
 }) {
+  const aiEnabled = useMomentumConfig().ai_enabled;
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -224,6 +237,11 @@ function CreateMenu({
         <DropdownMenuItem onSelect={onNewProject}>
           <Icon icon={FolderPlus} /> Project
         </DropdownMenuItem>
+        {aiEnabled ? (
+          <DropdownMenuItem onSelect={onFromBrief}>
+            <MoMark size={14} /> Project from a brief
+          </DropdownMenuItem>
+        ) : null}
         <DropdownMenuItem onSelect={onNewTeam}>
           <Icon icon={Users} /> Team
         </DropdownMenuItem>

@@ -85,7 +85,7 @@ async def project_people(session: AsyncSession, project: Project) -> list[User]:
     return list(rows.scalars())
 
 
-def _match_person(name: str, people: list[User]) -> User | None:
+def match_person(name: str, people: list[User]) -> User | None:
     v = name.strip().lstrip("@").lower()
     if not v:
         return None
@@ -154,7 +154,7 @@ async def break_down(
         existing.add(title.lower())
         item: dict[str, object] = {"title": title}
         if s.assignee:
-            person = _match_person(s.assignee, people)
+            person = match_person(s.assignee, people)
             if person is None:
                 notes.append(
                     f"“{title}”: {s.assignee} isn't someone on this project, so it's unassigned."

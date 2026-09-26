@@ -228,6 +228,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/ai/projects/from-brief": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Plan a project from a brief (a previewed AI action; creates nothing) */
+        post: operations["ai_project_from_brief_api_v1_ai_projects_from_brief_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/ai/projects/{project_id}/status-draft": {
         parameters: {
             query?: never;
@@ -2447,6 +2464,47 @@ export interface components {
         FollowersOut: {
             /** Followers */
             followers: string[];
+        };
+        /** FromBriefIn */
+        FromBriefIn: {
+            /** Brief */
+            brief: string;
+            /** End On */
+            end_on?: string | null;
+            /** Name */
+            name?: string | null;
+            /** Start On */
+            start_on?: string | null;
+            /** Team Id */
+            team_id?: string | null;
+        };
+        /** FromBriefOut */
+        FromBriefOut: {
+            /**
+             * Action Id
+             * Format: uuid
+             */
+            action_id: string;
+            /**
+             * End On
+             * Format: date
+             */
+            end_on: string;
+            /** Name */
+            name: string;
+            /** Notes */
+            notes: string[];
+            /** Open Questions */
+            open_questions: string[];
+            /**
+             * Start On
+             * Format: date
+             */
+            start_on: string;
+            /** Tasks */
+            tasks: number;
+            /** Team */
+            team: string;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -4833,6 +4891,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AiPrefs"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ai_project_from_brief_api_v1_ai_projects_from_brief_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FromBriefIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FromBriefOut"];
                 };
             };
             /** @description Validation Error */

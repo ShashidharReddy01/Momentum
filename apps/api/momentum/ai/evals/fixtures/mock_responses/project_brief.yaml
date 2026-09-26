@@ -1,0 +1,25 @@
+# S3.4.6 project from a brief (mock). Handwritten plan spanning 60 days, with one person on the
+# team (Ana Souza), one who doesn't exist (Zed Unknown) and an unstaffed role.
+default:
+  tool_calls:
+    - name: submit_result
+      arguments:
+        name: "(mock) Brief rollout"
+        roles:
+          - {role: "designer", person: "Ana Souza"}
+          - {role: "legal", person: "Zed Unknown"}
+          - {role: "copywriter"}
+        sections:
+          - name: "Discovery"
+            tasks:
+              - {title: "Interview five customers", role: "designer", start_offset: 0, due_offset: 7}
+              - {title: "Write the requirements", start_offset: 5, due_offset: 14}
+          - name: "Build"
+            tasks:
+              - {title: "Design the pages", role: "designer", start_offset: 14, due_offset: 35}
+              - {title: "Review the terms", role: "legal", start_offset: 20, due_offset: 40}
+              - {title: "Write the copy", role: "copywriter", start_offset: 30, due_offset: 45}
+          - name: "Launch"
+            tasks:
+              - {title: "Launch the site", start_offset: 55, due_offset: 60, description: "Go live and announce."}
+        open_questions: ["Who signs off on pricing?"]

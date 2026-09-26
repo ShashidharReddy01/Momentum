@@ -17,6 +17,7 @@ from momentum.ai import (
     breakdown,
     chat,
     citations,
+    from_brief,
     memory,
     plan_day,
     prefs,
@@ -645,3 +646,52 @@ async def ai_plan_my_day(ctx: CtxDep, uow: UowDep, rt: RuntimeDep) -> PlanDayOut
             notes=r.notes,
             citations=[CitationOut(**c.to_json()) for c in cites],
         )
+
+
+# ---------------- project from a brief (S3.4.6) ----------------
+
+
+class FromBriefIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    brief: str = Field(min_length=1, max_length=from_brief.MAX_BRIEF)
+    name: str | None = Field(default=None, max_length=120)
+    team_id: uuid.UUID | None = None
+    start_on: date | None = None
+    end_on: date | None = None
+
+
+class FromBriefOut(BaseModel):
+    action_id: uuid.UUID
+    name: str
+    team: str
+    start_on: date
+    end_on: date
+    tasks: int
+    notes: list[str]
+    open_questions: list[str]
+
+
+@router.post(
+    "/projects/from-brief",
+    response_model=FromBriefOut,
+    summary="Plan a project from a brief (a previewed AI action; creates nothing)",
+)
+async def ai_project_from_brief(
+    body: FromBriefIn, ctx: CtxDep, uow: UowDep, rt: RuntimeDep
+) -> FromBriefOut:
+    llm = require_llm(rt)
+    ctx = ctx.with_(via="ai")
+    async with uow.transaction() as s:
+        r = await from_brief.plan_from_brief(
+            s,
+            llm,
+            ctx,
+            rt.tools,
+            body.brief,
+            now=datetime.now(UTC),
+            name=body.name,
+            team_id=body.team_id,
+            start_on=body.start_on,
+            end_on=body.end_on,
+        )
+        return FromBriefOut(**r.__dict__)

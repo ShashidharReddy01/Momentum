@@ -159,15 +159,15 @@ async def test_an_explicit_viewer_is_not_assignable_even_on_the_team(
 
 
 def test_ambiguous_names_are_never_guessed() -> None:
-    from momentum.ai.breakdown import _match_person
+    from momentum.ai.breakdown import match_person
     from momentum.domain.users.models import User
 
     ana = User(name="Ana Souza", email="ana@x.test")
     ana2 = User(name="Ana Lima", email="ana.lima@x.test")
     tom = User(name="Tom Becker", email="tom@x.test")
     people = [ana, ana2, tom]
-    assert _match_person("Ana", people) is None
-    assert _match_person("Ana Lima", people) is ana2
-    assert _match_person("@tom", people) is tom
-    assert _match_person("ANA@X.TEST", people) is ana
-    assert _match_person("  ", people) is None
+    assert match_person("Ana", people) is None
+    assert match_person("Ana Lima", people) is ana2
+    assert match_person("@tom", people) is tom
+    assert match_person("ANA@X.TEST", people) is ana
+    assert match_person("  ", people) is None

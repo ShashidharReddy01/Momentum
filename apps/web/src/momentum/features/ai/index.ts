@@ -14,6 +14,7 @@ export {
   useAiActionMutations,
   useConversation,
   useConversations,
+  useProjectFromBrief,
   useWriteHelp,
   type AiAction,
   type DiffRow,

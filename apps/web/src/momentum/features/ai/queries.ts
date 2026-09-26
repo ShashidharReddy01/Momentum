@@ -158,3 +158,12 @@ export function usePlanMyDay() {
     mutationFn: async () => (await api.POST('/api/v1/ai/plan-my-day')).data!,
   });
 }
+
+/** S3.4.6: Mo's plan for a new project from a brief, as a previewed AI action. */
+export function useProjectFromBrief() {
+  const api = useApi();
+  return useMutation({
+    mutationFn: async (body: components['schemas']['FromBriefIn']) =>
+      (await api.POST('/api/v1/ai/projects/from-brief', { body })).data!,
+  });
+}

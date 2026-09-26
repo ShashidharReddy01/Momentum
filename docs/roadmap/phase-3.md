@@ -88,6 +88,8 @@
 
 **S3.4.5 built (2026-09-26):** `ai/plan_day.py` + `POST /ai/plan-my-day` (default alias, prompt `plan_day/v1`): the model sees my open tasks (key, My Tasks section, due/overdue, priority, blocked) and submits keys for Today (ordered) and Later; the server keeps only my open tasks' keys, drops duplicates, caps Today at 8, only moves to Later what is in Today (notes for each), and proposes nothing when the day already matches. Applied through the new tool `plan_my_day` (low risk) → `mytasks.move_my_task` (the plan goes first in Today, pinned, one undo); `mytasks.first_in_bucket` added. UI: "Plan my day" on My Tasks → reasons with citations, notes, PreviewCard. No estimates field exists yet and calendar time is Phase 7, so neither is considered.
 
+**S3.4.6 built (2026-09-26):** `ai/from_brief.py` + `POST /ai/projects/from-brief {brief ≤ 20k, name?, team_id?, start_on?, end_on?}` (smart alias, prompt `project_brief/v1`). The model plans in relative days and roles; the server turns them into dates and people: **the plan fits a requested end date** (compressed proportionally when it runs over, with a note; the deadline is also in the prompt), roles map only to members of the project's team (**unknown or outside people → unassigned + note**; ambiguous names never guessed; `breakdown.match_person` shared), the team is the one chosen (must be mine) or my only team (`team_required` otherwise). One `create_project_from_plan` call proposed as a medium-risk AI action. UI: Create → "Project from a brief" dialog (paste or upload .txt/.md, team, start, must-finish-by) → summary, notes, open questions, PreviewCard. PDFs/Word files aren't read in the browser (paste their text).
+
 ## E3.5 Quality and admin
 
 ### S3.5.1: Eval harness
