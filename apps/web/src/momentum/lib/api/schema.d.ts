@@ -72,6 +72,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/ai/admin/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Workspace AI settings (admin) */
+        get: operations["get_admin_ai_settings_api_v1_ai_admin_settings_get"];
+        /** Change workspace AI settings (admin) */
+        put: operations["put_admin_ai_settings_api_v1_ai_admin_settings_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ai/admin/usage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** AI usage by feature, user and day (admin) */
+        get: operations["get_admin_ai_usage_api_v1_ai_admin_usage_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/ai/chat": {
         parameters: {
             query?: never;
@@ -1871,6 +1906,12 @@ export interface components {
             /** Verb */
             verb: string;
         };
+        /** AdminAiSettingsOut */
+        AdminAiSettingsOut: {
+            config: components["schemas"]["AiConfig"];
+            effective: components["schemas"]["EffectiveAi"];
+            models: components["schemas"]["ModelAliasesOut"];
+        };
         /** AiActionEnvelope */
         AiActionEnvelope: {
             data: components["schemas"]["AiActionOut"];
@@ -1914,6 +1955,22 @@ export interface components {
             state: "proposed" | "approved" | "applied" | "rejected" | "expired" | "undone" | "failed";
             /** Summary */
             summary: string;
+        };
+        /**
+         * AiConfig
+         * @description Admin-editable AI policy, stored in ``workspaces.settings['ai']``.
+         *
+         *     Each field is an *override*: ``None`` means "use the deployment's value from
+         *     ``momentum.core.settings``", so an untouched workspace behaves exactly as its environment
+         *     configures it. See ``effective_ai`` for how the two combine.
+         */
+        AiConfig: {
+            /** Allow Auto Apply */
+            allow_auto_apply?: boolean | null;
+            /** Enabled */
+            enabled?: boolean | null;
+            /** Monthly Budget Usd */
+            monthly_budget_usd?: number | null;
         };
         /** AiOperationOut */
         AiOperationOut: {
@@ -2290,6 +2347,18 @@ export interface components {
             label: string;
             /** Verb */
             verb: string;
+        };
+        /**
+         * EffectiveAi
+         * @description What the running system actually does, after combining environment and workspace.
+         */
+        EffectiveAi: {
+            /** Allow Auto Apply */
+            allow_auto_apply: boolean;
+            /** Enabled */
+            enabled: boolean;
+            /** Monthly Budget Usd */
+            monthly_budget_usd: number;
         };
         /** FavoriteIn */
         FavoriteIn: {
@@ -2851,6 +2920,17 @@ export interface components {
             /** Name */
             name: string;
         };
+        /** ModelAliasesOut */
+        ModelAliasesOut: {
+            /** Default */
+            default: string;
+            /** Embed */
+            embed: string;
+            /** Fast */
+            fast: string;
+            /** Smart */
+            smart: string;
+        };
         /** MutationMeta */
         MutationMeta: {
             /** Activity Id */
@@ -2868,6 +2948,11 @@ export interface components {
         /** MutationOut[CommentOut] */
         MutationOut_CommentOut_: {
             data: components["schemas"]["CommentOut"];
+            meta: components["schemas"]["MutationMeta"];
+        };
+        /** MutationOut[EffectiveAi] */
+        MutationOut_EffectiveAi_: {
+            data: components["schemas"]["EffectiveAi"];
             meta: components["schemas"]["MutationMeta"];
         };
         /** MutationOut[FieldOut] */
@@ -4338,6 +4423,71 @@ export interface components {
             /** Count */
             count: number;
         };
+        /** UsageByDay */
+        UsageByDay: {
+            /** Calls */
+            calls: number;
+            /** Cost Usd */
+            cost_usd: string;
+            /** Day */
+            day: string;
+            /** Errors */
+            errors: number;
+            /** Tokens In */
+            tokens_in: number;
+            /** Tokens Out */
+            tokens_out: number;
+        };
+        /** UsageByFeature */
+        UsageByFeature: {
+            /** Calls */
+            calls: number;
+            /** Cost Usd */
+            cost_usd: string;
+            /** Errors */
+            errors: number;
+            /** Feature */
+            feature: string;
+            /** Tokens In */
+            tokens_in: number;
+            /** Tokens Out */
+            tokens_out: number;
+        };
+        /** UsageByUser */
+        UsageByUser: {
+            /** Calls */
+            calls: number;
+            /** Cost Usd */
+            cost_usd: string;
+            /** Errors */
+            errors: number;
+            /** Tokens In */
+            tokens_in: number;
+            /** Tokens Out */
+            tokens_out: number;
+            /** User Id */
+            user_id: string | null;
+            /** User Name */
+            user_name: string | null;
+        };
+        /** UsageReport */
+        UsageReport: {
+            /** By Day */
+            by_day: components["schemas"]["UsageByDay"][];
+            /** By Feature */
+            by_feature: components["schemas"]["UsageByFeature"][];
+            /** By User */
+            by_user: components["schemas"]["UsageByUser"][];
+            /** Month Spend Usd */
+            month_spend_usd: string;
+            /** Monthly Budget Usd */
+            monthly_budget_usd: number;
+            /**
+             * Since
+             * Format: date-time
+             */
+            since: string;
+        };
         /** UserInviteIn */
         UserInviteIn: {
             /** Email */
@@ -4541,6 +4691,90 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AiActionEnvelope"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_admin_ai_settings_api_v1_ai_admin_settings_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminAiSettingsOut"];
+                };
+            };
+        };
+    };
+    put_admin_ai_settings_api_v1_ai_admin_settings_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AiConfig"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationOut_EffectiveAi_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_admin_ai_usage_api_v1_ai_admin_usage_get: {
+        parameters: {
+            query?: {
+                days?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UsageReport"];
                 };
             };
             /** @description Validation Error */

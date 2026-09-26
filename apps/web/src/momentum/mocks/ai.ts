@@ -146,6 +146,64 @@ export function aiMemoryHandlers(initial: string[] = [], opts: { canEdit?: boole
   return { handlers, bullets };
 }
 
+type AiConfig = components['schemas']['AiConfig'];
+type EffectiveAi = components['schemas']['EffectiveAi'];
+type UsageReport = components['schemas']['UsageReport'];
+
+function effectiveOf(c: AiConfig): EffectiveAi {
+  return {
+    enabled: c.enabled !== false,
+    monthly_budget_usd: c.monthly_budget_usd ?? 0,
+    allow_auto_apply: c.allow_auto_apply !== false,
+  };
+}
+
+/** Admin AI settings + usage (S3.5.2). `canEdit: false` answers with 403, as the server does for
+ * non-admins. `usage` defaults to an empty report. */
+export function aiAdminHandlers(
+  initialConfig: AiConfig = {},
+  usage: Partial<UsageReport> = {},
+  opts: { canEdit?: boolean } = {},
+) {
+  let config: AiConfig = { ...initialConfig };
+  const canEdit = opts.canEdit ?? true;
+  const models = {
+    fast: 'provider/chat-fast',
+    default: 'provider/chat-default',
+    smart: 'provider/chat-smart',
+    embed: 'provider/embed',
+  };
+  const report: UsageReport = {
+    since: '2026-08-27T00:00:00Z',
+    month_spend_usd: '0.00',
+    monthly_budget_usd: 0,
+    by_feature: [],
+    by_user: [],
+    by_day: [],
+    ...usage,
+  };
+  const forbidden = () =>
+    HttpResponse.json(
+      { code: 'forbidden', title: 'Forbidden', status: 403, detail: 'Admins only' },
+      { status: 403, headers: { 'content-type': 'application/problem+json' } },
+    );
+  const handlers = [
+    http.get('*/api/v1/ai/admin/settings', () =>
+      canEdit ? HttpResponse.json({ config, effective: effectiveOf(config), models }) : forbidden(),
+    ),
+    http.put('*/api/v1/ai/admin/settings', async ({ request }) => {
+      if (!canEdit) return forbidden();
+      config = (await request.json()) as AiConfig;
+      return HttpResponse.json({
+        data: effectiveOf(config),
+        meta: { activity_id: '01a0ccaf-0000-7000-8000-000000000901', batch_id: null, version: null },
+      });
+    }),
+    http.get('*/api/v1/ai/admin/usage', () => (canEdit ? HttpResponse.json(report) : forbidden())),
+  ];
+  return { handlers, config: () => config };
+}
+
 export type ScriptedEvent = [string, Record<string, unknown>];
 
 /** `POST /ai/command` as an SSE stream of scripted events (S3.2.2); one script per request, in

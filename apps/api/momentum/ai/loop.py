@@ -34,6 +34,7 @@ from momentum.ai.types import (
     ToolSchema,
 )
 from momentum.core.context import Ctx
+from momentum.domain.workspace.service import get_ai_config
 
 Emit = Callable[[str, dict[str, Any]], Awaitable[None]]
 OUT_OF_STEPS = "I couldn't finish that in the steps I'm allowed. Try a narrower request."
@@ -225,7 +226,11 @@ async def emit_proposals(
         "action_proposed",
         {"action_id": str(action.id), "summary": action.summary, "risk": action.risk},
     )
-    if action.risk == "low" and (await get_prefs(session, ctx)).auto_apply_low_risk:
+    # An admin can switch auto-apply off workspace-wide (S3.5.2), on top of the user's own toggle.
+    wants_auto_apply = (await get_prefs(session, ctx)).auto_apply_low_risk
+    config = await get_ai_config(session, ctx.workspace_id)
+    workspace_allows = config.allow_auto_apply is not False
+    if action.risk == "low" and wants_auto_apply and workspace_allows:
         applied = await apply_action(session, ctx, registry, action.id)
         if applied.outcome == "applied":
             await emit(

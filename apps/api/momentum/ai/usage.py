@@ -16,9 +16,10 @@ from typing import Protocol
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from momentum.ai.errors import BudgetExceeded
+from momentum.ai.errors import AIDisabled, BudgetExceeded
 from momentum.ai.models import LlmCall
 from momentum.core.context import Ctx
+from momentum.domain.workspace.service import AiConfig, get_ai_config
 
 
 @dataclass(frozen=True)
@@ -37,6 +38,8 @@ class CallRecord:
 
 
 class UsageLog(Protocol):
+    async def check_enabled(self, ctx: Ctx) -> None: ...
+
     async def check_budget(self, ctx: Ctx) -> None: ...
 
     async def record(self, ctx: Ctx, rec: CallRecord) -> None: ...
@@ -44,6 +47,9 @@ class UsageLog(Protocol):
 
 class NullUsageLog:
     """For callers with no workspace database (``momentum llm-check``): no budget, no rows."""
+
+    async def check_enabled(self, ctx: Ctx) -> None:
+        return None
 
     async def check_budget(self, ctx: Ctx) -> None:
         return None
@@ -75,13 +81,28 @@ class DbUsageLog:
             )
         return Decimal(total or 0)
 
+    async def _config(self, ctx: Ctx) -> AiConfig:
+        async with self._sf() as session:
+            return await get_ai_config(session, ctx.workspace_id)
+
+    async def check_enabled(self, ctx: Ctx) -> None:
+        """The admin switch (S3.5.2). ``LLM`` has already checked the environment's kill switch;
+        this is the workspace override an admin can set on the AI settings page."""
+        if (await self._config(ctx)).enabled is False:
+            raise AIDisabled()
+
+    async def _limit(self, ctx: Ctx) -> Decimal:
+        override = (await self._config(ctx)).monthly_budget_usd
+        return self._budget if override is None else Decimal(str(override))
+
     async def check_budget(self, ctx: Ctx) -> None:
-        if self._budget <= 0:
+        budget = await self._limit(ctx)
+        if budget <= 0:
             return
         spent = await self.month_spend(ctx.workspace_id)
-        if spent >= self._budget:
+        if spent >= budget:
             raise BudgetExceeded(
-                f"This workspace has used ${spent:.2f} of its ${self._budget:.2f} monthly AI "
+                f"This workspace has used ${spent:.2f} of its ${budget:.2f} monthly AI "
                 "budget. An admin can raise it.",
             )
 

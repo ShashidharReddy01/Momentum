@@ -167,3 +167,44 @@ export function useProjectFromBrief() {
       (await api.POST('/api/v1/ai/projects/from-brief', { body })).data!,
   });
 }
+
+// ---------------- admin: AI settings and usage (S3.5.2) ----------------
+
+export type AdminAiSettings = components['schemas']['AdminAiSettingsOut'];
+export type AiConfig = components['schemas']['AiConfig'];
+export type UsageReport = components['schemas']['UsageReport'];
+
+export const adminAiKeys = {
+  settings: ['ai', 'admin', 'settings'] as const,
+  usage: (days: number) => ['ai', 'admin', 'usage', days] as const,
+};
+
+/** The workspace's AI policy (admin only): raw overrides, what they resolve to, and the
+ * deployment's model aliases (read-only). */
+export function useAdminAiSettings() {
+  const api = useApi();
+  return useQuery({
+    queryKey: adminAiKeys.settings,
+    queryFn: async () => (await api.GET('/api/v1/ai/admin/settings')).data!,
+  });
+}
+
+/** Change the workspace's AI policy (admin only). */
+export function useAdminAiSettingsMutation() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (body: AiConfig) => (await api.PUT('/api/v1/ai/admin/settings', { body })).data!,
+    onSuccess: () => void qc.invalidateQueries({ queryKey: adminAiKeys.settings }),
+    onError: (e) => toastError(e, "Couldn't save AI settings"),
+  });
+}
+
+/** Token/cost usage by feature, user and day over the last `days` (admin only). */
+export function useAdminAiUsage(days = 30) {
+  const api = useApi();
+  return useQuery({
+    queryKey: adminAiKeys.usage(days),
+    queryFn: async () => (await api.GET('/api/v1/ai/admin/usage', { params: { query: { days } } })).data!,
+  });
+}

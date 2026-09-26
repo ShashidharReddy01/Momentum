@@ -25,6 +25,7 @@ from momentum.ai import (
     sse,
     status_draft,
     summarize,
+    usage_report,
     write,
 )
 from momentum.ai.command import run_command
@@ -39,6 +40,12 @@ from momentum.api.schemas import ListOut, MutationOut
 from momentum.core.errors import ValidationFailed
 from momentum.domain.status_updates.schemas import StatusUpdateIn
 from momentum.domain.status_updates.service import body_text as status_body_text
+from momentum.domain.workspace.service import (
+    AiConfig,
+    EffectiveAi,
+    get_ai_config_for_admin,
+    set_ai_config,
+)
 
 router = APIRouter(prefix="/ai", tags=["ai"])
 
@@ -695,3 +702,61 @@ async def ai_project_from_brief(
             end_on=body.end_on,
         )
         return FromBriefOut(**r.__dict__)
+
+
+# ---------------- AI usage and settings (admin, S3.5.2) ----------------
+
+
+class ModelAliasesOut(BaseModel):
+    fast: str
+    default: str
+    smart: str
+    embed: str
+
+
+class AdminAiSettingsOut(BaseModel):
+    config: AiConfig
+    effective: EffectiveAi
+    models: ModelAliasesOut
+
+
+@router.get(
+    "/admin/settings",
+    response_model=AdminAiSettingsOut,
+    summary="Workspace AI settings (admin)",
+)
+async def get_admin_ai_settings(ctx: CtxDep, uow: UowDep) -> AdminAiSettingsOut:
+    async with uow.transaction() as s:
+        config, effective = await get_ai_config_for_admin(s, ctx)
+    return AdminAiSettingsOut(
+        config=config,
+        effective=effective,
+        models=ModelAliasesOut(
+            fast=ctx.settings.llm_model_fast,
+            default=ctx.settings.llm_model_default,
+            smart=ctx.settings.llm_model_smart,
+            embed=ctx.settings.llm_embed_model,
+        ),
+    )
+
+
+@router.put(
+    "/admin/settings",
+    response_model=MutationOut[EffectiveAi],
+    summary="Change workspace AI settings (admin)",
+)
+async def put_admin_ai_settings(
+    body: AiConfig, ctx: CtxDep, uow: UowDep
+) -> MutationOut[EffectiveAi]:
+    async with uow.transaction() as s:
+        return MutationOut.of(await set_ai_config(s, ctx, body), EffectiveAi)
+
+
+@router.get(
+    "/admin/usage",
+    response_model=usage_report.UsageReport,
+    summary="AI usage by feature, user and day (admin)",
+)
+async def get_admin_ai_usage(ctx: CtxDep, uow: UowDep, days: int = 30) -> usage_report.UsageReport:
+    async with uow.transaction() as s:
+        return await usage_report.get_usage_report(s, ctx, days=days)

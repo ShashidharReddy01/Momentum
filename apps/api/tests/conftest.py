@@ -4,7 +4,9 @@ test truncates the Momentum tables afterwards."""
 
 from __future__ import annotations
 
+import asyncio
 import os
+import sys
 import tempfile
 from collections.abc import AsyncIterator, Callable
 from typing import TYPE_CHECKING
@@ -22,6 +24,16 @@ from momentum.migrations_runner import upgrade_head
 
 if TYPE_CHECKING:
     from tests.helpers import Clients
+
+
+# psycopg's async mode can't run on Windows' default Proactor loop (momentum/cli.py has the same
+# note); pytest-asyncio otherwise creates its event loops under that default policy.
+if sys.platform == "win32":
+
+    @pytest.fixture(scope="session")
+    def event_loop_policy() -> asyncio.AbstractEventLoopPolicy:
+        return asyncio.WindowsSelectorEventLoopPolicy()
+
 
 TEST_DB = os.environ.get(
     "MOMENTUM_TEST_DATABASE_URL",

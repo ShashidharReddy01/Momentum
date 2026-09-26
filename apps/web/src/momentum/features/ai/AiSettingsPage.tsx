@@ -8,6 +8,7 @@ import { IconButton } from '@/components/ui/IconButton';
 import { Input } from '@/components/ui/Input';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useMe } from '@/features/auth';
+import { AdminAiSection } from './AdminAiSection';
 import { useAiPrefs, useMemoryMutations, useWorkspaceMemory } from './memoryQueries';
 
 const MAX = 300;
@@ -15,7 +16,8 @@ const MAX = 300;
 /**
  * `/settings/ai` (S3.1.5): workspace memory — short facts Mo carries into every conversation
  * ("Sprints start on Mondays"). Everyone can read them (they shape everyone's answers); only a
- * workspace admin can change them (the API enforces that too). S3.5.2 adds usage and settings.
+ * workspace admin can change them (the API enforces that too). S3.5.2 adds an admin-only section
+ * (`AdminAiSection`) below it: enable/disable, budget, auto-apply policy, model aliases and usage.
  */
 export function AiSettingsPage() {
   const me = useMe();
@@ -127,6 +129,7 @@ export function AiSettingsPage() {
           </form>
         ) : null}
       </section>
+      {isAdmin ? <AdminAiSection /> : null}
     </div>
   );
 }

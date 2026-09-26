@@ -274,6 +274,7 @@ class LLM:
     async def _preflight(self, ctx: Ctx, rec: _RecordBase) -> None:
         if not self.settings.ai_enabled:
             raise AIDisabled()
+        await self.usage.check_enabled(ctx)  # the workspace's own switch (S3.5.2)
         try:
             await self.usage.check_budget(ctx)
         except BudgetExceeded:

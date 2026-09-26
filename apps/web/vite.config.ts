@@ -26,5 +26,13 @@ export default defineConfig({
     setupFiles: ['./src/test/setup.ts'],
     css: false,
     restoreMocks: true,
+    // jsdom + userEvent interactions can run past the 5s default on a slower machine; the tests
+    // themselves aren't slow, just tight on margin (real hangs still time out, just later).
+    testTimeout: 15000,
+    // Native Windows (no container) creates a jsdom environment per file so slowly that running
+    // many files concurrently starves userEvent's timers past testTimeout (momentum/cli.py and
+    // tests/conftest.py have the same "Windows is different here" note, for psycopg). CI and dev
+    // containers run Linux and keep full parallelism; only a native Windows checkout serializes.
+    fileParallelism: process.platform !== 'win32',
   },
 });

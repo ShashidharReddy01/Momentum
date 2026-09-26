@@ -44,7 +44,7 @@ def test_every_recorded_undo_op_has_a_handler() -> None:
             importlib.import_module(mod.name)
     ops = set()
     for path in root.rglob("*.py"):
-        ops |= set(re.findall(r'undo_op\(\s*"([a-z_.]+)"', path.read_text()))
+        ops |= set(re.findall(r'undo_op\(\s*"([a-z_.]+)"', path.read_text(encoding="utf-8")))
     assert ops, "no undo ops found"
     missing = ops - set(_HANDLERS)
     assert not missing, f"undo ops without a handler: {sorted(missing)}"
