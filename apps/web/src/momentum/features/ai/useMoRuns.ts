@@ -25,7 +25,9 @@ export interface Candidate {
  * only `valid` ones (it exists and you can see it) become links. */
 export interface Citation {
   ref: string;
-  type: 'task' | 'project';
+  /** `comment`: a `[C3]` label in a thread summary (S3.4.1): `title` is the author. */
+  type: 'task' | 'project' | 'comment';
+  created_at?: string | null;
   valid: boolean;
   id?: string | null;
   key?: string | null;

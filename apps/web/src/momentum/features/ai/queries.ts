@@ -101,3 +101,15 @@ export function useFeedback() {
     onError: (e) => toastError(e, "Couldn't save your rating"),
   });
 }
+
+export type SummaryResult = components['schemas']['SummaryOut'];
+
+/** S3.4.1: summarize a task's comment thread, or my unread inbox (cached on the server by
+ * content, so asking again for unchanged content is instant). */
+export function useSummarize() {
+  const api = useApi();
+  return useMutation({
+    mutationFn: async (body: components['schemas']['SummarizeIn']) =>
+      (await api.POST('/api/v1/ai/summarize', { body })).data!,
+  });
+}

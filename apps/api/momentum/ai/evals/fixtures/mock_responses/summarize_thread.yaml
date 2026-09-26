@@ -1,0 +1,8 @@
+# S3.4.1 thread summaries (mock). The thread is labelled C1..Cn, oldest first.
+responses:
+  - match: {contains: "pricing tiers"}
+    text: "- Ana proposed three pricing tiers [C1]; Ravi agreed and asked for a free trial [C2].\n- Open: who writes the FAQ [C3]."
+  - match: {contains: "just one note"}
+    text: "- (mock) A single note [C1]; see also [C9]."
+default:
+  text: "- (mock) The discussion starts with [C1]; the latest comment is summarized in mock mode only."

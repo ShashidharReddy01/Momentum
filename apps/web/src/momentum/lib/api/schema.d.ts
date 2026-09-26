@@ -228,6 +228,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/ai/summarize": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Summarize a task's comment thread, or my unread inbox (cached by content) */
+        post: operations["ai_summarize_api_v1_ai_summarize_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/attachments/{attachment_id}": {
         parameters: {
             query?: never;
@@ -3471,6 +3488,51 @@ export interface components {
             /** Before Id */
             before_id?: string | null;
         };
+        /** SummarizeIn */
+        SummarizeIn: {
+            /**
+             * Target
+             * @enum {string}
+             */
+            target: "task_thread" | "inbox";
+            /** Task Id */
+            task_id?: string | null;
+        };
+        /** SummaryCitationOut */
+        SummaryCitationOut: {
+            /** Created At */
+            created_at?: string | null;
+            /** Id */
+            id?: string | null;
+            /** Key */
+            key?: string | null;
+            /** Ref */
+            ref: string;
+            /** Title */
+            title?: string | null;
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "task" | "project" | "comment";
+            /** Valid */
+            valid: boolean;
+        };
+        /** SummaryOut */
+        SummaryOut: {
+            /** Cached */
+            cached: boolean;
+            /** Citations */
+            citations: components["schemas"]["SummaryCitationOut"][];
+            /** Count */
+            count: number;
+            /** Created At */
+            created_at: string | null;
+            /** Omitted */
+            omitted: number;
+            /** Summary */
+            summary: string;
+        };
         /** TagCreateIn */
         TagCreateIn: {
             /**
@@ -4514,6 +4576,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["QuickAddParseOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ai_summarize_api_v1_ai_summarize_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SummarizeIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SummaryOut"];
                 };
             };
             /** @description Validation Error */

@@ -1,0 +1,3 @@
+# S3.4.1 inbox catch-up (mock). Notifications are listed N1..Nn with task keys.
+default:
+  text: "- (mock) Unread notifications are about {{$keys}}."

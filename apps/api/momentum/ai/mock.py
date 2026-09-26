@@ -161,14 +161,20 @@ def _fill(args: Any, last: Any) -> Any:
     return args
 
 
-_TEXT_SLOT = re.compile(r"\{\{(\$last\.[^}]+)\}\}")
+_TEXT_SLOT = re.compile(r"\{\{(\$last\.[^}]+|\$keys)\}\}")
+_KEY = re.compile(r"\bT-\d+\b")
 
 
-def _fill_text(text: str, last: Any) -> str:
+def _fill_text(text: str, last: Any, user_text: str = "") -> str:
     """``{{$last.<path>}}`` in fixture text → that value (a list joined with spaces, a missing
-    value as "(none)"), e.g. citations taken from the search the loop just ran."""
+    value as "(none)"), e.g. citations taken from the search the loop just ran. ``{{$keys}}`` →
+    every task key in the last user message, as citations (``[T-1] [T-4]``), for features whose
+    data is in the prompt rather than in a tool result (summaries, status drafts)."""
 
     def one(m: re.Match[str]) -> str:
+        if m.group(1) == "$keys":
+            keys = list(dict.fromkeys(_KEY.findall(user_text)))
+            return " ".join(f"[{k}]" for k in keys) or "(none)"
         value = _fill(m.group(1), last)
         if isinstance(value, list):
             value = " ".join(str(v) for v in value if v is not None)
@@ -198,7 +204,7 @@ def _entry_to_completion(entry: dict[str, Any], req: ChatRequest) -> RawCompleti
         )
         for i, tc in enumerate(entry.get("tool_calls") or [])
     ]
-    text = _fill_text(str(entry.get("text") or ""), last)
+    text = _fill_text(str(entry.get("text") or ""), last, _last_user_text(req.messages))
     prompt = "".join(_content_text(m.get("content")) for m in req.messages)
     return RawCompletion(
         text=text,

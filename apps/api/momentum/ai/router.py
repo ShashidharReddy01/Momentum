@@ -12,7 +12,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from momentum.ai import actions, chat, memory, prefs, quick_add, sse
+from momentum.ai import actions, chat, memory, prefs, quick_add, sse, summarize
 from momentum.ai.command import run_command
 from momentum.ai.context import Screen
 from momentum.ai.errors import AIUnavailable
@@ -22,6 +22,7 @@ from momentum.ai.models import AiAction
 from momentum.ai.prefs import AiPrefs
 from momentum.api.deps import CtxDep, RuntimeDep, UowDep
 from momentum.api.schemas import ListOut, MutationOut
+from momentum.core.errors import ValidationFailed
 
 router = APIRouter(prefix="/ai", tags=["ai"])
 
@@ -433,3 +434,56 @@ async def put_ai_feedback(body: FeedbackIn, ctx: CtxDep, uow: UowDep) -> Feedbac
             comment=body.comment,
         )
         return FeedbackOut.model_validate(fb)
+
+
+# ---------------- summaries (S3.4.1) ----------------
+
+
+class SummarizeIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    target: Literal["task_thread", "inbox"]
+    task_id: uuid.UUID | None = None
+
+
+class SummaryCitationOut(BaseModel):
+    ref: str
+    type: Literal["task", "project", "comment"]
+    valid: bool
+    id: str | None = None
+    key: str | None = None
+    title: str | None = None
+    created_at: str | None = None
+
+
+class SummaryOut(BaseModel):
+    summary: str
+    citations: list[SummaryCitationOut]
+    cached: bool
+    count: int
+    omitted: int
+    created_at: datetime | None
+
+
+@router.post(
+    "/summarize",
+    response_model=SummaryOut,
+    summary="Summarize a task's comment thread, or my unread inbox (cached by content)",
+)
+async def ai_summarize(body: SummarizeIn, ctx: CtxDep, uow: UowDep, rt: RuntimeDep) -> SummaryOut:
+    llm = require_llm(rt)
+    ctx = ctx.with_(via="ai")
+    async with uow.transaction() as s:
+        if body.target == "task_thread":
+            if body.task_id is None:
+                raise ValidationFailed("task_id is required to summarize a thread")
+            r = await summarize.summarize_thread(s, llm, ctx, body.task_id, now=datetime.now(UTC))
+        else:
+            r = await summarize.summarize_inbox(s, llm, ctx, now=datetime.now(UTC))
+        return SummaryOut(
+            summary=r.text,
+            citations=[SummaryCitationOut(**c) for c in r.citations],
+            cached=r.cached,
+            count=r.count,
+            omitted=r.omitted,
+            created_at=r.created_at,
+        )

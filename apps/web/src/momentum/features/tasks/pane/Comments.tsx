@@ -7,6 +7,7 @@ import { Icon } from '@/components/ui/Icon';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/Popover';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { Segmented } from '@/components/ui/Tabs';
+import { SummaryButton } from '@/features/ai';
 import { useMe } from '@/features/auth';
 import { usePeople } from '@/features/people';
 import { useSections } from '@/features/sections';
@@ -64,10 +65,11 @@ export function Comments({ task }: { task: TaskDetail }) {
     section: (id: string) => sections?.find((s) => s.id === id)?.name,
   };
   const entries = feed.data ? buildFeed(feed.data.data, names, filter) : [];
+  const commentCount = feed.data?.data.filter((i) => i.comment).length ?? 0;
 
   return (
     <section aria-label="Comments and activity" className="mt-8">
-      <div className="mb-2 flex items-center gap-3">
+      <div className="mb-2 flex flex-wrap items-center gap-3">
         <h3 className="section-label">Activity</h3>
         <Segmented
           label="Show"
@@ -79,6 +81,9 @@ export function Comments({ task }: { task: TaskDetail }) {
             { value: 'activity', label: 'Changes' },
           ]}
         />
+        {commentCount >= 2 ? (
+          <SummaryButton key={task.id} body={{ target: 'task_thread', task_id: task.id }} label="Summarize" />
+        ) : null}
       </div>
       {feed.isPending ? (
         <Skeleton className="h-12" />

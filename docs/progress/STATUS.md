@@ -4,7 +4,8 @@
 
 ## Current focus
 - **Phase:** 3: AI Layer v1 ("Mo") — **in progress**. Kickoff done (`docs/roadmap/phase-3-kickoff.md`); S3.1.1–S3.3.2 done (E3.1 platform, E3.2 command bar, E3.3 Ask Mo; J7 and J8 pass). Phase 2 is complete (exit criteria met; see below).
-- **Next slice:** S3.4.1 Summarize thread + inbox catch-up (`POST /ai/summarize`, cached by content hash in `ai_summaries`), then S3.4.2–S3.4.6.
+- **Next slice:** S3.4.2 Break into subtasks, then S3.4.3–S3.4.6, S3.5.1, S3.5.2, Phase 3 exit.
+- **Product-owner instruction (2026-09-26):** finish all remaining slices, then one big local test run against the real gateway (100+ questions/actions covering edge cases), then fix from that run.
 - **Scope note (product owner, 2026-09-26):** the customer-operations capabilities (SQQ, pricing, contracts, invoices, pushes to internal systems as tools and assignable agents) will be done later in the product owner's own codebase, **not in this repo**. Finish the roadmap as written.
 - **Branch:** all Phase 3 work is on `claude/clever-hopper-pbv7yr` (ahead of `main`). Continue from that branch.
 - **Standing instruction (product owner, 2026-09-26):** "push it all and finish the remaining slices": continue slice by slice through Phase 3, committing and pushing each.
@@ -22,6 +23,8 @@
   - **Observed once, not fixed (pre-existing):** J1 failed once in three full `make e2e` runs (the third quickly typed task "Order the swag" never appeared; J1 alone and two further full runs passed). No trace kept. Likely keystrokes landing while the draft row re-mounts after Enter. Watch for it; investigate with a trace if it recurs.
   - Verified: `test_ai_chat.py` (12), `askMo.test.tsx` (6), e2e 9/9 (J1–J8 + quick add) on two consecutive runs.
 - **S3.3.2 Contextual entry points (done):** `AskMoButton` in the task pane, project header and bulk bar → a new chat pinned to that task/project/selection (chip + ×), starter questions per context/screen, the pane's open task included in the route screen, and a clear "Mo is turned off" panel when AI is off (a first piece of the exit criterion "AI-unavailable degrades gracefully"). Frontend only; one backend test proves a pinned task/selection reaches the prompt and invisible selected ids are dropped. Mutation checks (pinned screen ignored, no new chat on pin, pane task dropped from the route screen, buttons shown with AI off, context ignored by suggestions) each caught. Verified: `askAbout.test.tsx` (4), `test_ai_chat.py` (13).
+
+- **S3.4.1 Summaries (done):** `POST /ai/summarize` (task thread / inbox), content-hash cache in `ai_summaries`, `[C3]` comment citations, "Summarize" in the task feed and "Catch me up" in the inbox (see phase file). Found by tests: the same `dict(result)` SQLAlchemy pitfall as S3.3.1, and the known "ids expire after a rollback" test trap. Mutation checks (cache bypass, hash ignoring content, deleted comments included, no visibility check, read notifications included, unescaped comment text; UI: button for 1 comment, shown with AI off, invalid label chip) each caught; "a label outside the thread is invalid" first **survived** (no fixture cited a missing label), now covered. Verified: `test_ai_summarize.py` (5), `summaries.test.tsx` (5).
 
 ## Handoff notes (2026-09-26, S3.1.2 → S3.2.2)
 - **S3.2.2 ⌘K natural-language commands (done, J7 passes):** see the phase file's Built note. Backend `ai/loop.py`, `ai/command.py`, `ai/sse.py`, `ai/prefs.py`, `POST /ai/command`, `GET/PUT /ai/prefs`, prompt `command/v1.md`, fixtures `command.yaml`; mock transport gained `turn:` matching and `$last.<path>` arguments (multi-step loops without hard-coded keys). Frontend `lib/sse.ts`, `features/ai/{useMoRuns,intent}.ts`, the Ask Mo panel (runs, activity line, PreviewCard, candidates, auto-applied + Undo), ⌘K "✦ Ask Mo to do this", Edit → ⌘K pre-filled, the auto-apply toggle on `/settings/ai`. New e2e `j7-mo-command.e2e.ts` (journey-scoped: creates its own overdue task through smart quick add).
@@ -292,7 +295,7 @@
 - [x] S3.1.1 LLM gateway + `llm-check` · [x] S3.1.2 Tool registry + sweep (17 tools; `semantic_search` → S3.1.4, `create_status_update` → S3.4.3) · [x] S3.1.3 AI actions (preview → apply → undo) · [x] S3.1.4 Embeddings + hybrid retrieval (+ optional rerank, off) · [x] S3.1.5 Workspace memory + context builders
 - [x] S3.2.1 Smart quick-add (24 local + 6 AI fixture phrases) · [x] S3.2.2 ⌘K natural-language commands (J7 passes)
 - [x] S3.3.1 Ask Mo chat backend + panel (J8 passes) · [x] S3.3.2 Contextual entry points
-- [ ] S3.4.1 Summaries · [ ] S3.4.2 Break into subtasks · [ ] S3.4.3 Draft status update · [ ] S3.4.4 Writing help · [ ] S3.4.5 Plan my day · [ ] S3.4.6 Project from brief
+- [x] S3.4.1 Summaries · [ ] S3.4.2 Break into subtasks · [ ] S3.4.3 Draft status update · [ ] S3.4.4 Writing help · [ ] S3.4.5 Plan my day · [ ] S3.4.6 Project from brief
 - [ ] S3.5.1 Eval harness · [ ] S3.5.2 AI usage and settings (admin)
 - [ ] Phase 3 exit: J7, J8 (mock); `EVALS_LIVE=1 make evals` against a real gateway (product owner); AI-unavailable degrades gracefully; usage page token counts
 

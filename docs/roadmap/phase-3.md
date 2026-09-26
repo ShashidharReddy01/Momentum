@@ -79,6 +79,8 @@
 | S3.4.5 Plan my day | Orders today's tasks considering due, priority, estimates, (calendar in P7); proposes moving items to Today/Later | Proposal applied via my_task_placements | M |
 | S3.4.6 Project from brief | Paste/upload brief → plan preview (sections, tasks, relative dates, roles→members) → create project | Plan fits a requested end date; unknown people become unassigned + note | M |
 
+**S3.4.1 built (2026-09-26):** `ai/summarize.py`, `POST /ai/summarize {target: task_thread|inbox, task_id}` (fast alias; prompts `summarize_thread/v1`, `summarize_inbox/v1`). Threads are sent as labelled comments `[C1]…[Cn]` (newest 60, the rest counted), cited labels map back to the comments (author, date; a label not in the thread is invalid), task keys resolve as the reader. Cached in `ai_summaries` by a hash of prompt version + model + the exact content (comment ids, text, edits; unread notification ids): a repeat is instant and costs nothing; a new, edited or deleted comment makes a new summary; two people get the same cached thread summary. UI: "Summarize" in the task feed (2+ comments), "Catch me up" in the inbox; results in an AI callout with citation chips; nothing to summarize → 422 with a readable message; outage → "Mo is unavailable". Mock fixtures gained `{{$keys}}` (task keys in the prompt).
+
 ## E3.5 Quality and admin
 
 ### S3.5.1: Eval harness

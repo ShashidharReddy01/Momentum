@@ -4,6 +4,7 @@ import { EmptyState } from '@/components/common/States';
 import { IconButton } from '@/components/ui/IconButton';
 import { Icon } from '@/components/ui/Icon';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { SummaryButton } from '@/features/ai';
 import { TaskNavProvider, TaskPane, useTaskNav } from '@/features/tasks';
 import { cn } from '@/lib/cn';
 import { formatRelative } from '@/lib/dates';
@@ -66,9 +67,12 @@ function InboxBody() {
   return (
     <div className="flex h-full min-h-0">
       <div className="min-w-0 flex-1 overflow-auto px-4 md:px-8 py-6">
-        <h1 className="page-title mb-4 flex items-center gap-2">
-          <Icon icon={InboxIcon} size={20} /> Inbox
-        </h1>
+        <div className="mb-4 flex flex-wrap items-center gap-3">
+          <h1 className="page-title flex flex-1 items-center gap-2">
+            <Icon icon={InboxIcon} size={20} /> Inbox
+          </h1>
+          {tab === 'active' ? <SummaryButton body={{ target: 'inbox' }} label="Catch me up" /> : null}
+        </div>
         <div role="tablist" aria-label="Inbox" className="mb-3 flex gap-1 border-b border-hair-soft">
           {(['active', 'archive'] as const).map((t) => (
             <button

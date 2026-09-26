@@ -179,7 +179,7 @@ function AutoApplied({ actionId }: { actionId: string }) {
   );
 }
 
-const INLINE = /(\[T-\d+\]|\[P:[^\]\n]+\]|\*\*[^*\n]+\*\*)/g;
+const INLINE = /(\[T-\d+\]|\[C\d+\]|\[P:[^\]\n]+\]|\*\*[^*\n]+\*\*)/g;
 
 /**
  * Mo's text as a small safe subset of Markdown (paragraphs, `- ` bullets, **bold**), built as
@@ -229,6 +229,24 @@ function inline(line: string, byRef: Map<string, Citation>): ReactNode {
 
 function Cite({ refText, citation }: { refText: string; citation?: Citation }) {
   if (!citation) return <>{refText}</>; // not resolved (yet): plain text while streaming
+  if (citation.type === 'comment') {
+    const when = citation.created_at
+      ? new Date(citation.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+      : '';
+    return citation.valid ? (
+      <span
+        aria-label={`Comment by ${citation.title ?? 'unknown'}${when ? `, ${when}` : ''}`}
+        className="mx-0.5 inline-flex items-center rounded border border-hair-soft bg-surface-2 px-1 text-[12px] text-ink-2"
+      >
+        {citation.title?.split(' ')[0] ?? 'Comment'}
+        {when ? ` · ${when}` : ''}
+      </span>
+    ) : (
+      <span title="Mo cited a comment that isn't in this thread" className="text-muted">
+        {refText}
+      </span>
+    );
+  }
   const shown = citation.type === 'task' ? (citation.key ?? refText) : (citation.title ?? refText);
   if (!citation.valid || !citation.id)
     return (
