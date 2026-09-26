@@ -9,7 +9,8 @@ cases:
     input: "Assign all overdue tasks in Launch Plan to Ana"
     expect:
       tools_include: [search_tasks]
-      proposes: [bulk_update_tasks]
+      # one task really changes, so a single update is as right as a bulk one
+      proposes_any: [bulk_update_tasks, update_task]
       # "Sign vendor contract" is overdue too but already Ana's: no change, so not in the diff
       targets_include: ["Finalize pricing tiers"]
       targets_exclude: ["QA the checkout flow", "Zenith"]

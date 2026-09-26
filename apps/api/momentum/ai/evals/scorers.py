@@ -89,7 +89,7 @@ def _op_args(obs: Observation, tool: str) -> list[dict[str, Any]]:
     return [op.get("args") or {} for op in obs.operations if op.get("tool") == tool]
 
 
-def score(obs: Observation, expect: dict[str, Any], *, today: date) -> list[Check]:
+def score(obs: Observation, expect: dict[str, Any], *, today: date, asked: str = "") -> list[Check]:
     out: list[Check] = []
     add = out.append
     text = obs.text or ""
@@ -132,11 +132,14 @@ def score(obs: Observation, expect: dict[str, Any], *, today: date) -> list[Chec
     for t in expect.get("targets_exclude", []):
         add(Check(f"targets_exclude:{t}", _low(t) not in labels, "in the proposed change"))
     if "clarifies" in expect:
+        # Asking which one, in words and with nothing proposed, is a clarification too.
+        asked_in_words = not obs.operations and "?" in text
+        clarified = obs.clarified or asked_in_words
         add(
             Check(
                 "clarifies",
-                obs.clarified == bool(expect["clarifies"]),
-                f"clarified: {obs.clarified}",
+                clarified == bool(expect["clarifies"]),
+                f"clarified: {obs.clarified}, text: {text[-80:]!r}",
             )
         )
 
@@ -153,7 +156,10 @@ def score(obs: Observation, expect: dict[str, Any], *, today: date) -> list[Chec
         add(Check(f"cites_include:{t}", ok, "not cited"))
     for t in expect.get("mentions_exclude", []):
         in_cites = any(_low(t) in _low(str(c.get("title") or "")) for c in obs.citations)
-        add(Check(f"mentions_exclude:{t}", _low(t) not in lt and not in_cites, "leaked"))
+        # Echoing what the asker typed ("no task called Zenith found") reveals nothing.
+        echoed = _low(t) in _low(asked)
+        in_text = _low(t) in lt and not echoed
+        add(Check(f"mentions_exclude:{t}", not in_text and not in_cites, "leaked"))
     if "grounded" in expect:
         add(
             Check("grounded", obs.grounded == bool(expect["grounded"]), f"grounded: {obs.grounded}")

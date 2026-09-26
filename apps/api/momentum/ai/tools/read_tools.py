@@ -17,6 +17,7 @@ from zoneinfo import ZoneInfo
 
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import ColumnElement, and_, func, or_, select
+from sqlalchemy.orm import aliased
 
 from momentum.ai import retrieval
 from momentum.ai.embeddings import INDEXED
@@ -29,6 +30,7 @@ from momentum.ai.tools.refs import (
     resolve_task,
 )
 from momentum.ai.tools.views import clip, iso, task_brief, task_briefs, user_names
+from momentum.ai.visibility import visible_task_ids
 from momentum.core.activity import Activity
 from momentum.core.ids import task_key
 from momentum.domain.access import visible_projects_clause
@@ -84,6 +86,9 @@ class SearchTasksArgs(BaseModel):
     due_before: date | None = Field(default=None, description="Due on or before this date")
     due_after: date | None = Field(default=None, description="Due on or after this date")
     overdue: bool = Field(default=False, description="Only open tasks due before today")
+    blocked: bool = Field(
+        default=False, description="Only open tasks waiting on an unfinished blocking task"
+    )
     limit: int = Field(default=20, ge=1, le=50)
 
 
@@ -91,7 +96,7 @@ class SearchTasksArgs(BaseModel):
     name="search_tasks",
     description=(
         "Find tasks the user can see with structured filters (text, project, assignee, status, "
-        "due range, overdue). Returns keys like T-123 to use with other tools."
+        "due range, overdue, blocked). Returns keys like T-123 to use with other tools."
     ),
     risk="read",
     scopes=READ,
@@ -129,6 +134,14 @@ async def search_tasks(tc: ToolContext, args: SearchTasksArgs) -> ToolResult:
         stmt = stmt.where(clause)
     if args.overdue:
         stmt = stmt.where(Task.due_on < today_for(ctx))
+    if args.blocked:
+        blocker = aliased(Task)
+        waiting = (
+            select(TaskDependency.task_id)
+            .join(blocker, blocker.id == TaskDependency.depends_on_id)
+            .where(blocker.deleted_at.is_(None), blocker.completed_at.is_(None))
+        )
+        stmt = stmt.where(Task.completed_at.is_(None), Task.id.in_(waiting))
     if args.due_before:
         stmt = stmt.where(Task.due_on <= args.due_before)
     if args.due_after:
@@ -182,7 +195,11 @@ async def get_task(tc: ToolContext, args: GetTaskArgs) -> ToolResult:
             await s.execute(
                 select(Task)
                 .join(TaskDependency, TaskDependency.depends_on_id == Task.id)
-                .where(TaskDependency.task_id == task.id, Task.deleted_at.is_(None))
+                .where(
+                    TaskDependency.task_id == task.id,
+                    Task.deleted_at.is_(None),
+                    Task.id.in_(visible_task_ids(tc.ctx)),  # never name a task the reader can't see
+                )
                 .order_by(Task.number)
             )
         ).scalars()
@@ -521,6 +538,14 @@ async def get_project_activity(tc: ToolContext, args: GetProjectActivityArgs) ->
         fields = sorted(k for k in r.diff if k not in ("position", "parent_position"))
         if fields and r.verb == "task.updated":
             entry["fields"] = fields
+            # A date that moved is the answer to "did anything slip", so say from what to what.
+            moved = {
+                k: {"from": r.diff[k][0], "to": r.diff[k][1]}
+                for k in ("due_on", "start_on", "priority")
+                if k in r.diff and isinstance(r.diff[k], list) and len(r.diff[k]) >= 2
+            }
+            if moved:
+                entry["changes"] = moved
         entries.append(entry)
     return ToolResult.success(
         f"{len(entries)}{'+' if more else ''} change(s) in {project.name} "

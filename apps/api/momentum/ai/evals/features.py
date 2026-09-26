@@ -30,7 +30,9 @@ from momentum.ai.tools.registry import ToolRegistry
 from momentum.core.context import Ctx
 from momentum.core.errors import DomainError
 from momentum.core.settings import Settings
+from momentum.domain.notifications.models import Notification
 from momentum.domain.projects.models import Project
+from momentum.domain.tasks.models import Task
 from momentum.domain.teams.models import Team
 
 FEATURES = (
@@ -187,6 +189,24 @@ async def _run(
     elif feature == "summarize_inbox":
         inbox = await summarize.summarize_inbox(session, llm, ctx, now=now)
         obs.text, obs.citations = inbox.text, inbox.citations
+        unread = (
+            await session.execute(
+                select(Notification, Task.number)
+                .outerjoin(Task, Task.id == Notification.entity_id)
+                .where(
+                    Notification.user_id == ctx.actor.id,
+                    Notification.read_at.is_(None),
+                    Notification.archived_at.is_(None),
+                )
+                .order_by(Notification.created_at.desc())
+            )
+        ).all()
+        # what the judge checks the summary against (the model saw exactly these)
+        source = []
+        for n, num in unread:
+            key = f"[T-{num}] " if num else ""
+            source.append(f"{n.kind.replace('_', ' ')} {key}{n.title}: {n.snippet or ''}")
+        obs.data = {"source": source}
     elif feature == "breakdown":
         b = await break_down(
             session,
@@ -218,6 +238,7 @@ async def _run(
     elif feature == "plan_day":
         p = await plan_day(session, llm, ctx, registry, now=now)
         obs.text, obs.notes = p.rationale, p.notes
+        obs.citations = [c.to_json() for c in await citations.resolve(session, ctx, obs.text)]
         obs.data = {"today": p.today, "later": p.later}
         obs.operations, obs.risk = await _operations(session, p.action_id)
     elif feature == "write":

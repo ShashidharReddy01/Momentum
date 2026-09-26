@@ -105,6 +105,23 @@ describe('AI settings: admin section (S3.5.2)', () => {
     expect(within(table).getByText('3')).toBeInTheDocument();
   });
 
+  it('says cost is not measured (and shows no fake $0) when a model has no price', async () => {
+    await boot('admin', [], {
+      config: { monthly_budget_usd: 10 },
+      usage: {
+        unpriced_models: ['provider/chat-default'],
+        by_feature: [{ feature: 'chat', calls: 3, tokens_in: 100, tokens_out: 50, cost_usd: '0', errors: 0 }],
+      },
+    });
+    const note = await screen.findByRole('status');
+    expect(note).toHaveTextContent("Cost isn't measured: no price is set for provider/chat-default");
+    expect(note).toHaveTextContent("budget can't be enforced");
+    expect(screen.queryByText(/spent this month/)).toBeNull();
+    const table = screen.getByText('By feature').closest('table')!;
+    expect(within(table).getByText('100')).toBeInTheDocument(); // tokens stay exact
+    expect(within(table).getAllByText('—')).toHaveLength(1);
+  });
+
   it('unchecking "Mo is turned on" saves an explicit override', async () => {
     const { user, adminApi } = await boot('admin', []);
     await user.click(await screen.findByRole('checkbox', { name: /Mo is turned on/ }));

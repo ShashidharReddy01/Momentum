@@ -26,6 +26,7 @@ from momentum.ai.context.tokens import safe
 from momentum.ai.llm import LLM
 from momentum.ai.structured import extract
 from momentum.ai.tools.registry import ToolRegistry
+from momentum.ai.visibility import visible_task_ids
 from momentum.core.context import Ctx
 from momentum.core.errors import ValidationFailed
 from momentum.core.ids import task_key
@@ -88,6 +89,21 @@ async def plan_day(
             )
         ).scalars()
     )
+    # what blocks each task, named only when the reader can see the blocker (no title leaks)
+    blockers: dict[uuid.UUID, list[str]] = {}
+    named = await session.execute(
+        select(TaskDependency.task_id, Task.number, Task.title)
+        .join(Task, Task.id == TaskDependency.depends_on_id)
+        .where(
+            TaskDependency.task_id.in_(ids),
+            Task.completed_at.is_(None),
+            Task.deleted_at.is_(None),
+            Task.id.in_(visible_task_ids(ctx)),
+        )
+        .order_by(Task.number)
+    )
+    for task_id, number, title in named.tuples():
+        blockers.setdefault(task_id, []).append(f"[{task_key(number)}] {safe(title)}")
     by_key: dict[str, tuple[Task, str]] = {}
     lines = []
     for t, p in rows[:MAX_LISTED]:
@@ -103,7 +119,9 @@ async def plan_day(
         if t.priority:
             bits.append(f"priority {t.priority}")
         if t.id in blocked:
-            bits.append("blocked")
+            bits.append(
+                f"blocked by {', '.join(blockers[t.id])}" if t.id in blockers else "blocked"
+            )
         lines.append(f"[{key}] {safe(t.title)} ({', '.join(bits)})")
     if len(rows) > MAX_LISTED:
         lines.append(f"(+{len(rows) - MAX_LISTED} more open tasks not shown)")

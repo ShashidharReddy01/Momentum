@@ -749,6 +749,31 @@ async def test_llm_check_only_warns_when_optional_rerank_is_missing() -> None:
     assert by_name["rerank"].status == "fail"
 
 
+async def test_llm_check_warns_when_a_dollar_budget_has_no_prices() -> None:
+    s = gw_settings(llm_max_retries=0, ai_monthly_budget_usd=50)
+    by_name = {r.name: r for r in await run_llm_check(gateway_llm(s, FakeGateway()))}
+    row = by_name["pricing"]
+    assert row.status == "warn"
+    assert "provider/chat-default" in row.detail and "can never trip" in row.detail
+
+    prices = {
+        m: {"in_per_mtok": 3, "out_per_mtok": 15}
+        for m in ("provider/chat-default", "provider/chat-fast", "provider/chat-smart")
+    }
+    prices["provider/embed"] = {"in_per_mtok": 0.1, "out_per_mtok": 0}
+    s = gw_settings(llm_max_retries=0, ai_monthly_budget_usd=50, llm_price_table=json.dumps(prices))
+    by_name = {r.name: r for r in await run_llm_check(gateway_llm(s, FakeGateway()))}
+    assert by_name["pricing"].status == "pass"
+    # with no budget the row still warns (cost would be n/a) but doesn't claim a budget is broken
+    s = gw_settings(llm_max_retries=0)
+    detail = {r.name: r for r in await run_llm_check(gateway_llm(s, FakeGateway()))}[
+        "pricing"
+    ].detail
+    assert "no cost" in detail and "never trip" not in detail
+    assert gateway_llm(gw_settings(), FakeGateway()).unpriced_models()
+    assert build_llm(make_settings()).unpriced_models() == []  # mock mode: nothing is spent
+
+
 def test_llm_check_cli_prints_a_table(monkeypatch: pytest.MonkeyPatch) -> None:
     from typer.testing import CliRunner
 

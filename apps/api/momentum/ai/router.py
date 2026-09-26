@@ -757,6 +757,10 @@ async def put_admin_ai_settings(
     response_model=usage_report.UsageReport,
     summary="AI usage by feature, user and day (admin)",
 )
-async def get_admin_ai_usage(ctx: CtxDep, uow: UowDep, days: int = 30) -> usage_report.UsageReport:
+async def get_admin_ai_usage(
+    ctx: CtxDep, uow: UowDep, rt: RuntimeDep, days: int = 30
+) -> usage_report.UsageReport:
     async with uow.transaction() as s:
-        return await usage_report.get_usage_report(s, ctx, days=days)
+        return await usage_report.get_usage_report(
+            s, ctx, days=days, unpriced_models=rt.llm.unpriced_models() if rt.llm else []
+        )

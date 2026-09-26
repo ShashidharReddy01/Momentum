@@ -20,15 +20,30 @@ export async function titlesIn(page: Page, section: string): Promise<string[]> {
     .evaluateAll((els) => els.map((e) => e.getAttribute('aria-label') ?? ''));
 }
 
+/** Scroll an element into view and return its box once it is attached and has stopped moving.
+ * Rows re-render when the optimistic update reconciles with the server (and on a slow machine
+ * that lands mid-action), so a single scroll + measure can hit a detached or moving element. */
+async function stableBox(loc: Locator) {
+  let last = '';
+  let box: { x: number; y: number; width: number; height: number } | null = null;
+  await expect(async () => {
+    await loc.scrollIntoViewIfNeeded({ timeout: 2_000 });
+    box = await loc.boundingBox();
+    const now = JSON.stringify(box);
+    const steady = box !== null && now === last;
+    last = now;
+    expect(steady).toBe(true);
+  }).toPass({ timeout: 10_000 });
+  return box!;
+}
+
 /** Pointer drag of a row onto the top or bottom half of another row. */
 export async function dragRow(page: Page, from: Locator, to: Locator, where: 'before' | 'after') {
-  await from.scrollIntoViewIfNeeded();
-  const a = (await from.boundingBox())!;
+  const a = await stableBox(from);
   await page.mouse.move(a.x + 60, a.y + a.height / 2);
   await page.mouse.down();
   await page.mouse.move(a.x + 70, a.y + a.height / 2 + 8, { steps: 4 });
-  await to.scrollIntoViewIfNeeded();
-  const b = (await to.boundingBox())!;
+  const b = await stableBox(to);
   await page.mouse.move(b.x + 80, where === 'before' ? b.y + 6 : b.y + b.height - 6, { steps: 12 });
   await page.waitForTimeout(150);
   await page.mouse.up();
@@ -48,13 +63,11 @@ export async function dragOnto(
   to: Locator,
   offset: { x: number; y: number } = { x: 0, y: 0 },
 ) {
-  await from.scrollIntoViewIfNeeded();
-  const a = (await from.boundingBox())!;
+  const a = await stableBox(from);
   await page.mouse.move(a.x + a.width / 2, a.y + a.height / 2);
   await page.mouse.down();
   await page.mouse.move(a.x + a.width / 2 + 10, a.y + a.height / 2 + 8, { steps: 4 });
-  await to.scrollIntoViewIfNeeded();
-  const b = (await to.boundingBox())!;
+  const b = await stableBox(to);
   await page.mouse.move(b.x + b.width / 2 + offset.x, b.y + b.height / 2 + offset.y, { steps: 12 });
   await page.waitForTimeout(150);
   await page.mouse.up();

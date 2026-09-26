@@ -4487,6 +4487,11 @@ export interface components {
              * Format: date-time
              */
             since: string;
+            /**
+             * Unpriced Models
+             * @default []
+             */
+            unpriced_models: string[];
         };
         /** UserInviteIn */
         UserInviteIn: {

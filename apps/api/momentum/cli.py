@@ -188,6 +188,12 @@ def evals(
 
     from momentum.ai.evals import main as evals_main
 
+    # The report carries model text (translations, symbols); a legacy console codepage
+    # (Windows cp1252) must not crash the summary after a paid run.
+    reconfigure = getattr(sys.stdout, "reconfigure", None)
+    if reconfigure is not None:
+        reconfigure(errors="replace")
+
     ok = run_async(
         evals_main.run(
             Settings(),

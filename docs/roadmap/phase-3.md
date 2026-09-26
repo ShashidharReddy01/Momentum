@@ -101,3 +101,35 @@
 **Scope:** admin AI page: enable/disable, auto-apply policy, budget, usage by feature/user/day (from `llm_calls`), memory editor link, model alias display (read-only).
 **Size:** S
 **Built (2026-09-26):** `domain/workspace/service.py` gains `AiConfig`/`EffectiveAi` (stored in the existing `workspaces.settings['ai']` JSONB, the same precedent as per-user `users.prefs['ai']` — no migration): each field is an override (`None` = follow the deployment's env setting), merged by `effective_ai()`. **The environment always bounds the workspace:** an admin can switch AI off where the deployment allows it, or lower the budget, but can never turn AI on where `MOMENTUM_AI_ENABLED=false`. `ai/usage.py`'s `DbUsageLog` gained `check_enabled` (the workspace kill switch, checked in `LLM._preflight` alongside the existing environment check) and reads the budget override before `check_budget`. `ai/loop.py`'s `emit_proposals` now also requires the workspace's `allow_auto_apply` before auto-applying a low-risk action (on top of the user's own preference). `ai/usage_report.py` (`GET /ai/admin/usage`) aggregates `llm_calls` by feature/user/day plus month-to-date spend; `GET`/`PUT /ai/admin/settings` (workspace admins only, enforced in the service layer per CLAUDE.md §3, not just the router). Frontend: an admin-only section on the existing `/settings/ai` page (`AdminAiSection`) — enable/disable, budget, auto-apply policy, model aliases (read-only), and usage tables by feature/person/day. Mutation-style checks: env bounding the override each direction, undo restoring the previous config, workspace `enabled=false` blocking a call even with the environment on, budget override used instead of the environment default, workspace `allow_auto_apply=false` blocking auto-apply despite the user's own preference on, usage aggregation grouping/errors, non-admin refused on every admin read/write (service-level, not just the router). Verified: `test_ai_admin.py` (10), `aiSettings.test.tsx` (+5 for the admin section).
+
+
+---
+
+## Phase 3 exit (2026-09-26 / 27)
+
+**Exit criteria: met.** `EVALS_LIVE=1 make evals` against the real gateway (Portkey, Bedrock Sonnet 4 for `fast`/`default`/`smart`, Cohere embed v3) passes: **141/141 cases, every feature above its threshold** (final run: ~13 min, ~1.4 M tokens). J1-J8 and quick add pass in a real browser (9/9). Backend 455/455 (+ ruff, mypy strict, import-linter), web 287/287 (+ tsc, eslint, prettier). AI-off degrades gracefully (S3.3.2 and per-feature tests). Token counts are exact (`llm_calls`).
+
+**Honest limits.** That is **one clean full pass on the final code**, not several in a row; the runs before it each had 1-3 failures that led to a fix (below). Live results vary run to run (temperature and judge), so expect an occasional single-case miss; the 10+ cases per feature exist so one miss doesn't fail a 90% threshold. **Dollar cost is still not measured** (empty price table, see the config note). Token usage was not cross-checked against the Portkey dashboard.
+
+### What the live runs found (9 full runs)
+
+*Product gaps, fixed with tests:*
+1. **"Which tasks are blocked?"** could not be answered from a list. Task briefs now carry open blockers (`blocked_by`) and `search_tasks` has a `blocked` filter (additive schema change).
+2. **"Did anything slip?"** could not be answered: activity said `due_on` changed but not from what to what. Entries now carry `changes: {due_on|start_on|priority: {from, to}}`.
+3. **A one-comment thread** was summarized as "no real discussion" instead of the decision. Prompt fixed.
+4. **Inbox summaries** said "new comment on T-32" without saying what it said. Prompt now requires the content.
+5. **Status drafts invented judgments** ("completed 12 days ahead of schedule", "good progress"); the prompt now bans comparisons and judgments not in the facts.
+6. **Plan my day** cited keys bare (`T-45`), which the UI never links; the prompt now requires brackets. It also told the model a task was blocked but not by what: the plan input now names the blocker (only when the reader can see it).
+7. **A privacy gap, found by mutation-testing that change:** `get_task` named blockers in private projects the reader can't see. Both `get_task` and the new brief `blocked_by` now count an invisible blocker ("a task you can't see") and never name it.
+8. **The budget could never trip** without a price table (unpriced models cost 0). Now: `llm-check` has a `pricing` row that warns, startup logs `budget_unpriced`, and the admin usage page says "Cost isn't measured" with "—" in cost cells instead of a fake $0. The setting itself is unchanged (see STATUS: needs the price table).
+
+*Harness and case faults (the product was right), fixed:*
+- The judge saw no text for breakdown/brief (output is a previewed action), no plan end date, no plan-day citations, and not the source material (inbox notifications, status facts) it was asked to check claims against. It now sees all of these.
+- Leak check flagged words the asker typed; `clarifies` accepted only the structured path; rubrics asked for what the feature cannot see (the inbox has only comment notifications, no assignments; ownership of tasks); several literal-phrase and unfounded expectations.
+- **Small samples:** 4-8 cases per feature meant one failure sank a 90% threshold, and the regression check compared different case sets. Added 23 cases (every feature now has 10+; total 141), and the regression check now compares only the cases both runs have. Thresholds are unchanged.
+- **Outages counted as quality failures:** a network drop mid-run failed 21 cases. A case lost to `ai_unavailable` is now left out of the rate, the feature and run are `INCOMPLETE` (exit 1, rerun), and incomplete or partial (`--case`/`--feature`) reports are never the regression baseline.
+- `momentum evals` crashed after the run on Windows (`Δ` in a cp1252 console); stdout now tolerates it. Report cost prints `n/a` when unpriced.
+
+*E2E on Windows, found and fixed:* Playwright launched `serve.sh` through cmd.exe (now `bash ...`); `serve.sh` inherited `MOMENTUM_LLM_MODE=gateway` from `apps/api/.env`, so J7/J8 hit the real gateway (now pinned to `mock`); J1 had been broken since S3.4.6 (the Create menu gained "Project from a brief", making the name `Project` ambiguous); J3/J4 raced the list's loading skeleton and re-rendering rows (drag helpers now wait for a stable element); J1's Undo click raced stacked toasts. **Run them here with** `MOMENTUM_E2E_CHROMIUM` pointing at an installed Chrome (Playwright's bundled Chromium isn't installed).
+
+*Process notes:* one incident: Docker Desktop stopped mid-session, which killed the database and the running shell (a run reported a failure that was the outage, not the code); restarting `compose-postgres-1` fixed it, data intact. A test I wrote used the machine's local date against the actor's timezone and failed after midnight; fixed (the Phase 1 retro rule again).

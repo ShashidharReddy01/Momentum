@@ -162,3 +162,33 @@ async def test_the_plan_goes_first_in_today(uow: UnitOfWork, world: World) -> No
     out = await call(uow, world.ravi, "plan_my_day", {"today": [key(world.copy)]}, mode="apply")
     assert out.ok
     assert (await buckets(uow, world.ravi))["today"] == ["Draft pricing copy", "Draft pricing FAQ"]
+
+
+async def test_blocked_tasks_name_their_visible_blockers_only(
+    uow: UnitOfWork, world: World, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The plan input says what a blocked task waits on (so the rationale can), but never names
+    a blocker the reader can't see (a task in a private project)."""
+    from momentum.ai import plan_day as module
+
+    seen: list[str] = []
+
+    async def fake_extract(*args: object, user: str, schema: type, **kwargs: object) -> object:  # type: ignore[type-arg]
+        seen.append(user)
+        return schema(today=[], later=[], rationale="x")
+
+    monkeypatch.setattr(module, "extract", fake_extract)
+    await assign_to_ravi(uow, world, world.copy.id, world.faq.id)
+    async with uow.transaction() as s:
+        await tasks.add_dependency(s, world.ravi, world.copy.id, world.faq.id)
+    await plan(uow, world.ravi)
+    copy_line = next(x for x in seen[-1].splitlines() if x.startswith(f"[{key(world.copy)}]"))
+    assert f"blocked by [{key(world.faq)}] Draft pricing FAQ" in copy_line
+
+    async with uow.transaction() as s:  # now it waits only on a task Ravi can't see
+        await tasks.remove_dependency(s, world.ravi, world.copy.id, world.faq.id)
+        await tasks.add_dependency(s, world.priya, world.copy.id, world.hidden.id)
+    await plan(uow, world.ravi)
+    copy_line = next(x for x in seen[-1].splitlines() if x.startswith(f"[{key(world.copy)}]"))
+    assert "blocked" in copy_line and "Draft pricing secret" not in copy_line
+    assert key(world.hidden) not in copy_line

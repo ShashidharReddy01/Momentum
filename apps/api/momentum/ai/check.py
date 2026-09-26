@@ -237,6 +237,20 @@ async def run_llm_check(llm: LLM) -> list[CheckResult]:
             await _timed(f"embeddings ({input_type})", functools.partial(embed, input_type))
         )
 
+    async def pricing() -> tuple[Status, str]:
+        unpriced = llm.unpriced_models()
+        if not unpriced:
+            return "pass", "every configured model has a price (or this is mock mode)"
+        budget = llm.settings.ai_monthly_budget_usd
+        effect = (
+            f"the ${budget:g} monthly budget can never trip and cost shows as n/a"
+            if budget > 0
+            else "usage will show tokens but no cost"
+        )
+        return "warn", f"no MOMENTUM_LLM_PRICE_TABLE entry for {', '.join(unpriced)}: {effect}"
+
+    results.append(await _timed("pricing", pricing))
+
     async def rerank() -> tuple[Status, str]:
         order = await llm.rerank(
             RERANK_QUERY, RERANK_DOCS, top_n=len(RERANK_DOCS), feature=FEATURE, ctx=ctx

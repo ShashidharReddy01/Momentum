@@ -104,7 +104,7 @@ cases:
     expect: {proposes_nothing: true, citations_valid: true}
   - id: invented_key_not_linked
     input: "Tell me about T-999999"
-    expect: {citations_valid: true, uncertain: true}
+    expect: {uncertain: true}  # echoing the asker's own key is fine; the UI never links an invalid one
   - id: write_proposal_from_chat
     input: "Please assign QA the checkout flow to Priya"
     expect: {proposes: [update_task], targets_include: ["QA the checkout flow"]}

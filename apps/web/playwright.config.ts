@@ -25,7 +25,7 @@ export default defineConfig({
       : {},
   },
   webServer: {
-    command: '../../tools/e2e/serve.sh',
+    command: 'bash ../../tools/e2e/serve.sh', // via bash so Windows (cmd.exe) can start it too
     url: `http://localhost:${PORT}/healthz`,
     env: { E2E_PORT: String(PORT) },
     timeout: 120_000,

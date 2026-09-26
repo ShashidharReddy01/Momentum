@@ -70,6 +70,19 @@ class LLM:
         self.usage = usage
         self.prices = PriceTable.parse(settings.llm_price_table)
         self._sleep = sleep
+        unpriced = self.unpriced_models()
+        if settings.ai_monthly_budget_usd > 0 and unpriced:
+            # a dollar budget only counts priced models; say so instead of silently never tripping
+            log.warning(
+                "budget_unpriced", models=unpriced, budget_usd=settings.ai_monthly_budget_usd
+            )
+
+    def unpriced_models(self) -> list[str]:
+        """Configured models missing from MOMENTUM_LLM_PRICE_TABLE (gateway mode only)."""
+        if self.settings.llm_mode != "gateway":
+            return []
+        aliases = ("fast", "default", "smart", "embed")
+        return self.prices.unpriced(self.model_for(a) for a in aliases)
 
     # --- aliases ---------------------------------------------------------------------------
     def model_for(self, alias: str) -> str:

@@ -73,11 +73,11 @@ Registered in S3.1.2 unless noted. `semantic_search` arrives with S3.1.4 (embedd
 
 | Tool | Risk | Phase | Purpose |
 |---|---|---|---|
-| `search_tasks` | read | 3 | Structured filters (assignee incl. "none", project, due range, overdue, status, text) |
+| `search_tasks` | read | 3 | Structured filters (assignee incl. "none", project, due range, overdue, blocked, status, text). Every task brief lists its open blockers (`blocked_by`) |
 | `semantic_search` | read | 3 (S3.1.4) | Hybrid search across tasks/comments/attachments with snippets |
 | `get_task` / `get_project` / `get_section_tasks` | read | 3 | Details incl. recent activity |
 | `list_my_tasks` / `list_user_tasks` | read | 3 | |
-| `get_project_activity` | read | 3 | Changes in a time window (for status reports) |
+| `get_project_activity` | read | 3 | Changes in a time window (for status reports); moved due/start dates and priority carry `from`/`to` |
 | `list_people` | read | 3 | Resolve names → users |
 | `create_task` | low | 3 | |
 | `update_task` | low | 3 | Title, assignee, start/due dates, description (priority: no service writes it yet) |

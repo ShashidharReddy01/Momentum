@@ -14,7 +14,7 @@ test('J1: from an empty team to done tasks, with undo', async ({ page }) => {
 
   // create a project in it
   await page.getByRole('button', { name: 'Create' }).click();
-  await page.getByRole('menuitem', { name: 'Project' }).click();
+  await page.getByRole('menuitem', { name: 'Project', exact: true }).click();
   const dialog = page.getByRole('dialog');
   await dialog.getByLabel('Name').fill('Launch Checklist');
   await dialog.getByLabel('Team').selectOption({ label: 'E2E Journeys' });
@@ -49,11 +49,14 @@ test('J1: from an empty team to done tasks, with undo', async ({ page }) => {
   await row(page, 'Draft the announcement').getByRole('checkbox').click();
   await expect(page.getByText('Task completed')).toBeVisible();
   await settled(page);
+  // Earlier toasts (assigned, due date) can still be stacked and animating over this one on a slow
+  // machine, so pointer hit-testing on the toast is unreliable; the journey is about Undo working,
+  // so fire the button's own click instead of aiming a mouse at the moving stack.
   await page
     .locator('[data-sonner-toast]')
     .filter({ hasText: 'Task completed' })
     .getByRole('button', { name: 'Undo' })
-    .click();
+    .dispatchEvent('click');
   await expect(row(page, 'Draft the announcement').getByRole('checkbox')).not.toBeChecked();
 
   // it all persisted

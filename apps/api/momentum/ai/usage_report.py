@@ -50,6 +50,9 @@ class UsageReport(BaseModel):
     since: datetime
     month_spend_usd: Decimal
     monthly_budget_usd: float  # 0 = unlimited; the effective value (workspace override or env)
+    # models with no price configured: their cost is unknown (shown as 0), so a dollar budget
+    # cannot count them; token counts are exact either way
+    unpriced_models: list[str] = []
     by_feature: list[UsageByFeature]
     by_user: list[UsageByUser]
     by_day: list[UsageByDay]
@@ -65,7 +68,9 @@ def _totals(row: object) -> UsageTotals:
     )
 
 
-async def get_usage_report(session: AsyncSession, ctx: Ctx, *, days: int = 30) -> UsageReport:
+async def get_usage_report(
+    session: AsyncSession, ctx: Ctx, *, days: int = 30, unpriced_models: list[str] | None = None
+) -> UsageReport:
     require(ctx, Action.WORKSPACE_ADMIN)
     days = max(1, min(days, MAX_DAYS))
     since = datetime.now(UTC) - timedelta(days=days)
@@ -108,6 +113,7 @@ async def get_usage_report(session: AsyncSession, ctx: Ctx, *, days: int = 30) -
         since=since,
         month_spend_usd=Decimal(month_spend or 0),
         monthly_budget_usd=eff.monthly_budget_usd,
+        unpriced_models=unpriced_models or [],
         by_feature=[
             UsageByFeature(feature=r.feature, **_totals(r).model_dump()) for r in by_feature_rows
         ],

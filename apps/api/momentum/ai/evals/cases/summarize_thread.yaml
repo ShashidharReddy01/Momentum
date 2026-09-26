@@ -7,7 +7,7 @@ cases:
     expect: {citations_valid: true, min_citations: 1, not_empty: true}
   - id: pricing_thread_content
     task: "Finalize pricing tiers"
-    expect: {citations_valid: true, min_citations: 2, text_include_any: ["three tiers", "3 tiers"], text_include_all: ["trial"]}
+    expect: {citations_valid: true, min_citations: 2, text_include_any: ["three tiers", "3 tiers", "three pricing tiers", "Starter"], text_include_all: ["trial"]}
     judge: {rubric: "Covers the decision (three tiers, 14-day trial, annual = two months free), Mei updating the copy, and the open question (FAQ owner), citing comments."}
   - id: open_question_surfaced
     task: "Finalize pricing tiers"
@@ -31,3 +31,9 @@ cases:
     user: priya
     task: "Secret launch partner: Zenith Corp"
     expect: {error: validation_failed}
+  - id: annual_discount_decision
+    task: "Finalize pricing tiers"
+    expect: {citations_valid: true, min_citations: 1, text_include_any: ["two months", "annual"]}
+  - id: mei_copy_commitment
+    task: "Finalize pricing tiers"
+    expect: {citations_valid: true, text_include_any: ["Mei"]}

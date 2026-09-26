@@ -177,6 +177,7 @@ export function aiAdminHandlers(
     since: '2026-08-27T00:00:00Z',
     month_spend_usd: '0.00',
     monthly_budget_usd: 0,
+    unpriced_models: [],
     by_feature: [],
     by_user: [],
     by_day: [],

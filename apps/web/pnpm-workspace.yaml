@@ -4,5 +4,5 @@ minimumReleaseAge: 1440
 
 # Install scripts we deliberately don't run (newer pnpm stops on unreviewed ones).
 # msw: its postinstall only copies a browser service worker, which we don't use.
-ignoredBuiltDependencies:
-  - msw
+allowBuilds:
+  msw: false

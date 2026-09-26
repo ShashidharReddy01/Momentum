@@ -9,6 +9,7 @@ token counts, which are exact.
 from __future__ import annotations
 
 import json
+from collections.abc import Iterable
 from dataclasses import dataclass
 from decimal import Decimal
 
@@ -45,6 +46,10 @@ class PriceTable:
             except ArithmeticError as e:
                 raise ValueError(f"MOMENTUM_LLM_PRICE_TABLE[{model!r}] has a bad price") from e
         return cls(prices)
+
+    def unpriced(self, models: Iterable[str]) -> list[str]:
+        """The models with no entry: their calls cost 0, so dollar budgets can't count them."""
+        return sorted({m for m in models if m not in self._prices})
 
     def cost(self, model: str, tokens_in: int, tokens_out: int) -> Decimal:
         price = self._prices.get(model)

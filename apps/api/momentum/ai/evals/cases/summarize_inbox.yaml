@@ -8,11 +8,33 @@ cases:
   - id: ana_catch_up_live
     user: ana
     expect: {citations_valid: true, cites_include: ["Sign vendor contract"]}
-    judge: {rubric: "Leads with what needs Ana (her assignments, the overdue vendor contract) and groups the rest; nothing invented."}
+    judge: {rubric: "Says what the unread comments on the vendor contract are about, citing the task, and groups the rest; states nothing the notifications do not (no invented assignments, deadlines or statuses)."}
   - id: mei_catch_up
     user: mei
     expect: {citations_valid: true, min_citations: 1, mentions_exclude: ["Zenith"]}
   - id: nobody_unread
     mock: true
     user: noor
+    expect: {error: validation_failed}
+  - id: ravi_catch_up
+    user: ravi
+    expect: {citations_valid: true, min_citations: 1, mentions_exclude: ["Zenith"]}
+  - id: priya_catch_up
+    user: priya
+    expect: {citations_valid: true, min_citations: 1}
+  - id: ravi_groups_by_task
+    user: ravi
+    expect: {citations_valid: true, min_citations: 1}
+    judge: {rubric: "Groups comments on the same task into one point instead of one line per notification, and cites the tasks."}
+  - id: ana_no_invented_deadlines
+    user: ana
+    expect: {citations_valid: true}
+    judge: {rubric: "States only what the comments say; does not claim assignments, due dates or statuses the notifications don't mention."}
+  - id: lena_nobody_unread
+    mock: true
+    user: lena
+    expect: {error: validation_failed}
+  - id: tom_nobody_unread
+    mock: true
+    user: tom
     expect: {error: validation_failed}

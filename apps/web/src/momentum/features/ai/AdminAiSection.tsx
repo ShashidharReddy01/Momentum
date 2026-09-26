@@ -25,6 +25,7 @@ export function AdminAiSection() {
   }
   if (!settings.data) return null;
   const { config, effective, models } = settings.data;
+  const unpriced = (usage.data?.unpriced_models.length ?? 0) > 0;
   const patch = (next: Partial<AiConfig>) => save.mutate({ ...config, ...next });
 
   return (
@@ -107,19 +108,38 @@ export function AdminAiSection() {
           <Skeleton className="mt-3 h-20 w-full" />
         ) : usage.data ? (
           <>
-            <p className="mt-1 text-sm text-muted">
-              {money(usage.data.month_spend_usd)} spent this month
-              {effective.monthly_budget_usd > 0 ? ` of a ${money(effective.monthly_budget_usd)} budget` : ''}.
-            </p>
+            {unpriced ? (
+              <p className="mt-1 text-sm text-muted" role="status">
+                Cost isn&apos;t measured: no price is set for {usage.data.unpriced_models.join(', ')}. Token
+                counts are exact.
+                {effective.monthly_budget_usd > 0
+                  ? ` The ${money(effective.monthly_budget_usd)} budget can't be enforced until prices are set.`
+                  : ''}
+              </p>
+            ) : (
+              <p className="mt-1 text-sm text-muted">
+                {money(usage.data.month_spend_usd)} spent this month
+                {effective.monthly_budget_usd > 0
+                  ? ` of a ${money(effective.monthly_budget_usd)} budget`
+                  : ''}
+                .
+              </p>
+            )}
             <UsageTable
               caption="By feature"
+              costKnown={!unpriced}
               rows={usage.data.by_feature.map((r) => ({ label: r.feature, ...r }))}
             />
             <UsageTable
               caption="By person"
+              costKnown={!unpriced}
               rows={usage.data.by_user.map((r) => ({ label: r.user_name ?? 'Agent', ...r }))}
             />
-            <UsageTable caption="By day" rows={usage.data.by_day.map((r) => ({ label: r.day, ...r }))} />
+            <UsageTable
+              caption="By day"
+              costKnown={!unpriced}
+              rows={usage.data.by_day.map((r) => ({ label: r.day, ...r }))}
+            />
           </>
         ) : null}
       </section>
@@ -130,8 +150,10 @@ export function AdminAiSection() {
 function UsageTable({
   caption,
   rows,
+  costKnown,
 }: {
   caption: string;
+  costKnown: boolean;
   rows: {
     label: string;
     calls: number;
@@ -162,7 +184,7 @@ function UsageTable({
             <td className="py-2 pr-3">{r.calls}</td>
             <td className="py-2 pr-3">{r.tokens_in}</td>
             <td className="py-2 pr-3">{r.tokens_out}</td>
-            <td className="py-2 pr-3">{money(r.cost_usd)}</td>
+            <td className="py-2 pr-3">{costKnown ? money(r.cost_usd) : '—'}</td>
             <td className="py-2">{r.errors}</td>
           </tr>
         ))}

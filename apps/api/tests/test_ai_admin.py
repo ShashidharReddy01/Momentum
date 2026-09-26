@@ -222,6 +222,10 @@ async def test_usage_report_aggregates_by_feature_user_and_day(
     assert by_user[world.ravi.actor.id].calls == 2
     assert by_user[world.ana.actor.id].calls == 1
     assert len(report.by_day) == 2  # today and yesterday
+    assert report.unpriced_models == []
+    async with uow.transaction() as s:
+        report = await get_usage_report(s, admin, days=30, unpriced_models=["some/model"])
+    assert report.unpriced_models == ["some/model"]  # cost is unknown; the page says so
 
 
 async def test_usage_report_requires_admin(uow: UnitOfWork, world: World) -> None:

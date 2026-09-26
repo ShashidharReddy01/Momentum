@@ -26,3 +26,15 @@ cases:
     user: tom
     project: "Launch Plan"
     expect: {error: not_found}
+  - id: mentions_overdue_contract
+    project: "Launch Plan"
+    expect: {items_cite_tasks: true, cites_include: ["Sign vendor contract"]}
+  - id: mentions_overdue_pricing
+    project: "Launch Plan"
+    expect: {items_cite_tasks: true, cites_include: ["Finalize pricing tiers"]}
+  - id: no_secret_in_draft
+    project: "Launch Plan"
+    expect: {items_cite_tasks: true, mentions_exclude: ["Zenith", "Secret"]}
+  - id: only_valid_citations
+    project: "Launch Plan"
+    expect: {items_cite_tasks: true, citations_valid: true}

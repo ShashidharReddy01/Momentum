@@ -6,6 +6,7 @@ test('J3: drag to reorder within and across sections, persisted', async ({ page 
   await login(page);
   await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Website Revamp' }).click();
   await expect(page.getByRole('button', { name: /^Project name: Website Revamp/ })).toBeVisible();
+  await expect(page.locator('[data-task-id]').first()).toBeVisible(); // wait for the data, not the skeleton
   const backlog = await titlesIn(page, 'Backlog');
   const progress = await titlesIn(page, 'In progress');
   expect(backlog.length).toBeGreaterThanOrEqual(3);

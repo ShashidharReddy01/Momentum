@@ -14,11 +14,12 @@ from typing import Any
 from sqlalchemy import select
 
 from momentum.ai.tools.base import ToolContext
+from momentum.ai.visibility import visible_task_ids
 from momentum.core.ids import task_key
 from momentum.domain.access import visible_projects_clause
 from momentum.domain.projects.models import Project
 from momentum.domain.sections.models import Section
-from momentum.domain.tasks.models import Task, TaskProject
+from momentum.domain.tasks.models import Task, TaskDependency, TaskProject
 from momentum.domain.users.models import User
 
 TEXT_LIMIT = 1500
@@ -68,6 +69,27 @@ async def task_briefs(tc: ToolContext, tasks: list[Task]) -> list[dict[str, Any]
     for task_id, pname, sname in placed:
         where.setdefault(task_id, (pname, sname))
     names = await user_names(tc, {t.assignee_id for t in tasks})
+    # Open blockers, so "which tasks are blocked" is answerable from any list.
+    blockers: dict[uuid.UUID, list[str]] = {}
+    blocker_rows = await s.execute(
+        select(
+            TaskDependency.task_id,
+            Task.number,
+            Task.title,
+            Task.id.in_(visible_task_ids(tc.ctx)),
+        )
+        .join(Task, Task.id == TaskDependency.depends_on_id)
+        .where(
+            TaskDependency.task_id.in_(ids),
+            Task.deleted_at.is_(None),
+            Task.completed_at.is_(None),
+        )
+        .order_by(Task.number)
+    )
+    for task_id, number, title, can_see in blocker_rows.all():
+        # a blocker the reader can't see is counted, never named
+        label = f"{task_key(number)} {title}" if can_see else "a task you can't see"
+        blockers.setdefault(task_id, []).append(label)
     out: list[dict[str, Any]] = []
     for t in tasks:
         b: dict[str, Any] = {
@@ -90,6 +112,8 @@ async def task_briefs(tc: ToolContext, tasks: list[Task]) -> list[dict[str, Any]
             b["priority"] = t.priority
         if t.id in where:
             b["project"], b["section"] = where[t.id]
+        if t.id in blockers:
+            b["blocked_by"] = blockers[t.id]
         parent = parent_of.get(t.parent_id) if t.parent_id else None
         if parent is not None:
             b["parent"] = f"{task_key(parent.number)} {parent.title}"

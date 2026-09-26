@@ -229,3 +229,96 @@ def test_eval_database_is_always_a_throwaway() -> None:
     )
     with pytest.raises(SystemExit):
         reset_database("postgresql+psycopg://u:p@db:5432/momentum")  # refuses before connecting
+
+
+def test_leak_check_ignores_words_the_asker_typed_but_not_citations() -> None:
+    said = Observation(text="I found no task about Zenith Corp.")
+    expect = {"mentions_exclude": ["Zenith"]}
+    assert names(score(said, expect, today=TODAY, asked="Mark the Zenith task done"))[
+        "mentions_exclude:Zenith"
+    ]
+    # the same words in an answer to a question that never mentioned them are a leak
+    assert not names(score(said, expect, today=TODAY, asked="What is blocked?"))[
+        "mentions_exclude:Zenith"
+    ]
+    cited = Observation(text="ok", citations=[{"title": "Zenith Corp", "valid": True}])
+    assert not names(score(cited, expect, today=TODAY, asked="Zenith"))["mentions_exclude:Zenith"]
+
+
+def test_clarifies_accepts_a_question_in_words_only_when_nothing_is_proposed() -> None:
+    words = Observation(text="Which pricing task do you mean?")
+    assert names(score(words, {"clarifies": True}, today=TODAY))["clarifies"]
+    listed = Observation(text="Which do you mean?\n- [T-1] A\n- [T-2] B")  # question first
+    assert names(score(listed, {"clarifies": True}, today=TODAY))["clarifies"]
+    acted = Observation(text="Which one?", operations=[{"tool": "update_task"}])
+    assert not names(score(acted, {"clarifies": True}, today=TODAY))["clarifies"]
+    assert not names(score(Observation(text="Done."), {"clarifies": True}, today=TODAY))[
+        "clarifies"
+    ]
+
+
+def _case(id: str, passed: bool, error: str | None = None) -> runner.CaseResult:
+    return runner.CaseResult(feature="f", id=id, passed=passed, checks=[], error=error)
+
+
+def test_an_outage_is_not_a_quality_failure_and_makes_the_run_incomplete() -> None:
+    results = [
+        _case("a", True),
+        _case("b", True),
+        _case("c", False, "ai_unavailable:connection"),
+    ]
+    summary = runner.summarize("f", results, 0.9, None)
+    assert summary.rate == 1.0 and summary.unavailable == 1  # left out of the rate
+    assert not summary.ok  # but never a clean pass
+    report = runner.Report(mode="live", started_at="", models={}, prompts={}, features=[summary])
+    assert report.incomplete and "INCOMPLETE" in render(report)
+    # a case that failed for another reason still counts against the rate
+    assert (
+        runner.summarize("f", [_case("a", True), _case("b", False, "boom")], 0.5, None).rate == 0.5
+    )
+    # a case that expected the outage and got it passed, so it is not "lost"
+    assert not _case("x", True, "ai_unavailable:connection").unavailable
+
+
+def test_partial_and_incomplete_reports_are_never_the_baseline(tmp_path: Path) -> None:
+    def write(name: str, *, partial: bool = False, unavailable: int = 0, rate: float = 1.0) -> None:
+        feature = runner.FeatureSummary(
+            feature="f",
+            cases=4,
+            passed=4,
+            rate=rate,
+            threshold=0.9,
+            ok=True,
+            unavailable=unavailable,
+        )
+        report = runner.Report(
+            mode="live", started_at=name, models={}, prompts={}, features=[feature], partial=partial
+        )
+        (tmp_path / f"live-{name}.json").write_text(
+            __import__("json").dumps(runner.asdict(report)), encoding="utf-8"
+        )
+
+    write("1-full", rate=0.8)
+    write("2-outage", unavailable=3)
+    write("3-partial", partial=True)
+    baseline = latest(tmp_path, "live")
+    assert baseline is not None and baseline.started_at == "1-full"
+    assert latest(tmp_path / "missing", "live") is None
+
+
+def test_regression_compares_only_the_cases_both_runs_have() -> None:
+    def prev(passed: dict[str, bool]) -> runner.Report:
+        cases = [_case(i, ok) for i, ok in passed.items()]
+        feature = runner.summarize("f", cases, 0.5, None)
+        return runner.Report(
+            mode="live", started_at="", models={}, prompts={}, features=[feature], cases=cases
+        )
+
+    before = prev({"a": True, "b": True})  # 100% on two cases
+    # ten cases now, two new ones fail: the shared cases still pass, so no regression
+    now = [_case(i, True) for i in "abcdefgh"] + [_case("x", False), _case("y", False)]
+    summary = runner.summarize("f", now, 0.5, before)
+    assert summary.rate == 0.8 and summary.regression == 0.0 and summary.ok
+    # a shared case that used to pass and now fails is one
+    worse = runner.summarize("f", [_case("a", True), _case("b", False)], 0.1, before)
+    assert worse.regression == 50.0 and not worse.ok

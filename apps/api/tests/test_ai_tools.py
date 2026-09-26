@@ -381,6 +381,50 @@ async def test_project_activity_window(uow: UnitOfWork, world: World) -> None:
     assert out.result.error["code"] == "invalid_arguments"  # type: ignore[index]
 
 
+async def test_lists_show_open_blockers_and_date_moves(uow: UnitOfWork, world: World) -> None:
+    today = date.today()
+    async with uow.transaction() as s:
+        await tasks.add_dependency(s, world.ravi, world.copy.id, world.faq.id)
+        await tasks.update_task(s, world.ravi, world.copy.id, {"due_on": today})
+        await tasks.update_task(s, world.ravi, world.copy.id, {"due_on": today + timedelta(days=5)})
+    out = await call(uow, world.ravi, "search_tasks", {"text": "pricing"})
+    by_key = {t["key"]: t for t in out.result.data["tasks"]}
+    assert by_key[key(world.copy)]["blocked_by"] == [f"{key(world.faq)} Draft pricing FAQ"]
+    assert "blocked_by" not in by_key[key(world.faq)]
+
+    out = await call(
+        uow,
+        world.ravi,
+        "get_project_activity",
+        # a day back: "today" differs between this machine and the actor's timezone near midnight
+        {"project": "AI Tools Lab", "since": (today - timedelta(days=1)).isoformat()},
+    )
+    moves = [e["changes"]["due_on"] for e in out.result.data["entries"] if "changes" in e]
+    assert {"from": today.isoformat(), "to": (today + timedelta(days=5)).isoformat()} in moves
+
+    out = await call(uow, world.ravi, "search_tasks", {"blocked": True})
+    assert [t["key"] for t in out.result.data["tasks"]] == [key(world.copy)]
+
+    async with uow.transaction() as s:  # a blocker in a private project is counted, never named
+        await tasks.add_dependency(s, world.priya, world.copy.id, world.hidden.id)
+    out = await call(uow, world.ravi, "search_tasks", {"text": "pricing"})
+    by_key = {t["key"]: t for t in out.result.data["tasks"]}
+    assert "a task you can't see" in by_key[key(world.copy)]["blocked_by"]
+    assert "Draft pricing secret" not in str(out.result.data)
+    got = await call(uow, world.ravi, "get_task", {"task": key(world.copy)})
+    assert "Draft pricing secret" not in str(got.result.data)
+    async with uow.transaction() as s:
+        await tasks.remove_dependency(s, world.priya, world.copy.id, world.hidden.id)
+
+    async with uow.transaction() as s:  # a finished blocker no longer blocks
+        await tasks.set_completed(s, world.ana, world.faq.id, True)
+    out = await call(uow, world.ravi, "search_tasks", {"blocked": True})
+    assert out.result.data["tasks"] == []
+    out = await call(uow, world.ravi, "search_tasks", {"text": "pricing"})
+    by_key = {t["key"]: t for t in out.result.data["tasks"]}
+    assert "blocked_by" not in by_key[key(world.copy)]
+
+
 async def test_list_people(uow: UnitOfWork, world: World) -> None:
     out = await call(uow, world.ravi, "list_people", {"query": "an"})
     names = {p["name"] for p in out.result.data["people"]}

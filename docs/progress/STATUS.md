@@ -3,8 +3,8 @@
 > Updated by the AI at the end of every slice and every session. The human confirms "done" after trying the slice.
 
 ## Current focus
-- **Phase:** 3: AI Layer v1 ("Mo") — **in progress**. Kickoff done (`docs/roadmap/phase-3-kickoff.md`); S3.1.1–S3.5.2 done (E3.1–E3.5 complete: platform, command bar, Ask Mo, inline AI actions, quality/admin). Phase 2 is complete (exit criteria met; see below).
-- **Next up:** the Phase 3 exit — the product owner's "one big local test run" (`EVALS_LIVE=1 make evals` against the real gateway) plus fixes from it, then the phase-exit retro and doc updates.
+- **Phase:** 3: AI Layer v1 ("Mo") — **complete; exit criteria met** (2026-09-27; see the Phase 3 retro and `docs/roadmap/phase-3.md` "Phase 3 exit"). Awaiting the product owner's sign-off. Kickoff done (`docs/roadmap/phase-3-kickoff.md`); S3.1.1–S3.5.2 done. Phase 2 is complete.
+- **Next up:** the product owner signs off Phase 3 and answers the item under the Phase 3 retro's "Needs product-owner decision" (set the price table). **Then Phase 4. Not started.**
 - **Product-owner instruction (2026-09-26):** finish all remaining slices, then one big local test run against the real gateway (100+ questions/actions covering edge cases), then fix from that run.
 - **Scope note (product owner, 2026-09-26):** the customer-operations capabilities (SQQ, pricing, contracts, invoices, pushes to internal systems as tools and assignable agents) will be done later in the product owner's own codebase, **not in this repo**. Finish the roadmap as written.
 - **Branch:** all Phase 3 work is on `claude/clever-hopper-pbv7yr` (ahead of `main`). Continue from that branch.
@@ -15,7 +15,13 @@
 - **This session's environment (2026-09-26, S3.5.2):** native Windows dev machine (not a Linux container), with a real Portkey key already configured in `apps/api/.env` (`MOMENTUM_LLM_MODE=gateway`) — so the product owner's "one big local test run" can actually run from here (`EVALS_LIVE=1 make evals`), unlike earlier sessions.
 - **Blockers:** none
 
-## Handoff notes (latest session: 2026-09-26, S3.5.2 →)
+## Handoff notes (latest session: 2026-09-26/27, Phase 3 exit)
+- **Phase 3 is done; details, the run-by-run history and every fix are in `docs/roadmap/phase-3.md` "Phase 3 exit".** Nine full live runs on the real gateway; the last one (final code) passed 141/141. Reports are in `reports/evals/` (git-ignored); partial and incomplete reports are ignored as baselines automatically.
+- **Verified on the final code:** backend 455/455 + ruff format/check + mypy strict + import-linter; web 287/287 + tsc + eslint + prettier; e2e 9/9; live evals 141/141.
+- **Windows dev notes (this machine):** `make` isn't installed, so run steps directly (`uv run ...`, `pnpm exec ...`). E2E: `MOMENTUM_E2E_CHROMIUM="C:\Program Files\Google\Chrome\Application\chrome.exe" pnpm exec playwright test` from `apps/web` (Playwright's own Chromium isn't installed; `serve.sh` now runs through `bash` and pins the mock LLM). If Postgres seems dead: Docker Desktop may have stopped; start it, then `docker start compose-postgres-1` (data persists).
+- **Not done, on purpose:** nothing in the price table (product-owner value), no threshold changes, no Phase 4 work.
+
+## Handoff notes (2026-09-26, S3.5.2 →)
 - **S3.5.2 AI usage and settings (admin) (done):** see the phase file's Built note. Workspace-level `AiConfig` in `workspaces.settings['ai']` (no migration; same JSONB-preference precedent as `users.prefs['ai']`), merged with the environment by `effective_ai()` — **the environment always bounds the workspace** (an admin can turn AI off or lower the budget where the deployment allows it, never turn it on where the deployment disabled it). Wired into `LLM._preflight` (workspace kill switch) and `emit_proposals` (workspace auto-apply policy on top of the user's own preference). `GET`/`PUT /ai/admin/settings`, `GET /ai/admin/usage` (feature/user/day aggregation from `llm_calls`), both admin-gated in the service layer. Frontend: an admin-only section on the existing `/settings/ai` page. Verified: `test_ai_admin.py` (10), `aiSettings.test.tsx` (+5).
 - **First native-Windows session, three real environment gaps found and fixed at the root (none are product bugs):**
   1. **psycopg's async driver can't run on Windows' default Proactor event loop** (`momentum/cli.py` already knew this for `serve`/`migrate`; pytest didn't). Fixed in `tests/conftest.py` with the same `WindowsSelectorEventLoopPolicy`, via pytest-asyncio's `event_loop_policy` fixture override (a `PytestDeprecationWarning` is expected until pytest-asyncio's `pytest_asyncio_loop_factories` hook is worth the extra complexity; harmless, doesn't fail anything, and is gated to `sys.platform == "win32"` so it never applies in the Linux containers this project normally runs in).
@@ -312,8 +318,8 @@
 - [x] S3.2.1 Smart quick-add (24 local + 6 AI fixture phrases) · [x] S3.2.2 ⌘K natural-language commands (J7 passes)
 - [x] S3.3.1 Ask Mo chat backend + panel (J8 passes) · [x] S3.3.2 Contextual entry points
 - [x] S3.4.1 Summaries · [x] S3.4.2 Break into subtasks · [x] S3.4.3 Draft status update · [x] S3.4.4 Writing help · [x] S3.4.5 Plan my day · [x] S3.4.6 Project from brief
-- [x] S3.5.1 Eval harness (118 cases; mock 21/21) · [ ] S3.5.2 AI usage and settings (admin)
-- [ ] Phase 3 exit: J7, J8 (mock); `EVALS_LIVE=1 make evals` against a real gateway (product owner); AI-unavailable degrades gracefully; usage page token counts
+- [x] S3.5.1 Eval harness (141 cases since the Phase 3 exit; mock 23/23) · [x] S3.5.2 AI usage and settings (admin)
+- [x] Phase 3 exit (2026-09-27): `EVALS_LIVE=1 make evals` against the real gateway **passes: 141/141, every threshold** (one clean full pass on the final code) · e2e 9/9 incl. J7, J8 (mock) · backend, web, lint, types green · AI-unavailable degrades gracefully · usage token counts exact; **dollar cost unmeasured until a price table is set**
 
 ### Phases 4–9
 Tracked in their phase files; copy the slice list here at each phase kickoff.
@@ -338,9 +344,33 @@ Tracked in their phase files; copy the slice list here at each phase kickoff.
 | 2026-09-26 | S3.1.2: `semantic_search` registered in S3.1.4 and `create_status_update` in S3.4.3 instead of S3.1.2's "all Phase 1–2 tools" sweep | Their backing tables (`embeddings`, `status_updates`) arrive in those slices |
 | 2026-09-26 | Phase 7: MCP server dropped (S7.1) | Product owner: not required |
 | 2026-09-26 | Aliases: `fast`/`default`/`smart` all point at the same Sonnet 4 id for now; S3.1.4 gets optional Cohere rerank, off by default | Product-owner answers to kickoff Q1/Q2 |
+| 2026-09-26 | Phase 3 exit: eval scorer takes the asker's text (echoing it is not a leak); `clarifies` accepts a question in words; the judge sees proposed operations; three cases corrected | The first live run's failures were mostly harness/case faults, found by reading each failure (see phase-3.md "Phase 3 exit") |
+| 2026-09-26 | Phase 3 exit: `search_tasks.blocked`, `blocked_by` in task briefs, `from`/`to` for moved dates in project activity | Real gaps: Mo could not answer "which tasks are blocked" or "did anything slip" from list results |
 | 2026-09-24 | Phase 2 started without a human sign-off gate on Phase 1, at explicit product-owner instruction ("finish off Phase 2 as you have all the context", "do not ask any permission... just finish this whole phase at ur own pace") given while unavailable | Phase 1 exit criteria were already met and the product owner asked to proceed rather than wait; noted here per that same instruction to record decisions/blockers instead of stopping |
 
 ## Phase retros
+### Phase 3 (2026-09-27)
+**Exit criteria: met.** Live evals pass (141/141, one clean full pass on the final code, after eight earlier runs that each found something); J7, J8 pass in a real browser; AI-off degrades gracefully; token counts exact. **Open:** dollar cost is unmeasured (no price table).
+
+- **Went well:**
+  - The eval harness paid for itself on the first live run: it found real gaps mock mode could never show (no way to list blocked tasks, no old-to-new dates in project activity, prompts that under-reported or invented), including a real privacy gap (`get_task` naming blockers in private projects), found only because a mutation check on a related change made me look.
+  - Reading every failure instead of chasing the pass rate: roughly half of the "failures" were the harness or the case being wrong (a judge given no text, no source material, a rubric asking for what the feature can't see). Fixing those first made the number mean something.
+  - Making the harness honest, not lenient: outages are reported as INCOMPLETE, partial runs can't become a baseline, regressions compare like with like, and no threshold was lowered.
+  - The gateway was fine: ~2-5 s per call and no rate-limit or streaming problems across ~1.4 M tokens per run.
+- **Went less well:**
+  - The harness was never run against a live model before the exit, so its own bugs surfaced only then. **Rule:** a new eval feature needs one live case before it is called done.
+  - I called a repeat failure "judge noise" before checking; it was a real prompt weakness. **Rule:** a case that fails twice is a finding, not noise.
+  - Scripted doc/code edits (string replaces) silently missed or wrote the wrong line endings several times on Windows; the Edit tool and an assert on every replace are the rule (already noted at S3.1.5, and it recurred).
+  - E2E had not been run on this machine, so J1 had been broken since S3.4.6 unnoticed, and the e2e server was quietly using the real gateway. **Rule:** run `e2e` at least once at each phase exit on the machine you will keep working on.
+  - Docker Desktop stopped mid-session and took the shell and a run with it; I first misread the symptom as a code problem.
+- **Watch in Phase 4:**
+  - Live results vary run to run: expect the odd single-case miss; run a flapping feature 3x before tuning (the inbox summary was checked that way: 3/3, 30/30 cases).
+  - Chat spends ~19 k tokens per question (~700 k per 35 cases). Fine now; check before agents (Phase 5) multiply it.
+  - `fast`/`default`/`smart` are still the same model, so alias-specific behavior (e.g. fast summaries) is untested.
+  - Prompts were edited in place and are still `v1`, so recorded `prompt_version` doesn't distinguish the old wording: bump the version on the next prompt change.
+- **Needs product-owner decision:**
+  1. **Set `MOMENTUM_LLM_PRICE_TABLE`** for the Bedrock Sonnet 4 id and the embed model. Until then cost shows as "not measured" (the admin page and `llm-check` now say so) and `MOMENTUM_AI_MONTHLY_BUDGET_USD` can't be enforced. Or say if the budget should count tokens instead (I did not change budget semantics: it touches AI autonomy defaults).
+
 ### Phase 1 (2026-09-23)
 **Exit criteria:** all met. E2E J1, J3 and J2 (up to inbox delivery, which is Phase 2) pass with `make e2e`, plus a quick-add journey; the 2,000-task list renders in 0.44s and scrolls at 60fps (`docs/engineering/performance.md`); `tests/test_permission_matrix.py` covers 7 kinds of user x 9 task actions, and teams/projects/sections have their own matrices; `make check`: 158 backend and 124 web tests.
 

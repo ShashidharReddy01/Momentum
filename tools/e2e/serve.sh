@@ -6,6 +6,8 @@ ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 export MOMENTUM_DATABASE_URL="${MOMENTUM_E2E_DATABASE_URL:-postgresql+psycopg://momentum:momentum@localhost:5432/momentum_e2e}"
 export MOMENTUM_AUTH_MODE=dev
 export MOMENTUM_ENV=local
+# Journeys are written for the mock fixtures; a developer's apps/api/.env must not switch them to a real gateway.
+export MOMENTUM_LLM_MODE=mock
 export MOMENTUM_SPA_DIR="$ROOT/apps/web/dist"
 cd "$ROOT/apps/api"
 uv run python "$ROOT/tools/e2e/reset_db.py"

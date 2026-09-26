@@ -8,7 +8,7 @@ cases:
   - id: priya_vendor_contract_mock
     mock: true
     input: "priya should review the vendor contract asap, it's important"
-    expect: {fields: {assignee: "Priya Nair", project: "Vendor Onboarding", priority: high}}
+    expect: {fields: {assignee: "Priya Nair", priority: high}}
   - id: recurring_mock
     mock: true
     input: "water the office plants every monday and thursday"

@@ -1,7 +1,7 @@
 [
   {
     "function": {
-      "description": "Find tasks the user can see with structured filters (text, project, assignee, status, due range, overdue). Returns keys like T-123 to use with other tools.",
+      "description": "Find tasks the user can see with structured filters (text, project, assignee, status, due range, overdue, blocked). Returns keys like T-123 to use with other tools.",
       "name": "search_tasks",
       "parameters": {
         "additionalProperties": false,
@@ -18,6 +18,11 @@
             ],
             "default": null,
             "description": "\"me\", a name, an email, or \"none\" for unassigned tasks"
+          },
+          "blocked": {
+            "default": false,
+            "description": "Only open tasks waiting on an unfinished blocking task",
+            "type": "boolean"
           },
           "due_after": {
             "anyOf": [

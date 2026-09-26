@@ -57,6 +57,11 @@ class CaseResult:
     tokens_out: int = 0
     cost_usd: float = 0.0
 
+    @property
+    def unavailable(self) -> bool:
+        """Failed only because the AI could not be reached: says nothing about quality."""
+        return not self.passed and (self.error or "").startswith("ai_unavailable")
+
 
 @dataclass
 class FeatureSummary:
@@ -70,6 +75,7 @@ class FeatureSummary:
     tokens: int = 0
     cost_usd: float = 0.0
     p50_ms: int = 0
+    unavailable: int = 0  # cases lost to an AI outage, left out of the rate
 
 
 @dataclass
@@ -80,6 +86,11 @@ class Report:
     prompts: dict[str, str]
     features: list[FeatureSummary] = field(default_factory=list)
     cases: list[CaseResult] = field(default_factory=list)
+    partial: bool = False  # only some features/cases ran: never a regression baseline
+
+    @property
+    def incomplete(self) -> bool:
+        return any(f.unavailable for f in self.features)
 
     @property
     def ok(self) -> bool:
@@ -142,10 +153,37 @@ async def judge(
     cited = ", ".join(
         f"{c.get('ref')} {c.get('title') or ''}".strip() for c in obs.citations if c.get("valid")
     )
+    # Breakdown and brief answer with a previewed action, not text: show what it would change.
+    changes = "\n".join(
+        f"{op.get('tool')}: {json.dumps(op.get('args') or {}, ensure_ascii=False)}"
+        for op in obs.operations
+    )[:6000]
+    # A plan is judged against its dates, which live outside the operations' text.
+    plan_facts = (
+        [
+            f"Plan ends: {obs.data['end_on']} "
+            f"(requested end: {obs.data.get('requested_end') or 'none'})"
+        ]
+        if "end_on" in obs.data
+        else []
+    )
+    # Claims are checked against what the feature was given (inbox notifications, status facts).
+    source = obs.data.get("source") or obs.data.get("facts")
+    source_block = (
+        [
+            "Source material the output must be true to:\n"
+            + json.dumps(source, ensure_ascii=False, default=str)[:5000]
+        ]
+        if source
+        else []
+    )
     body = "\n".join(
         [
             f"Request: {case.get('input') or case.get('task') or case.get('project') or ''}",
-            f"Output:\n{obs.text}",
+            f"Output:\n{obs.text or '(none)'}",
+            f"Proposed changes:\n{changes or '(none)'}",
+            *plan_facts,
+            *source_block,
             f"Valid citations: {cited or '(none)'}",
             f"Notes from the server: {'; '.join(obs.notes) or '(none)'}",
             f"Rubric: {spec['rubric']}",
@@ -186,6 +224,7 @@ async def run_evals(
         started_at=datetime.now(UTC).isoformat(),
         models={a: llm.model_for(a) for a in ("fast", "default", "smart", "embed")},
         prompts={},
+        partial=bool(features or case_filter),
     )
     for feature, cases in load_cases(features).items():
         results: list[CaseResult] = []
@@ -202,7 +241,12 @@ async def run_evals(
                 await session.begin()
                 try:
                     obs = await run_case(session, llm, registry, settings, world, filled, feature)
-                    checks = score(obs, filled.get("expect") or {}, today=today)
+                    checks = score(
+                        obs,
+                        filled.get("expect") or {},
+                        today=today,
+                        asked=str(filled.get("input") or ""),
+                    )
                     if live and filled.get("judge") and obs.error is None:
                         checks.append(await judge(llm, settings, world, filled, obs))
                 finally:
@@ -238,14 +282,27 @@ def summarize(
     feature: str, results: list[CaseResult], threshold: float, previous: Report | None
 ) -> FeatureSummary:
     """A feature's pass rate against its threshold and against the previous report."""
+    lost = sum(r.unavailable for r in results)
+    counted = len(results) - lost
     passed = sum(r.passed for r in results)
-    rate = passed / len(results)
+    rate = passed / counted if counted else 0.0
     regression = None
     if previous is not None:
+        # Compare on the cases both runs have: a feature that gained cases isn't a regression.
+        then = {
+            c.id: c.passed for c in previous.cases if c.feature == feature and not c.unavailable
+        }
+        now = {r.id: r.passed for r in results if not r.unavailable}
+        common = then.keys() & now.keys()
         before = next((f for f in previous.features if f.feature == feature), None)
-        if before is not None:
+        if common:
+            drop = sum(then[i] for i in common) / len(common) - sum(now[i] for i in common) / len(
+                common
+            )
+            regression = round(drop * 100, 1)
+        elif before is not None and not previous.cases:  # an old report without per-case results
             regression = round((before.rate - rate) * 100, 1)
-    ok = rate >= threshold and (regression is None or regression <= REGRESSION_POINTS)
+    ok = lost == 0 and rate >= threshold and (regression is None or regression <= REGRESSION_POINTS)
     return FeatureSummary(
         feature=feature,
         cases=len(results),
@@ -257,6 +314,7 @@ def summarize(
         tokens=sum(r.tokens_in + r.tokens_out for r in results),
         cost_usd=round(sum(r.cost_usd for r in results), 6),
         p50_ms=int(statistics.median(r.latency_ms for r in results)),
+        unavailable=lost,
     )
 
 
@@ -289,20 +347,30 @@ def render(report: Report) -> str:
     ]
     for f in report.features:
         delta = "" if f.regression is None else f"{-f.regression:+.1f}"
+        cost = "n/a" if f.cost_usd == 0 and f.tokens else f"{f.cost_usd:.4f}"
         lines.append(
             f"{f.feature:<18} {f.passed:>4}/{f.cases:<4} {f.rate * 100:>5.0f}% "
-            f"{f.threshold * 100:>5.0f}% {delta:>6} {f.tokens:>8} {f.cost_usd:>8.4f} "
-            f"{f.p50_ms:>7}  {'ok' if f.ok else 'FAIL'}"
+            f"{f.threshold * 100:>5.0f}% {delta:>6} {f.tokens:>8} {cost:>8} "
+            f"{f.p50_ms:>7}  {'INCOMPLETE' if f.unavailable else 'ok' if f.ok else 'FAIL'}"
         )
-    failed = [c for c in report.cases if not c.passed]
+    failed = [c for c in report.cases if not c.passed and not c.unavailable]
     if failed:
         lines.append("")
         lines.append("Failed cases:")
         for c in failed:
             why = "; ".join(f"{ch['name']} ({ch['detail']})" for ch in c.checks if not ch["passed"])
             lines.append(f"- {c.feature}/{c.id}: {why}"[:400])
+    lost = sum(f.unavailable for f in report.features)
+    if lost:
+        lines.append("")
+        lines.append(
+            f"{lost} case(s) could not reach the AI (outage, not a quality result) and are left "
+            "out of the rates. Rerun."
+        )
     lines.append("")
-    lines.append("RESULT: " + ("PASS" if report.ok else "FAIL"))
+    lines.append(
+        "RESULT: " + ("INCOMPLETE" if report.incomplete else "PASS" if report.ok else "FAIL")
+    )
     return "\n".join(lines)
 
 
@@ -315,17 +383,21 @@ def save(report: Report, directory: Path) -> Path:
 
 
 def latest(directory: Path, mode: str) -> Report | None:
-    files = sorted(directory.glob(f"{mode}-*.json"))
-    if not files:
-        return None
-    raw = json.loads(files[-1].read_text(encoding="utf-8"))
-    return Report(
-        mode=raw["mode"],
-        started_at=raw["started_at"],
-        models=raw.get("models", {}),
-        prompts=raw.get("prompts", {}),
-        features=[FeatureSummary(**f) for f in raw.get("features", [])],
-    )
+    """The newest report that is a fair baseline: a full run that no outage cut short."""
+    for path in sorted(directory.glob(f"{mode}-*.json"), reverse=True):
+        raw = json.loads(path.read_text(encoding="utf-8"))
+        features = [FeatureSummary(**f) for f in raw.get("features", [])]
+        if raw.get("partial") or any(f.unavailable for f in features):
+            continue
+        return Report(
+            mode=raw["mode"],
+            started_at=raw["started_at"],
+            models=raw.get("models", {}),
+            prompts=raw.get("prompts", {}),
+            features=features,
+            cases=[CaseResult(**c) for c in raw.get("cases", [])],
+        )
+    return None
 
 
 def elapsed(started: float) -> str:

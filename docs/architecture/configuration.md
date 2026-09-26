@@ -85,10 +85,10 @@ Frontend build-time variables use the `VITE_MOMENTUM_` prefix, but the SPA prefe
 | `MOMENTUM_LLM_SUPPORTS_STREAMING_TOOLS` | `true` | Fall back to non-streaming tool steps if false |
 | `MOMENTUM_LLM_RERANK_MODEL` | `cohere-rerank-v3.5` | Rerank model name as the gateway knows it (Cohere-style `/rerank`). Probed by `llm-check`. For cost estimates, its `LLM_PRICE_TABLE` `in_per_mtok` is the price per search unit |
 | `MOMENTUM_AI_RERANK` | `false` | Rerank hybrid-search candidates before the top k (S3.1.4). Turn on once `llm-check`'s rerank row passes |
-| `MOMENTUM_LLM_PRICE_TABLE` | `{}` | JSON `{model: {in_per_mtok, out_per_mtok}}` (USD, keyed by the configured model name) for cost estimates; unlisted models cost 0 |
+| `MOMENTUM_LLM_PRICE_TABLE` | `{}` | JSON `{model: {in_per_mtok, out_per_mtok}}` (USD, keyed by the configured model name) for cost estimates; unlisted models cost 0. **Set it in gateway mode:** with no entry the admin usage page shows "cost isn't measured", `llm-check` warns (`pricing` row) and startup logs `budget_unpriced` if a budget is set |
 | `MOMENTUM_LLM_FIXTURES_DIR` | (packaged) | Mock/record fixture directory; empty = `momentum/ai/evals/fixtures/mock_responses` |
 | `MOMENTUM_EVALS_DATABASE_URL` | (empty) | S3.5.1: the throwaway database `momentum evals` drops and rebuilds on every run (migrate, seed, eval workspace, reindex). Its name must end in `_evals`. Empty = the main database's name + `_evals` on the same server (the role needs `CREATEDB`) |
-| `MOMENTUM_AI_MONTHLY_BUDGET_USD` | `0` (= unlimited) | Workspace cap on estimated cost (sum of `llm_calls.cost_usd` since 00:00 UTC on the 1st); checked before every call |
+| `MOMENTUM_AI_MONTHLY_BUDGET_USD` | `0` (= unlimited) | Workspace cap on estimated cost (sum of `llm_calls.cost_usd` since 00:00 UTC on the 1st); checked before every call. Only models priced in `MOMENTUM_LLM_PRICE_TABLE` count, so an unpriced model never trips it (the usage page, `llm-check` and the startup log say so) |
 | `MOMENTUM_AI_AUTO_APPLY_LOW_RISK` | `false` | Workspace default for ⌘K/chat |
 | `MOMENTUM_AI_DEBUG_CAPTURE` | `false` | Store prompts/responses for 7 days (never in prod by default) |
 

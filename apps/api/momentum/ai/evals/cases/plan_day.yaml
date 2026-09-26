@@ -17,3 +17,19 @@ cases:
   - id: no_private_leak
     user: ravi
     expect: {mentions_exclude: ["Zenith"], today_exclude: ["{{key:Secret launch partner: Zenith Corp}}"]}
+  - id: priya_blocked_urgent
+    user: priya
+    expect: {citations_valid: true}
+    judge: {rubric: "Doesn't present the blocked payment provider approval as ready to start; it says it waits on the vendor contract or leaves it out of today."}
+  - id: ana_webinar_later
+    user: ana
+    expect: {today_exclude: ["{{key:Book launch webinar}}"], citations_valid: true}
+  - id: mei_blocked_copy_not_today
+    user: mei
+    expect: {today_exclude: ["{{key:Update pricing page copy}}"], citations_valid: true}
+  - id: ravi_reason_short
+    expect: {citations_valid: true}
+    judge: {rubric: "The explanation is brief (at most three sentences) and refers to tasks by their bracketed keys.", min: 3}
+  - id: priya_own_private_task_ok
+    user: priya
+    expect: {citations_valid: true, min_citations: 1}
