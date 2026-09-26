@@ -7,12 +7,13 @@ import uuid
 from datetime import datetime
 from typing import Any, Literal
 
-from fastapi import APIRouter
-from pydantic import BaseModel, ConfigDict
+from fastapi import APIRouter, status
+from pydantic import BaseModel, ConfigDict, Field
 
-from momentum.ai import actions
+from momentum.ai import actions, memory
 from momentum.ai.models import AiAction
 from momentum.api.deps import CtxDep, RuntimeDep, UowDep
+from momentum.api.schemas import ListOut, MutationOut
 
 router = APIRouter(prefix="/ai", tags=["ai"])
 
@@ -120,3 +121,72 @@ async def reject_ai_action(action_id: uuid.UUID, ctx: CtxDep, uow: UowDep) -> Ai
 async def undo_ai_action(action_id: uuid.UUID, ctx: CtxDep, uow: UowDep) -> AiActionEnvelope:
     async with uow.transaction() as s:
         return AiActionEnvelope(data=action_out(await actions.undo_action(s, ctx, action_id)))
+
+
+# ---------------- workspace memory (S3.1.5) ----------------
+
+
+class MemoryOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    scope: Literal["workspace", "team", "project"]
+    scope_id: uuid.UUID | None
+    text: str
+    created_at: datetime
+    updated_at: datetime
+
+
+class MemoryCreateIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    scope: Literal["workspace", "team", "project"] = "workspace"
+    scope_id: uuid.UUID | None = None
+    text: str = Field(min_length=1, max_length=memory.MAX_TEXT)
+
+
+class MemoryPatchIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    text: str = Field(min_length=1, max_length=memory.MAX_TEXT)
+
+
+@router.get("/memory", response_model=ListOut[MemoryOut], summary="Memory bullets of a scope")
+async def list_ai_memory(
+    ctx: CtxDep,
+    uow: UowDep,
+    scope: Literal["workspace", "team", "project"] = "workspace",
+    scope_id: uuid.UUID | None = None,
+) -> ListOut[MemoryOut]:
+    async with uow.transaction() as s:
+        rows = await memory.list_memory(s, ctx, scope, scope_id)
+        return ListOut(data=[MemoryOut.model_validate(m) for m in rows])
+
+
+@router.post(
+    "/memory",
+    response_model=MutationOut[MemoryOut],
+    status_code=status.HTTP_201_CREATED,
+    summary="Add a memory bullet",
+)
+async def create_ai_memory(
+    body: MemoryCreateIn, ctx: CtxDep, uow: UowDep
+) -> MutationOut[MemoryOut]:
+    async with uow.transaction() as s:
+        m = await memory.create_memory(s, ctx, body.scope, body.scope_id, body.text)
+        return MutationOut.of(m, MemoryOut)
+
+
+@router.patch("/memory/{memory_id}", response_model=MutationOut[MemoryOut], summary="Edit a bullet")
+async def update_ai_memory(
+    memory_id: uuid.UUID, body: MemoryPatchIn, ctx: CtxDep, uow: UowDep
+) -> MutationOut[MemoryOut]:
+    async with uow.transaction() as s:
+        return MutationOut.of(await memory.update_memory(s, ctx, memory_id, body.text), MemoryOut)
+
+
+@router.delete(
+    "/memory/{memory_id}", response_model=MutationOut[MemoryOut], summary="Remove a bullet"
+)
+async def delete_ai_memory(
+    memory_id: uuid.UUID, ctx: CtxDep, uow: UowDep
+) -> MutationOut[MemoryOut]:
+    async with uow.transaction() as s:
+        return MutationOut.of(await memory.delete_memory(s, ctx, memory_id), MemoryOut)

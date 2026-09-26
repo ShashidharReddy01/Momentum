@@ -74,6 +74,7 @@ Event payloads share an envelope:
 | `agent_run.started` / `agent_run.finished` | 5 | agent_id, status, cost |
 | `notification.created` | 2 | notification summary (channel `user:<id>` only) |
 | `import.progress` / `import.finished` | 2 | stats |
+| `ai_memory.changed` | 3 | `{scope}` (created, edited, removed or restored; channel `workspace:<id>`, `team:<id>` or `project:<id>`) |
 
 **Adding an event type** requires updating this table, `momentum/core/events.py` (`EventType` enum), and the frontend event handler map (`apps/web/src/lib/realtime/handlers.ts`).
 

@@ -1,0 +1,14 @@
+<data source="task">
+<task key="T-32" id="<id>" project="AI Tools Lab" section="To do">
+title: Draft pricing copy
+status: open · assignee: Ana Souza · start: 2026-09-21 (Mon) · due: 2026-09-25 (Fri) OVERDUE
+description: Rewrite the pricing page. Keep it under 200 words.
+subtasks:
+  [x] Collect prices (T-35)
+  [ ] Draft v1 (T-36)
+blocked by: [T-33] Draft pricing FAQ (open)
+recent comments:
+  - Ana Souza (2026-09-22): Can we reuse the table?
+  - Ravi Kumar (2026-09-23): Yes, update the prices.
+</task>
+</data>

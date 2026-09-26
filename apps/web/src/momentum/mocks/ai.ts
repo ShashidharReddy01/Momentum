@@ -85,3 +85,62 @@ export function aiHandlers(initial: AiAction[], opts: { staleOnce?: boolean } = 
   ];
   return { handlers, calls };
 }
+
+type Bullet = {
+  id: string;
+  scope: 'workspace';
+  scope_id: null;
+  text: string;
+  created_at: string;
+  updated_at: string;
+};
+
+/** In-memory workspace memory API (S3.1.5). `canEdit: false` answers writes with 403, as the
+ * server does for non-admins. */
+export function aiMemoryHandlers(initial: string[] = [], opts: { canEdit?: boolean } = {}) {
+  let n = 0;
+  const at = '2026-09-26T10:00:00Z';
+  const mk = (text: string): Bullet => ({
+    id: `mem-${++n}`,
+    scope: 'workspace',
+    scope_id: null,
+    text,
+    created_at: at,
+    updated_at: at,
+  });
+  const bullets = initial.map(mk);
+  const meta = () => ({
+    activity_id: `01a0ccaf-0000-7000-8000-0000000${String(900 + n)}`,
+    batch_id: null,
+    version: null,
+  });
+  const forbidden = () =>
+    HttpResponse.json(
+      { code: 'forbidden', title: 'Forbidden', status: 403, detail: 'Admins only' },
+      { status: 403, headers: { 'content-type': 'application/problem+json' } },
+    );
+  const canEdit = opts.canEdit ?? true;
+  const handlers = [
+    http.get('*/api/v1/ai/memory', () => HttpResponse.json({ data: bullets, meta: { next_cursor: null } })),
+    http.post('*/api/v1/ai/memory', async ({ request }) => {
+      if (!canEdit) return forbidden();
+      const b = (await request.json()) as { text: string };
+      const x = mk(b.text);
+      bullets.push(x);
+      return HttpResponse.json({ data: x, meta: meta() }, { status: 201 });
+    }),
+    http.patch('*/api/v1/ai/memory/:id', async ({ params, request }) => {
+      if (!canEdit) return forbidden();
+      const x = bullets.find((b) => b.id === params.id)!;
+      x.text = ((await request.json()) as { text: string }).text;
+      return HttpResponse.json({ data: x, meta: meta() });
+    }),
+    http.delete('*/api/v1/ai/memory/:id', ({ params }) => {
+      if (!canEdit) return forbidden();
+      const i = bullets.findIndex((b) => b.id === params.id);
+      const [x] = bullets.splice(i, 1);
+      return HttpResponse.json({ data: x, meta: meta() });
+    }),
+  ];
+  return { handlers, bullets };
+}

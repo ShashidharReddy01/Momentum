@@ -1,0 +1,13 @@
+<data source="project">
+<project name="AI Tools Lab" id="<id>" team="Product" privacy="team" my_role="admin">
+sections: To do (2 open, 0 done) · Doing (0 open, 0 done)
+last 7 days: 2 created, 0 completed, 2 edits
+members: Lena Novak (viewer), Ravi Kumar (admin); members of team Product can edit
+overdue (1):
+  [T-32] Draft pricing copy (due 2026-09-25, Ana Souza)
+blocked by open tasks (1):
+  [T-32] Draft pricing copy (waits on 1)
+due in the next 14 days (1):
+  [T-33] Draft pricing FAQ (due 2026-10-02, unassigned)
+</project>
+</data>

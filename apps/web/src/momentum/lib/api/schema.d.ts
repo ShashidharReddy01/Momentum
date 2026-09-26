@@ -72,6 +72,42 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/ai/memory": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Memory bullets of a scope */
+        get: operations["list_ai_memory_api_v1_ai_memory_get"];
+        put?: never;
+        /** Add a memory bullet */
+        post: operations["create_ai_memory_api_v1_ai_memory_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ai/memory/{memory_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove a bullet */
+        delete: operations["delete_ai_memory_api_v1_ai_memory__memory_id__delete"];
+        options?: never;
+        head?: never;
+        /** Edit a bullet */
+        patch: operations["update_ai_memory_api_v1_ai_memory__memory_id__patch"];
+        trace?: never;
+    };
     "/api/v1/attachments/{attachment_id}": {
         parameters: {
             query?: never;
@@ -2146,6 +2182,13 @@ export interface components {
             /** @default {} */
             meta: components["schemas"]["ListMeta"];
         };
+        /** ListOut[MemoryOut] */
+        ListOut_MemoryOut_: {
+            /** Data */
+            data: components["schemas"]["MemoryOut"][];
+            /** @default {} */
+            meta: components["schemas"]["ListMeta"];
+        };
         /** ListOut[MyTaskOut] */
         ListOut_MyTaskOut_: {
             /** Data */
@@ -2254,6 +2297,51 @@ export interface components {
             user: components["schemas"]["UserOut"];
             workspace: components["schemas"]["WorkspaceOut"];
         };
+        /** MemoryCreateIn */
+        MemoryCreateIn: {
+            /**
+             * Scope
+             * @default workspace
+             * @enum {string}
+             */
+            scope: "workspace" | "team" | "project";
+            /** Scope Id */
+            scope_id?: string | null;
+            /** Text */
+            text: string;
+        };
+        /** MemoryOut */
+        MemoryOut: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Scope
+             * @enum {string}
+             */
+            scope: "workspace" | "team" | "project";
+            /** Scope Id */
+            scope_id: string | null;
+            /** Text */
+            text: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** MemoryPatchIn */
+        MemoryPatchIn: {
+            /** Text */
+            text: string;
+        };
         /** MentionProject */
         MentionProject: {
             /** Color */
@@ -2331,6 +2419,11 @@ export interface components {
         /** MutationOut[ListOut[TaskOut]] */
         MutationOut_ListOut_TaskOut__: {
             data: components["schemas"]["ListOut_TaskOut_"];
+            meta: components["schemas"]["MutationMeta"];
+        };
+        /** MutationOut[MemoryOut] */
+        MutationOut_MemoryOut_: {
+            data: components["schemas"]["MemoryOut"];
             meta: components["schemas"]["MutationMeta"];
         };
         /** MutationOut[OkOut] */
@@ -3662,6 +3755,137 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AiActionEnvelope"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_ai_memory_api_v1_ai_memory_get: {
+        parameters: {
+            query?: {
+                scope?: "workspace" | "team" | "project";
+                scope_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListOut_MemoryOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_ai_memory_api_v1_ai_memory_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MemoryCreateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationOut_MemoryOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_ai_memory_api_v1_ai_memory__memory_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                memory_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationOut_MemoryOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_ai_memory_api_v1_ai_memory__memory_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                memory_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MemoryPatchIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationOut_MemoryOut_"];
                 };
             };
             /** @description Validation Error */

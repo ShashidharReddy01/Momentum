@@ -265,6 +265,8 @@ id, workspace_id, feature (`chat`,`command`,`summarize`,`status_draft`,`agent:<k
 ### `ai_memory`
 id, workspace_id, scope (`workspace`,`team`,`project`), scope_id, text, created_by, timestamps. Admin-editable facts injected into prompts.
 
+**As built (S3.1.5, migration 0018):** plus `deleted_at` (soft delete, so removal is undoable); check `scope_id is null` exactly when `scope = 'workspace'`; index `(workspace_id, scope, scope_id)`. Text ≤ 300 characters, ≤ 50 bullets per scope. Edit rights: workspace → workspace admin; team → team lead or admin; project → project admin. Service `ai/memory.py` (activity with undo + `ai_memory.changed` event).
+
 ### `embeddings`
 | Column | Type | Notes |
 |---|---|---|

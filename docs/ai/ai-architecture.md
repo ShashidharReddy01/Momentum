@@ -124,6 +124,8 @@ Context builders produce compact, typed context blocks. **Rules:** only permitte
 | `project_ctx(project, window)` | Sections with counts, overdue/blocked lists, recent activity digest, members, latest status | ≤ 3,500 |
 | `retrieval_ctx(query)` | Top-k hybrid search chunks with keys + snippet + link | ≤ 2,000 |
 
+**As built (S3.1.5):** `ai/context/` (`tokens.py`: conservative estimate of ~3 chars/token plus one per newline, `clip`, `safe` (one line, `<`/`>` escaped), `fit` (keep head/tail, drop optional lines with a "+N more not shown" note); `builders.py`: the six builders above with exactly these budgets, `now` passed in for determinism, single entities via `get_visible_task`/`get_visible_project` and lists via `ai/visibility.py`, user content escaped and wrapped in `<data source="task|project|search">`). `system_base` carries the §7 skeleton and workspace + team + project memory (`ai/memory.py` `memory_for`). A thread with more than 20 comments shows the latest 8 plus the cached `ai_summaries` thread summary if one exists (generated from S3.4.1), else "(N earlier comments not shown)". Long lists are capped with a note, never silently. Golden snapshots: `tests/snapshots/context/*.txt` (ids normalized; `UPDATE_SNAPSHOTS=1`).
+
 Long content is summarized hierarchically (comment threads > 20 messages: the cached thread summary in `ai_summaries` is keyed by content hash).
 
 ### Context format (example)

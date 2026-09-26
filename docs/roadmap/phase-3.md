@@ -39,6 +39,7 @@
 ### S3.1.5: Workspace memory + context builders
 **Scope:** migration `ai_memory`; admin UI to edit memory bullets; context builders with token budgets (tiktoken-like estimate, conservative), golden snapshot tests.
 **Size:** M
+**Built (2026-09-26):** migration 0018; `ai/memory.py` + `/api/v1/ai/memory` (workspace/team/project scopes, undoable); `ai/context/`; `/settings/ai` page ("AI settings" in the user menu) with the workspace memory editor (read-only for non-admins). The UI edits workspace memory only; team/project bullets are API-only until a project settings screen needs them.
 
 ## E3.2 Command bar
 

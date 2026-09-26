@@ -1,0 +1,5 @@
+Screen: project
+Project: AI Tools Lab [P:AI Tools Lab] (list view)
+Selected (2):
+  [T-32] Draft pricing copy
+  [T-33] Draft pricing FAQ

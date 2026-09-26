@@ -157,3 +157,34 @@ class AiSummary(IdMixin, Base):
         CheckConstraint("kind in ('thread', 'project_week', 'inbox', 'task')", name="kind"),
         UniqueConstraint("entity_type", "entity_id", "kind", "content_hash"),
     )
+
+
+MEMORY_SCOPES = ("workspace", "team", "project")
+
+
+class AiMemory(IdMixin, Base):
+    """S3.1.5: a short fact Mo should know ("Sprints start on Mondays"), injected into prompts.
+
+    Workspace bullets reach every prompt; team and project bullets only prompts about that team
+    or project. Admin-curated (see ``ai/memory.py`` for who may edit which scope)."""
+
+    __tablename__ = "ai_memory"
+
+    workspace_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("workspaces.id"))
+    scope: Mapped[str] = mapped_column(String(12))
+    scope_id: Mapped[uuid.UUID | None]
+    text: Mapped[str] = mapped_column(Text)
+    created_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    __table_args__ = (
+        CheckConstraint(f"scope in {MEMORY_SCOPES}", name="scope"),
+        CheckConstraint(
+            "(scope = 'workspace') = (scope_id is null)", name="scope_id_matches_scope"
+        ),
+        Index("ix_ai_memory_scope", "workspace_id", "scope", "scope_id"),
+    )

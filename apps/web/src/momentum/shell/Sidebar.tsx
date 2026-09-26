@@ -14,6 +14,7 @@ import {
   LogOut,
   Moon,
   Plus,
+  Sparkles,
   Sun,
   Users,
 } from 'lucide-react';
@@ -268,6 +269,9 @@ function UserMenu() {
         </DropdownMenuItem>
         <DropdownMenuItem onSelect={() => navigate('/settings/members')}>
           <Icon icon={Users} /> Members
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => navigate('/settings/ai')}>
+          <Icon icon={Sparkles} /> AI settings
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem onSelect={() => logout.mutate()}>
