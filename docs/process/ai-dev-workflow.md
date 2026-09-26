@@ -37,6 +37,7 @@ How the human (product owner, reviewer, and committer) and the AI (implementer) 
 AI sessions have limited memory, so the repository carries the context:
 
 - `docs/progress/STATUS.md` → **Current focus** and **Handoff notes** sections are updated at the end of every session, even mid-slice: what's done, what's half-done (file list), next steps, gotchas.
+- Keep `STATUS.md` small (every session reads it in full): at the end of a slice, move the previous session's handoff note to `docs/progress/handoff-archive.md` and keep only the newest one, plus the current phase's retro.
 - WIP rule: never leave `make check` red at the end of a session without a handoff note explaining why and how to fix it.
 - Long-lived knowledge (patterns, gotchas) moves from handoff notes into the right doc (coding standards, architecture) at phase exit.
 

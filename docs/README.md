@@ -36,6 +36,7 @@ Docs are the **source of truth for intent**. Code must match them, and when the 
 | Roadmap | `roadmap/roadmap.md` | Phases, dependencies, milestones |
 | Roadmap | `roadmap/phase-0.md` … `phase-9.md` | Epics → slices with acceptance criteria and tests |
 | Progress | `progress/STATUS.md` | Live tracker (updated every slice) |
+| Progress archive | `progress/handoff-archive.md` | Older handoff notes and retros (read only when relevant) |
 | Decisions | `adr/` | Architecture Decision Records |
 | Integrations | `integrations/asana-import.md` | Asana → Momentum data mapping and import algorithm |
 | Runbooks | `runbooks/local-development.md` | Local setup and troubleshooting |
