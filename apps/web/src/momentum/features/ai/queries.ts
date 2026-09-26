@@ -1,7 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMemo } from 'react';
 import type { components } from '@/lib/api/schema';
+import { useMomentumConfig } from '@/lib/config';
 import { toastError } from '@/lib/toast';
 import { useApi } from '@/providers/api';
+import { errorText } from './errors';
 
 export type AiAction = components['schemas']['AiActionOut'];
 export type AiOperation = components['schemas']['AiOperationOut'];
@@ -126,4 +129,23 @@ export function useBreakdown(taskId: string) {
         })
       ).data!,
   });
+}
+
+/** S3.4.4: the editor's writing-help call, or undefined while AI is off (no Mo menu then). */
+export function useWriteHelp(): ((req: components['schemas']['WriteIn']) => Promise<string>) | undefined {
+  const api = useApi();
+  const aiEnabled = useMomentumConfig().ai_enabled;
+  return useMemo(
+    () =>
+      aiEnabled
+        ? async (req: components['schemas']['WriteIn']) => {
+            try {
+              return (await api.POST('/api/v1/ai/write', { body: req })).data!.text;
+            } catch (e) {
+              throw new Error(errorText(e));
+            }
+          }
+        : undefined,
+    [api, aiEnabled],
+  );
 }

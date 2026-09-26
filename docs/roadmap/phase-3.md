@@ -84,6 +84,8 @@
 
 **S3.4.3 built (2026-09-26):** migration 0020 `status_updates`; domain `status_updates` (service, the one write path: sets the project status, undo withdraws and restores the previous status; `GET/POST /projects/{id}/status-updates`, citations resolved per reader); tool `create_status_update` (medium); `ai/status_draft.py` + `POST /ai/projects/{id}/status-draft` (default alias, prompt `status_draft/v1`): facts collected server-side, **every remaining claim cites a task from the facts** (uncited or out-of-facts claims removed with notes; stray summary keys stripped). UI: project header "Draft status" + status chip; the **Overview** tab is now live with the status history, "Post update" and "Draft with Mo" (editable AICallout, posted as the user and marked AI-drafted, undo toast). The rest of Overview stays Phase 6.
 
+**S3.4.4 built (2026-09-26):** `ai/write.py` + `POST /ai/write {action: improve|shorten|fix_grammar|tone|translate, text ≤ 8000, tone?, language?}` → `{text}` (fast alias, prompt `write/v1`; text sent as data with line breaks kept and `<` escaped; wrapping quotes/fences removed; an empty reply is `bad_response`; language names validated). UI: a **"Mo" menu in the editor's toolbar** (not a floating bubble menu: that needs a floating-UI dependency the toolbar doesn't) on the task description: it works on the selection, or the whole text when nothing is selected, and shows the rewrite as a suggestion (Replace / Try again / Reject). Replace inserts it as Markdown, and is refused if the text changed since asking. The comment editor doesn't have it yet (it has its own small editor).
+
 ## E3.5 Quality and admin
 
 ### S3.5.1: Eval harness

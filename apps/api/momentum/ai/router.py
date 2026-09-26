@@ -23,6 +23,7 @@ from momentum.ai import (
     sse,
     status_draft,
     summarize,
+    write,
 )
 from momentum.ai.command import run_command
 from momentum.ai.context import Screen
@@ -573,3 +574,40 @@ async def ai_status_draft(
             since=r.since,
             citations=[CitationOut(**c.to_json()) for c in cites],
         )
+
+
+# ---------------- writing help (S3.4.4) ----------------
+
+
+class WriteIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    action: write.Action
+    text: str = Field(min_length=1, max_length=write.MAX_CHARS)
+    tone: write.Tone | None = None
+    language: str | None = Field(
+        default=None, min_length=2, max_length=40, pattern=r"^[A-Za-zÀ-ÿ ()\-]+$"
+    )
+
+
+class WriteOut(BaseModel):
+    text: str
+
+
+@router.post(
+    "/write", response_model=WriteOut, summary="Rewrite text (a suggestion; nothing is stored)"
+)
+async def ai_write(body: WriteIn, ctx: CtxDep, rt: RuntimeDep) -> WriteOut:
+    llm = require_llm(rt)
+    if body.action == "translate" and not body.language:
+        raise ValidationFailed("Choose a language to translate into")
+    if not body.text.strip():
+        raise ValidationFailed("Select some text first")
+    text = await write.rewrite(
+        llm,
+        ctx.with_(via="ai"),
+        action=body.action,
+        text=body.text,
+        tone=body.tone,
+        language=body.language,
+    )
+    return WriteOut(text=text)

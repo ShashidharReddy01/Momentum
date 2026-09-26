@@ -19,6 +19,15 @@ Element.prototype.scrollIntoView ??= function scrollIntoView() {};
 // sonner's toasts capture the pointer on press (clicking a toast action, e.g. Undo)
 Element.prototype.setPointerCapture ??= function setPointerCapture() {};
 Element.prototype.releasePointerCapture ??= function releasePointerCapture() {};
+// ProseMirror measures the selection to scroll it into view after programmatic edits (S3.4.4)
+const noRects = () =>
+  ({ length: 0, item: () => null, [Symbol.iterator]: [][Symbol.iterator] }) as unknown as DOMRectList;
+const zeroRect = () =>
+  ({ x: 0, y: 0, top: 0, left: 0, right: 0, bottom: 0, width: 0, height: 0, toJSON() {} }) as DOMRect;
+Range.prototype.getClientRects ??= noRects;
+Range.prototype.getBoundingClientRect ??= zeroRect;
+Element.prototype.getClientRects ??= noRects;
+document.elementFromPoint ??= () => null;
 window.matchMedia ??= ((query: string) => ({
   matches: false,
   media: query,

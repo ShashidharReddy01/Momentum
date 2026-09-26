@@ -3,9 +3,9 @@ import { AICallout } from '@/components/common/AI';
 import { MoMark } from '@/components/common/MoMark';
 import { Button } from '@/components/ui/Button';
 import { IconButton } from '@/components/ui/IconButton';
-import { ApiError } from '@/lib/api/errors';
 import { useMomentumConfig } from '@/lib/config';
 import { MoText } from './MoThread';
+import { errorText } from './errors';
 import { useSummarize } from './queries';
 import type { Citation } from './useMoRuns';
 
@@ -47,12 +47,4 @@ export function SummaryButton({ body, label }: { body: Target; label: string }) 
       ) : null}
     </div>
   );
-}
-
-export function errorText(e: unknown): string {
-  if (e instanceof ApiError) {
-    if (e.problem.code === 'ai_unavailable') return 'Mo is unavailable right now. Try again shortly.';
-    return e.problem.detail ?? e.problem.title ?? 'Something went wrong.';
-  }
-  return 'Something went wrong.';
 }

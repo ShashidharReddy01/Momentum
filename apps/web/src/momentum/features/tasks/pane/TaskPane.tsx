@@ -31,6 +31,7 @@ import {
 import { Icon } from '@/components/ui/Icon';
 import { IconButton } from '@/components/ui/IconButton';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { useWriteHelp } from '@/features/ai';
 import { useMe } from '@/features/auth';
 import { FieldValueEditor, useProjectFields, useSetFieldValue, useTaskFieldValues } from '@/features/fields';
 import { usePeople } from '@/features/people';
@@ -510,6 +511,7 @@ function docText(doc: JSONContent | null): string {
 }
 
 function Description({ task, canEdit }: { task: TaskDetail; canEdit: boolean }) {
+  const writingHelp = useWriteHelp();
   const d = useDescriptionAutosave(task, canEdit);
   const label = SAVE_LABEL[d.state];
   return (
@@ -569,6 +571,7 @@ function Description({ task, canEdit }: { task: TaskDetail; canEdit: boolean }) 
           placeholder={canEdit ? 'What is this task about? Markdown paste works too.' : 'No description'}
           onChange={d.onChange}
           onBlur={() => void d.flush()}
+          writingHelp={writingHelp}
           className="-mx-2 px-2 py-1 focus-within:bg-surface-2/40 hover:bg-surface-2/40"
         />
       </Suspense>

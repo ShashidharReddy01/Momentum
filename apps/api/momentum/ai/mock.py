@@ -161,7 +161,8 @@ def _fill(args: Any, last: Any) -> Any:
     return args
 
 
-_TEXT_SLOT = re.compile(r"\{\{(\$last\.[^}]+|\$keys)\}\}")
+_TEXT_SLOT = re.compile(r"\{\{(\$last\.[^}]+|\$keys|\$data)\}\}")
+_DATA = re.compile(r"<data[^>]*>\n?(.*?)\n?</data>", re.S)
 _KEY = re.compile(r"\bT-\d+\b")
 
 
@@ -169,9 +170,13 @@ def _fill_text(text: str, last: Any, user_text: str = "") -> str:
     """``{{$last.<path>}}`` in fixture text → that value (a list joined with spaces, a missing
     value as "(none)"), e.g. citations taken from the search the loop just ran. ``{{$keys}}`` →
     every task key in the last user message, as citations (``[T-1] [T-4]``), for features whose
-    data is in the prompt rather than in a tool result (summaries, status drafts)."""
+    data is in the prompt rather than in a tool result (summaries, status drafts). ``{{$data}}``
+    → the content of the last user message's ``<data>`` block (writing help echoes it)."""
 
     def one(m: re.Match[str]) -> str:
+        if m.group(1) == "$data":  # the (first) <data> block of the last user message
+            found = _DATA.search(user_text)
+            return found.group(1) if found else ""
         if m.group(1) == "$keys":
             keys = list(dict.fromkeys(_KEY.findall(user_text)))
             return " ".join(f"[{k}]" for k in keys) or "(none)"

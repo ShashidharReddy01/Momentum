@@ -6,7 +6,7 @@ import { IconButton } from '@/components/ui/IconButton';
 import { useMomentumConfig } from '@/lib/config';
 import { PreviewCard } from './PreviewCard';
 import { useBreakdown } from './queries';
-import { errorText } from './Summaries';
+import { errorText } from './errors';
 
 /**
  * S3.4.2 "Break down": Mo proposes 3–10 subtasks (optionally guided: "split by week"), shown as a

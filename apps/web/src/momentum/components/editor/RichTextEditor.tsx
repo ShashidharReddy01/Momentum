@@ -16,10 +16,11 @@ import {
   SquareCode,
   Strikethrough,
 } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Icon } from '@/components/ui/Icon';
 import { Popover, PopoverAnchor, PopoverContent } from '@/components/ui/Popover';
 import { cn } from '@/lib/cn';
+import { useWritingHelp, type WritingHelp } from './WritingHelp';
 
 const SAFE_PROTOCOLS = ['http', 'https', 'mailto'];
 export const isSafeUrl = (url: string) => {
@@ -47,6 +48,7 @@ export function RichTextEditor({
   onChange,
   onBlur,
   className,
+  writingHelp,
 }: {
   content: JSONContent | null;
   revision: number;
@@ -56,6 +58,8 @@ export function RichTextEditor({
   onChange: (doc: JSONContent) => void;
   onBlur?: () => void;
   className?: string;
+  /** S3.4.4: Mo's writing help in the toolbar (the host supplies the AI call; omit = none). */
+  writingHelp?: WritingHelp;
 }) {
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
@@ -111,15 +115,17 @@ export function RichTextEditor({
     editor?.setEditable(editable, false);
   }, [editor, editable]);
 
+  const help = useWritingHelp(editor, editable ? writingHelp : undefined);
   return (
     <div className={cn('group/editor rounded-md', className)}>
-      {editable && editor ? <Toolbar editor={editor} /> : null}
+      {editable && editor ? <Toolbar editor={editor} extra={help.menu} /> : null}
+      {help.panel}
       <EditorContent editor={editor} />
     </div>
   );
 }
 
-function Toolbar({ editor }: { editor: Editor }) {
+function Toolbar({ editor, extra }: { editor: Editor; extra?: ReactNode }) {
   const active = useEditorState({
     editor,
     selector: ({ editor: e }) => ({
@@ -247,6 +253,7 @@ function Toolbar({ editor }: { editor: Editor }) {
           </form>
         </PopoverContent>
       </Popover>
+      {extra}
     </div>
   );
 }

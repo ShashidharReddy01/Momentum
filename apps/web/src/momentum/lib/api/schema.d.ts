@@ -279,6 +279,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/ai/write": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Rewrite text (a suggestion; nothing is stored) */
+        post: operations["ai_write_api_v1_ai_write_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/attachments/{attachment_id}": {
         parameters: {
             query?: never;
@@ -4288,6 +4305,25 @@ export interface components {
             /** Slug */
             slug: string;
         };
+        /** WriteIn */
+        WriteIn: {
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "improve" | "shorten" | "fix_grammar" | "tone" | "translate";
+            /** Language */
+            language?: string | null;
+            /** Text */
+            text: string;
+            /** Tone */
+            tone?: ("friendly" | "formal" | "direct" | "confident") | null;
+        };
+        /** WriteOut */
+        WriteOut: {
+            /** Text */
+            text: string;
+        };
     };
     responses: never;
     parameters: never;
@@ -4878,6 +4914,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["BreakdownOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ai_write_api_v1_ai_write_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WriteIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WriteOut"];
                 };
             };
             /** @description Validation Error */

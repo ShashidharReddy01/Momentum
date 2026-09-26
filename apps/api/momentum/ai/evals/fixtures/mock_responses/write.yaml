@@ -1,0 +1,11 @@
+# S3.4.4 writing help (mock). The system prompt names the task; the user message is the text in
+# <data source="text">. Fixtures match the text; the default echoes it, visibly marked as mock.
+responses:
+  - match: {contains: "teh launch is delayd"}
+    text: "The launch is delayed."
+  - match: {contains: "wrap it in quotes please"}
+    text: "\"Quoted answer.\""
+  - match: {contains: "reply with nothing"}
+    text: "   "
+default:
+  text: "(mock) {{$data}}"
