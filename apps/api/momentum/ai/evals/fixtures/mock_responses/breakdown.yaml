@@ -1,0 +1,26 @@
+# S3.4.2 break into subtasks (mock). The user message carries the task (<task …>), the project
+# members and optional guidance; answers call submit_result.
+responses:
+  # every kind of output the server must correct (backend tests)
+  - match: {contains: "test every correction"}
+    tool_calls:
+      - name: submit_result
+        arguments:
+          subtasks:
+            - {title: "Collect competitor prices", assignee: "Ana Souza"}
+            - {title: "Draft the copy", assignee: "Ana"}
+            - {title: "Check with an outsider", assignee: "Tom Becker"}
+            - {title: "Ask a viewer", assignee: "Lena Novak"}
+            - {title: "Ask someone unknown", assignee: "Nobody Atall"}
+            - {title: "Review with legal", due_on: "2020-01-01"}
+            - {title: "Ship after the deadline", due_on: "2031-01-01"}
+            - {title: "Publish the page", due_on: "2029-12-01"}
+            - {title: "draft the COPY"}
+default:
+  tool_calls:
+    - name: submit_result
+      arguments:
+        subtasks:
+          - {title: "(mock) Gather what's needed", assignee: "Ana Souza"}
+          - {title: "(mock) Do the main work"}
+          - {title: "(mock) Review and wrap up"}

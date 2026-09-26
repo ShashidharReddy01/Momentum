@@ -175,6 +175,8 @@ Workspace memory:
 
 - **As built (S3.4.1):** `ai/summarize.py` summaries: plain `complete` calls (no tools), content wrapped in `<data source="comments|inbox">`, results cached in `ai_summaries` keyed by `(entity, kind, sha256(prompt version, model, content))` with insert-on-conflict so concurrent requests share one row.
 
+- **As built (S3.4.2):** inline features that change data (break down; later status drafts, plan my day, project from brief) use `structured.extract` for a typed proposal, **validate it server-side** against what the user may do (people on the project, date ranges, duplicates), and turn it into registry tool calls proposed through `ai/actions.py` (`source="inline"`), never a write path of their own.
+
 ## 8. Prompt-injection and data safety
 
 - All user/external content (task text, comments, attachments, Slack messages, emails) is wrapped in `<data source="…">…</data>` and the system prompt declares it non-instructional.

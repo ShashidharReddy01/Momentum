@@ -22,6 +22,7 @@ import { AssigneePicker } from './AssigneePicker';
 import { DatePicker } from './DatePicker';
 import type { Task } from './queries';
 import { useSubtaskMutations, useSubtasks } from './subtasks';
+import { BreakDownButton } from '@/features/ai';
 import { DraftRow } from './TaskRow';
 
 /**
@@ -80,14 +81,17 @@ export function SubtaskList({
   return (
     <div className={cn(!compact && 'mt-6')}>
       {!compact ? (
-        <h3 className="section-label mb-1 flex items-center gap-2">
-          Subtasks
-          {list.length ? (
-            <span className="tabular font-normal normal-case text-muted-2">
-              {done}/{list.length}
-            </span>
-          ) : null}
-        </h3>
+        <div className="mb-1 flex flex-wrap items-center gap-2">
+          <h3 className="section-label flex flex-1 items-center gap-2">
+            Subtasks
+            {list.length ? (
+              <span className="tabular font-normal normal-case text-muted-2">
+                {done}/{list.length}
+              </span>
+            ) : null}
+          </h3>
+          {canEdit ? <BreakDownButton taskId={parentId} /> : null}
+        </div>
       ) : null}
       <div role="list" aria-label="Subtasks">
         {list.map((t, i) => (

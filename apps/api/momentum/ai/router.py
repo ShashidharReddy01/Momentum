@@ -12,7 +12,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from momentum.ai import actions, chat, memory, prefs, quick_add, sse, summarize
+from momentum.ai import actions, breakdown, chat, memory, prefs, quick_add, sse, summarize
 from momentum.ai.command import run_command
 from momentum.ai.context import Screen
 from momentum.ai.errors import AIUnavailable
@@ -487,3 +487,35 @@ async def ai_summarize(body: SummarizeIn, ctx: CtxDep, uow: UowDep, rt: RuntimeD
             omitted=r.omitted,
             created_at=r.created_at,
         )
+
+
+# ---------------- break into subtasks (S3.4.2) ----------------
+
+
+class BreakdownIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    hint: str | None = Field(default=None, max_length=500)
+
+
+class BreakdownOut(BaseModel):
+    action_id: uuid.UUID
+    notes: list[str]
+    count: int
+
+
+@router.post(
+    "/tasks/{task_id}/subtasks",
+    response_model=BreakdownOut,
+    summary="Propose subtasks for a task (a previewed AI action; creates nothing)",
+)
+async def ai_breakdown(
+    task_id: uuid.UUID, body: BreakdownIn, ctx: CtxDep, uow: UowDep, rt: RuntimeDep
+) -> BreakdownOut:
+    llm = require_llm(rt)
+    ctx = ctx.with_(via="ai")
+    async with uow.transaction() as s:
+        r = await breakdown.break_down(
+            s, llm, ctx, rt.tools, task_id, hint=body.hint, now=datetime.now(UTC)
+        )
+        assert r.action_id is not None
+        return BreakdownOut(action_id=r.action_id, notes=r.notes, count=r.count)

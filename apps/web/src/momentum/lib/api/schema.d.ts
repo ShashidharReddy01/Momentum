@@ -245,6 +245,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/ai/tasks/{task_id}/subtasks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Propose subtasks for a task (a previewed AI action; creates nothing) */
+        post: operations["ai_breakdown_api_v1_ai_tasks__task_id__subtasks_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/attachments/{attachment_id}": {
         parameters: {
             query?: never;
@@ -1939,6 +1956,23 @@ export interface components {
         Body_upload_task_attachment_api_v1_tasks__task_id__attachments_post: {
             /** File */
             file: string;
+        };
+        /** BreakdownIn */
+        BreakdownIn: {
+            /** Hint */
+            hint?: string | null;
+        };
+        /** BreakdownOut */
+        BreakdownOut: {
+            /**
+             * Action Id
+             * Format: uuid
+             */
+            action_id: string;
+            /** Count */
+            count: number;
+            /** Notes */
+            notes: string[];
         };
         /** ChatIn */
         ChatIn: {
@@ -4609,6 +4643,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SummaryOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ai_breakdown_api_v1_ai_tasks__task_id__subtasks_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BreakdownIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BreakdownOut"];
                 };
             };
             /** @description Validation Error */

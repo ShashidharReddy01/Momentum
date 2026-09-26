@@ -49,7 +49,7 @@ export function SummaryButton({ body, label }: { body: Target; label: string }) 
   );
 }
 
-function errorText(e: unknown): string {
+export function errorText(e: unknown): string {
   if (e instanceof ApiError) {
     if (e.problem.code === 'ai_unavailable') return 'Mo is unavailable right now. Try again shortly.';
     return e.problem.detail ?? e.problem.title ?? 'Something went wrong.';

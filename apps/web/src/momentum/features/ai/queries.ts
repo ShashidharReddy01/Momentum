@@ -113,3 +113,17 @@ export function useSummarize() {
       (await api.POST('/api/v1/ai/summarize', { body })).data!,
   });
 }
+
+/** S3.4.2: Mo proposes subtasks for a task, as an AI action to review (creates nothing). */
+export function useBreakdown(taskId: string) {
+  const api = useApi();
+  return useMutation({
+    mutationFn: async (hint: string | null) =>
+      (
+        await api.POST('/api/v1/ai/tasks/{task_id}/subtasks', {
+          params: { path: { task_id: taskId } },
+          body: { hint },
+        })
+      ).data!,
+  });
+}
