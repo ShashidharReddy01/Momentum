@@ -6,7 +6,7 @@
 
 ## Current focus
 - **Phase:** 3: AI Layer v1 ("Mo") — **complete; exit criteria met** (2026-09-27; see the Phase 3 retro and `docs/roadmap/phase-3.md` "Phase 3 exit"). Awaiting the product owner's sign-off. Kickoff done (`docs/roadmap/phase-3-kickoff.md`); S3.1.1–S3.5.2 done. Phase 2 is complete.
-- **Next up:** the product owner signs off Phase 3 and answers the item under the Phase 3 retro's "Needs product-owner decision" (set the price table). **Then Phase 4. Not started.**
+- **Next up:** **Phase 4, S4.1.1 Rule model and executor (Opus).** Phase 3 is done (product-owner sign-off given by starting Phase 4). Each slice is a fresh session that follows `docs/process/slice-session.md` and ends by printing the next slice's prompt. The one open product-owner item (set `MOMENTUM_LLM_PRICE_TABLE`) does not block.
 - **Product-owner instruction (2026-09-26):** finish all remaining slices, then one big local test run against the real gateway (100+ questions/actions covering edge cases), then fix from that run.
 - **Scope note (product owner, 2026-09-26):** the customer-operations capabilities (SQQ, pricing, contracts, invoices, pushes to internal systems as tools and assignable agents) will be done later in the product owner's own codebase, **not in this repo**. Finish the roadmap as written.
 - **Branch:** all Phase 3 work is on `claude/clever-hopper-pbv7yr` (ahead of `main`). Continue from that branch.
