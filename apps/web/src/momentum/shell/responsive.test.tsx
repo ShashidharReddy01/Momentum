@@ -5,6 +5,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest
 import { MomentumApp } from '@/MomentumApp';
 import { authHandlers } from '@/mocks/handlers';
 import { homeHandlers } from '@/mocks/home';
+import { onboardingHandlers } from '@/mocks/onboarding';
 import { projectHandlers } from '@/mocks/projects';
 import { sectionHandlers } from '@/mocks/sections';
 import { taskHandlers } from '@/mocks/tasks';
@@ -39,6 +40,7 @@ describe('Narrow screens', () => {
       ...projectHandlers('', undefined, [{ name: 'Website Revamp', my_role: 'admin' }]),
       ...sectionHandlers('', { 'seed-1': ['Backlog'] }),
       ...taskHandlers(),
+      ...onboardingHandlers(),
     );
     window.history.replaceState(null, '', '/');
     render(<MomentumApp />);

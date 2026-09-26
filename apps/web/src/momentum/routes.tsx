@@ -3,6 +3,7 @@ import type { RouteObject } from 'react-router';
 import { AuthGate, DevLoginPage } from '@/features/auth';
 import { HomePage } from '@/features/home';
 import { AsanaImportPage } from '@/features/imports';
+import { MembersPage } from '@/features/members';
 import { InboxPage, NotificationSettingsPage } from '@/features/notifications';
 import { NotFoundPage, Placeholder } from '@/features/placeholders';
 import { ProjectPage } from '@/features/projects';
@@ -53,6 +54,11 @@ export function buildRoutes(config: RuntimeConfig): RouteObject[] {
           path: 'settings/import/asana',
           element: <AsanaImportPage />,
           handle: { crumb: 'Import from Asana' },
+        },
+        {
+          path: 'settings/members',
+          element: <MembersPage />,
+          handle: { crumb: 'Members' },
         },
         {
           path: 'ask',

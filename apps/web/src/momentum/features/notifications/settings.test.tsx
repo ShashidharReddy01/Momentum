@@ -5,6 +5,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { MomentumApp } from '@/MomentumApp';
 import { authHandlers } from '@/mocks/handlers';
 import { notificationHandlers } from '@/mocks/notifications';
+import { onboardingHandlers } from '@/mocks/onboarding';
 import { projectHandlers } from '@/mocks/projects';
 import { teamHandlers } from '@/mocks/teams';
 
@@ -49,6 +50,7 @@ describe('Notification settings (S2.5.3)', () => {
       ...teamHandlers(),
       ...projectHandlers(),
       ...notificationHandlers(),
+      ...onboardingHandlers(),
     );
     window.history.replaceState(null, '', '/');
     render(<MomentumApp />);

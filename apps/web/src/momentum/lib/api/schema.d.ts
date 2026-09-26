@@ -262,6 +262,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/onboarding": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** First-run checklist status for the Home page */
+        get: operations["get_onboarding_api_v1_me_onboarding_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Mark a first-run checklist step done, or dismiss the checklist */
+        patch: operations["patch_onboarding_api_v1_me_onboarding_patch"];
+        trace?: never;
+    };
     "/api/v1/me/prefs/notifications": {
         parameters: {
             query?: never;
@@ -1429,6 +1447,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/users/invite": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Invite a member by email (admin) */
+        post: operations["invite_user_api_v1_users_invite_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/users/members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Every workspace member incl. invited/disabled (admin, for the Members page) */
+        get: operations["list_members_api_v1_users_members_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/healthz": {
         parameters: {
             query?: never;
@@ -2392,6 +2444,24 @@ export interface components {
              */
             ok: boolean;
         };
+        /** OnboardingPatchIn */
+        OnboardingPatchIn: {
+            /** Dismissed */
+            dismissed?: boolean | null;
+            /** Used Command Palette */
+            used_command_palette?: boolean | null;
+        };
+        /** OnboardingStatusOut */
+        OnboardingStatusOut: {
+            /** Created Project */
+            created_project: boolean;
+            /** Dismissed */
+            dismissed: boolean;
+            /** Tried Import */
+            tried_import: boolean;
+            /** Used Command Palette */
+            used_command_palette: boolean;
+        };
         /**
          * OtherPlacementOut
          * @description One task's placement in a project other than the one being listed — the shape the bulk
@@ -3242,6 +3312,19 @@ export interface components {
             /** Count */
             count: number;
         };
+        /** UserInviteIn */
+        UserInviteIn: {
+            /** Email */
+            email: string;
+            /** Name */
+            name?: string | null;
+            /**
+             * Role
+             * @default member
+             * @enum {string}
+             */
+            role: "admin" | "member" | "guest";
+        };
         /** UserOut */
         UserOut: {
             /** Avatar Url */
@@ -3797,6 +3880,59 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MeOut"];
+                };
+            };
+        };
+    };
+    get_onboarding_api_v1_me_onboarding_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OnboardingStatusOut"];
+                };
+            };
+        };
+    };
+    patch_onboarding_api_v1_me_onboarding_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OnboardingPatchIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OnboardingStatusOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -6790,6 +6926,59 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    invite_user_api_v1_users_invite_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UserInviteIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_members_api_v1_users_members_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListOut_UserOut_"];
                 };
             };
         };

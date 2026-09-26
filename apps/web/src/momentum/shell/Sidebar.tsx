@@ -266,6 +266,9 @@ function UserMenu() {
         <DropdownMenuItem onSelect={() => navigate('/settings/import/asana')}>
           <Icon icon={Download} /> Import from Asana
         </DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => navigate('/settings/members')}>
+          <Icon icon={Users} /> Members
+        </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem onSelect={() => logout.mutate()}>
           <Icon icon={LogOut} /> Sign out

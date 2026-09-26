@@ -6,6 +6,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { MomentumApp } from './MomentumApp';
 import { authHandlers } from './mocks/handlers';
 import { notificationHandlers } from './mocks/notifications';
+import { onboardingHandlers } from './mocks/onboarding';
 import { projectHandlers } from './mocks/projects';
 import { searchHandlers } from './mocks/search';
 import { teamHandlers } from './mocks/teams';
@@ -30,6 +31,7 @@ describe('Momentum app shell', () => {
       ...projectHandlers(),
       ...notificationHandlers(),
       ...searchHandlers(),
+      ...onboardingHandlers(),
     );
     at('/');
     render(<MomentumApp />);
@@ -52,6 +54,7 @@ describe('Momentum app shell', () => {
       ...projectHandlers(),
       ...notificationHandlers(),
       ...searchHandlers(),
+      ...onboardingHandlers(),
     );
     at('/');
     render(<MomentumApp />);
@@ -73,6 +76,7 @@ describe('Momentum app shell', () => {
       ...projectHandlers(),
       ...notificationHandlers(),
       ...searchHandlers(),
+      ...onboardingHandlers(),
     );
     at('/');
     render(<MomentumApp />);
@@ -91,6 +95,7 @@ describe('Momentum app shell', () => {
       ...projectHandlers('/x'),
       ...notificationHandlers('/x'),
       ...searchHandlers('/x'),
+      ...onboardingHandlers('/x'),
     );
     at('/x/');
     render(<MomentumApp basePath="/x" />);

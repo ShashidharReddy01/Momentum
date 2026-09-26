@@ -13,12 +13,19 @@ const problem401 = (base: string) =>
     { status: 401, headers: { 'content-type': 'application/problem+json' } },
   );
 
-/** Stateful handler set emulating the dev-auth backend. */
+/** Stateful handler set emulating the dev-auth backend. `me` overrides the fixture user (e.g.
+ * `{ role: 'admin' }`) — S2.7.3's Members page gates its Invite button on workspace `role`. */
 export function authHandlers(
-  opts: { base?: string; loggedIn?: boolean; config?: Partial<RuntimeConfig> } = {},
+  opts: {
+    base?: string;
+    loggedIn?: boolean;
+    config?: Partial<RuntimeConfig>;
+    me?: Partial<typeof ravi>;
+  } = {},
 ) {
   const base = opts.base ?? '';
   let loggedIn = opts.loggedIn ?? false;
+  const me = { ...ravi, ...opts.me };
   const requests: string[] = [];
   const handlers = [
     http.get(`*${base}/api/v1/config`, ({ request }) => {
@@ -27,7 +34,7 @@ export function authHandlers(
     }),
     http.get(`*${base}/api/v1/me`, ({ request }) => {
       requests.push(new URL(request.url).pathname);
-      return loggedIn ? HttpResponse.json({ user: ravi, workspace }) : problem401(base);
+      return loggedIn ? HttpResponse.json({ user: me, workspace }) : problem401(base);
     }),
     http.get(`*${base}/api/v1/dev/users`, () => HttpResponse.json([ravi])),
     http.post(`*${base}/api/v1/dev/login`, ({ request }) => {

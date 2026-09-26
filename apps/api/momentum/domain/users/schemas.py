@@ -32,6 +32,24 @@ class MeOut(BaseModel):
     workspace: WorkspaceOut
 
 
+class UserInviteIn(BaseModel):
+    email: Annotated[str, StringConstraints(strip_whitespace=True, min_length=3, max_length=254)]
+    name: Annotated[str, StringConstraints(strip_whitespace=True, max_length=200)] | None = None
+    role: Literal["admin", "member", "guest"] = "member"
+
+
+class OnboardingStatusOut(BaseModel):
+    created_project: bool
+    tried_import: bool
+    used_command_palette: bool
+    dismissed: bool
+
+
+class OnboardingPatchIn(BaseModel):
+    used_command_palette: bool | None = None
+    dismissed: bool | None = None
+
+
 _UUID = r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"
 ASSIGNEE_FILTER = rf"^(me|none|{_UUID})$"
 

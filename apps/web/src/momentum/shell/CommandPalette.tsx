@@ -13,13 +13,14 @@ import {
   User,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { MoMark } from '@/components/common/MoMark';
 import { Dialog } from '@/components/ui/Dialog';
 import { Icon } from '@/components/ui/Icon';
 import { Kbd } from '@/components/ui/Kbd';
 import { useLogout } from '@/features/auth';
+import { useMarkOnboarding, useOnboarding } from '@/features/members';
 import { useSearch } from '@/features/search';
 import { useUi } from '@/stores/ui';
 
@@ -39,6 +40,23 @@ export function CommandPalette() {
   const logout = useLogout();
   const [query, setQuery] = useState('');
   const results = useSearch(query, { limit: 4 });
+
+  // S2.7.3: the "try ⌘K" onboarding checklist step has no natural DB record (unlike "create a
+  // project" or "import"), so it's pinged once, the first time the palette is actually opened.
+  // `enabled: open` (rather than always-on) matters beyond perf: CommandPalette mounts on every
+  // authenticated page via Layout, so an unconditional query here would mean every existing test
+  // that renders the app shell now needs an onboarding-status mock too, not just the ones that
+  // actually open the palette.
+  const onboarding = useOnboarding({ enabled: open });
+  const markOnboarding = useMarkOnboarding();
+  const pinged = useRef(false);
+  useEffect(() => {
+    if (!open || pinged.current || !onboarding.data) return;
+    pinged.current = true;
+    if (!onboarding.data.used_command_palette) {
+      markOnboarding.mutate({ used_command_palette: true });
+    }
+  }, [open, onboarding.data, markOnboarding]);
 
   const go = (to: string) => () => {
     setOpen(false);

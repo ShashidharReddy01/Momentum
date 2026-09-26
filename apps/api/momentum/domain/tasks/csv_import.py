@@ -15,7 +15,7 @@ from __future__ import annotations
 import csv
 import io
 import uuid
-from datetime import date
+from datetime import UTC, date, datetime
 
 from pydantic import BaseModel
 from sqlalchemy import func, select
@@ -24,6 +24,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from momentum.core.context import Ctx
 from momentum.core.errors import ValidationFailed
 from momentum.domain.access import get_visible_project, require_project_role
+from momentum.domain.integrations.models import ImportJob
 from momentum.domain.sections.service import create_section, list_sections
 from momentum.domain.tasks.service import create_task, set_completed
 from momentum.domain.users.models import User
@@ -89,6 +90,11 @@ async def import_csv(
     # (a bad row) is caught per row below; a permission error propagates as a real HTTP error.
     _, role = await get_visible_project(session, ctx, project_id)
     require_project_role(role, "editor", "import tasks")
+    assert ctx.actor.id is not None
+    job = ImportJob(
+        workspace_id=ctx.workspace_id, source="csv", status="running", started_by=ctx.actor.id
+    )
+    session.add(job)
     rows = _read_rows(csv_text)
     section_by_name: dict[str, uuid.UUID] = {
         s.name: s.id for s in await list_sections(session, project_id)
@@ -152,4 +158,7 @@ async def import_csv(
                 task, _ = task_m.entity
                 await set_completed(session, ctx, task.id, True, force=True)
 
+    job.status = "done"
+    job.stats = {"created": created, "skipped": skipped, "errors": len(errors)}
+    job.finished_at = datetime.now(UTC)
     return CsvImportResult(created=created, skipped=skipped, errors=errors)

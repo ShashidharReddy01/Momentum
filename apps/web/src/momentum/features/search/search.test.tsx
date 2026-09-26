@@ -5,6 +5,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { MomentumApp } from '@/MomentumApp';
 import { authHandlers } from '@/mocks/handlers';
 import { notificationHandlers } from '@/mocks/notifications';
+import { onboardingHandlers } from '@/mocks/onboarding';
 import { projectHandlers } from '@/mocks/projects';
 import { searchHandlers } from '@/mocks/search';
 import { teamHandlers } from '@/mocks/teams';
@@ -42,6 +43,7 @@ function boot() {
     ...projectHandlers('', undefined, [{ name: 'Website Revamp', my_role: 'admin' }]),
     ...notificationHandlers(),
     ...searchHandlers('', RESULTS),
+    ...onboardingHandlers(),
   );
   window.history.replaceState(null, '', '/');
   render(<MomentumApp />);
@@ -70,6 +72,7 @@ describe('Global search (S2.6.2)', () => {
       ...projectHandlers('', undefined, [{ name: 'Website Revamp', my_role: 'admin' }]),
       ...notificationHandlers(),
       ...searchHandlers('', RESULTS),
+      ...onboardingHandlers(),
     );
     window.history.replaceState(null, '', '/search?q=onboarding');
     render(<MomentumApp />);

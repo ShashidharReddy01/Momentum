@@ -12,7 +12,15 @@ from momentum.core.errors import NotFound
 from momentum.domain.access import get_visible_project
 from momentum.domain.users import service
 from momentum.domain.users.models import User
-from momentum.domain.users.schemas import MeOut, ProjectViewPrefs, UserOut, WorkspaceOut
+from momentum.domain.users.schemas import (
+    MeOut,
+    OnboardingPatchIn,
+    OnboardingStatusOut,
+    ProjectViewPrefs,
+    UserInviteIn,
+    UserOut,
+    WorkspaceOut,
+)
 from momentum.domain.workspace.service import ensure_default_workspace
 
 router = APIRouter(tags=["users"])
@@ -35,6 +43,65 @@ async def list_users(
     async with uow.transaction() as session:
         users = await service.list_users(session, ctx, q=q, limit=limit)
         return ListOut(data=[UserOut.model_validate(u) for u in users])
+
+
+@router.get(
+    "/users/members",
+    response_model=ListOut[UserOut],
+    summary="Every workspace member incl. invited/disabled (admin, for the Members page)",
+)
+async def list_members(ctx: CtxDep, uow: UowDep) -> ListOut[UserOut]:
+    async with uow.transaction() as session:
+        users = await service.list_members(session, ctx)
+        return ListOut(data=[UserOut.model_validate(u) for u in users])
+
+
+@router.post(
+    "/users/invite",
+    response_model=UserOut,
+    summary="Invite a member by email (admin)",
+)
+async def invite_user(body: UserInviteIn, ctx: CtxDep, uow: UowDep) -> UserOut:
+    async with uow.transaction() as session:
+        user = await service.invite_user(session, ctx, body.email, body.name, body.role)
+        return UserOut.model_validate(user)
+
+
+@router.get(
+    "/me/onboarding",
+    response_model=OnboardingStatusOut,
+    summary="First-run checklist status for the Home page",
+)
+async def get_onboarding(ctx: CtxDep, uow: UowDep) -> OnboardingStatusOut:
+    async with uow.transaction() as session:
+        status = await service.get_onboarding_status(session, ctx)
+        return OnboardingStatusOut(
+            created_project=status.created_project,
+            tried_import=status.tried_import,
+            used_command_palette=status.used_command_palette,
+            dismissed=status.dismissed,
+        )
+
+
+@router.patch(
+    "/me/onboarding",
+    response_model=OnboardingStatusOut,
+    summary="Mark a first-run checklist step done, or dismiss the checklist",
+)
+async def patch_onboarding(
+    body: OnboardingPatchIn, ctx: CtxDep, uow: UowDep
+) -> OnboardingStatusOut:
+    async with uow.transaction() as session:
+        await service.mark_onboarding(
+            session, ctx, used_command_palette=body.used_command_palette, dismissed=body.dismissed
+        )
+        status = await service.get_onboarding_status(session, ctx)
+        return OnboardingStatusOut(
+            created_project=status.created_project,
+            tried_import=status.tried_import,
+            used_command_palette=status.used_command_palette,
+            dismissed=status.dismissed,
+        )
 
 
 @router.get(

@@ -4,6 +4,7 @@ import { setupServer } from 'msw/node';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { MomentumApp } from '@/MomentumApp';
 import { authHandlers } from '@/mocks/handlers';
+import { onboardingHandlers } from '@/mocks/onboarding';
 import { projectHandlers } from '@/mocks/projects';
 import { sectionHandlers } from '@/mocks/sections';
 import { taskHandlers } from '@/mocks/tasks';
@@ -25,6 +26,7 @@ describe('Projects', () => {
       ...projectHandlers('', () => 'Design'),
       ...sectionHandlers('', { 'project-1': ['To do'] }),
       ...taskHandlers(),
+      ...onboardingHandlers(),
     );
     window.history.replaceState(null, '', '/');
     render(<MomentumApp />);

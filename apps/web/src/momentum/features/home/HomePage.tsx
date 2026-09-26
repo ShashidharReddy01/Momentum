@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { ArrowRight, CheckSquare, FolderKanban, FolderPlus, Hourglass } from 'lucide-react';
+import { ArrowRight, CheckSquare, FolderKanban, FolderPlus, Hourglass, Sparkles, X } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link } from 'react-router';
 import { CompleteCheck } from '@/components/common/CompleteCheck';
@@ -8,14 +8,18 @@ import { EmptyState, ErrorState } from '@/components/common/States';
 import { Avatar } from '@/components/ui/Avatar';
 import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
+import { IconButton } from '@/components/ui/IconButton';
+import { Kbd } from '@/components/ui/Kbd';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useMe } from '@/features/auth';
+import { useMarkOnboarding, useOnboarding } from '@/features/members';
 import { usePeople } from '@/features/people';
 import { NewProjectDialog } from '@/features/projects';
 import { TaskNavProvider, TaskPane, useTaskNav } from '@/features/tasks';
 import { colorVar } from '@/features/teams';
 import { cn } from '@/lib/cn';
 import { applyUserChannelEvent, useChannel } from '@/lib/realtime';
+import { useUi } from '@/stores/ui';
 import { homeKey, useCompleteFromHome, useHome, type HomeProject, type HomeTask } from './queries';
 
 function greeting(date: Date): string {
@@ -104,6 +108,10 @@ function HomeContent() {
         ) : null}
       </p>
 
+      {home.data && (home.data.has_projects || home.data.priorities.length) ? (
+        <OnboardingChecklist onNewProject={() => setNewProject(true)} />
+      ) : null}
+
       {home.isPending ? (
         <div className="mt-6 grid gap-4 md:grid-cols-3">
           <Skeleton className="h-56 md:col-span-2" />
@@ -137,6 +145,73 @@ function HomeContent() {
         </div>
       )}
       <NewProjectDialog open={newProject} onOpenChange={setNewProject} />
+    </div>
+  );
+}
+
+/** S2.7.3: first-run checklist. `created_project` and `tried_import` are computed server-side
+ * from real activity (any project this user created; any CSV/Asana import job they started) —
+ * "try ⌘K" has no natural database record, so it's the one item `CommandPalette` pings on first
+ * open (see its own comment). Hides itself once the person dismisses it explicitly; it does
+ * *not* auto-hide once all three are done, since "done" is still worth seeing confirmed. */
+function OnboardingChecklist({ onNewProject }: { onNewProject: () => void }) {
+  const onboarding = useOnboarding();
+  const markOnboarding = useMarkOnboarding();
+  const setPaletteOpen = useUi((s) => s.setPaletteOpen);
+  const status = onboarding.data;
+  if (!status || status.dismissed) return null;
+
+  const items = [
+    {
+      key: 'created_project',
+      done: status.created_project,
+      label: 'Create a project',
+      action: (
+        <Button size="sm" variant="text" onClick={onNewProject}>
+          New project
+        </Button>
+      ),
+    },
+    {
+      key: 'tried_import',
+      done: status.tried_import,
+      label: 'Import your existing tasks',
+      action: (
+        <Link to="/settings/import/asana" className="text-xs text-accent hover:underline">
+          Import from Asana
+        </Link>
+      ),
+    },
+    {
+      key: 'used_command_palette',
+      done: status.used_command_palette,
+      label: 'Try the command palette',
+      action: (
+        <Button size="sm" variant="text" onClick={() => setPaletteOpen(true)}>
+          Open <Kbd combo="mod+k" />
+        </Button>
+      ),
+    },
+  ] as const;
+
+  return (
+    <div className="mt-4 flex items-start gap-3 rounded-lg border border-hairline bg-surface p-3">
+      <Icon icon={Sparkles} size={16} className="mt-0.5 shrink-0 text-accent" />
+      <ul aria-label="Getting started" className="flex min-w-0 flex-1 flex-wrap gap-x-6 gap-y-2">
+        {items.map((it) => (
+          <li key={it.key} className="flex items-center gap-2 text-sm">
+            <CompleteCheck checked={it.done} disabled label={it.label} onChange={() => {}} size={16} />
+            <span className={cn(it.done && 'text-muted line-through')}>{it.label}</span>
+            {!it.done ? it.action : null}
+          </li>
+        ))}
+      </ul>
+      <IconButton
+        icon={X}
+        label="Dismiss getting-started checklist"
+        size="icon-sm"
+        onClick={() => markOnboarding.mutate({ dismissed: true })}
+      />
     </div>
   );
 }

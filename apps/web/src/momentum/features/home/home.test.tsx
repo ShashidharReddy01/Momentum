@@ -5,6 +5,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { MomentumApp } from '@/MomentumApp';
 import { authHandlers } from '@/mocks/handlers';
 import { homeHandlers, homeTask } from '@/mocks/home';
+import { onboardingHandlers } from '@/mocks/onboarding';
 import { projectHandlers } from '@/mocks/projects';
 import { sectionHandlers } from '@/mocks/sections';
 import { taskHandlers } from '@/mocks/tasks';
@@ -20,7 +21,10 @@ afterEach(() => {
 });
 afterAll(() => server.close());
 
-function boot(home: Partial<components['schemas']['HomeOut']>) {
+function boot(
+  home: Partial<components['schemas']['HomeOut']>,
+  onboarding: Parameters<typeof onboardingHandlers>[1] = {},
+) {
   const h = homeHandlers('', home);
   server.use(
     ...authHandlers({ loggedIn: true }).handlers,
@@ -29,6 +33,7 @@ function boot(home: Partial<components['schemas']['HomeOut']>) {
     ...projectHandlers('', undefined, [{ name: 'Website Revamp', my_role: 'admin' }]),
     ...sectionHandlers('', { 'seed-1': ['Backlog'] }),
     ...taskHandlers(),
+    ...onboardingHandlers('', onboarding),
   );
   window.history.replaceState(null, '', '/');
   render(<MomentumApp />);
@@ -110,5 +115,20 @@ describe('Home', () => {
     });
     await user.click(await screen.findByRole('button', { name: 'Open me' }));
     await waitFor(() => expect(window.location.search).toContain('task=home-'));
+  });
+
+  it('S2.7.3: onboarding checklist shows undone items, and can be dismissed', async () => {
+    const { user } = boot(
+      { recent_projects: [project('Website Revamp')] },
+      { created_project: true, tried_import: false, used_command_palette: false },
+    );
+    const checklist = await screen.findByRole('list', { name: 'Getting started' });
+    expect(within(checklist).getByText('Create a project')).toHaveClass('line-through');
+    expect(within(checklist).getByText('Import your existing tasks')).not.toHaveClass('line-through');
+
+    await user.click(screen.getByRole('button', { name: 'Dismiss getting-started checklist' }));
+    await waitFor(() =>
+      expect(screen.queryByRole('list', { name: 'Getting started' })).not.toBeInTheDocument(),
+    );
   });
 });
