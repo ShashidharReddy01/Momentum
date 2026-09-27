@@ -26,6 +26,7 @@ from momentum.core.mutation import Mutation
 from momentum.core.permissions import Action, can
 from momentum.domain.access import get_visible_project, require_project_role
 from momentum.domain.fields.models import FieldDef
+from momentum.domain.projects.models import Project
 from momentum.domain.rules.models import Rule, RuleRun
 from momentum.domain.rules.schemas import RuleIn, RulePatchIn, RuleSpec, is_custom_field
 from momentum.domain.sections.models import Section
@@ -63,21 +64,31 @@ async def _load(
 async def _check_references(
     session: AsyncSession, ctx: Ctx, project_id: uuid.UUID | None, spec: RuleSpec
 ) -> None:
-    """Every id the rule mentions must exist here (sections in the rule's own project)."""
+    """Every id the rule mentions must exist. ``move_section``'s section (like the trigger's)
+    must be in the rule's own project; ``add_to_project``'s section is checked against that
+    action's own target project instead."""
     trigger, conditions, actions = spec.trigger, spec.conditions, spec.actions
-    sections = {trigger.to_section} | {a.section_id for a in actions}
+    own_sections = {trigger.to_section} | {
+        a.section_id for a in actions if a.type == "move_section"
+    }
     users = {trigger.user_id} | {a.user_id for a in actions}
-    tags: set[uuid.UUID] = set()
+    tags = {a.tag_id for a in actions if a.type == "add_tag"}
+    other_projects = {
+        a.project_id for a in actions if a.type in ("add_to_project", "remove_from_project")
+    }
     fields: set[uuid.UUID] = set()
     if trigger.field and is_custom_field(trigger.field):
         fields.add(uuid.UUID(trigger.field))
+    for a in actions:
+        if a.type == "set_field" and a.field_id is not None and is_custom_field(a.field_id):
+            fields.add(uuid.UUID(a.field_id))
     for c in conditions:
         raw = c.value if isinstance(c.value, list) else [c.value]
         ids = {uuid.UUID(v) for v in raw if c.field in ("assignee", "tag") and isinstance(v, str)}
         (users if c.field == "assignee" else tags).update(ids)
         if is_custom_field(c.field):
             fields.add(uuid.UUID(c.field))
-    for section_id in sections - {None}:
+    for section_id in own_sections - {None}:
         section = await session.get(Section, section_id)
         if (
             section is None
@@ -85,11 +96,28 @@ async def _check_references(
             or (project_id is not None and section.project_id != project_id)
         ):
             raise ValidationFailed("That section isn't in this project")
+    for other_id in other_projects - {None}:
+        target = await session.get(Project, other_id)
+        if (
+            target is None
+            or target.workspace_id != ctx.workspace_id
+            or target.deleted_at is not None
+        ):
+            raise ValidationFailed("Unknown project in the rule")
+    for a in actions:
+        if a.type == "add_to_project" and a.section_id is not None:
+            section = await session.get(Section, a.section_id)
+            if (
+                section is None
+                or section.deleted_at is not None
+                or section.project_id != a.project_id
+            ):
+                raise ValidationFailed("That section isn't in the target project")
     for user_id in users - {None}:
         user = await session.get(User, user_id)
         if user is None or user.workspace_id != ctx.workspace_id or user.status != "active":
             raise ValidationFailed("Unknown person in the rule")
-    for tag_id in tags:
+    for tag_id in tags - {None}:
         tag = await session.get(Tag, tag_id)
         if tag is None or tag.workspace_id != ctx.workspace_id:
             raise ValidationFailed("Unknown tag in the rule")

@@ -18,30 +18,45 @@ from pydantic import (
     model_validator,
 )
 
-# Triggers the executor can fire on today. The others in the roadmap (due date approaching,
-# form submitted, approval decided) are refused rather than accepted and never fired.
+# Triggers the executor can fire on today. The others in the roadmap (form submitted, approval
+# decided) are refused rather than accepted and never fired.
 TRIGGER_PARAMS: dict[str, set[str]] = {
     "task.added": set(),
     "task.moved": {"to_section"},
     "task.field_changed": {"field", "to"},
     "task.completed": set(),
     "task.assigned": {"user_id"},
+    "task.due_approaching": set(),
 }
-NOT_YET_TRIGGERS = {"task.due_approaching", "form.submitted", "approval.decided"}
+NOT_YET_TRIGGERS = {"form.submitted", "approval.decided"}
 
 TRIGGER_FIELDS = ("priority", "due_on", "start_on")
 CONDITION_FIELDS = ("priority", "assignee", "due_on", "start_on", "tag")
 OPS = ("eq", "neq", "in", "empty", "not_empty", "gt", "lt")
 ORDERED_FIELDS = ("due_on", "start_on")  # gt/lt also work on custom number and date fields
 
+# Actions the executor can run today. `allowed` is every param an action accepts; a param
+# missing from ACTION_REQUIRED for that action is optional (e.g. add_to_project's section_id
+# falls back to the target project's default section, like the API endpoint does).
 ACTION_PARAMS: dict[str, set[str]] = {
     "assign": {"user_id"},
     "add_comment": {"text"},
     "move_section": {"section_id"},
     "mark_complete": set(),
+    "set_field": {"field_id", "value"},
+    "add_to_project": {"project_id", "section_id"},
+    "remove_from_project": {"project_id"},
+    "add_tag": {"tag_id"},
+    "create_subtasks": {"titles"},
+    "set_due_relative": {"days"},
+    "notify_user": {"user_id", "text"},
 }
+ACTION_REQUIRED: dict[str, set[str]] = {**ACTION_PARAMS, "add_to_project": {"project_id"}}
+# Slack (P7) and the AI step (S4.1.5) are on the roadmap but have no backing service yet.
+NOT_YET_ACTIONS = {"slack_message", "ai_step"}
 MAX_CONDITIONS = 10
 MAX_ACTIONS = 10
+MAX_SUBTASK_TITLES = 20
 
 
 def is_custom_field(name: str) -> bool:
@@ -110,6 +125,11 @@ class Condition(BaseModel):
         return self
 
 
+SubtaskTitle = Annotated[
+    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=500)
+]
+
+
 class Action(BaseModel):
     model_config = ConfigDict(extra="forbid")
     type: str
@@ -119,22 +139,42 @@ class Action(BaseModel):
         | None
     ) = None
     section_id: uuid.UUID | None = None
+    field_id: str | None = None  # "priority" or a custom field id
+    value: Any = None
+    project_id: uuid.UUID | None = None
+    tag_id: uuid.UUID | None = None
+    titles: list[SubtaskTitle] | None = Field(default=None, max_length=MAX_SUBTASK_TITLES)
+    days: int | None = Field(default=None, ge=-365, le=365)
 
     @model_validator(mode="after")
     def _check(self) -> Action:
+        if self.type in NOT_YET_ACTIONS:
+            raise ValueError(f"The action {self.type} isn't available yet")
         allowed = ACTION_PARAMS.get(self.type)
         if allowed is None:
             raise ValueError(f"Unknown action {self.type}")
         extra = self.model_fields_set - {"type"} - allowed
         if extra:
             raise ValueError(f"{self.type} doesn't take {', '.join(sorted(extra))}")
-        missing = {p for p in allowed if p not in self.model_fields_set}
+        missing = {
+            p for p in ACTION_REQUIRED.get(self.type, allowed) if p not in self.model_fields_set
+        }
         if missing:
             raise ValueError(f"{self.type} needs {', '.join(sorted(missing))}")
         if self.type == "add_comment" and self.text is None:
             raise ValueError("add_comment needs text")
         if self.type == "move_section" and self.section_id is None:
             raise ValueError("move_section needs a section_id")
+        if self.type == "notify_user" and self.text is None:
+            raise ValueError("notify_user needs text")
+        if self.type == "create_subtasks" and not self.titles:
+            raise ValueError("create_subtasks needs a non-empty titles list")
+        if (
+            self.type == "set_field"
+            and self.field_id != "priority"
+            and not (self.field_id is not None and is_custom_field(self.field_id))
+        ):
+            raise ValueError("field_id must be 'priority' or a custom field id")
         return self  # assign with user_id null unassigns
 
 

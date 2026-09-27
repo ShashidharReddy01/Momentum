@@ -8,10 +8,10 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from momentum.core.db import Base, IdMixin
 
-# Kinds this slice (S2.5.1) actually generates. `approval_requested`/`approval_decided` (Phase 4
-# workflow) and `agent_proposal`/`digest` (Phase 5 Pulse agent) are valid per data-model.md's own
-# check constraint but nothing produces them yet — listed so a later phase's migration doesn't
-# need to touch this constraint.
+# Kinds this slice (S2.5.1) actually generates, plus `rule` (S4.1.2's `notify_user` action).
+# `approval_requested`/`approval_decided` (Phase 4 workflow) and `agent_proposal`/`digest`
+# (Phase 5 Pulse agent) are valid per data-model.md's own check constraint but nothing produces
+# them yet — listed so a later phase's migration doesn't need to touch this constraint.
 NOTIFICATION_KINDS = (
     "assigned",
     "mentioned",
@@ -19,6 +19,7 @@ NOTIFICATION_KINDS = (
     "completed",
     "due_soon",
     "overdue",
+    "rule",
     "approval_requested",
     "approval_decided",
     "agent_proposal",

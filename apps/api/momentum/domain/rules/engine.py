@@ -34,11 +34,22 @@ from momentum.core.settings import Settings
 from momentum.core.telemetry import get_logger
 from momentum.domain.comments.service import create_comment
 from momentum.domain.fields.models import FieldValue
+from momentum.domain.fields.service import set_task_field_value
+from momentum.domain.notifications.service import notify
 from momentum.domain.rules.models import Rule, RuleRun
 from momentum.domain.sections.models import Section
 from momentum.domain.tags.models import TaskTag
+from momentum.domain.tags.service import add_task_tag
 from momentum.domain.tasks.models import Task, TaskProject
-from momentum.domain.tasks.service import move_tasks, set_completed, update_task
+from momentum.domain.tasks.service import (
+    add_task_to_project,
+    create_subtask,
+    move_tasks,
+    remove_task_from_project,
+    set_completed,
+    today_for,
+    update_task,
+)
 from momentum.domain.users.models import User
 
 log = get_logger("rules")
@@ -54,6 +65,7 @@ TRIGGER_EVENTS: dict[str, tuple[str, ...]] = {
     "task.field_changed": ("task.updated", "task.field_updated"),
     "task.completed": ("task.completed",),
     "task.assigned": ("task.assigned",),
+    "task.due_approaching": ("task.due_approaching",),
 }
 WATCHED = {e for events in TRIGGER_EVENTS.values() for e in events}
 
@@ -109,11 +121,82 @@ async def _mark_complete(
     await set_completed(session, ctx, task_id, True, batch_id=batch)
 
 
+async def _set_field(
+    session: AsyncSession, ctx: Ctx, task_id: uuid.UUID, spec: dict[str, Any], batch: uuid.UUID
+) -> None:
+    field_id = str(spec["field_id"])
+    if field_id == "priority":
+        await update_task(session, ctx, task_id, {"priority": spec.get("value")}, batch_id=batch)
+    else:
+        await set_task_field_value(session, ctx, task_id, uuid.UUID(field_id), spec.get("value"))
+
+
+async def _add_to_project(
+    session: AsyncSession, ctx: Ctx, task_id: uuid.UUID, spec: dict[str, Any], batch: uuid.UUID
+) -> None:
+    section_id = spec.get("section_id")
+    await add_task_to_project(
+        session,
+        ctx,
+        task_id,
+        uuid.UUID(str(spec["project_id"])),
+        section_id=uuid.UUID(str(section_id)) if section_id else None,
+    )
+
+
+async def _remove_from_project(
+    session: AsyncSession, ctx: Ctx, task_id: uuid.UUID, spec: dict[str, Any], batch: uuid.UUID
+) -> None:
+    await remove_task_from_project(session, ctx, task_id, uuid.UUID(str(spec["project_id"])))
+
+
+async def _add_tag(
+    session: AsyncSession, ctx: Ctx, task_id: uuid.UUID, spec: dict[str, Any], batch: uuid.UUID
+) -> None:
+    await add_task_tag(session, ctx, task_id, uuid.UUID(str(spec["tag_id"])), None)
+
+
+async def _create_subtasks(
+    session: AsyncSession, ctx: Ctx, task_id: uuid.UUID, spec: dict[str, Any], batch: uuid.UUID
+) -> None:
+    for title in spec["titles"]:
+        await create_subtask(session, ctx, task_id, str(title), batch_id=batch)
+
+
+async def _set_due_relative(
+    session: AsyncSession, ctx: Ctx, task_id: uuid.UUID, spec: dict[str, Any], batch: uuid.UUID
+) -> None:
+    due = today_for(ctx) + timedelta(days=int(spec["days"]))
+    await update_task(session, ctx, task_id, {"due_on": due.isoformat()}, batch_id=batch)
+
+
+async def _notify_user(
+    session: AsyncSession, ctx: Ctx, task_id: uuid.UUID, spec: dict[str, Any], batch: uuid.UUID
+) -> None:
+    user_id = spec.get("user_id")
+    await notify(
+        session,
+        ctx,
+        user_id=uuid.UUID(str(user_id)) if user_id else None,
+        kind="rule",
+        entity_type="task",
+        entity_id=task_id,
+        title=str(spec["text"])[:300],
+    )
+
+
 ACTIONS: dict[str, ActionFn] = {
     "assign": _assign,
     "add_comment": _add_comment,
     "move_section": _move_section,
     "mark_complete": _mark_complete,
+    "set_field": _set_field,
+    "add_to_project": _add_to_project,
+    "remove_from_project": _remove_from_project,
+    "add_tag": _add_tag,
+    "create_subtasks": _create_subtasks,
+    "set_due_relative": _set_due_relative,
+    "notify_user": _notify_user,
 }
 
 
@@ -203,7 +286,7 @@ async def _trigger_matches(session: AsyncSession, trig: dict[str, Any], ev: Outb
     if kind == "task.assigned":
         assignee = data.get("assignee_id")
         return bool(assignee is not None and trig.get("user_id") in (None, assignee))
-    return bool(kind == "task.completed")
+    return kind in ("task.completed", "task.due_approaching")
 
 
 async def _event_projects(session: AsyncSession, ev: OutboxEvent) -> set[uuid.UUID]:

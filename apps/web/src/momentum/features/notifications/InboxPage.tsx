@@ -17,6 +17,7 @@ const KIND_LABEL: Record<Notification['kind'], string> = {
   completed: 'Completed',
   due_soon: 'Due soon',
   overdue: 'Overdue',
+  rule: 'Rule',
   approval_requested: 'Approval requested',
   approval_decided: 'Approval decided',
   agent_proposal: 'Agent proposal',

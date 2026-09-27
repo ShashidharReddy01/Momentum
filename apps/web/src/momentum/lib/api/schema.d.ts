@@ -1937,14 +1937,26 @@ export interface components {
     schemas: {
         /** Action */
         Action: {
+            /** Days */
+            days?: number | null;
+            /** Field Id */
+            field_id?: string | null;
+            /** Project Id */
+            project_id?: string | null;
             /** Section Id */
             section_id?: string | null;
+            /** Tag Id */
+            tag_id?: string | null;
             /** Text */
             text?: string | null;
+            /** Titles */
+            titles?: string[] | null;
             /** Type */
             type: string;
             /** User Id */
             user_id?: string | null;
+            /** Value */
+            value?: unknown;
         };
         /** ActivityItemOut */
         ActivityItemOut: {
@@ -3245,7 +3257,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "assigned" | "mentioned" | "commented" | "completed" | "due_soon" | "overdue" | "approval_requested" | "approval_decided" | "agent_proposal" | "digest";
+            kind: "assigned" | "mentioned" | "commented" | "completed" | "due_soon" | "overdue" | "rule" | "approval_requested" | "approval_decided" | "agent_proposal" | "digest";
             /** Read At */
             read_at: string | null;
             /** Snippet */

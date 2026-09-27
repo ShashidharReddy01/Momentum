@@ -208,7 +208,7 @@ id bigserial pk, workspace_id, type text, entity_type, entity_id, payload jsonb,
 consumer text pk, last_outbox_id bigint, updated_at. Tracks outbox consumers for idempotent dispatch.
 
 ### `notifications`
-id, workspace_id, user_id, kind (`assigned`,`mentioned`,`commented`,`completed`,`due_soon`,`overdue`,`approval_requested`,`approval_decided`,`agent_proposal`,`digest`), entity_type, entity_id, activity_id null, title, snippet, priority_score real, read_at, archived_at, created_at. Index (user_id, archived_at, created_at desc).
+id, workspace_id, user_id, kind (`assigned`,`mentioned`,`commented`,`completed`,`due_soon`,`overdue`,`rule`,`approval_requested`,`approval_decided`,`agent_proposal`,`digest`), entity_type, entity_id, activity_id null, title, snippet, priority_score real, read_at, archived_at, created_at. Index (user_id, archived_at, created_at desc). `rule` added in migration 0022 (S4.1.2's `notify_user` action).
 
 ### `idempotency_keys`
 key text, user_id, method, path, response_status, response_body jsonb, created_at. pk (user_id, key). Purged after 24h by a periodic job.
@@ -217,6 +217,7 @@ key text, user_id, method, path, response_status, response_body jsonb, created_a
 
 - `rules` (S4.1.1, migration 0021): id, workspace_id, project_id null (null = workspace rule), name, enabled, trigger jsonb, conditions jsonb, actions jsonb, created_from_prompt text null, version, created_by (the rule acts as this person, with their permissions), timestamps, deleted_at. The JSON shape is validated on write (`domain/rules/schemas.py`).
 - `rule_runs` (S4.1.1): id, workspace_id, rule_id, project_id null, outbox_event_id, status (`success`,`skipped`,`failed`), depth int (of the triggering event), actions_run int, error text, started_at, finished_at, activity_batch_id. **Unique `(rule_id, outbox_event_id)`**: a rule never fires twice on one event. Skipped runs (depth or rate limit) are logged here.
+- S4.1.2 added actions `set_field`, `add_to_project`, `remove_from_project`, `add_tag`, `create_subtasks`, `set_due_relative`, `notify_user` (`slack_message`/`ai_step` still refused, P7/S4.1.5) and the `task.due_approaching` trigger. No new table for the trigger: `momentum/jobs/due_approaching.py` (hourly, `momentum_maintenance` queue) scans for tasks due tomorrow and emits `task.due_approaching` through `domain/rules/due_scan.py`, deduped per (task, due date) by checking `events_outbox` for a prior event with the same `due_on` before emitting.
 - `forms`: id, workspace_id, project_id, name, schema jsonb (fields, branching), conversational bool, public_token text unique null, is_active, created_by, timestamps, deleted_at.
 - `form_submissions`: id, form_id, task_id, submitted_by null, answers jsonb, created_at.
 - `templates`: id, workspace_id, kind (`project`,`task`), name, description, payload jsonb (sections, tasks with relative day offsets, roles, fields, rules), created_by, timestamps, deleted_at.

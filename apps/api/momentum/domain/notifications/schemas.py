@@ -14,6 +14,7 @@ NotificationKind = Literal[
     "completed",
     "due_soon",
     "overdue",
+    "rule",
     "approval_requested",
     "approval_decided",
     "agent_proposal",

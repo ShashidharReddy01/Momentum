@@ -1,4 +1,4 @@
-"""S4.1.1 Rules: the model and API (validation, permissions) and the executor: triggers,
+"""S4.1.1/S4.1.2 Rules: the model and API (validation, permissions) and the executor: triggers,
 conditions, actions, and above all loop protection (depth, rate, one run per event)."""
 
 from __future__ import annotations
@@ -7,6 +7,7 @@ import uuid
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime, timedelta
 from typing import Any
+from zoneinfo import ZoneInfo
 
 import httpx
 import pytest
@@ -17,6 +18,9 @@ from momentum.core.activity import Activity
 from momentum.core.events import ConsumerOffset, OutboxEvent
 from momentum.core.settings import Settings
 from momentum.domain.comments.models import Comment
+from momentum.domain.fields.models import FieldValue
+from momentum.domain.notifications.models import Notification
+from momentum.domain.rules.due_scan import scan_due_approaching
 from momentum.domain.rules.engine import (
     CONSUMER,
     MAX_ACTIONS_PER_MINUTE,
@@ -26,7 +30,8 @@ from momentum.domain.rules.engine import (
     run_rules,
 )
 from momentum.domain.rules.models import Rule, RuleRun
-from momentum.domain.tasks.models import Task
+from momentum.domain.tags.models import TaskTag
+from momentum.domain.tasks.models import Task, TaskProject
 from momentum.domain.users.models import User
 from tests.helpers import Clients
 
@@ -78,6 +83,11 @@ async def _user_id(c: httpx.AsyncClient, local: str) -> str:
 async def _run(sf: SessionFactory, settings: Settings) -> RulesRun:
     async with sf() as s, s.begin():
         return await run_rules(s, settings)
+
+
+async def _scan(sf: SessionFactory, settings: Settings) -> int:
+    async with sf() as s, s.begin():
+        return await scan_due_approaching(s, settings)
 
 
 async def _query[T](sf: SessionFactory, fn: Callable[[AsyncSession], Awaitable[T]]) -> T:
@@ -606,3 +616,235 @@ async def test_project_scope_and_multi_homed_tasks(
     await ravi.post(f"/api/v1/tasks/{task}/complete")
     await _run(session_factory, settings)
     assert await _runs(session_factory, rid) == []  # the task isn't in that rule's project
+
+
+# ---------------- S4.1.2: actions library ----------------
+
+
+async def test_new_action_validation(as_user: Clients) -> None:
+    ravi = await as_user("ravi")
+    pid = await _project(ravi)
+    trig = {"type": "task.completed"}
+    bad: list[dict[str, Any]] = [
+        {"type": "set_field"},  # needs field_id and value
+        {"type": "set_field", "field_id": "priority"},  # value must be present (even null)
+        {"type": "set_field", "field_id": "nope-not-a-uuid", "value": 1},
+        {"type": "add_to_project"},  # needs project_id
+        {"type": "remove_from_project"},
+        {"type": "add_tag"},  # needs tag_id
+        {"type": "create_subtasks"},  # needs titles
+        {"type": "create_subtasks", "titles": []},
+        {"type": "set_due_relative"},  # needs days
+        {"type": "set_due_relative", "days": 1000},  # out of range
+        {"type": "notify_user", "user_id": str(uuid.uuid4())},  # needs text
+        {"type": "slack_message"},  # not available yet
+        {"type": "ai_step"},  # not available yet
+    ]
+    for action in bad:
+        r = await ravi.post(
+            "/api/v1/rules",
+            json={"name": "R", "project_id": pid, "trigger": trig, "actions": [action]},
+        )
+        assert r.status_code == 422, (action, r.text)
+    # references: an unknown project/tag/field, and a section outside the target project
+    other_sec = await _sections(ravi, await _project(ravi, "Mobile App v2"))
+    for action in (
+        {"type": "add_to_project", "project_id": str(uuid.uuid4())},
+        {"type": "add_tag", "tag_id": str(uuid.uuid4())},
+        {"type": "set_field", "field_id": str(uuid.uuid4()), "value": 1},
+        {
+            "type": "add_to_project",
+            "project_id": str(uuid.uuid4()),
+            "section_id": other_sec["To do"],
+        },
+    ):
+        r = await ravi.post(
+            "/api/v1/rules",
+            json={"name": "R", "project_id": pid, "trigger": trig, "actions": [action]},
+        )
+        assert r.status_code == 422, (action, r.text)
+
+
+async def test_add_to_project_section_must_be_in_the_target_project(as_user: Clients) -> None:
+    ravi = await as_user("ravi")
+    pid = await _project(ravi)
+    other_pid = await _project(ravi, "Mobile App v2")
+    own_sec = await _sections(ravi, pid)
+    r = await ravi.post(
+        "/api/v1/rules",
+        json={
+            "name": "R",
+            "project_id": pid,
+            "trigger": {"type": "task.completed"},
+            "actions": [
+                {
+                    "type": "add_to_project",
+                    "project_id": other_pid,
+                    "section_id": own_sec["Backlog"],
+                }
+            ],
+        },
+    )
+    assert r.status_code == 422, r.text
+
+
+async def test_due_approaching_trigger_and_scan_dedup(
+    as_user: Clients, session_factory: SessionFactory, settings: Settings
+) -> None:
+    ravi = await as_user("ravi")
+    pid = await _project(ravi)
+    sec = await _sections(ravi, pid)
+    rid = await _rule(
+        ravi, pid, {"type": "task.due_approaching"}, [{"type": "add_comment", "text": "due soon"}]
+    )
+    task = await _task(ravi, pid, sec["Backlog"])
+    other = await _task(ravi, pid, sec["Backlog"])  # not due tomorrow: must not fire
+    tomorrow = (datetime.now(UTC) + timedelta(days=1)).date().isoformat()
+    assert (await ravi.patch(f"/api/v1/tasks/{task}", json={"due_on": tomorrow})).status_code == 200
+    assert (await _scan(session_factory, settings)) == 1
+    assert (await _scan(session_factory, settings)) == 0  # deduped: same task, same due date
+    stats = await _run(session_factory, settings)
+    assert stats.success == 1
+    assert len(await _comments(session_factory, task)) == 1
+    assert await _comments(session_factory, other) == []
+    assert [r.status for r in await _runs(session_factory, rid)] == ["success"]
+
+
+async def test_set_field_add_tag_create_subtasks_and_due_relative(
+    as_user: Clients, session_factory: SessionFactory, settings: Settings
+) -> None:
+    ravi = await as_user("ravi")
+    pid = await _project(ravi)
+    sec = await _sections(ravi, pid)
+    field = (
+        await ravi.post(f"/api/v1/projects/{pid}/fields", json={"name": "Effort", "type": "number"})
+    ).json()["data"]
+    tag = (await ravi.post("/api/v1/tags", json={"name": "Escalated"})).json()["data"]["id"]
+    rid = await _rule(
+        ravi,
+        pid,
+        {"type": "task.completed"},
+        [
+            {"type": "set_field", "field_id": "priority", "value": "urgent"},
+            {"type": "set_field", "field_id": field["id"], "value": 5},
+            {"type": "add_tag", "tag_id": tag},
+            {"type": "create_subtasks", "titles": ["Follow up", "Archive"]},
+            {"type": "set_due_relative", "days": 3},
+        ],
+    )
+    task = await _task(ravi, pid, sec["Backlog"])
+    await ravi.post(f"/api/v1/tasks/{task}/complete")
+    stats = await _run(session_factory, settings)
+    assert (stats.success, stats.failed) == (1, 0)
+    row = await _task_row(session_factory, task)
+    assert row.priority == "urgent"
+    expected_due = datetime.now(ZoneInfo("Asia/Kolkata")).date() + timedelta(days=3)  # ravi's tz
+    assert row.due_on == expected_due
+
+    async def field_value(s: AsyncSession) -> Any:
+        v = await s.get(FieldValue, (uuid.UUID(task), uuid.UUID(field["id"])))
+        return v.value if v else None
+
+    assert await _query(session_factory, field_value) == 5
+
+    async def tagged(s: AsyncSession) -> bool:
+        row = await s.get(TaskTag, (uuid.UUID(task), uuid.UUID(tag)))
+        return row is not None
+
+    assert await _query(session_factory, tagged) is True
+
+    async def subtasks(s: AsyncSession) -> list[str]:
+        rows = await s.execute(select(Task.title).where(Task.parent_id == uuid.UUID(task)))
+        return sorted(t for (t,) in rows)
+
+    assert await _query(session_factory, subtasks) == ["Archive", "Follow up"]
+
+    (run,) = await _runs(session_factory, rid)
+    assert (run.status, run.actions_run) == ("success", 5)
+
+
+async def test_add_to_project_and_remove_from_project(
+    as_user: Clients, session_factory: SessionFactory, settings: Settings
+) -> None:
+    ravi = await as_user("ravi")
+    mei_id = await _user_id(ravi, "mei")
+    pid = await _project(ravi)
+    other_pid = await _project(ravi, "Mobile App v2")
+    sec = await _sections(ravi, pid)
+    other_sec = await _sections(ravi, other_pid)
+    add_rule = await _rule(
+        ravi,
+        pid,
+        {"type": "task.completed"},
+        [{"type": "add_to_project", "project_id": other_pid, "section_id": other_sec["To do"]}],
+    )
+    remove_rule = await _rule(
+        ravi,
+        pid,
+        {"type": "task.assigned", "user_id": mei_id},
+        [{"type": "remove_from_project", "project_id": pid}],
+    )
+    task = await _task(ravi, pid, sec["Backlog"])
+    await ravi.post(f"/api/v1/tasks/{task}/complete")
+    await ravi.patch(f"/api/v1/tasks/{task}", json={"assignee_id": mei_id})
+    stats = await _run(session_factory, settings)
+    assert (stats.success, stats.failed) == (2, 0)
+
+    async def placements(s: AsyncSession) -> set[uuid.UUID]:
+        rows = await s.execute(select(TaskProject.project_id).where(TaskProject.task_id == task))
+        return {p for (p,) in rows}
+
+    assert await _query(session_factory, placements) == {uuid.UUID(other_pid)}
+    assert [r.status for r in await _runs(session_factory, add_rule)] == ["success"]
+    assert [r.status for r in await _runs(session_factory, remove_rule)] == ["success"]
+
+
+async def test_notify_user_creates_an_inbox_notification(
+    as_user: Clients, session_factory: SessionFactory, settings: Settings
+) -> None:
+    ravi = await as_user("ravi")
+    pid, mei_id = await _project(ravi), await _user_id(ravi, "mei")
+    sec = await _sections(ravi, pid)
+    await _rule(
+        ravi,
+        pid,
+        {"type": "task.completed"},
+        [{"type": "notify_user", "user_id": mei_id, "text": "Please take a look"}],
+    )
+    task = await _task(ravi, pid, sec["Backlog"], "Ping mei")
+    await ravi.post(f"/api/v1/tasks/{task}/complete")
+    await _run(session_factory, settings)
+
+    async def notifications(s: AsyncSession) -> list[Notification]:
+        rows = await s.execute(
+            select(Notification).where(Notification.user_id == uuid.UUID(mei_id))
+        )
+        return list(rows.scalars())
+
+    (notif,) = await _query(session_factory, notifications)
+    assert notif.kind == "rule" and notif.title == "Please take a look"
+
+
+async def test_a_new_actions_events_carry_the_depth_of_the_run_that_caused_them(
+    as_user: Clients, session_factory: SessionFactory, settings: Settings
+) -> None:
+    """Mutation check (S4.1.1's loop protection extends to every new action): a new action's
+    events must carry the triggering event's depth + 1, exactly like the original four."""
+    ravi = await as_user("ravi")
+    pid = await _project(ravi)
+    sec = await _sections(ravi, pid)
+    tag = (await ravi.post("/api/v1/tags", json={"name": "Depth check"})).json()["data"]["id"]
+    await _rule(ravi, pid, {"type": "task.completed"}, [{"type": "add_tag", "tag_id": tag}])
+    task = await _task(ravi, pid, sec["Backlog"])
+    await ravi.post(f"/api/v1/tasks/{task}/complete")
+    await _run(session_factory, settings)
+
+    async def events(s: AsyncSession) -> dict[str, list[int]]:
+        out: dict[str, list[int]] = {}
+        for e in (await s.execute(select(OutboxEvent).order_by(OutboxEvent.id))).scalars():
+            out.setdefault(e.type, []).append(e.payload["depth"])
+        return out
+
+    ev = await _query(session_factory, events)
+    assert ev["task.completed"] == [0]
+    assert ev["task.tagged"] == [1]
