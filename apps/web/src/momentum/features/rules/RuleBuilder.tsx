@@ -11,6 +11,8 @@ import { useSections } from '@/features/sections';
 import { useTagLibrary } from '@/features/tags';
 import {
   ACTIONS,
+  actionComplete,
+  AI_STEP_KINDS,
   CONDITION_FIELDS,
   defaultAction,
   defaultCondition,
@@ -273,6 +275,9 @@ function ActionRow({
   lookups: ReturnType<typeof useRuleLookups>;
 }) {
   const meta = ACTIONS.find((a) => a.type === action.type) ?? ACTIONS[0]!;
+  // `field_id` is shared with set_field; an AI step only shows it for the kind that needs one.
+  const needsField = (a: RuleAction) =>
+    a.type !== 'ai_step' || AI_STEP_KINDS.find((k) => k.kind === a.kind)?.needsField === true;
   return (
     <div className={rowClass}>
       <Select
@@ -306,7 +311,15 @@ function ActionRow({
           onChange={(v) => onChange({ ...action, section_id: v || null })}
         />
       ) : null}
-      {meta.params.includes('field_id') ? (
+      {action.type === 'ai_step' ? (
+        <Select
+          aria-label="AI step"
+          value={action.kind ?? ''}
+          onChange={(kind) => onChange({ type: 'ai_step', kind })}
+          options={AI_STEP_KINDS.map((k) => ({ id: k.kind, label: k.label }))}
+        />
+      ) : null}
+      {meta.params.includes('field_id') && needsField(action) ? (
         <Select
           aria-label="Field"
           value={action.field_id ?? ''}
@@ -399,13 +412,7 @@ export function RuleBuilder({
   const lookups = useRuleLookups(projectId);
 
   const sentence = describeRule(trigger, conditions, actions, lookups.lookups);
-  const canSave =
-    name.trim().length > 0 &&
-    actions.length > 0 &&
-    actions.every((a) => {
-      const meta = ACTIONS.find((m) => m.type === a.type);
-      return meta && meta.required.every((p) => (a as unknown as Record<string, unknown>)[p]);
-    });
+  const canSave = name.trim().length > 0 && actions.length > 0 && actions.every(actionComplete);
 
   return (
     <div className="flex flex-col gap-3 p-4">

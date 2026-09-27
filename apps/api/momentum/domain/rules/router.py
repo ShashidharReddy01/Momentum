@@ -11,6 +11,7 @@ from momentum.api.schemas import ListOut, MutationOut, OkOut
 from momentum.domain.rules import service
 from momentum.domain.rules.schemas import (
     ActionResultOut,
+    RuleAiStepOut,
     RuleIn,
     RuleOut,
     RulePatchIn,
@@ -81,7 +82,14 @@ async def delete_rule(rule_id: uuid.UUID, ctx: CtxDep, uow: UowDep) -> OkOut:
 async def list_runs(rule_id: uuid.UUID, ctx: CtxDep, uow: UowDep) -> ListOut[RuleRunOut]:
     async with uow.transaction() as s:
         runs = await service.list_runs(s, ctx, rule_id)
-        return ListOut(data=[RuleRunOut.model_validate(r) for r in runs])
+        return ListOut(
+            data=[
+                RuleRunOut.model_validate(r).model_copy(
+                    update={"ai_steps": [RuleAiStepOut.model_validate(st) for st in steps]}
+                )
+                for r, steps in runs
+            ]
+        )
 
 
 @router.post(

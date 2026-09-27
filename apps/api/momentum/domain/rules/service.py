@@ -28,7 +28,7 @@ from momentum.domain.access import get_visible_project, get_visible_task, requir
 from momentum.domain.fields.models import FieldDef
 from momentum.domain.projects.models import Project
 from momentum.domain.rules import engine
-from momentum.domain.rules.models import Rule, RuleRun
+from momentum.domain.rules.models import Rule, RuleAiStep, RuleRun
 from momentum.domain.rules.schemas import RuleIn, RulePatchIn, RuleSpec, is_custom_field
 from momentum.domain.sections.models import Section
 from momentum.domain.tags.models import Tag
@@ -90,7 +90,7 @@ async def _check_references(
     if trigger.field and is_custom_field(trigger.field):
         fields.add(uuid.UUID(trigger.field))
     for a in actions:
-        if a.type == "set_field" and a.field_id is not None and is_custom_field(a.field_id):
+        if a.type in ("set_field", "ai_step") and a.field_id and is_custom_field(a.field_id):
             fields.add(uuid.UUID(a.field_id))
     for c in conditions:
         raw = c.value if isinstance(c.value, list) else [c.value]
@@ -155,8 +155,9 @@ async def get_rule(session: AsyncSession, ctx: Ctx, rule_id: uuid.UUID) -> Rule:
 
 async def list_runs(
     session: AsyncSession, ctx: Ctx, rule_id: uuid.UUID, *, limit: int = RUNS_PAGE
-) -> list[RuleRun]:
-    """A rule's recent runs, newest first."""
+) -> list[tuple[RuleRun, list[RuleAiStep]]]:
+    """A rule's recent runs, newest first, each with the AI steps it queued (S4.1.5: a step
+    outlives its run, so its own status is what the history shows)."""
     rule = await _load(session, ctx, rule_id, "editor", "see this rule's runs")
     rows = await session.execute(
         select(RuleRun)
@@ -164,7 +165,18 @@ async def list_runs(
         .order_by(RuleRun.started_at.desc(), RuleRun.id.desc())
         .limit(limit)
     )
-    return list(rows.scalars())
+    runs = list(rows.scalars())
+    steps: dict[uuid.UUID, list[RuleAiStep]] = {}
+    if runs:
+        found = await session.execute(
+            select(RuleAiStep)
+            .where(RuleAiStep.rule_run_id.in_([r.id for r in runs]))
+            .order_by(RuleAiStep.created_at, RuleAiStep.id)
+        )
+        for step in found.scalars():
+            if step.rule_run_id is not None:
+                steps.setdefault(step.rule_run_id, []).append(step)
+    return [(r, steps.get(r.id, [])) for r in runs]
 
 
 async def create_rule(session: AsyncSession, ctx: Ctx, data: RuleIn) -> Mutation[Rule]:

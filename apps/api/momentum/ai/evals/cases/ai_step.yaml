@@ -1,0 +1,100 @@
+# AI step actions of a rule (S4.1.5). Each case runs the action itself (`run_kind`) on a task of
+# the synthetic "Launch Plan" project, as the rule's author would, and scores what it wrote:
+# `values_in` (the value written must be one of the acceptable ones), `values_absent` (a field the
+# task says nothing about must be left empty rather than guessed at), and the usual text checks
+# for the two kinds that write a comment. Fields on that project: Risk (Low/Medium/High), Vendor
+# (text) — both empty on every task, so a step has something to fill in.
+feature: ai_step
+cases:
+  # --- classify_field: priority
+  - id: classify_priority_blocker
+    kind: classify_field
+    field: priority
+    task: "Payment provider approval"
+    expect:
+      values_in: {priority: ["urgent", "high"]}
+  # A bare title and a due date say nothing about urgency: leaving it empty is the right answer.
+  - id: classify_priority_says_nothing
+    kind: classify_field
+    field: priority
+    mock: true
+    task: "Book launch webinar"
+    expect:
+      values_absent: ["priority"]
+  - id: classify_priority_contract
+    kind: classify_field
+    field: priority
+    task: "Sign vendor contract"
+    expect:
+      values_in: {priority: ["urgent", "high"]}
+
+  # --- classify_field: a custom choice field
+  - id: classify_risk_blocker
+    kind: classify_field
+    field: "Risk"
+    task: "Payment provider approval"
+    expect:
+      values_in: {Risk: ["High", "Medium"]}
+  - id: classify_risk_contract
+    kind: classify_field
+    field: "Risk"
+    task: "Sign vendor contract"
+    expect:
+      values_in: {Risk: ["High", "Medium"]}
+  - id: classify_risk_says_nothing
+    kind: classify_field
+    field: "Risk"
+    task: "Prepare press kit"
+    expect:
+      values_absent: ["Risk"]
+
+  # --- extract_fields: only what the task actually says
+  - id: extract_vendor_from_description
+    kind: extract_fields
+    mock: true
+    task: "Sign vendor contract"
+    expect:
+      values_in: {Vendor: ["DataCo", "DataCo legal"]}
+  - id: extract_leaves_unknown_alone
+    kind: extract_fields
+    task: "Draft customer email"
+    expect:
+      values_absent: ["Vendor"]
+  - id: extract_blocker_risk
+    kind: extract_fields
+    task: "Payment provider approval"
+    expect:
+      values_in: {Risk: ["High", "Medium"]}
+
+  # --- summarize_to_comment
+  - id: summarize_pricing_thread
+    kind: summarize_to_comment
+    mock: true
+    task: "Finalize pricing tiers"
+    expect: {not_empty: true, max_chars: 2000}
+  - id: summarize_thread_content
+    kind: summarize_to_comment
+    task: "Finalize pricing tiers"
+    expect: {not_empty: true, text_include_any: ["tier", "trial", "annual"]}
+    judge: {rubric: "A short summary of the pricing thread: three tiers, the free trial and the annual discount, and the open FAQ question. No invented decisions."}
+  - id: summarize_without_comments_fails
+    kind: summarize_to_comment
+    mock: true
+    task: "Prepare press kit"
+    expect: {error: validation_failed}
+
+  # --- draft_reply
+  - id: draft_reply_to_pricing
+    kind: draft_reply
+    mock: true
+    task: "Finalize pricing tiers"
+    expect: {not_empty: true, max_chars: 1200}
+  - id: draft_reply_answers_newest
+    kind: draft_reply
+    task: "Sign vendor contract"
+    expect: {not_empty: true, max_chars: 1200, text_include_any: ["DataCo", "contract", "sign"]}
+    judge: {rubric: "A short, plain reply to the newest comment (Ana: DataCo legal expects to sign on Friday). Every fact must come from the source material - no invented dates, names, numbers or decisions. Addressing the commenter by name, asking them a question and proposing an obvious next step are fine and are not inventions. Mark it down only for wrong or made-up facts, or for boilerplate (a greeting, a sign-off, \"here is a draft\")."}
+  - id: draft_reply_no_thread_asks
+    kind: draft_reply
+    task: "Draft customer email"
+    expect: {not_empty: true, max_chars: 1200}

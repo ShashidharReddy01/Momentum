@@ -6,6 +6,11 @@
 # can't see Product's projects); lena (Marketing).
 # Tags (S4.1.4): rules cases refer to these by name.
 tags: ["Escalated", "Needs review"]
+# Custom fields (S4.1.5): left empty on every task, so an AI step has something to fill in and
+# nothing else changes. Created on Launch Plan by ravi.
+fields:
+  - {project: "Launch Plan", name: "Risk", type: single_select, options: ["Low", "Medium", "High"]}
+  - {project: "Launch Plan", name: "Vendor", type: text}
 projects:
   - name: "Launch Plan"
     team: "Product"

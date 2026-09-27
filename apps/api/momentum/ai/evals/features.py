@@ -26,6 +26,7 @@ from momentum.ai.llm import LLM
 from momentum.ai.models import AiAction
 from momentum.ai.nl_rule import compile_rule
 from momentum.ai.plan_day import plan_day
+from momentum.ai.rule_steps import run_kind
 from momentum.ai.status_draft import draft_status
 from momentum.ai.tools.registry import ToolRegistry
 from momentum.core.context import Ctx
@@ -48,6 +49,7 @@ FEATURES = (
     "quick_add",
     "from_brief",
     "nl_rule",
+    "ai_step",
 )
 
 
@@ -281,6 +283,25 @@ async def _run(
         obs.clarified = compiled.question is not None
         obs.text = compiled.question or compiled.sentence or ""
         obs.data = {"rule": compiled.named, "sentence": compiled.sentence}
+    elif feature == "ai_step":
+        # The rule action itself (S4.1.5), run as the rule's author would: the case's writes are
+        # rolled back with the case's transaction like every other feature's.
+        field = case.get("field")
+        field_id = (
+            "priority" if field == "priority" else str(world.fields[field]) if field else None
+        )
+        step = await run_kind(
+            session, llm, ctx, world.task_ids[case["task"]], case["kind"], field_id, now=now
+        )
+        obs.text = step.comment or step.summary
+        obs.notes = step.notes
+        # `source` is what the model was shown, so the judge can check the draft against it.
+        obs.data = {
+            "summary": step.summary,
+            "comment": step.comment,
+            "source": step.source or None,
+            **step.values,
+        }
     else:
         raise ValueError(f"unknown eval feature {feature!r}")
 

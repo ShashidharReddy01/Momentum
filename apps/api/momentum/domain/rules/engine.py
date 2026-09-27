@@ -10,9 +10,15 @@ actions through the ordinary services as the rule's author with ``via="rule"``.
 - At most ``MAX_ACTIONS_PER_MINUTE`` rule actions per project per minute.
 - ``(rule_id, outbox_event_id)`` is unique: a rule never fires twice on one event.
 
+One action is different: ``ai_step`` (S4.1.5) is **queued**, not run — it writes a
+``rule_ai_steps`` row and ``momentum/ai/rule_steps.py`` performs it on the ``ai`` queue a moment
+later, because a model call must not be made inside the run's transaction. The run counts it as
+an action it queued; the step keeps its own status.
+
 A run is all or nothing: its actions share a savepoint, so a failing action leaves no partial
-change behind (the ``failed`` run keeps the error). The whole batch shares one transaction with
-the cursor, so a crash replays events without repeating any effect.
+change behind (the ``failed`` run keeps the error), and a queued AI step goes with it. The whole
+batch shares one transaction with the cursor, so a crash replays events without repeating any
+effect.
 """
 
 from __future__ import annotations
@@ -23,7 +29,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from sqlalchemy import func, select
+from sqlalchemy import func, insert, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from momentum.core.activity import Activity
@@ -36,7 +42,7 @@ from momentum.domain.comments.service import create_comment
 from momentum.domain.fields.models import FieldValue
 from momentum.domain.fields.service import set_task_field_value
 from momentum.domain.notifications.service import notify
-from momentum.domain.rules.models import Rule, RuleRun
+from momentum.domain.rules.models import Rule, RuleAiStep, RuleRun
 from momentum.domain.sections.models import Section
 from momentum.domain.tags.models import TaskTag
 from momentum.domain.tags.service import add_task_tag
@@ -183,6 +189,41 @@ async def _notify_user(
         entity_id=task_id,
         title=str(spec["text"])[:300],
     )
+
+
+async def _queue_ai_step(
+    session: AsyncSession,
+    ctx: Ctx,
+    rule: Rule,
+    run_id: uuid.UUID,
+    project_id: uuid.UUID | None,
+    task_id: uuid.UUID,
+    spec: dict[str, Any],
+    batch: uuid.UUID,
+) -> None:
+    """S4.1.5: hand the step to the ``ai`` queue instead of calling a model here.
+
+    A gateway call takes seconds, and this runs inside the run's savepoint — the executor must
+    not hold a write transaction open across it. The row is written inside that savepoint, so a
+    run that fails later queues nothing; ``momentum/ai/rule_steps.py`` picks it up within a
+    minute and does the AI write as the rule's author, marked as AI.
+    """
+    field_id = spec.get("field_id")
+    session.add(
+        RuleAiStep(
+            workspace_id=rule.workspace_id,
+            rule_id=rule.id,
+            rule_run_id=run_id,
+            project_id=project_id,
+            task_id=task_id,
+            kind=str(spec["kind"]),
+            field_id=str(field_id) if field_id else None,
+            status="queued",
+            depth=ctx.rule_depth,
+            activity_batch_id=batch,
+        )
+    )
+    await session.flush()
 
 
 ACTIONS: dict[str, ActionFn] = {
@@ -355,6 +396,24 @@ async def _fire(
     ctx = _rule_ctx(user, rule, ev, settings, depth)
     status, error, ran = "success", None, 0
     batch_id = uuid.uuid4()
+    # The row is inserted before the actions run so a queued AI step (S4.1.5) can point at it;
+    # its outcome is filled in at the end. Core insert/update rather than the ORM: the actions
+    # run in a savepoint whose rollback would expire an ORM instance, and an expired instance
+    # can't be assigned to from async code without a reload.
+    run_id = uuid.uuid4()
+    await session.execute(
+        insert(RuleRun).values(
+            id=run_id,
+            workspace_id=rule.workspace_id,
+            rule_id=rule.id,
+            project_id=project_id,
+            outbox_event_id=ev.id,
+            status="failed",
+            depth=depth,
+            actions_run=0,
+            started_at=started,
+        )
+    )
     if depth >= MAX_DEPTH:
         status, error = (
             "skipped",
@@ -378,22 +437,23 @@ async def _fire(
                 raise Forbidden("The person who created this rule is no longer active")
             async with session.begin_nested():
                 for spec in rule.actions:
-                    await ACTIONS[spec["type"]](session, ctx, ev.entity_id, spec, batch_id)
+                    if spec["type"] == "ai_step":
+                        await _queue_ai_step(
+                            session, ctx, rule, run_id, project_id, ev.entity_id, spec, batch_id
+                        )
+                    else:
+                        await ACTIONS[spec["type"]](session, ctx, ev.entity_id, spec, batch_id)
                     ran += 1
         except Exception as e:  # a rule must never take the executor down; the run keeps the error
             status, error, ran = "failed", (str(e) or type(e).__name__)[:500], 0
             log.warning("rule_failed", rule_id=str(rule.id), event_id=ev.id, error=error)
-    session.add(
-        RuleRun(
-            workspace_id=rule.workspace_id,
-            rule_id=rule.id,
-            project_id=project_id,
-            outbox_event_id=ev.id,
+    await session.execute(
+        update(RuleRun)
+        .where(RuleRun.id == run_id)
+        .values(
             status=status,
-            depth=depth,
-            actions_run=ran,
             error=error,
-            started_at=started,
+            actions_run=ran,
             finished_at=datetime.now(UTC),
             activity_batch_id=batch_id if ran else None,
         )
@@ -495,6 +555,11 @@ async def test_run(
         )
         task_id = task.id
         for spec in rule.actions:
+            if spec["type"] == "ai_step":
+                # An AI step is queued, not run, so there is nothing to preview: saying it would
+                # run is honest (the real run queues it) and no model call is made or charged.
+                results.append(ActionResult(f"ai_step: {spec.get('kind')}", True, None))
+                continue
             savepoint = await session.begin_nested()
             try:
                 await ACTIONS[spec["type"]](session, ctx, task_id, spec, uuid.uuid4())

@@ -38,6 +38,11 @@ ORDERED_FIELDS = ("due_on", "start_on")  # gt/lt also work on custom number and 
 # Actions the executor can run today. `allowed` is every param an action accepts; a param
 # missing from ACTION_REQUIRED for that action is optional (e.g. add_to_project's section_id
 # falls back to the target project's default section, like the API endpoint does).
+#
+# S4.1.5: ``ai_step`` is the one action the executor doesn't perform itself. It queues a
+# ``rule_ai_steps`` row that the ``ai`` queue runs afterwards (``momentum/ai/rule_steps.py``),
+# because a model call must not be made inside the rule run's transaction.
+AI_STEP_KINDS = ("summarize_to_comment", "classify_field", "extract_fields", "draft_reply")
 ACTION_PARAMS: dict[str, set[str]] = {
     "assign": {"user_id"},
     "add_comment": {"text"},
@@ -50,10 +55,15 @@ ACTION_PARAMS: dict[str, set[str]] = {
     "create_subtasks": {"titles"},
     "set_due_relative": {"days"},
     "notify_user": {"user_id", "text"},
+    "ai_step": {"kind", "field_id"},
 }
-ACTION_REQUIRED: dict[str, set[str]] = {**ACTION_PARAMS, "add_to_project": {"project_id"}}
-# Slack (P7) and the AI step (S4.1.5) are on the roadmap but have no backing service yet.
-NOT_YET_ACTIONS = {"slack_message", "ai_step"}
+ACTION_REQUIRED: dict[str, set[str]] = {
+    **ACTION_PARAMS,
+    "add_to_project": {"project_id"},
+    "ai_step": {"kind"},  # field_id only for classify_field (checked below)
+}
+# Slack messages are on the roadmap (P7) but have no backing service yet.
+NOT_YET_ACTIONS = {"slack_message"}
 MAX_CONDITIONS = 10
 MAX_ACTIONS = 10
 MAX_SUBTASK_TITLES = 20
@@ -145,6 +155,7 @@ class Action(BaseModel):
     tag_id: uuid.UUID | None = None
     titles: list[SubtaskTitle] | None = Field(default=None, max_length=MAX_SUBTASK_TITLES)
     days: int | None = Field(default=None, ge=-365, le=365)
+    kind: str | None = None  # ai_step: one of AI_STEP_KINDS
 
     @model_validator(mode="after")
     def _check(self) -> Action:
@@ -175,6 +186,16 @@ class Action(BaseModel):
             and not (self.field_id is not None and is_custom_field(self.field_id))
         ):
             raise ValueError("field_id must be 'priority' or a custom field id")
+        if self.type == "ai_step":
+            if self.kind not in AI_STEP_KINDS:
+                raise ValueError(f"kind must be one of {', '.join(AI_STEP_KINDS)}")
+            if self.kind == "classify_field" and not (
+                self.field_id == "priority"
+                or (self.field_id is not None and is_custom_field(self.field_id))
+            ):
+                raise ValueError("classify_field needs a field_id ('priority' or a custom field)")
+            if self.kind != "classify_field" and self.field_id is not None:
+                raise ValueError(f"{self.kind} doesn't take a field_id")
         return self  # assign with user_id null unassigns
 
 
@@ -228,6 +249,22 @@ class RuleOut(BaseModel):
     updated_at: datetime
 
 
+class RuleAiStepOut(BaseModel):
+    """S4.1.5: one queued AI step of a run. The rule run finishes before the step does, so the
+    run history shows the step's own status (queued → running → done/failed)."""
+
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    task_id: uuid.UUID
+    kind: str
+    field_id: str | None
+    status: str
+    result: str | None
+    error: str | None
+    created_at: datetime
+    finished_at: datetime | None
+
+
 class RuleRunOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
@@ -240,6 +277,7 @@ class RuleRunOut(BaseModel):
     started_at: datetime
     finished_at: datetime | None
     activity_batch_id: uuid.UUID | None
+    ai_steps: list[RuleAiStepOut] = Field(default_factory=list)
 
 
 class RuleTestRunIn(BaseModel):

@@ -1975,6 +1975,8 @@ export interface components {
             days?: number | null;
             /** Field Id */
             field_id?: string | null;
+            /** Kind */
+            kind?: string | null;
             /** Project Id */
             project_id?: string | null;
             /** Section Id */
@@ -3783,6 +3785,40 @@ export interface components {
              */
             workdays_only: boolean;
         };
+        /**
+         * RuleAiStepOut
+         * @description S4.1.5: one queued AI step of a run. The rule run finishes before the step does, so the
+         *     run history shows the step's own status (queued → running → done/failed).
+         */
+        RuleAiStepOut: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Error */
+            error: string | null;
+            /** Field Id */
+            field_id: string | null;
+            /** Finished At */
+            finished_at: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Kind */
+            kind: string;
+            /** Result */
+            result: string | null;
+            /** Status */
+            status: string;
+            /**
+             * Task Id
+             * Format: uuid
+             */
+            task_id: string;
+        };
         /** RuleCompileIn */
         RuleCompileIn: {
             /**
@@ -3912,6 +3948,8 @@ export interface components {
             actions_run: number;
             /** Activity Batch Id */
             activity_batch_id: string | null;
+            /** Ai Steps */
+            ai_steps?: components["schemas"]["RuleAiStepOut"][];
             /** Depth */
             depth: number;
             /** Error */

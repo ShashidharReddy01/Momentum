@@ -18,6 +18,17 @@ type R = {
   created_at: string;
   updated_at: string;
 };
+type AiStep = {
+  id: string;
+  task_id: string;
+  kind: string;
+  field_id: string | null;
+  status: string;
+  result: string | null;
+  error: string | null;
+  created_at: string;
+  finished_at: string | null;
+};
 type Run = {
   id: string;
   rule_id: string;
@@ -29,9 +40,10 @@ type Run = {
   started_at: string;
   finished_at: string | null;
   activity_batch_id: string | null;
+  ai_steps?: AiStep[];
 };
 
-/** In-memory S4.1.1-S4.1.4 rules API: CRUD, run history, a canned "test run" (every action comes
+/** In-memory S4.1.1-S4.1.5 rules API: CRUD, run history, a canned "test run" (every action comes
  * back `ok: true` — the backend's own conditions/action logic is covered in test_rules.py; this
  * mock only needs to exercise the builder UI) and a canned NL compile. */
 export function ruleHandlers(base = '', seedRuns: Record<string, Run[]> = {}) {

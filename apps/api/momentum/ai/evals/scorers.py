@@ -62,6 +62,8 @@ KNOWN = frozenset(
         "tasks_between",
         "fields",
         "rule_exact",
+        "values_in",
+        "values_absent",
     }
 )
 
@@ -276,6 +278,21 @@ def score(obs: Observation, expect: dict[str, Any], *, today: date, asked: str =
     if "rule_exact" in expect:
         got = obs.data.get("rule")
         add(Check("rule_exact", got == expect["rule_exact"], json.dumps(got, default=str)[:300]))
+
+    # AI step (S4.1.5): the value it wrote must be one of the acceptable ones, and a field the
+    # task says nothing about must be left alone rather than guessed at.
+    for name, allowed in (expect.get("values_in") or {}).items():
+        got = obs.data.get(name)
+        ok = got is not None and _low(str(got)) in [_low(str(a)) for a in allowed]
+        add(Check(f"values_in:{name}", ok, f"{name}: {got!r}"))
+    for name in expect.get("values_absent") or []:
+        add(
+            Check(
+                f"values_absent:{name}",
+                obs.data.get(name) is None,
+                f"{name}: {obs.data.get(name)!r}",
+            )
+        )
 
     # quick add
     fields = expect.get("fields") or {}

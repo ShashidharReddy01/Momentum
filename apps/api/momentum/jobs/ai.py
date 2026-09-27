@@ -19,6 +19,26 @@ async def expire_ai_actions(timestamp: int) -> None:
     log.info("ai_actions_expired", count=n, timestamp=timestamp)
 
 
+@blueprint.periodic(cron="* * * * *", periodic_id="run_ai_steps")
+@blueprint.task(name="run_ai_steps", queue="momentum_ai", queueing_lock="run_ai_steps")
+async def run_ai_steps(timestamp: int) -> None:
+    """Run the AI steps rules queued (S4.1.5). Claiming and running are separate transactions,
+    and each step gets its own, so a slow gateway call never holds another step's writes."""
+    from momentum.ai.rule_steps import claim_steps, run_step
+    from momentum.core.settings import Settings
+    from momentum.jobs.db import job_llm, job_session
+
+    settings = Settings()
+    async with job_session() as session:
+        ids, timed_out = await claim_steps(session)
+    counts = {"done": 0, "failed": 0, "skipped": 0}
+    for step_id in ids:
+        async with job_session() as session:
+            counts[await run_step(session, job_llm(), settings, step_id)] += 1
+    if ids or timed_out:
+        log.info("rule_ai_steps_ran", timed_out=timed_out, timestamp=timestamp, **counts)
+
+
 @blueprint.periodic(cron="* * * * *", periodic_id="index_embeddings")
 @blueprint.task(name="index_embeddings", queue="momentum_ai", queueing_lock="index_embeddings")
 async def index_embeddings(timestamp: int) -> None:

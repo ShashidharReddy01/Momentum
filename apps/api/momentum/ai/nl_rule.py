@@ -70,7 +70,9 @@ ActionType = Literal[
     "create_subtasks",
     "set_due_relative",
     "notify_user",
+    "ai_step",
 ]
+AiStepKind = Literal["summarize_to_comment", "classify_field", "extract_fields", "draft_reply"]
 Op = Literal["eq", "neq", "in", "empty", "not_empty", "gt", "lt"]
 
 TASK_FIELDS = {
@@ -83,6 +85,13 @@ TASK_FIELDS = {
     "start": "start_on",
 }
 CONDITION_ONLY = {"assignee": "assignee", "assigned to": "assignee", "tag": "tag", "tags": "tag"}
+# S4.1.5: how an AI step reads in the confirmation sentence.
+AI_STEP_WORDS = {
+    "summarize_to_comment": "let Mo post a summary of the comments",
+    "draft_reply": "let Mo draft a reply comment",
+    "classify_field": "let Mo set {field} from what the task says",
+    "extract_fields": "let Mo fill in the empty fields from the description",
+}
 ME = {"me", "myself", "i", "the person asking"}
 
 
@@ -114,6 +123,7 @@ class DraftAction(BaseModel):
     tag: str | None = Field(default=None, max_length=200)
     titles: list[str] | None = Field(default=None, max_length=20)
     days: int | None = Field(default=None, ge=-365, le=365)
+    kind: AiStepKind | None = Field(default=None, description="ai_step: which AI step to run")
 
 
 class RuleDraft(BaseModel):
@@ -363,6 +373,20 @@ async def _resolve_action(
         if a.days is None:
             raise _Ask("How many days from when the rule runs should the due date be?")
         spec["days"] = named["days"] = a.days
+    elif a.type == "ai_step":
+        if a.kind is None:
+            raise _Ask(
+                "What should Mo do: summarize the comments, draft a reply, classify one field, "
+                "or fill in the empty fields?"
+            )
+        spec["kind"] = named["kind"] = a.kind
+        if a.kind == "classify_field":
+            if not a.field:
+                raise _Ask("Which field should Mo classify the task into?")
+            fid, display = _field(refs, a.field, condition=False)
+            if fid in ("due_on", "start_on"):
+                raise _Ask("Mo can classify priority or a custom field, not a date.")
+            spec["field_id"], named["field_id"] = fid, display
     return spec, named
 
 
@@ -430,6 +454,8 @@ def _action_words(a: dict[str, Any]) -> str:
         return f"add tag {a['tag_id']}"
     if kind == "create_subtasks":
         return "create subtasks: " + ", ".join(a["titles"])
+    if kind == "ai_step":
+        return AI_STEP_WORDS[str(a["kind"])].format(field=a.get("field_id", "a field"))
     if kind == "set_due_relative":
         days = a["days"]
         return f"set the due date {abs(days)} day{'' if abs(days) == 1 else 's'} " + (

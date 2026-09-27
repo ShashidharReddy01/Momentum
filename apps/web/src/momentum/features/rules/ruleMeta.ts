@@ -23,8 +23,8 @@ export const OPS: { op: string; label: string; needsValue: boolean }[] = [
   { op: 'not_empty', label: 'is not empty', needsValue: false },
 ];
 
-/** Mirrors `ACTION_PARAMS`/`ACTION_REQUIRED` (minus `NOT_YET_ACTIONS`: `slack_message` (P7) and
- * `ai_step` (S4.1.5) are refused on write, so the builder doesn't offer them yet). */
+/** Mirrors `ACTION_PARAMS`/`ACTION_REQUIRED` (minus `NOT_YET_ACTIONS`: `slack_message` is refused
+ * on write until P7, so the builder doesn't offer it). */
 export const ACTIONS: { type: string; label: string; params: string[]; required: string[] }[] = [
   { type: 'assign', label: 'Assign to', params: ['user_id'], required: ['user_id'] },
   { type: 'add_comment', label: 'Add a comment', params: ['text'], required: ['text'] },
@@ -47,7 +47,26 @@ export const ACTIONS: { type: string; label: string; params: string[]; required:
   { type: 'create_subtasks', label: 'Create subtasks', params: ['titles'], required: ['titles'] },
   { type: 'set_due_relative', label: 'Set a relative due date', params: ['days'], required: ['days'] },
   { type: 'notify_user', label: 'Notify someone', params: ['user_id', 'text'], required: ['text'] },
+  { type: 'ai_step', label: 'Let Mo do a step (AI)', params: ['kind', 'field_id'], required: ['kind'] },
 ];
+
+/** S4.1.5 `AI_STEP_KINDS`: what the AI step does. `classify_field` is the only one that takes a
+ * field. The step runs on the AI queue just after the rule, and its writes are marked as AI. */
+export const AI_STEP_KINDS: { kind: string; label: string; needsField: boolean }[] = [
+  { kind: 'summarize_to_comment', label: 'Summarize the comments into a comment', needsField: false },
+  { kind: 'draft_reply', label: 'Draft a reply to the newest comment', needsField: false },
+  { kind: 'classify_field', label: 'Set a field from what the task says', needsField: true },
+  { kind: 'extract_fields', label: 'Fill in the empty fields from the description', needsField: false },
+];
+
+/** Whether an action has everything it needs to be saved (`required`, plus the AI step's field). */
+export function actionComplete(a: RuleAction): boolean {
+  const meta = ACTIONS.find((m) => m.type === a.type);
+  if (!meta) return false;
+  const values = a as unknown as Record<string, unknown>;
+  if (!meta.required.every((p) => values[p])) return false;
+  return !(a.type === 'ai_step' && a.kind === 'classify_field' && !a.field_id);
+}
 
 export function defaultTrigger(type: string): RuleTrigger {
   return { type };
@@ -60,6 +79,7 @@ export function defaultCondition(): RuleCondition {
 export function defaultAction(type: string): RuleAction {
   if (type === 'set_due_relative') return { type, days: 1 };
   if (type === 'create_subtasks') return { type, titles: [''] };
+  if (type === 'ai_step') return { type, kind: 'summarize_to_comment' };
   return { type };
 }
 
@@ -142,6 +162,19 @@ function describeAction(a: RuleAction, l: RuleLookups): string {
       return `set the due date to ${a.days ?? 0} day${a.days === 1 ? '' : 's'} from now`;
     case 'notify_user':
       return `notify ${person(l, a.user_id)}: "${a.text ?? ''}"`;
+    case 'ai_step':
+      switch (a.kind) {
+        case 'summarize_to_comment':
+          return 'let Mo post a summary of the comments';
+        case 'draft_reply':
+          return 'let Mo draft a reply comment';
+        case 'classify_field':
+          return `let Mo set ${fieldName(l, a.field_id)} from what the task says`;
+        case 'extract_fields':
+          return 'let Mo fill in the empty fields from the description';
+        default:
+          return 'let Mo do a step';
+      }
     default:
       return a.type;
   }

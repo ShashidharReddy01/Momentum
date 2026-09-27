@@ -29,6 +29,8 @@ export interface RuleAction {
   tag_id?: string | null;
   titles?: string[] | null;
   days?: number | null;
+  /** S4.1.5 `ai_step`: which AI step to run (see `AI_STEP_KINDS` in `ruleMeta.ts`). */
+  kind?: string | null;
 }
 
 export type RuleOut = Omit<components['schemas']['RuleOut'], 'trigger' | 'conditions' | 'actions'> & {
@@ -37,6 +39,7 @@ export type RuleOut = Omit<components['schemas']['RuleOut'], 'trigger' | 'condit
   actions: RuleAction[];
 };
 export type RuleRun = components['schemas']['RuleRunOut'];
+export type RuleAiStep = components['schemas']['RuleAiStepOut'];
 export type RuleTestRun = components['schemas']['RuleTestRunOut'];
 
 export interface RuleSpec {

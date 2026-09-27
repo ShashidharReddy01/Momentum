@@ -14,6 +14,7 @@ mock:
   quick_add: 1.0
   from_brief: 1.0
   nl_rule: 1.0
+  ai_step: 1.0
 live:
   command: 0.9
   chat: 0.85
@@ -26,3 +27,4 @@ live:
   quick_add: 0.85
   from_brief: 0.9
   nl_rule: 0.9
+  ai_step: 0.85

@@ -1,0 +1,12 @@
+# Mock responses for S4.1.5's draft-reply AI step (feature "ai_step_reply"). Matched on the task's
+# title inside the task block. Synthetic only.
+responses:
+  - match: {contains: "finalize pricing tiers"}
+    text: "Agreed on the three tiers and the 14-day trial. I'll take the pricing FAQ unless someone else has already started it."
+  - match: {contains: "sign vendor contract"}
+    text: "Thanks - Friday works. I'll check back after DataCo signs so the launch date doesn't slip."
+  # tests/test_rule_ai_steps.py
+  - match: {contains: "empty reply please"}
+    text: "   "
+default:
+  text: "(mock) A drafted reply, written in mock mode only."

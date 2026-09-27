@@ -1,0 +1,40 @@
+# Mock responses for S4.1.5's field-filling AI step (feature "ai_step_fields"). The model answers
+# with field names and option labels, never ids, so these fixtures don't depend on any database's
+# uuids. Matched on the task's title inside the task block. Synthetic only.
+responses:
+  # Nothing in this task says how urgent it is, so the right answer is to fill nothing in.
+  - match: {contains: "book launch webinar"}
+    tool_calls:
+      - name: submit_result
+        arguments:
+          values: []
+  - match: {contains: "sign vendor contract"}
+    tool_calls:
+      - name: submit_result
+        arguments:
+          values:
+            - {field: "Vendor", value: "DataCo", reason: "the signed DataCo contract"}
+            - {field: "Risk", value: "High", reason: "launch is blocked until it is signed"}
+  # tests/test_rule_ai_steps.py
+  - match: {contains: "qa the checkout flow"}
+    tool_calls:
+      - name: submit_result
+        arguments:
+          values:
+            - {field: "priority", value: "high", reason: "checkout must work at launch"}
+  - match: {contains: "unknown option please"}
+    tool_calls:
+      - name: submit_result
+        arguments:
+          values:
+            - {field: "Risk", value: "Catastrophic", reason: "not one of the choices"}
+  - match: {contains: "nothing to say please"}
+    tool_calls:
+      - name: submit_result
+        arguments:
+          values: []
+default:
+  tool_calls:
+    - name: submit_result
+      arguments:
+        values: []

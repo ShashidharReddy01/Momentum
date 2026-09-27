@@ -21,6 +21,9 @@ from momentum.core.context import Actor, Ctx
 from momentum.core.ids import task_key
 from momentum.core.settings import Settings
 from momentum.domain.comments.service import create_comment
+from momentum.domain.fields.models import FieldDef
+from momentum.domain.fields.schemas import FieldCreateIn, SelectOptionIn
+from momentum.domain.fields.service import create_field
 from momentum.domain.projects.models import Project
 from momentum.domain.projects.schemas import ProjectCreateIn
 from momentum.domain.projects.service import create_project
@@ -42,6 +45,7 @@ class EvalWorld:
     keys: dict[str, str] = field(default_factory=dict)  # task title → key
     task_ids: dict[str, uuid.UUID] = field(default_factory=dict)
     projects: dict[str, uuid.UUID] = field(default_factory=dict)
+    fields: dict[str, uuid.UUID] = field(default_factory=dict)  # custom field name → id
 
     def ctx(self, local: str, settings: Settings) -> Ctx:
         u = self.users[local]
@@ -69,6 +73,12 @@ async def load_world(session: AsyncSession) -> EvalWorld:
         world.task_ids.setdefault(t.title, t.id)
     for pid, name in (await session.execute(select(Project.id, Project.name))).tuples():
         world.projects[name] = pid
+    for fid, fname in (
+        await session.execute(
+            select(FieldDef.id, FieldDef.name).where(FieldDef.deleted_at.is_(None))
+        )
+    ).tuples():
+        world.fields.setdefault(fname, fid)
     return world
 
 
@@ -121,6 +131,30 @@ async def build_workspace(
         for t in p["tasks"]:
             if t.get("completed"):
                 await tasks.set_completed(session, owner, created[t["title"]], True)
+    # Custom fields are created outside the project loop (like tags) so that an eval database
+    # built by an earlier version gets them too: the project itself is only created once.
+    for f in spec.get("fields", []):  # S4.1.5: the fields an AI step fills in
+        exists = (
+            await session.execute(select(FieldDef.id).where(FieldDef.name == f["name"]))
+        ).scalar_one_or_none()
+        if exists is not None:
+            continue
+        project_id = (
+            await session.execute(select(Project.id).where(Project.name == f["project"]))
+        ).scalar_one()
+        await create_field(
+            session,
+            world.ctx(f.get("owner", "ravi"), settings),
+            project_id,
+            FieldCreateIn(
+                name=f["name"],
+                type=f["type"],
+                options=(
+                    [SelectOptionIn(label=o) for o in f["options"]] if f.get("options") else None
+                ),
+                description=f.get("description"),
+            ),
+        )
     await session.flush()
     return await load_world(session)
 

@@ -147,6 +147,65 @@ describe('Rule builder and run history (S4.1.3)', () => {
     expect(screen.queryByRole('textbox', { name: 'Rule name' })).toBeNull();
   });
 
+  it('builds an AI step and shows its own status in the run history (S4.1.5)', async () => {
+    const user = await boot();
+    server.use(
+      http.get('*/api/v1/rules/rule-1/runs', () =>
+        HttpResponse.json({
+          data: [
+            {
+              id: 'run-1',
+              rule_id: 'rule-1',
+              outbox_event_id: 1,
+              status: 'success',
+              depth: 0,
+              actions_run: 1,
+              error: null,
+              started_at: '2026-09-27T00:00:00Z',
+              finished_at: '2026-09-27T00:00:01Z',
+              activity_batch_id: null,
+              ai_steps: [
+                {
+                  id: 'step-1',
+                  task_id: 'task-1',
+                  kind: 'classify_field',
+                  field_id: 'priority',
+                  status: 'done',
+                  result: 'Set priority to high',
+                  error: null,
+                  created_at: '2026-09-27T00:00:01Z',
+                  finished_at: '2026-09-27T00:00:20Z',
+                },
+              ],
+            },
+          ],
+          meta: { next_cursor: null },
+        }),
+      ),
+    );
+    await openDialog(user);
+    await user.click(screen.getByRole('button', { name: 'New rule' }));
+    await user.type(screen.getByRole('textbox', { name: 'Rule name' }), 'Mo triages');
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Action' }), 'Let Mo do a step (AI)');
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: 'AI step' }),
+      'Set a field from what the task says',
+    );
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Field' }), 'Priority');
+    expect(screen.getByText(/let Mo set priority from what the task says/)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Create rule' }));
+
+    // the saved rule reads back as an AI step (so kind and field made it through the API)
+    await waitFor(() => expect(screen.getByText('Mo triages')).toBeInTheDocument());
+    expect(screen.getByText(/let Mo set priority from what the task says/)).toBeInTheDocument();
+
+    await user.click(await screen.findByRole('button', { name: "Mo triages's history" }));
+    const steps = await screen.findByRole('list', { name: 'AI steps' });
+    expect(within(steps).getByText(/Set a field from what the task says/)).toBeInTheDocument();
+    expect(within(steps).getByText(/done/)).toBeInTheDocument();
+    expect(within(steps).getByText(/Set priority to high/)).toBeInTheDocument();
+  });
+
   it('hides "describe a rule" while AI is off', async () => {
     const user = await boot({ my_role: 'admin' }, ['Backlog'], false);
     await openDialog(user);

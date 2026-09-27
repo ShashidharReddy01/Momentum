@@ -1,12 +1,21 @@
 import { Command } from 'cmdk';
 import { AlertTriangle, CheckCircle2, MinusCircle, PlayCircle } from 'lucide-react';
 import { useState } from 'react';
+import { MoMark } from '@/components/common/MoMark';
 import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/Popover';
 import { cn } from '@/lib/cn';
 import { useSearchProjectTasks, type TaskSummary } from '@/features/tasks';
-import { useRuleRuns, useTestRun, type RuleOut, type RuleTestRun } from './queries';
+import { AI_STEP_KINDS } from './ruleMeta';
+import {
+  useRuleRuns,
+  useTestRun,
+  type RuleAiStep,
+  type RuleOut,
+  type RuleRun,
+  type RuleTestRun,
+} from './queries';
 
 const STATUS: Record<string, { icon: typeof CheckCircle2; className: string; label: string }> = {
   success: { icon: CheckCircle2, className: 'text-ok', label: 'Success' },
@@ -14,11 +23,31 @@ const STATUS: Record<string, { icon: typeof CheckCircle2; className: string; lab
   skipped: { icon: MinusCircle, className: 'text-muted', label: 'Skipped' },
 };
 
-function RunRow({
-  run,
-}: {
-  run: { status: string; error: string | null; actions_run: number; started_at: string };
-}) {
+/** S4.1.5: an AI step outlives the run that queued it (it runs on the AI queue a moment later),
+ * so it carries its own status — that's what's shown here, with the amber AI marking. */
+const STEP_STATUS: Record<string, { className: string; label: string }> = {
+  queued: { className: 'text-muted', label: 'queued' },
+  running: { className: 'text-muted', label: 'running' },
+  done: { className: 'text-ok', label: 'done' },
+  failed: { className: 'text-crit', label: 'failed' },
+};
+
+function AiStepRow({ step }: { step: RuleAiStep }) {
+  const s = STEP_STATUS[step.status] ?? STEP_STATUS.queued!;
+  const kind = AI_STEP_KINDS.find((k) => k.kind === step.kind)?.label ?? step.kind;
+  return (
+    <li className="flex items-start gap-1.5 text-xs">
+      <MoMark size={11} className="mt-0.5 shrink-0 text-amber-ink" />
+      <span className="text-amber-ink">{kind}</span>
+      <span className={s.className}>— {s.label}</span>
+      {(step.error ?? step.result) ? (
+        <span className="min-w-0 truncate text-muted">{step.error ?? step.result}</span>
+      ) : null}
+    </li>
+  );
+}
+
+function RunRow({ run }: { run: RuleRun }) {
   const s = STATUS[run.status] ?? STATUS.skipped!;
   return (
     <li className="flex items-start gap-2 border-b border-hair-soft py-2 text-sm last:border-0">
@@ -33,6 +62,13 @@ function RunRow({
           <p className="text-xs text-muted">
             {run.actions_run} action{run.actions_run === 1 ? '' : 's'} run
           </p>
+        ) : null}
+        {run.ai_steps?.length ? (
+          <ul aria-label="AI steps" className="mt-1 flex flex-col gap-0.5">
+            {run.ai_steps.map((step) => (
+              <AiStepRow key={step.id} step={step} />
+            ))}
+          </ul>
         ) : null}
       </div>
     </li>
