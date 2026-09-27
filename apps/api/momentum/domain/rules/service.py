@@ -26,6 +26,7 @@ from momentum.core.mutation import Mutation
 from momentum.core.permissions import Action, can
 from momentum.domain.access import get_visible_project, get_visible_task, require_project_role
 from momentum.domain.fields.models import FieldDef
+from momentum.domain.forms.models import Form
 from momentum.domain.projects.models import Project
 from momentum.domain.rules import engine
 from momentum.domain.rules.models import Rule, RuleAiStep, RuleRun
@@ -106,6 +107,14 @@ async def _check_references(
             or (project_id is not None and section.project_id != project_id)
         ):
             raise ValidationFailed("That section isn't in this project")
+    if trigger.form_id is not None:
+        form = await session.get(Form, trigger.form_id)
+        if (
+            form is None
+            or form.deleted_at is not None
+            or (project_id is not None and form.project_id != project_id)
+        ):
+            raise ValidationFailed("That form isn't in this project")
     for other_id in other_projects - {None}:
         target = await session.get(Project, other_id)
         if (

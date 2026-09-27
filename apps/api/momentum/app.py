@@ -36,6 +36,8 @@ def _api_router(settings: Settings) -> APIRouter:
     from momentum.domain.attachments.router import router as attachments_router
     from momentum.domain.comments.router import router as comments_router
     from momentum.domain.fields.router import router as fields_router
+    from momentum.domain.forms.router import public_router as forms_public_router
+    from momentum.domain.forms.router import router as forms_router
     from momentum.domain.home.router import router as home_router
     from momentum.domain.mytasks.router import router as mytasks_router
     from momentum.domain.notifications.router import router as notifications_router
@@ -68,6 +70,8 @@ def _api_router(settings: Settings) -> APIRouter:
     api.include_router(tags_router)
     api.include_router(status_updates_router)
     api.include_router(rules_router)
+    api.include_router(forms_router)
+    api.include_router(forms_public_router)
     api.include_router(mytasks_router)
     api.include_router(notifications_router)
     api.include_router(home_router)

@@ -52,3 +52,7 @@ class AccountDisabled(DomainError):
 
 class CsrfFailed(DomainError):
     status, code, title = 403, "csrf_failed", "Missing CSRF header"
+
+
+class TooManyRequests(DomainError):
+    status, code, title = 429, "too_many_requests", "Too many requests"

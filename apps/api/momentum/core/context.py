@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Literal
 if TYPE_CHECKING:
     from momentum.core.settings import Settings
 
-Via = Literal["ui", "ai", "agent", "rule", "import", "integration", "api", "mcp", "system"]
+Via = Literal["ui", "ai", "agent", "rule", "import", "integration", "api", "mcp", "system", "form"]
 ActorKind = Literal["user", "agent", "rule", "system", "integration", "import"]
 
 

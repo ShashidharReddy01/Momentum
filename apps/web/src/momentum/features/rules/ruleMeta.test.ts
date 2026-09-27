@@ -8,6 +8,7 @@ const lookups: RuleLookups = {
   sections: new Map([['s1', 'Review']]),
   projects: new Map(),
   fields: new Map([['f1', 'Risk']]),
+  forms: new Map(),
 };
 
 describe('AI step metadata (S4.1.5)', () => {

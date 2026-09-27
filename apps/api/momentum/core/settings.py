@@ -86,6 +86,13 @@ class Settings(BaseSettings):
     # S4.1.1: kill switch for the rules executor (rules stay editable; nothing fires)
     rules_enabled: bool = True
 
+    # S4.2.1: public form spam limits. A submission is throttled per (form, hashed submitter
+    # IP) and, separately, per form overall, so a single spoofed-IP flood is still bounded.
+    forms_ip_hash_salt: str = "dev-only-change-me"
+    forms_rate_limit_per_ip: int = Field(default=5, ge=1)
+    forms_rate_limit_per_form: int = Field(default=60, ge=1)
+    forms_rate_limit_window_minutes: int = Field(default=10, ge=1)
+
     # AI (used from Phase 3)
     ai_enabled: bool = True
     llm_mode: LLMMode = "mock"
@@ -134,6 +141,8 @@ class Settings(BaseSettings):
             if self.ai_enabled and self.llm_mode != "gateway":
                 # Never a silent fallback to mock AI output in production (CLAUDE.md §3).
                 raise ValueError("MOMENTUM_LLM_MODE must be 'gateway' in production")
+            if self.forms_ip_hash_salt == "dev-only-change-me":
+                raise ValueError("MOMENTUM_FORMS_IP_HASH_SALT must be set in production")
         _json_str_map(self.llm_extra_headers, "MOMENTUM_LLM_EXTRA_HEADERS")
         self.base_path = self.base_path.rstrip("/")
         if self.base_path and not self.base_path.startswith("/"):

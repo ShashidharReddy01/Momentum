@@ -9,6 +9,7 @@ export const TRIGGERS: { type: string; label: string; params: string[] }[] = [
   { type: 'task.completed', label: 'A task is completed', params: [] },
   { type: 'task.assigned', label: 'A task is assigned', params: ['user_id'] },
   { type: 'task.due_approaching', label: "A task's due date is approaching", params: [] },
+  { type: 'form.submitted', label: 'A form is submitted', params: ['form_id'] },
 ];
 
 export const TRIGGER_FIELDS = ['priority', 'due_on', 'start_on'] as const;
@@ -89,6 +90,7 @@ export interface RuleLookups {
   sections: Map<string, string>;
   projects: Map<string, string>;
   fields: Map<string, string>;
+  forms: Map<string, string>;
 }
 
 const person = (l: RuleLookups, id: string | null | undefined) =>
@@ -117,6 +119,8 @@ function describeTrigger(t: RuleTrigger, l: RuleLookups): string {
       return t.user_id ? `a task is assigned to ${person(l, t.user_id)}` : 'a task is assigned';
     case 'task.due_approaching':
       return "a task's due date is tomorrow";
+    case 'form.submitted':
+      return t.form_id ? `the ${l.forms.get(t.form_id) ?? 'form'} form is submitted` : 'a form is submitted';
     default:
       return t.type;
   }

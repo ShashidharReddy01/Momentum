@@ -133,8 +133,12 @@ async def test_rule_validation(as_user: Clients) -> None:
     ok = [{"type": "add_comment", "text": "hi"}]
     bad: list[dict[str, Any]] = [
         {"trigger": {"type": "task.exploded"}, "actions": ok},
-        {"trigger": {"type": "form.submitted"}, "actions": ok},  # not available yet
+        {"trigger": {"type": "approval.decided"}, "actions": ok},  # not available yet
         {"trigger": {"type": "task.completed", "to_section": sec["Review"]}, "actions": ok},
+        {
+            "trigger": {"type": "form.submitted", "form_id": str(uuid.uuid4())},
+            "actions": ok,
+        },  # unknown form
         {"trigger": {"type": "task.field_changed", "field": "title"}, "actions": ok},
         {"trigger": move, "actions": []},
         {"trigger": move, "actions": [{"type": "delete_everything"}]},

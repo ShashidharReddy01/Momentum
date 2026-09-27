@@ -53,6 +53,9 @@ export function ruleHandlers(base = '', seedRuns: Record<string, Run[]> = {}) {
   const now = '2026-09-27T00:00:00Z';
 
   return [
+    // S4.2.1: the trigger picker offers "form.submitted" and needs the project's forms to name
+    // one; the rules tests don't exercise forms themselves, so an empty list is enough here.
+    http.get(`*${base}/api/v1/forms`, () => HttpResponse.json({ data: [], meta: { next_cursor: null } })),
     http.get(`*${base}/api/v1/rules`, ({ request }) => {
       const url = new URL(request.url);
       const projectId = url.searchParams.get('project_id');

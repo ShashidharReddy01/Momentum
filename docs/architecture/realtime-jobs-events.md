@@ -71,7 +71,8 @@ Event payloads share an envelope:
 | `status_update.withdrawn` | 3 | `project_id`, `status` (the restored one), `version`: an undone update (S3.4.3) |
 | `ai_action.proposed` / `ai_action.applied` / `ai_action.rejected` / `ai_action.undone` | 3 | ai_action_id, summary |
 | `approval.requested` / `approval.decided` | 4 | state |
-| `form.submitted` | 4 | form_id, task_id |
+| `form.submitted` | 4 | `entity_type="task"`, `form_id`, `project_id` (S4.2.1; emitted alongside the ordinary `task.created`/`task.assigned` events after a submission's task is created, so it reaches the rules executor's task-only event filter; channel `project:<id>`) |
+| `form.created` / `form.updated` / `form.deleted` | 4 | `project_id` (created, deleted); `changes`, `version` (updated); channel `project:<id>` (S4.2.1) |
 | `rule.created` / `rule.updated` / `rule.deleted` | 4 | `project_id` (created, deleted); `changes` (names), `version` (updated); channel `project:<id>` or `workspace:<id>` (S4.1.1; frontend handler in `lib/realtime/handlers.ts` since S4.1.3) |
 | `rule.ran` | 4 | rule_id, status (`success`/`skipped`/`failed`), task_id (S4.1.1; carries the run's depth) |
 | `task.due_approaching` | 4 | `due_on` (S4.1.2; emitted by the hourly `scan_due_approaching` job, deduped per (task, due date); actor `system`) |

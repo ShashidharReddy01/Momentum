@@ -14,6 +14,7 @@ import { Icon } from '@/components/ui/Icon';
 import { IconButton } from '@/components/ui/IconButton';
 import { errorText } from '@/features/ai';
 import { useFieldLibrary } from '@/features/fields';
+import { useForms } from '@/features/forms';
 import { usePeople } from '@/features/people';
 import { useProjects } from '@/features/projects';
 import { useSections } from '@/features/sections';
@@ -30,12 +31,14 @@ function useSentenceLookups(projectId: string): RuleLookups {
   const sections = useSections(projectId);
   const projects = useProjects();
   const fields = useFieldLibrary();
+  const forms = useForms(projectId);
   return {
     people: new Map((people.data ?? []).map((p) => [p.id, p.name])),
     tags: new Map((tags.data ?? []).map((t) => [t.id, t.name])),
     sections: new Map((sections.data ?? []).map((s) => [s.id, s.name])),
     projects: new Map((projects.data ?? []).map((p) => [p.id, p.name])),
     fields: new Map((fields.data ?? []).map((f) => [f.id, f.name])),
+    forms: new Map((forms.data ?? []).map((f) => [f.id, f.name])),
   };
 }
 

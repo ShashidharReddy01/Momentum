@@ -589,6 +589,60 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/forms": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A project's forms */
+        get: operations["list_forms_api_v1_forms_get"];
+        put?: never;
+        /** Create a form (project admins) */
+        post: operations["create_form_api_v1_forms_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/forms/{form_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One form */
+        get: operations["get_form_api_v1_forms__form_id__get"];
+        put?: never;
+        post?: never;
+        /** Delete a form */
+        delete: operations["delete_form_api_v1_forms__form_id__delete"];
+        options?: never;
+        head?: never;
+        /** Edit, enable or disable a form */
+        patch: operations["patch_form_api_v1_forms__form_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/forms/{form_id}/submit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Submit a form while signed in (the internal link) */
+        post: operations["submit_form_internal_api_v1_forms__form_id__submit_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/home": {
         parameters: {
             query?: never;
@@ -1244,6 +1298,40 @@ export interface paths {
         put?: never;
         /** Unarchive */
         post: operations["unarchive_api_v1_projects__project_id__unarchive_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/public/forms/{token}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A public form's questions (no login) */
+        get: operations["get_public_form_api_v1_public_forms__token__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/public/forms/{token}/submit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Submit a public form (no login; rate limited) */
+        post: operations["submit_public_form_api_v1_public_forms__token__submit_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2665,6 +2753,95 @@ export interface components {
             /** Followers */
             followers: string[];
         };
+        /** FormIn */
+        FormIn: {
+            /** Description */
+            description?: string | null;
+            /**
+             * Enabled
+             * @default true
+             */
+            enabled: boolean;
+            /** Name */
+            name: string;
+            /**
+             * Project Id
+             * Format: uuid
+             */
+            project_id: string;
+            /**
+             * Public Enabled
+             * @default false
+             */
+            public_enabled: boolean;
+            /** Questions */
+            questions: components["schemas"]["Question"][];
+            /** Section Id */
+            section_id?: string | null;
+        };
+        /** FormOut */
+        FormOut: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Created By
+             * Format: uuid
+             */
+            created_by: string;
+            /** Description */
+            description: string | null;
+            /** Enabled */
+            enabled: boolean;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /**
+             * Project Id
+             * Format: uuid
+             */
+            project_id: string;
+            /** Public Enabled */
+            public_enabled: boolean;
+            /** Public Token */
+            public_token: string;
+            /** Questions */
+            questions: {
+                [key: string]: unknown;
+            }[];
+            /** Section Id */
+            section_id: string | null;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Version */
+            version: number;
+        };
+        /** FormPatchIn */
+        FormPatchIn: {
+            /** Description */
+            description?: string | null;
+            /** Enabled */
+            enabled?: boolean | null;
+            /** Expected Version */
+            expected_version?: number | null;
+            /** Name */
+            name?: string | null;
+            /** Public Enabled */
+            public_enabled?: boolean | null;
+            /** Questions */
+            questions?: components["schemas"]["Question"][] | null;
+            /** Section Id */
+            section_id?: string | null;
+        };
         /** FromBriefIn */
         FromBriefIn: {
             /** Brief */
@@ -2836,6 +3013,13 @@ export interface components {
         ListOut_FieldValueOut_: {
             /** Data */
             data: components["schemas"]["FieldValueOut"][];
+            /** @default {} */
+            meta: components["schemas"]["ListMeta"];
+        };
+        /** ListOut[FormOut] */
+        ListOut_FormOut_: {
+            /** Data */
+            data: components["schemas"]["FormOut"][];
             /** @default {} */
             meta: components["schemas"]["ListMeta"];
         };
@@ -3108,6 +3292,11 @@ export interface components {
         /** MutationOut[FollowersOut] */
         MutationOut_FollowersOut_: {
             data: components["schemas"]["FollowersOut"];
+            meta: components["schemas"]["MutationMeta"];
+        };
+        /** MutationOut[FormOut] */
+        MutationOut_FormOut_: {
+            data: components["schemas"]["FormOut"];
             meta: components["schemas"]["MutationMeta"];
         };
         /** MutationOut[ListOut[TaskOut]] */
@@ -3692,6 +3881,60 @@ export interface components {
             /** View */
             view?: ("list" | "board" | "calendar" | "timeline" | "overview" | "dashboard") | null;
         };
+        /** PublicFormOut */
+        PublicFormOut: {
+            /** Description */
+            description: string | null;
+            /** Name */
+            name: string;
+            /** Questions */
+            questions: components["schemas"]["PublicQuestionOut"][];
+        };
+        /** PublicOption */
+        PublicOption: {
+            /** Id */
+            id: string;
+            /** Label */
+            label: string;
+        };
+        /** PublicQuestionOut */
+        PublicQuestionOut: {
+            /** Help Text */
+            help_text: string | null;
+            /** Id */
+            id: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "short_text" | "long_text" | "select" | "multi_select" | "number" | "date" | "checkbox" | "person";
+            /** Label */
+            label: string;
+            /** Options */
+            options?: components["schemas"]["PublicOption"][] | null;
+            /** People */
+            people?: components["schemas"]["PublicOption"][] | null;
+            /** Required */
+            required: boolean;
+            show_if?: components["schemas"]["ShowIf"] | null;
+        };
+        /** Question */
+        Question: {
+            /** Help Text */
+            help_text?: string | null;
+            /** Id */
+            id: string;
+            /** Label */
+            label: string;
+            /** Maps To */
+            maps_to: string;
+            /**
+             * Required
+             * @default false
+             */
+            required: boolean;
+            show_if?: components["schemas"]["ShowIf"] | null;
+        };
         /** QuickAddIn */
         QuickAddIn: {
             /** Text */
@@ -4109,6 +4352,16 @@ export interface components {
             /** Label */
             label: string;
         };
+        /**
+         * ShowIf
+         * @description Branching v1: show this question only if an earlier one's answer equals a value.
+         */
+        ShowIf: {
+            /** Equals */
+            equals?: unknown;
+            /** Question Id */
+            question_id: string;
+        };
         /** StatusCitationOut */
         StatusCitationOut: {
             /** Id */
@@ -4226,6 +4479,18 @@ export interface components {
             summary: string;
             /** Title */
             title: string;
+        };
+        /** SubmitFormIn */
+        SubmitFormIn: {
+            /** Answers */
+            answers?: {
+                [key: string]: unknown;
+            };
+            /**
+             * Website
+             * @default
+             */
+            website: string;
         };
         /** SubtaskCreateIn */
         SubtaskCreateIn: {
@@ -4771,6 +5036,8 @@ export interface components {
         Trigger: {
             /** Field */
             field?: string | null;
+            /** Form Id */
+            form_id?: string | null;
             /** To */
             to?: unknown;
             /** To Section */
@@ -6178,6 +6445,202 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ListOut_FieldOut_"];
+                };
+            };
+        };
+    };
+    list_forms_api_v1_forms_get: {
+        parameters: {
+            query: {
+                project_id: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListOut_FormOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_form_api_v1_forms_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FormIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationOut_FormOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_form_api_v1_forms__form_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                form_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FormOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_form_api_v1_forms__form_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                form_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OkOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    patch_form_api_v1_forms__form_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                form_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FormPatchIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationOut_FormOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    submit_form_internal_api_v1_forms__form_id__submit_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                form_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SubmitFormIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OkOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -7755,6 +8218,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MutationOut_ProjectOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_public_form_api_v1_public_forms__token__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicFormOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    submit_public_form_api_v1_public_forms__token__submit_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SubmitFormIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OkOut"];
                 };
             };
             /** @description Validation Error */

@@ -262,14 +262,27 @@ async def test_ai_disabled_refuses_calls_without_touching_the_gateway() -> None:
 
 def test_production_never_silently_uses_mock_ai() -> None:
     with pytest.raises(ValueError, match="LLM_MODE"):
-        make_settings(env="production", auth_mode="easyauth", secret_key="x" * 40, llm_mode="mock")
-    make_settings(env="production", auth_mode="easyauth", secret_key="x" * 40, llm_mode="gateway")
+        make_settings(
+            env="production",
+            auth_mode="easyauth",
+            secret_key="x" * 40,
+            llm_mode="mock",
+            forms_ip_hash_salt="y" * 32,
+        )
+    make_settings(
+        env="production",
+        auth_mode="easyauth",
+        secret_key="x" * 40,
+        llm_mode="gateway",
+        forms_ip_hash_salt="y" * 32,
+    )
     make_settings(
         env="production",
         auth_mode="easyauth",
         secret_key="x" * 40,
         llm_mode="mock",
         ai_enabled=False,
+        forms_ip_hash_salt="y" * 32,
     )
 
 

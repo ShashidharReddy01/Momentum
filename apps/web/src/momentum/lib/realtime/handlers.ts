@@ -74,6 +74,12 @@ function applyRegardlessOfOwnEcho(qc: QueryClient, event: RealtimeEvent, ctx: Re
     if (type === 'rule.ran') void qc.invalidateQueries({ queryKey: ['rules', id, 'runs'] });
     return;
   }
+  if (entityType === 'form') {
+    const projectId = str(data.project_id) ?? ctx.projectId;
+    if (projectId) void qc.invalidateQueries({ queryKey: ['projects', projectId, 'forms'] });
+    void qc.invalidateQueries({ queryKey: ['forms', id] });
+    return;
+  }
   if (entityType === 'comment') {
     const taskId = str(data.task_id);
     if (!taskId) return;

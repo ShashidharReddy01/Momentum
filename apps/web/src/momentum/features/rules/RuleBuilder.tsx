@@ -5,6 +5,7 @@ import { Icon } from '@/components/ui/Icon';
 import { IconButton } from '@/components/ui/IconButton';
 import { Input } from '@/components/ui/Input';
 import { useFieldLibrary, useProjectFields } from '@/features/fields';
+import { useForms } from '@/features/forms';
 import { usePeople } from '@/features/people';
 import { useProjects } from '@/features/projects';
 import { useSections } from '@/features/sections';
@@ -68,6 +69,7 @@ function useRuleLookups(projectId: string) {
   const projects = useProjects();
   const projectFields = useProjectFields(projectId);
   const fieldLibrary = useFieldLibrary();
+  const forms = useForms(projectId);
 
   const lookups: RuleLookups = useMemo(
     () => ({
@@ -76,8 +78,9 @@ function useRuleLookups(projectId: string) {
       sections: new Map((sections.data ?? []).map((s) => [s.id, s.name])),
       projects: new Map((projects.data ?? []).map((p) => [p.id, p.name])),
       fields: new Map((fieldLibrary.data ?? []).map((f) => [f.id, f.name])),
+      forms: new Map((forms.data ?? []).map((f) => [f.id, f.name])),
     }),
-    [people.data, tags.data, sections.data, projects.data, fieldLibrary.data],
+    [people.data, tags.data, sections.data, projects.data, fieldLibrary.data, forms.data],
   );
 
   return {
@@ -92,6 +95,7 @@ function useRuleLookups(projectId: string) {
       { id: 'priority', label: 'Priority' },
       ...(projectFields.data ?? []).map((pf) => ({ id: pf.field.id, label: pf.field.name })),
     ],
+    formOptions: (forms.data ?? []).map((f) => ({ id: f.id, label: f.name })),
   };
 }
 
@@ -175,6 +179,15 @@ function TriggerEditor({
           onChange={(v) => onChange({ ...trigger, user_id: v || null })}
           placeholder="Anyone"
           options={lookups.peopleOptions}
+        />
+      ) : null}
+      {meta.params.includes('form_id') ? (
+        <Select
+          aria-label="Form"
+          value={trigger.form_id ?? ''}
+          onChange={(v) => onChange({ ...trigger, form_id: v || null })}
+          placeholder="Any form"
+          options={lookups.formOptions}
         />
       ) : null}
     </div>

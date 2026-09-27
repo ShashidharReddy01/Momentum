@@ -1,6 +1,7 @@
 import type { RouteObject } from 'react-router';
 import { AiActionPage, AiSettingsPage, AskPage } from '@/features/ai';
 import { AuthGate, DevLoginPage } from '@/features/auth';
+import { FormFillPage, PublicFormPage } from '@/features/forms';
 import { HomePage } from '@/features/home';
 import { AsanaImportPage } from '@/features/imports';
 import { MembersPage } from '@/features/members';
@@ -26,6 +27,8 @@ export function buildRoutes(config: RuntimeConfig): RouteObject[] {
       : [];
   return [
     ...devRoutes,
+    // S4.2.1: the public form link has no session — its own route outside AuthGate/Layout.
+    { path: 'f/:token', element: <PublicFormPage /> },
     {
       element: (
         <AuthGate>
@@ -41,6 +44,11 @@ export function buildRoutes(config: RuntimeConfig): RouteObject[] {
         },
         { path: 'teams/:teamId', element: <TeamPage />, handle: { crumb: 'Team' } },
         { path: 'projects/:projectId/:view?', element: <ProjectPage />, handle: { crumb: 'Project' } },
+        {
+          path: 'projects/:projectId/forms/:formId',
+          element: <FormFillPage />,
+          handle: { crumb: 'Fill out form' },
+        },
         { path: 'task/:taskId', element: <TaskPage />, handle: { crumb: 'Task' } },
         { path: 'tags/:tagId', element: <TagPage />, handle: { crumb: 'Tag' } },
         { path: 'inbox', element: <InboxPage />, handle: { crumb: 'Inbox' } },

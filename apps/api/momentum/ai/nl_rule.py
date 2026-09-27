@@ -33,6 +33,7 @@ from momentum.core.context import Ctx
 from momentum.core.errors import ValidationFailed
 from momentum.domain.access import visible_projects_clause
 from momentum.domain.fields.service import list_project_fields
+from momentum.domain.forms.service import list_forms
 from momentum.domain.projects.models import Project
 from momentum.domain.rules.schemas import MAX_ACTIONS, MAX_CONDITIONS, RuleIn
 from momentum.domain.rules.service import authorize_manage
@@ -57,6 +58,7 @@ TriggerType = Literal[
     "task.completed",
     "task.assigned",
     "task.due_approaching",
+    "form.submitted",
 ]
 ActionType = Literal[
     "assign",
@@ -102,6 +104,9 @@ class DraftTrigger(BaseModel):
     field: str | None = Field(default=None, max_length=200, description="task.field_changed")
     to: Any = Field(default=None, description="task.field_changed: the new value, if named")
     person: str | None = Field(default=None, max_length=200, description="task.assigned")
+    form: str | None = Field(
+        default=None, max_length=200, description="form.submitted: its name, if named"
+    )
 
 
 class DraftCondition(BaseModel):
@@ -166,6 +171,7 @@ class _Refs:
     tags: list[tuple[uuid.UUID, str]]
     fields: list[tuple[uuid.UUID, str, str]]  # id, name, kind
     others: list[str]  # other projects the user can see, by name (add_to/remove_from_project)
+    forms: list[tuple[uuid.UUID, str]]  # form.submitted
 
     @property
     def person_options(self) -> list[tuple[uuid.UUID, str]]:
@@ -184,6 +190,7 @@ async def load_refs(session: AsyncSession, ctx: Ctx, project: Project) -> _Refs:
         .order_by(func.lower(Project.name))
         .limit(OTHER_PROJECTS)
     )
+    forms = await list_forms(session, ctx, project.id)
     return _Refs(
         project=project,
         sections=[(s.id, s.name) for s in await list_sections(session, project.id)],
@@ -191,6 +198,7 @@ async def load_refs(session: AsyncSession, ctx: Ctx, project: Project) -> _Refs:
         tags=[(t.id, t.name) for t in await list_tags(session, ctx)],
         fields=[(f.id, f.name, f.type) for _pf, f in attached],
         others=list(others.scalars()),
+        forms=[(f.id, f.name) for f in forms],
     )
 
 
@@ -205,6 +213,7 @@ def reference_block(refs: _Refs) -> str:
             f"People: {', '.join(safe(u.name) for u in refs.people) or 'none'}",
             f"Tags: {', '.join(safe(n) for _i, n in refs.tags) or 'none'}",
             f"Custom fields: {fields}",
+            f"Forms: {', '.join(safe(n) for _i, n in refs.forms) or 'none'}",
             f"Other projects: {', '.join(safe(n) for n in refs.others) or 'none'}",
             "</data>",
         ]
@@ -277,6 +286,9 @@ def _resolve_trigger(
     elif t.type == "task.assigned" and t.person:
         uid, name = _person(refs, ctx, t.person)
         spec["user_id"], named["user_id"] = str(uid), name
+    elif t.type == "form.submitted" and t.form:
+        form_id, name = _pick("form", t.form, refs.forms)
+        spec["form_id"], named["form_id"] = str(form_id), name
     return spec, named
 
 
@@ -414,6 +426,8 @@ def _trigger_words(t: dict[str, Any]) -> str:
         return "a task is completed"
     if kind == "task.assigned":
         return f"a task is assigned to {t['user_id']}" if "user_id" in t else "a task is assigned"
+    if kind == "form.submitted":
+        return f"the {t['form_id']} form is submitted" if "form_id" in t else "a form is submitted"
     return "a task's due date is tomorrow"
 
 

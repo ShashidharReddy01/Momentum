@@ -27,8 +27,9 @@ TRIGGER_PARAMS: dict[str, set[str]] = {
     "task.completed": set(),
     "task.assigned": {"user_id"},
     "task.due_approaching": set(),
+    "form.submitted": {"form_id"},
 }
-NOT_YET_TRIGGERS = {"form.submitted", "approval.decided"}
+NOT_YET_TRIGGERS = {"approval.decided"}
 
 TRIGGER_FIELDS = ("priority", "due_on", "start_on")
 CONDITION_FIELDS = ("priority", "assignee", "due_on", "start_on", "tag")
@@ -85,6 +86,7 @@ class Trigger(BaseModel):
     field: str | None = None
     to: Any = None
     user_id: uuid.UUID | None = None
+    form_id: uuid.UUID | None = None  # form.submitted: null means any form in the project
 
     @model_validator(mode="after")
     def _check(self) -> Trigger:
