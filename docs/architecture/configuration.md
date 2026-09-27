@@ -53,6 +53,7 @@ Frontend build-time variables use the `VITE_MOMENTUM_` prefix, but the SPA prefe
 | `MOMENTUM_WORKER_MODE` | `embedded` | `embedded` · `separate` · `off` |
 | `MOMENTUM_WORKER_CONCURRENCY` | `4` | |
 | `MOMENTUM_REALTIME_ENABLED` | `true` | |
+| `MOMENTUM_RULES_ENABLED` | `true` | Kill switch for the rules executor (S4.1.1): rules stay editable but nothing fires |
 | `MOMENTUM_WS_REPLAY_LIMIT` | `500` | |
 
 ## Storage

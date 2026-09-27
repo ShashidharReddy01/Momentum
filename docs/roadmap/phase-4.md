@@ -20,6 +20,8 @@ Triggers: task added to project, moved to section, field changed, completed, ass
 **AC:** a chain A→B→C→A stops at depth 3 with a logged skip.
 **Size:** L
 
+**Built (2026-09-27):** migration 0021 (`rules`, `rule_runs`), `domain/rules/` (`models`, `schemas`, `service`, `engine`, `router`), job `run_rules` (every minute). API: `GET/POST /rules` (`?project_id=`), `GET/PATCH/DELETE /rules/{id}`, `GET /rules/{id}/runs`. Triggers built: task added, moved to section (an actual section change), field changed (priority, due/start date, custom field; optional `to`), completed, assigned (optional person). **Not built, refused on write:** due date approaching (needs a scanning job; S4.1.2), form submitted (S4.2.1), approval decided (S4.4.1). Conditions: eq, neq, in, empty, not_empty, gt, lt on priority, assignee, due/start date, tag, custom fields. Actions built (just enough to prove the executor; S4.1.2 adds the rest): assign, add comment, move to section, mark complete. Events carry `depth`; loop protection, rate limit and per-event dedupe are as in `realtime-jobs-events.md` §5. New setting `MOMENTUM_RULES_ENABLED`. Rule actions run as the rule's author (`via="rule"`, `actor_kind=rule`); only project admins manage project rules.
+
 ### S4.1.2: Actions library
 **Scope:** set field, assign, move section, add to project, remove from project, add tag, add comment, create subtasks (from list), mark complete, set due relative ("+3 days"), notify user (inbox), Slack message (enabled in P7), AI step (S4.1.5).
 **Size:** M

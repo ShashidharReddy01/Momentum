@@ -215,8 +215,8 @@ key text, user_id, method, path, response_status, response_body jsonb, created_a
 
 ## 7. Workflow (Phase 4)
 
-- `rules`: id, workspace_id, project_id null (null = workspace rule), name, enabled, trigger jsonb, conditions jsonb, actions jsonb, created_from_prompt text null, version, created_by, timestamps, deleted_at.
-- `rule_runs`: id, rule_id, outbox_event_id, status (`success`,`skipped`,`failed`), depth int, error text, started_at, finished_at, activity_batch_id.
+- `rules` (S4.1.1, migration 0021): id, workspace_id, project_id null (null = workspace rule), name, enabled, trigger jsonb, conditions jsonb, actions jsonb, created_from_prompt text null, version, created_by (the rule acts as this person, with their permissions), timestamps, deleted_at. The JSON shape is validated on write (`domain/rules/schemas.py`).
+- `rule_runs` (S4.1.1): id, workspace_id, rule_id, project_id null, outbox_event_id, status (`success`,`skipped`,`failed`), depth int (of the triggering event), actions_run int, error text, started_at, finished_at, activity_batch_id. **Unique `(rule_id, outbox_event_id)`**: a rule never fires twice on one event. Skipped runs (depth or rate limit) are logged here.
 - `forms`: id, workspace_id, project_id, name, schema jsonb (fields, branching), conversational bool, public_token text unique null, is_active, created_by, timestamps, deleted_at.
 - `form_submissions`: id, form_id, task_id, submitted_by null, answers jsonb, created_at.
 - `templates`: id, workspace_id, kind (`project`,`task`), name, description, payload jsonb (sections, tasks with relative day offsets, roles, fields, rules), created_by, timestamps, deleted_at.

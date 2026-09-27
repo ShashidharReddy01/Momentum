@@ -37,6 +37,7 @@ Event payloads share an envelope:
   "entity_type": "task", "entity_id": "…",
   "actor": {"id": "…", "kind": "user|agent|rule|system|integration|import"},
   "activity_id": "…", "batch_id": null,
+  "depth": 0,
   "channels": ["project:<id>", "task:<id>", "user:<assignee_id>"],
   "data": { "changes": {"due_on": ["2026-09-20", "2026-09-27"]}, "version": 8 },
   "ts": "2026-09-23T10:00:00Z"
@@ -71,7 +72,8 @@ Event payloads share an envelope:
 | `ai_action.proposed` / `ai_action.applied` / `ai_action.rejected` / `ai_action.undone` | 3 | ai_action_id, summary |
 | `approval.requested` / `approval.decided` | 4 | state |
 | `form.submitted` | 4 | form_id, task_id |
-| `rule.ran` | 4 | rule_id, status |
+| `rule.created` / `rule.updated` / `rule.deleted` | 4 | `project_id` (created, deleted); `changes` (names), `version` (updated); channel `project:<id>` or `workspace:<id>` (S4.1.1; no frontend handler until the rule UI, S4.1.3) |
+| `rule.ran` | 4 | rule_id, status (`success`/`skipped`/`failed`), task_id (S4.1.1; carries the run's depth) |
 | `agent_run.started` / `agent_run.finished` | 5 | agent_id, status, cost |
 | `notification.created` | 2 | notification summary (channel `user:<id>` only) |
 | `import.progress` / `import.finished` | 2 | stats |
@@ -167,3 +169,4 @@ Rules:
 - Periodic tasks (cron) are defined in `momentum/jobs/schedule.py` and deduplicated by Procrastinate's `queueing_lock`, so they're safe with several instances.
 - `WORKER_MODE=embedded` starts the worker inside the web process lifespan. `separate` runs `momentum worker`.
 - **As built (Phase 3):** periodic tasks live next to their jobs (`jobs/tasks.py` heartbeat, `jobs/ai.py`), not in a `schedule.py`. `expire_ai_actions` (maintenance, every 15 min, S3.1.3) and `index_embeddings` (ai, every minute, S3.1.4). `index_embeddings` is an **outbox consumer** with its own `consumer_offsets` row (`embeddings`): it re-indexes each task/comment/attachment/project an event names, at most once per run, locks its cursor row for the run (two workers never double-process), and on a gateway failure stops *before* the failing event so the next run retries it. Jobs get a session and a gateway from `jobs/db.py` (`job_session()`, `job_llm()`).
+- **Rules executor (S4.1.1):** `run_rules` (`jobs/rules.py`, default queue, every minute, `queueing_lock`) is an outbox consumer with its own `consumer_offsets` row (`rules`), locked for the run; it repeats batches until it has caught up, so events that rules cause are handled in the same run. **Every event carries `depth`** (`Ctx.rule_depth`, stamped by `emit`): 0 for a person's change, the triggering event's depth + 1 for changes made by a rule's actions. A rule does not fire on an event of depth >= 3 (a `skipped` `rule_runs` row and a `rule_skipped` warning instead); at most 50 rule actions per project per minute; one run per `(rule, event)`. Rules only fire on events created after the rule, and `MOMENTUM_RULES_ENABLED=false` drops (never replays) events meanwhile. A run is all-or-nothing (savepoint). Latency is up to a minute (the cron tick), not per-event.

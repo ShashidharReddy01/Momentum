@@ -1233,6 +1233,60 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Rules of a project (`project_id`), or the workspace's own rules when omitted */
+        get: operations["list_rules_api_v1_rules_get"];
+        put?: never;
+        /** Create a rule (project admins; workspace admins for workspace rules) */
+        post: operations["create_rule_api_v1_rules_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/rules/{rule_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One rule */
+        get: operations["get_rule_api_v1_rules__rule_id__get"];
+        put?: never;
+        post?: never;
+        /** Delete a rule (history stays) */
+        delete: operations["delete_rule_api_v1_rules__rule_id__delete"];
+        options?: never;
+        head?: never;
+        /** Edit, enable or disable a rule */
+        patch: operations["patch_rule_api_v1_rules__rule_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/rules/{rule_id}/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A rule's recent runs, newest first */
+        get: operations["list_runs_api_v1_rules__rule_id__runs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/search": {
         parameters: {
             query?: never;
@@ -1881,6 +1935,17 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** Action */
+        Action: {
+            /** Section Id */
+            section_id?: string | null;
+            /** Text */
+            text?: string | null;
+            /** Type */
+            type: string;
+            /** User Id */
+            user_id?: string | null;
+        };
         /** ActivityItemOut */
         ActivityItemOut: {
             /** Actor Id */
@@ -2254,6 +2319,15 @@ export interface components {
              * Format: uuid
              */
             task_id: string;
+        };
+        /** Condition */
+        Condition: {
+            /** Field */
+            field: string;
+            /** Op */
+            op: string;
+            /** Value */
+            value?: unknown;
         };
         /** ConversationDetailOut */
         ConversationDetailOut: {
@@ -2750,6 +2824,20 @@ export interface components {
             /** @default {} */
             meta: components["schemas"]["ListMeta"];
         };
+        /** ListOut[RuleOut] */
+        ListOut_RuleOut_: {
+            /** Data */
+            data: components["schemas"]["RuleOut"][];
+            /** @default {} */
+            meta: components["schemas"]["ListMeta"];
+        };
+        /** ListOut[RuleRunOut] */
+        ListOut_RuleRunOut_: {
+            /** Data */
+            data: components["schemas"]["RuleRunOut"][];
+            /** @default {} */
+            meta: components["schemas"]["ListMeta"];
+        };
         /** ListOut[SectionOut] */
         ListOut_SectionOut_: {
             /** Data */
@@ -2988,6 +3076,11 @@ export interface components {
         /** MutationOut[ProjectOut] */
         MutationOut_ProjectOut_: {
             data: components["schemas"]["ProjectOut"];
+            meta: components["schemas"]["MutationMeta"];
+        };
+        /** MutationOut[RuleOut] */
+        MutationOut_RuleOut_: {
+            data: components["schemas"]["RuleOut"];
             meta: components["schemas"]["MutationMeta"];
         };
         /** MutationOut[SectionOut] */
@@ -3634,6 +3727,116 @@ export interface components {
              * @default false
              */
             workdays_only: boolean;
+        };
+        /** RuleIn */
+        RuleIn: {
+            /** Actions */
+            actions: components["schemas"]["Action"][];
+            /** Conditions */
+            conditions?: components["schemas"]["Condition"][];
+            /** Created From Prompt */
+            created_from_prompt?: string | null;
+            /**
+             * Enabled
+             * @default true
+             */
+            enabled: boolean;
+            /** Name */
+            name: string;
+            /** Project Id */
+            project_id?: string | null;
+            trigger: components["schemas"]["Trigger"];
+        };
+        /** RuleOut */
+        RuleOut: {
+            /** Actions */
+            actions: {
+                [key: string]: unknown;
+            }[];
+            /** Conditions */
+            conditions: {
+                [key: string]: unknown;
+            }[];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Created By
+             * Format: uuid
+             */
+            created_by: string;
+            /** Created From Prompt */
+            created_from_prompt: string | null;
+            /** Enabled */
+            enabled: boolean;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Project Id */
+            project_id: string | null;
+            /** Trigger */
+            trigger: {
+                [key: string]: unknown;
+            };
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Version */
+            version: number;
+        };
+        /** RulePatchIn */
+        RulePatchIn: {
+            /** Actions */
+            actions?: components["schemas"]["Action"][] | null;
+            /** Conditions */
+            conditions?: components["schemas"]["Condition"][] | null;
+            /** Enabled */
+            enabled?: boolean | null;
+            /** Expected Version */
+            expected_version?: number | null;
+            /** Name */
+            name?: string | null;
+            trigger?: components["schemas"]["Trigger"] | null;
+        };
+        /** RuleRunOut */
+        RuleRunOut: {
+            /** Actions Run */
+            actions_run: number;
+            /** Activity Batch Id */
+            activity_batch_id: string | null;
+            /** Depth */
+            depth: number;
+            /** Error */
+            error: string | null;
+            /** Finished At */
+            finished_at: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Outbox Event Id */
+            outbox_event_id: number;
+            /**
+             * Rule Id
+             * Format: uuid
+             */
+            rule_id: string;
+            /**
+             * Started At
+             * Format: date-time
+             */
+            started_at: string;
+            /** Status */
+            status: string;
         };
         /** ScreenIn */
         ScreenIn: {
@@ -4405,6 +4608,19 @@ export interface components {
             description?: string | null;
             /** Name */
             name?: string | null;
+        };
+        /** Trigger */
+        Trigger: {
+            /** Field */
+            field?: string | null;
+            /** To */
+            to?: unknown;
+            /** To Section */
+            to_section?: string | null;
+            /** Type */
+            type: string;
+            /** User Id */
+            user_id?: string | null;
         };
         /** UndoIn */
         UndoIn: {
@@ -7348,6 +7564,198 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MutationOut_ProjectOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_rules_api_v1_rules_get: {
+        parameters: {
+            query?: {
+                project_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListOut_RuleOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_rule_api_v1_rules_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RuleIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationOut_RuleOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_rule_api_v1_rules__rule_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                rule_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RuleOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_rule_api_v1_rules__rule_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                rule_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OkOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    patch_rule_api_v1_rules__rule_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                rule_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RulePatchIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationOut_RuleOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_runs_api_v1_rules__rule_id__runs_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                rule_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListOut_RuleRunOut_"];
                 };
             };
             /** @description Validation Error */

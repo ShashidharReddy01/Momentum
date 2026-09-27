@@ -102,6 +102,8 @@ resolve_user(principal):
 | Manage rules, forms, templates | ✓ | ✓ (setting) | ✗ | ✗ |
 | Manage members, privacy, archive/delete project | ✓ | ✗ | ✗ | ✗ |
 
+_As built (S4.1.1): rules are managed by project admins only (there is no editor setting yet); editors can view them and their runs; workspace rules (no project) need a workspace admin. A rule's actions run as its author, so they can never do more than the author could._
+
 Team members get **editor** by default on `team`-privacy projects of their team, unless a per-project role says otherwise. Workspace admins get **admin** on `team`-privacy projects. **Private** projects are visible only to explicit project members, admins included. Projects of a deleted team are hidden. Editors may rename/recolor and change the default view; privacy, archive and delete need project **admin**. Implemented in `momentum/domain/access.py` (`project_role`, `visible_projects_clause`, `get_visible_project`). Sharing: project admins add people with a role (explicit roles override the team default, in both directions); every project keeps at least one explicit admin (409 `last_admin`); anyone can leave a project they were explicitly added to.
 
 ## 6. Task visibility

@@ -12,6 +12,7 @@ from momentum.domain.integrations.models import ExternalLink, ImportJob
 from momentum.domain.mytasks.models import MyTaskPlacement
 from momentum.domain.notifications.models import Notification
 from momentum.domain.projects.models import Favorite, Project, ProjectMember
+from momentum.domain.rules.models import Rule, RuleRun
 from momentum.domain.sections.models import Section
 from momentum.domain.status_updates.models import StatusUpdate
 from momentum.domain.tags.models import Tag, TaskTag
@@ -47,6 +48,8 @@ __all__ = [
     "ProjectField",
     "ProjectMember",
     "Reaction",
+    "Rule",
+    "RuleRun",
     "Section",
     "StatusUpdate",
     "Tag",

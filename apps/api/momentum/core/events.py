@@ -86,6 +86,7 @@ async def emit(
         "channels": list(dict.fromkeys(channels or [])),
         "data": data or {},
         "request_id": ctx.request_id,
+        "depth": ctx.rule_depth,
     }
     row = OutboxEvent(
         workspace_id=ctx.workspace_id,

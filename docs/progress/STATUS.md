@@ -6,7 +6,7 @@
 
 ## Current focus
 - **Phase:** 3: AI Layer v1 ("Mo") — **complete; exit criteria met** (2026-09-27; see the Phase 3 retro and `docs/roadmap/phase-3.md` "Phase 3 exit"). Awaiting the product owner's sign-off. Kickoff done (`docs/roadmap/phase-3-kickoff.md`); S3.1.1–S3.5.2 done. Phase 2 is complete.
-- **Next up:** **Phase 4, S4.1.1 Rule model and executor (Opus).** Phase 3 is done (product-owner sign-off given by starting Phase 4). Each slice is a fresh session that follows `docs/process/slice-session.md` and ends by printing the next slice's prompt. The one open product-owner item (set `MOMENTUM_LLM_PRICE_TABLE`) does not block.
+- **Next up:** **Phase 4, S4.1.2 Actions library (Sonnet)** (S4.1.1 done 2026-09-27). Phase 3 is done (product-owner sign-off given by starting Phase 4). Each slice is a fresh session that follows `docs/process/slice-session.md` and ends by printing the next slice's prompt. The one open product-owner item (set `MOMENTUM_LLM_PRICE_TABLE`) does not block.
 - **Product-owner instruction (2026-09-26):** finish all remaining slices, then one big local test run against the real gateway (100+ questions/actions covering edge cases), then fix from that run.
 - **Scope note (product owner, 2026-09-26):** the customer-operations capabilities (SQQ, pricing, contracts, invoices, pushes to internal systems as tools and assignable agents) will be done later in the product owner's own codebase, **not in this repo**. Finish the roadmap as written.
 - **Branch:** all Phase 3 work is on `claude/clever-hopper-pbv7yr` (ahead of `main`). Continue from that branch.
@@ -17,11 +17,14 @@
 - **This session's environment (2026-09-26, S3.5.2):** native Windows dev machine (not a Linux container), with a real Portkey key already configured in `apps/api/.env` (`MOMENTUM_LLM_MODE=gateway`) — so the product owner's "one big local test run" can actually run from here (`EVALS_LIVE=1 make evals`), unlike earlier sessions.
 - **Blockers:** none
 
-## Handoff notes (latest session: 2026-09-26/27, Phase 3 exit)
-- **Phase 3 is done; details, the run-by-run history and every fix are in `docs/roadmap/phase-3.md` "Phase 3 exit".** Nine full live runs on the real gateway; the last one (final code) passed 141/141. Reports are in `reports/evals/` (git-ignored); partial and incomplete reports are ignored as baselines automatically.
-- **Verified on the final code:** backend 455/455 + ruff format/check + mypy strict + import-linter; web 287/287 + tsc + eslint + prettier; e2e 9/9; live evals 141/141.
-- **Windows dev notes (this machine):** `make` isn't installed, so run steps directly (`uv run ...`, `pnpm exec ...`). E2E: `MOMENTUM_E2E_CHROMIUM="C:\Program Files\Google\Chrome\Application\chrome.exe" pnpm exec playwright test` from `apps/web` (Playwright's own Chromium isn't installed; `serve.sh` now runs through `bash` and pins the mock LLM). If Postgres seems dead: Docker Desktop may have stopped; start it, then `docker start compose-postgres-1` (data persists).
-- **Not done, on purpose:** nothing in the price table (product-owner value), no threshold changes, no Phase 4 work.
+## Handoff notes (latest session: 2026-09-27, S4.1.1 Rule model and executor)
+- **Shipped:** migration 0021 (`rules`, `rule_runs`); `momentum/domain/rules/` (models, schemas, service, engine, router); job `run_rules` (every minute, outbox consumer `rules`); `Ctx.rule_depth` and `depth` on every outbox event; setting `MOMENTUM_RULES_ENABLED`; API `/rules` CRUD + `/rules/{id}/runs`; 36 tests in `tests/test_rules.py`. Details in `docs/roadmap/phase-4.md` S4.1.1 "Built".
+- **Decisions:** (1) rule actions run as the rule's **author** (permissions bounded by them; a disabled author = `failed` run); (2) only **project admins** manage project rules, workspace admins workspace rules (the permissions doc says "editor (setting)"; no setting exists, so the stricter default; editors can view); (3) a rule fires on events of depth < 3, so a chain makes at most 3 hops, then a `skipped` run + `rule_skipped` warning; (4) a run is all-or-nothing (savepoint), and only runs that matched trigger and conditions are logged (plus skips); (5) rules ignore events older than the rule, and the kill switch drops events rather than replaying them; (6) rule CRUD has activity + events but no undo (config, like tags/fields); rule *actions* are undoable through the ordinary activity batch; (7) built only 4 actions (assign, comment, move, complete) and 5 triggers; due-approaching / form / approval triggers are refused on write until their sources exist.
+- **Mutation checks (16, all killed):** depth limit raised; `>=` to `>`; depth not stamped in `emit`; rule ctx not adding a hop; no per-event dedupe; no rate limit; rate window ignored; no savepoint; no created_at guard; reorder counted as a move; project scope ignored; kill switch not dropping; project rules needing only editor; edit needing only editor; workspace rules open to members; disabled author still acting.
+- **Gotchas:** rules fire up to a minute after the change (cron tick), not instantly; realtime `rule.*` events have no frontend handler until S4.1.3; `run_rules` needs the worker (`WORKER_MODE=embedded` runs it). Windows: Python heredocs mangle non-ASCII in doc edits (use the Edit tool).
+- **Try it:** `make dev`, then (no UI yet) as a project admin `POST /api/v1/rules` with `{"name":"Review","project_id":"…","trigger":{"type":"task.moved","to_section":"…"},"actions":[{"type":"add_comment","text":"Ready"}]}`, move a task into that section, wait a minute, see the comment and `GET /api/v1/rules/{id}/runs`.
+- **Deferred:** the due-approaching trigger (S4.1.2), the other actions (S4.1.2), UI and dry-run test-run (S4.1.3), per-event instant execution (consider a NOTIFY-driven run if a minute proves too slow).
+- **Windows dev notes:** `make` isn't installed (`uv run ...`, `pnpm exec ...`). E2E: `MOMENTUM_E2E_CHROMIUM="C:\Program Files\Google\Chrome\Application\chrome.exe" pnpm exec playwright test`. If Postgres seems dead, start Docker Desktop then `docker start compose-postgres-1`.
 
 ## Open questions
 | # | Question | Needed by | Status |
@@ -73,7 +76,11 @@
 - [x] S3.5.1 Eval harness (141 cases since the Phase 3 exit; mock 23/23) · [x] S3.5.2 AI usage and settings (admin)
 - [x] Phase 3 exit (2026-09-27): `EVALS_LIVE=1 make evals` against the real gateway **passes: 141/141, every threshold** (one clean full pass on the final code) · e2e 9/9 incl. J7, J8 (mock) · backend, web, lint, types green · AI-unavailable degrades gracefully · usage token counts exact; **dollar cost unmeasured until a price table is set**
 
-### Phases 4–9
+### Phase 4: Workflow and Intake
+- [x] S4.1.1 Rule model and executor (2026-09-27) · [ ] S4.1.2 Actions library · [ ] S4.1.3 Rule builder UI and run history · [ ] S4.1.4 NL to rule · [ ] S4.1.5 AI step action
+- [ ] S4.2.1 Form builder (+ public forms) · [ ] S4.2.2 Conversational intake · [ ] S4.3.1 Project templates · [ ] S4.3.2 Task templates · [ ] S4.3.3 Template from description · [ ] S4.4.1 Approvals · [ ] S4.4.2 Recurring tasks · [ ] Phase 4 exit
+
+### Phases 5–9
 Tracked in their phase files; copy the slice list here at each phase kickoff.
 
 ## Plan changes log

@@ -38,6 +38,9 @@ class Ctx:
     via: Via = "ui"
     dry_run: bool = False
     acting_for: Actor | None = None
+    # How many rule hops led to this context (S4.1.1). Every event emitted with this context
+    # carries it as ``depth``, which is what stops rule chains from looping.
+    rule_depth: int = 0
 
     @property
     def workspace_id(self) -> uuid.UUID:

@@ -83,6 +83,8 @@ class Settings(BaseSettings):
     worker_mode: WorkerMode = "embedded"
     worker_concurrency: int = 4
     realtime_enabled: bool = True
+    # S4.1.1: kill switch for the rules executor (rules stay editable; nothing fires)
+    rules_enabled: bool = True
 
     # AI (used from Phase 3)
     ai_enabled: bool = True

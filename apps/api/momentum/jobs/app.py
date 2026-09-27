@@ -7,6 +7,7 @@ import procrastinate
 from momentum.core.settings import Settings
 from momentum.jobs import ai as _ai  # noqa: F401 - registers `expire_ai_actions`
 from momentum.jobs import attachments as _attachments  # noqa: F401 - registers `extract_text`
+from momentum.jobs import rules as _rules  # noqa: F401 - registers `run_rules`
 from momentum.jobs.tasks import blueprint
 
 # Queue names are prefixed so they never collide with a host app using Procrastinate too.

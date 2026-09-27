@@ -2,6 +2,11 @@
 
 > Moved out of `STATUS.md` (2026-09-27) to keep it small: every AI session reads STATUS in full. Newest first. Nothing here is current instruction; the code and the docs are.
 
+## Handoff notes (2026-09-26/27, Phase 3 exit →)
+- **Phase 3 is done; details, the run-by-run history and every fix are in `docs/roadmap/phase-3.md` "Phase 3 exit".** Nine full live runs on the real gateway; the last one (final code) passed 141/141. Reports are in `reports/evals/` (git-ignored); partial and incomplete reports are ignored as baselines automatically.
+- **Verified on the final code:** backend 455/455 + ruff format/check + mypy strict + import-linter; web 287/287 + tsc + eslint + prettier; e2e 9/9; live evals 141/141.
+- **Not done, on purpose:** nothing in the price table (product-owner value), no threshold changes, no Phase 4 work.
+
 ## Handoff notes (2026-09-26, S3.5.2 →)
 - **S3.5.2 AI usage and settings (admin) (done):** see the phase file's Built note. Workspace-level `AiConfig` in `workspaces.settings['ai']` (no migration; same JSONB-preference precedent as `users.prefs['ai']`), merged with the environment by `effective_ai()` — **the environment always bounds the workspace** (an admin can turn AI off or lower the budget where the deployment allows it, never turn it on where the deployment disabled it). Wired into `LLM._preflight` (workspace kill switch) and `emit_proposals` (workspace auto-apply policy on top of the user's own preference). `GET`/`PUT /ai/admin/settings`, `GET /ai/admin/usage` (feature/user/day aggregation from `llm_calls`), both admin-gated in the service layer. Frontend: an admin-only section on the existing `/settings/ai` page. Verified: `test_ai_admin.py` (10), `aiSettings.test.tsx` (+5).
 - **First native-Windows session, three real environment gaps found and fixed at the root (none are product bugs):**
