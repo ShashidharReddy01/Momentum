@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { useParams } from 'react-router';
 import { ApiError } from '@/lib/api/errors';
+import { ConversationalFiller } from './ConversationalFiller';
 import { FormFiller } from './FormFiller';
-import { usePublicForm, useSubmitPublicForm } from './queries';
+import { useConversePublic, useConverseSubmitPublic, usePublicForm, useSubmitPublicForm } from './queries';
 
 /** The public link (S4.2.1): `/f/:token`, no login, its own route outside `AuthGate`/`Layout`.
  * A hidden `website` input is the honeypot — a real person never fills it in, and the server
@@ -11,6 +12,8 @@ export function PublicFormPage() {
   const { token = '' } = useParams();
   const form = usePublicForm(token);
   const submit = useSubmitPublicForm(token);
+  const converseTurn = useConversePublic(token);
+  const converseSubmit = useConverseSubmitPublic(token);
   const [done, setDone] = useState(false);
   const [website, setWebsite] = useState('');
 
@@ -37,6 +40,18 @@ export function PublicFormPage() {
         <h1 className="text-lg font-semibold text-ink">Thanks — got it.</h1>
         <p className="mt-1 text-sm text-muted">Your submission was recorded.</p>
       </div>
+    );
+  }
+
+  if (form.data.conversational) {
+    return (
+      <ConversationalFiller
+        name={form.data.name}
+        description={form.data.description}
+        converse={(history) => converseTurn.mutateAsync(history)}
+        submit={(history, answers) => converseSubmit.mutateAsync({ history, answers })}
+        onSubmitted={() => setDone(true)}
+      />
     );
   }
 

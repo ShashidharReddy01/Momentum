@@ -40,6 +40,9 @@ class Form(IdMixin, TimestampMixin, SoftDeleteMixin, Base):
     questions: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, default=list)
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     public_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    # S4.2.2: chat UI asks the questions naturally instead of a plain form; answers still map
+    # to the same fields, and the transcript is attached as a comment on the created task.
+    conversational: Mapped[bool] = mapped_column(Boolean, default=False)
     # Generated once, kept even while the public link is off, so re-enabling it doesn't hand
     # out a new URL. Never guessable (secrets.token_urlsafe); only shown to a project admin.
     public_token: Mapped[str] = mapped_column(String(64), unique=True)

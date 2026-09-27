@@ -175,6 +175,7 @@ export function FormBuilder({
   const [sectionId, setSectionId] = useState(initial?.section_id ?? '');
   const [enabled, setEnabled] = useState(initial?.enabled ?? true);
   const [publicEnabled, setPublicEnabled] = useState(initial?.public_enabled ?? false);
+  const [conversational, setConversational] = useState(initial?.conversational ?? false);
   const [questions, setQuestions] = useState<Question[]>(
     initial?.questions ?? [{ id: 'q1', label: 'What needs to be done?', required: true, maps_to: 'title' }],
   );
@@ -233,6 +234,10 @@ export function FormBuilder({
           <Toggle checked={publicEnabled} onChange={setPublicEnabled} label="Public link" />
           Public link (no login)
         </span>
+        <span className="flex items-center gap-1.5 text-sm text-muted">
+          <Toggle checked={conversational} onChange={setConversational} label="Conversational" />
+          Conversational (Mo asks the questions in a chat)
+        </span>
       </div>
 
       <ul className="flex flex-col gap-2">
@@ -271,6 +276,7 @@ export function FormBuilder({
               questions,
               enabled,
               public_enabled: publicEnabled,
+              conversational,
             })
           }
         >

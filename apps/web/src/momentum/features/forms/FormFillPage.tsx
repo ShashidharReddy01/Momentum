@@ -3,9 +3,10 @@ import { useNavigate, useParams } from 'react-router';
 import { useProjectFields } from '@/features/fields';
 import { usePeople } from '@/features/people';
 import { ApiError } from '@/lib/api/errors';
+import { ConversationalFiller } from './ConversationalFiller';
 import { FormFiller } from './FormFiller';
 import { renderQuestions } from './formMeta';
-import { useForm, useSubmitFormInternal } from './queries';
+import { useConverseInternal, useConverseSubmitInternal, useForm, useSubmitFormInternal } from './queries';
 
 /** The internal (logged-in) submission link: `/projects/:projectId/forms/:formId`, inside the
  * ordinary authenticated shell. The caller need only see the project (S4.2.1: intake is a
@@ -17,6 +18,8 @@ export function FormFillPage() {
   const fields = useProjectFields(projectId);
   const people = usePeople();
   const submit = useSubmitFormInternal(formId);
+  const converseTurn = useConverseInternal(formId);
+  const converseSubmit = useConverseSubmitInternal(formId);
   const [done, setDone] = useState(false);
 
   if (form.isPending || fields.isPending || people.isPending) {
@@ -41,6 +44,18 @@ export function FormFillPage() {
           Back to the project
         </button>
       </div>
+    );
+  }
+
+  if (form.data.conversational) {
+    return (
+      <ConversationalFiller
+        name={form.data.name}
+        description={form.data.description}
+        converse={(history) => converseTurn.mutateAsync(history)}
+        submit={(history, answers) => converseSubmit.mutateAsync({ history, answers })}
+        onSubmitted={() => setDone(true)}
+      />
     );
   }
 

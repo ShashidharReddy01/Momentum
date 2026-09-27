@@ -96,6 +96,7 @@ class FormIn(FormSpec):
     section_id: uuid.UUID | None = None
     enabled: bool = True
     public_enabled: bool = False
+    conversational: bool = False
 
 
 class FormPatchIn(BaseModel):
@@ -106,6 +107,7 @@ class FormPatchIn(BaseModel):
     questions: list[Question] | None = Field(default=None, min_length=1, max_length=MAX_QUESTIONS)
     enabled: bool | None = None
     public_enabled: bool | None = None
+    conversational: bool | None = None
     expected_version: int | None = None
 
 
@@ -119,6 +121,7 @@ class FormOut(BaseModel):
     questions: list[dict[str, Any]]
     enabled: bool
     public_enabled: bool
+    conversational: bool
     public_token: str
     version: int
     created_by: uuid.UUID
@@ -151,6 +154,7 @@ class PublicFormOut(BaseModel):
     name: str
     description: str | None
     questions: list[PublicQuestionOut]
+    conversational: bool = False
 
 
 class SubmitFormIn(BaseModel):
@@ -167,3 +171,36 @@ class FormSubmissionOut(BaseModel):
     task_id: uuid.UUID
     submitted_by: uuid.UUID | None
     created_at: datetime
+
+
+# ---------------- S4.2.2 conversational intake ----------------
+
+MAX_TURN_TEXT = 2000
+MAX_TURNS = 40
+
+
+class ConversationMessage(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    role: Literal["user", "assistant"]
+    text: Annotated[str, StringConstraints(strip_whitespace=True, max_length=MAX_TURN_TEXT)]
+
+
+class ConverseIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    history: list[ConversationMessage] = Field(max_length=MAX_TURNS)
+
+
+class ConverseTurnOut(BaseModel):
+    """One reply from Mo: what to say next, and (once ``done``) the answers gathered so far —
+    ready for the caller to show a confirmation and then submit."""
+
+    message: str
+    done: bool
+    answers: dict[str, Any] = Field(default_factory=dict)
+
+
+class ConverseSubmitIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    history: list[ConversationMessage] = Field(max_length=MAX_TURNS)
+    answers: dict[str, Any] = Field(default_factory=dict, max_length=MAX_QUESTIONS)
+    website: Annotated[str, StringConstraints(max_length=200)] = ""

@@ -29,7 +29,15 @@ export interface FormSpec {
   questions: Question[];
   enabled: boolean;
   public_enabled: boolean;
+  conversational: boolean;
 }
+
+export interface ConversationTurn {
+  role: 'user' | 'assistant';
+  text: string;
+}
+
+export type ConverseTurnOut = components['schemas']['ConverseTurnOut'];
 
 export const formKeys = {
   byProject: (projectId: string) => ['projects', projectId, 'forms'] as const,
@@ -129,6 +137,60 @@ export function useSubmitPublicForm(token: string) {
         await api.POST('/api/v1/public/forms/{token}/submit', {
           params: { path: { token } },
           body,
+        })
+      ).data!,
+  });
+}
+
+/** S4.2.2: one turn of the conversational intake, and the final confirm+submit. Stateless on
+ * the server — the client resends the whole transcript each turn. */
+export function useConverseInternal(formId: string) {
+  const api = useApi();
+  return useMutation({
+    mutationFn: async (history: ConversationTurn[]) =>
+      (
+        await api.POST('/api/v1/forms/{form_id}/converse', {
+          params: { path: { form_id: formId } },
+          body: { history },
+        })
+      ).data! as ConverseTurnOut,
+  });
+}
+
+export function useConverseSubmitInternal(formId: string) {
+  const api = useApi();
+  return useMutation({
+    mutationFn: async (v: { history: ConversationTurn[]; answers: Record<string, unknown> }) =>
+      (
+        await api.POST('/api/v1/forms/{form_id}/converse/submit', {
+          params: { path: { form_id: formId } },
+          body: { ...v, website: '' },
+        })
+      ).data!,
+  });
+}
+
+export function useConversePublic(token: string) {
+  const api = useApi();
+  return useMutation({
+    mutationFn: async (history: ConversationTurn[]) =>
+      (
+        await api.POST('/api/v1/public/forms/{token}/converse', {
+          params: { path: { token } },
+          body: { history },
+        })
+      ).data! as ConverseTurnOut,
+  });
+}
+
+export function useConverseSubmitPublic(token: string) {
+  const api = useApi();
+  return useMutation({
+    mutationFn: async (v: { history: ConversationTurn[]; answers: Record<string, unknown> }) =>
+      (
+        await api.POST('/api/v1/public/forms/{token}/converse/submit', {
+          params: { path: { token } },
+          body: { ...v, website: '' },
         })
       ).data!,
   });

@@ -75,6 +75,16 @@ describe('Form builder (S4.2.1)', () => {
     await waitFor(() => expect(screen.queryByText('Intake')).not.toBeInTheDocument());
   });
 
+  it('marks a form conversational once the toggle is on (S4.2.2)', async () => {
+    const user = await boot();
+    await openDialog(user);
+    await user.click(screen.getByRole('button', { name: 'New form' }));
+    await user.type(screen.getByRole('textbox', { name: 'Form name' }), 'Chat intake');
+    await user.click(screen.getByRole('switch', { name: 'Conversational' }));
+    await user.click(screen.getByRole('button', { name: 'Create form' }));
+    await waitFor(() => expect(screen.getByText('Conversational')).toBeInTheDocument());
+  });
+
   it('an editor has no access to project settings, so no Forms entry either', async () => {
     await boot({ my_role: 'editor' });
     expect(screen.queryByRole('button', { name: 'Project actions' })).not.toBeInTheDocument();

@@ -626,6 +626,40 @@ export interface paths {
         patch: operations["patch_form_api_v1_forms__form_id__patch"];
         trace?: never;
     };
+    "/api/v1/forms/{form_id}/converse": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** One turn of the conversational intake (internal link) */
+        post: operations["converse_internal_api_v1_forms__form_id__converse_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/forms/{form_id}/converse/submit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Confirm and submit a conversational intake (internal link) */
+        post: operations["converse_submit_internal_api_v1_forms__form_id__converse_submit_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/forms/{form_id}/submit": {
         parameters: {
             query?: never;
@@ -1315,6 +1349,40 @@ export interface paths {
         get: operations["get_public_form_api_v1_public_forms__token__get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/public/forms/{token}/converse": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** One turn of the conversational intake (public link; rate limited) */
+        post: operations["converse_public_api_v1_public_forms__token__converse_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/public/forms/{token}/converse/submit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Confirm and submit a conversational intake (public link; rate limited) */
+        post: operations["converse_submit_public_api_v1_public_forms__token__converse_submit_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2480,6 +2548,16 @@ export interface components {
             /** Messages */
             messages: components["schemas"]["ChatMessageOut"][];
         };
+        /** ConversationMessage */
+        ConversationMessage: {
+            /**
+             * Role
+             * @enum {string}
+             */
+            role: "user" | "assistant";
+            /** Text */
+            text: string;
+        };
         /** ConversationOut */
         ConversationOut: {
             /** Context Id */
@@ -2506,6 +2584,40 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+        };
+        /** ConverseIn */
+        ConverseIn: {
+            /** History */
+            history: components["schemas"]["ConversationMessage"][];
+        };
+        /** ConverseSubmitIn */
+        ConverseSubmitIn: {
+            /** Answers */
+            answers?: {
+                [key: string]: unknown;
+            };
+            /** History */
+            history: components["schemas"]["ConversationMessage"][];
+            /**
+             * Website
+             * @default
+             */
+            website: string;
+        };
+        /**
+         * ConverseTurnOut
+         * @description One reply from Mo: what to say next, and (once ``done``) the answers gathered so far —
+         *     ready for the caller to show a confirmation and then submit.
+         */
+        ConverseTurnOut: {
+            /** Answers */
+            answers?: {
+                [key: string]: unknown;
+            };
+            /** Done */
+            done: boolean;
+            /** Message */
+            message: string;
         };
         /** CsvImportResult */
         CsvImportResult: {
@@ -2755,6 +2867,11 @@ export interface components {
         };
         /** FormIn */
         FormIn: {
+            /**
+             * Conversational
+             * @default false
+             */
+            conversational: boolean;
             /** Description */
             description?: string | null;
             /**
@@ -2781,6 +2898,8 @@ export interface components {
         };
         /** FormOut */
         FormOut: {
+            /** Conversational */
+            conversational: boolean;
             /**
              * Created At
              * Format: date-time
@@ -2827,6 +2946,8 @@ export interface components {
         };
         /** FormPatchIn */
         FormPatchIn: {
+            /** Conversational */
+            conversational?: boolean | null;
             /** Description */
             description?: string | null;
             /** Enabled */
@@ -3883,6 +4004,11 @@ export interface components {
         };
         /** PublicFormOut */
         PublicFormOut: {
+            /**
+             * Conversational
+             * @default false
+             */
+            conversational: boolean;
             /** Description */
             description: string | null;
             /** Name */
@@ -6610,6 +6736,76 @@ export interface operations {
             };
         };
     };
+    converse_internal_api_v1_forms__form_id__converse_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                form_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConverseIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConverseTurnOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    converse_submit_internal_api_v1_forms__form_id__converse_submit_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                form_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConverseSubmitIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OkOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     submit_form_internal_api_v1_forms__form_id__submit_post: {
         parameters: {
             query?: never;
@@ -8249,6 +8445,76 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PublicFormOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    converse_public_api_v1_public_forms__token__converse_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConverseIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConverseTurnOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    converse_submit_public_api_v1_public_forms__token__converse_submit_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConverseSubmitIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OkOut"];
                 };
             };
             /** @description Validation Error */

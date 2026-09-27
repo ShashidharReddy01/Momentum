@@ -70,6 +70,9 @@ function FormRow({
         {form.public_enabled ? (
           <span className="rounded bg-accent-2 px-1.5 py-0.5 text-xs text-accent-ink">Public</span>
         ) : null}
+        {form.conversational ? (
+          <span className="rounded bg-amber-2 px-1.5 py-0.5 text-xs text-amber-ink">Conversational</span>
+        ) : null}
         {canEdit ? (
           <>
             <Button size="sm" variant="ghost" onClick={onEdit}>

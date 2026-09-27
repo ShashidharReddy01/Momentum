@@ -31,6 +31,8 @@ CSRF_EXEMPT = ("/api/v1/public/", "/webhooks/")
 
 
 def _api_router(settings: Settings) -> APIRouter:
+    from momentum.ai.forms_intake_router import public_router as forms_intake_public_router
+    from momentum.ai.forms_intake_router import router as forms_intake_router
     from momentum.ai.router import router as ai_router
     from momentum.api.undo import router as undo_router
     from momentum.domain.attachments.router import router as attachments_router
@@ -72,6 +74,8 @@ def _api_router(settings: Settings) -> APIRouter:
     api.include_router(rules_router)
     api.include_router(forms_router)
     api.include_router(forms_public_router)
+    api.include_router(forms_intake_router)
+    api.include_router(forms_intake_public_router)
     api.include_router(mytasks_router)
     api.include_router(notifications_router)
     api.include_router(home_router)

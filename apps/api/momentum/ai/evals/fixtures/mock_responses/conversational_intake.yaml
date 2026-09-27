@@ -1,0 +1,41 @@
+# Mock responses for S4.2.2 conversational intake (feature "conversational_intake"). Synthetic
+# only. Matches on a substring of the whole request (form context + conversation so far); since
+# the transcript accumulates, entries are ordered **most-progressed conversation first** so a
+# later turn's request (which still contains earlier substrings) doesn't fall back to an
+# earlier turn's rule — the mock picks the first matching entry in file order.
+responses:
+  - match: {contains: "person: 2026-10-03"}
+    tool_calls:
+      - name: submit_result
+        arguments:
+          message: "Here's what I've got: \"Fix the leaky faucet\", due 2026-10-03. Sound right?"
+          done: true
+          answers: {q_title: "Fix the leaky faucet", q_due: "2026-10-03"}
+  - match: {contains: "person: soon-ish"}
+    tool_calls:
+      - name: submit_result
+        arguments:
+          message: "Could you give me an actual date, like 2026-10-03?"
+          done: false
+          answers: {q_title: "Fix the leaky faucet"}
+  - match: {contains: "person: fix the leaky faucet"}
+    tool_calls:
+      - name: submit_result
+        arguments:
+          message: "Got it. When should it be done by?"
+          done: false
+          answers: {q_title: "Fix the leaky faucet"}
+  - match: {contains: "person: report a bug"}
+    tool_calls:
+      - name: submit_result
+        arguments:
+          message: "Here's what I've got: \"Report a bug\". Sound right?"
+          done: true
+          answers: {q_title: "Report a bug"}
+  - match: {contains: "nothing said yet"}
+    tool_calls:
+      - name: submit_result
+        arguments:
+          message: "Hi! What's the task called?"
+          done: false
+          answers: {}

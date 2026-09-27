@@ -36,12 +36,14 @@ from momentum.core.events import emit
 from momentum.core.mutation import Mutation
 from momentum.core.settings import Settings
 from momentum.domain.access import get_visible_project, require_project_role
+from momentum.domain.comments.service import create_comment
 from momentum.domain.fields.models import FieldDef, ProjectField
 from momentum.domain.fields.service import set_task_field_value, validate_value
 from momentum.domain.forms.models import Form, FormSubmission
 from momentum.domain.forms.schemas import (
     FIXED_TARGETS,
     MAX_ANSWER_TEXT,
+    ConversationMessage,
     FormIn,
     FormPatchIn,
     FormSpec,
@@ -138,6 +140,12 @@ async def get_form(session: AsyncSession, ctx: Ctx, form_id: uuid.UUID) -> Form:
     return await _load(session, ctx, form_id, "editor", "see this form")
 
 
+async def get_form_to_submit(session: AsyncSession, ctx: Ctx, form_id: uuid.UUID) -> Form:
+    """The internal link needs only visibility, not editor access: intake is a controlled
+    channel (the task is created as the form's owner), not a grant of edit rights."""
+    return await _load(session, ctx, form_id, "viewer", "submit this form")
+
+
 async def create_form(session: AsyncSession, ctx: Ctx, data: FormIn) -> Mutation[Form]:
     if ctx.actor.id is None:
         raise Forbidden("Forms need a person to act as")
@@ -161,6 +169,7 @@ async def create_form(session: AsyncSession, ctx: Ctx, data: FormIn) -> Mutation
         questions=[q.model_dump() for q in data.questions],
         enabled=data.enabled,
         public_enabled=data.public_enabled,
+        conversational=data.conversational,
         public_token=secrets.token_urlsafe(24),
         created_by=ctx.actor.id,
     )
@@ -208,7 +217,14 @@ async def update_form(
         ):
             raise ValidationFailed("That section isn't in this project")
     changes: Diff = {}
-    for key in ("name", "description", "section_id", "enabled", "public_enabled"):
+    for key in (
+        "name",
+        "description",
+        "section_id",
+        "enabled",
+        "public_enabled",
+        "conversational",
+    ):
         if key not in sent:
             continue
         value = getattr(data, key)
@@ -336,7 +352,12 @@ async def _question_view(
 async def public_form_view(session: AsyncSession, form: Form) -> PublicFormOut:
     fields = await _project_fields(session, form.project_id)
     questions = [await _question_view(session, form.project_id, q, fields) for q in form.questions]
-    return PublicFormOut(name=form.name, description=form.description, questions=questions)
+    return PublicFormOut(
+        name=form.name,
+        description=form.description,
+        questions=questions,
+        conversational=form.conversational,
+    )
 
 
 # ---------------- submission ----------------
@@ -379,6 +400,16 @@ async def _rate_limit(
             )
 
 
+async def rate_limit_turn(
+    session: AsyncSession, settings: Settings, form_id: uuid.UUID, ip_hash: str | None
+) -> None:
+    """S4.2.2: a coarse guard before a conversational turn spends a model call. Reuses the
+    submission counters rather than a new per-turn table — imperfect against someone who
+    converses without ever submitting, but bounds the common spam pattern for free. Carried to
+    the security review pass, like S4.2.1's other public-endpoint limitations."""
+    await _rate_limit(session, settings, form_id, ip_hash)
+
+
 def _is_blank(value: Any) -> bool:
     return value is None or value == "" or value == []
 
@@ -406,8 +437,9 @@ async def submit_form(
     submitted_by: uuid.UUID | None,
     ip_hash: str | None,
     rate_limited: bool,
-) -> uuid.UUID | None:
-    """Create the task the answers describe, as the form's owner. Returns the new task's id, or
+) -> tuple[uuid.UUID, Ctx] | None:
+    """Create the task the answers describe, as the form's owner. Returns the new task's id and
+    the ctx it was created with (S4.2.2 reuses it to attach the conversation transcript), or
     ``None`` when the honeypot field was filled in (a real success is faked to the caller without
     creating anything, so a bot never learns the trap tripped)."""
     if body.website.strip():
@@ -511,4 +543,50 @@ async def submit_form(
         data={"form_id": str(form.id), "project_id": str(form.project_id)},
         channels=_channels(form.project_id),
     )
-    return task.id
+    return task.id, ctx
+
+
+def _transcript_text(history: list[ConversationMessage]) -> str:
+    speaker = {"assistant": "Mo", "user": "You"}
+    return "\n".join(f"{speaker[m.role]}: {m.text}" for m in history if m.text.strip())
+
+
+async def attach_transcript(
+    session: AsyncSession, ctx: Ctx, task_id: uuid.UUID, history: list[ConversationMessage]
+) -> None:
+    """S4.2.2: the conversation that led to a conversational submission, kept as a comment on
+    the task it created — so the answers behind an "equivalent to a classic submission" task are
+    never lost."""
+    text = _transcript_text(history)
+    if not text:
+        return
+    await create_comment(
+        session, ctx, task_id, _text_doc(f"Conversational intake transcript:\n{text}")
+    )
+
+
+async def submit_conversational(
+    session: AsyncSession,
+    settings: Settings,
+    form: Form,
+    answers: dict[str, Any],
+    history: list[ConversationMessage],
+    *,
+    submitted_by: uuid.UUID | None,
+    ip_hash: str | None,
+    rate_limited: bool,
+) -> uuid.UUID | None:
+    result = await submit_form(
+        session,
+        settings,
+        form,
+        SubmitFormIn(answers=answers, website=""),
+        submitted_by=submitted_by,
+        ip_hash=ip_hash,
+        rate_limited=rate_limited,
+    )
+    if result is None:
+        return None
+    task_id, ctx = result
+    await attach_transcript(session, ctx, task_id, history)
+    return task_id

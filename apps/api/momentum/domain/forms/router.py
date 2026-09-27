@@ -79,7 +79,7 @@ async def submit_form_internal(
     form_id: uuid.UUID, body: SubmitFormIn, ctx: CtxDep, uow: UowDep
 ) -> OkOut:
     async with uow.transaction() as s:
-        form = await service.get_form(s, ctx, form_id)
+        form = await service.get_form_to_submit(s, ctx, form_id)
         await service.submit_form(
             s,
             ctx.settings,
