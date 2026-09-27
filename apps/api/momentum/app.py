@@ -53,6 +53,7 @@ def _api_router(settings: Settings) -> APIRouter:
     from momentum.domain.tasks.csv_import_router import router as csv_import_router
     from momentum.domain.tasks.router import router as tasks_router
     from momentum.domain.teams.router import router as teams_router
+    from momentum.domain.templates.router import router as templates_router
     from momentum.domain.users.router import dev_router
     from momentum.domain.users.router import router as users_router
     from momentum.integrations.asana_import.router import router as asana_router
@@ -76,6 +77,7 @@ def _api_router(settings: Settings) -> APIRouter:
     api.include_router(forms_public_router)
     api.include_router(forms_intake_router)
     api.include_router(forms_intake_public_router)
+    api.include_router(templates_router)
     api.include_router(mytasks_router)
     api.include_router(notifications_router)
     api.include_router(home_router)

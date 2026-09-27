@@ -2036,6 +2036,75 @@ export interface paths {
         patch: operations["set_role_api_v1_teams__team_id__members__user_id__patch"];
         trace?: never;
     };
+    "/api/v1/templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Templates (`?kind=`) */
+        get: operations["list_templates_api_v1_templates_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/templates/from-project": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Save a project as a reusable template (project admins) */
+        post: operations["save_project_template_api_v1_templates_from_project_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/templates/{template_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One template */
+        get: operations["get_template_api_v1_templates__template_id__get"];
+        put?: never;
+        post?: never;
+        /** Delete a template */
+        delete: operations["delete_template_api_v1_templates__template_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/templates/{template_id}/new-project": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create a new project from a template */
+        post: operations["new_project_from_template_api_v1_templates__template_id__new_project_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/undo": {
         parameters: {
             query?: never;
@@ -3263,6 +3332,13 @@ export interface components {
             /** @default {} */
             meta: components["schemas"]["ListMeta"];
         };
+        /** ListOut[TemplateOut] */
+        ListOut_TemplateOut_: {
+            /** Data */
+            data: components["schemas"]["TemplateOut"][];
+            /** @default {} */
+            meta: components["schemas"]["ListMeta"];
+        };
         /** ListOut[UserOut] */
         ListOut_UserOut_: {
             /** Data */
@@ -3430,6 +3506,11 @@ export interface components {
             data: components["schemas"]["MemoryOut"];
             meta: components["schemas"]["MutationMeta"];
         };
+        /** MutationOut[NewProjectOut] */
+        MutationOut_NewProjectOut_: {
+            data: components["schemas"]["NewProjectOut"];
+            meta: components["schemas"]["MutationMeta"];
+        };
         /** MutationOut[OkOut] */
         MutationOut_OkOut_: {
             data: components["schemas"]["OkOut"];
@@ -3493,6 +3574,11 @@ export interface components {
         /** MutationOut[TeamOut] */
         MutationOut_TeamOut_: {
             data: components["schemas"]["TeamOut"];
+            meta: components["schemas"]["MutationMeta"];
+        };
+        /** MutationOut[TemplateOut] */
+        MutationOut_TemplateOut_: {
+            data: components["schemas"]["TemplateOut"];
             meta: components["schemas"]["MutationMeta"];
         };
         /** MyTaskMoveIn */
@@ -3577,6 +3663,45 @@ export interface components {
         };
         /** NamedRef */
         NamedRef: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+        };
+        /** NewProjectFromTemplateIn */
+        NewProjectFromTemplateIn: {
+            /** Color */
+            color?: string | null;
+            /** Name */
+            name: string;
+            /**
+             * Privacy
+             * @default team
+             * @enum {string}
+             */
+            privacy: "team" | "private";
+            /** Role Mapping */
+            role_mapping?: components["schemas"]["RoleMapping"][];
+            /**
+             * Start Date
+             * Format: date
+             */
+            start_date: string;
+            /**
+             * Team Id
+             * Format: uuid
+             */
+            team_id: string;
+        };
+        /**
+         * NewProjectOut
+         * @description Just enough for the caller to navigate to the new project — its own detail comes from
+         *     the ordinary `GET /projects/{id}` (one write path, no second project-rendering shape).
+         */
+        NewProjectOut: {
             /**
              * Id
              * Format: uuid
@@ -4154,6 +4279,13 @@ export interface components {
              */
             workdays_only: boolean;
         };
+        /** RoleMapping */
+        RoleMapping: {
+            /** Role Id */
+            role_id: string;
+            /** User Id */
+            user_id?: string | null;
+        };
         /**
          * RuleAiStepOut
          * @description S4.1.5: one queued AI step of a run. The rule run finishes before the step does, so the
@@ -4364,6 +4496,18 @@ export interface components {
             actions: components["schemas"]["ActionResultOut"][];
             /** Conditions Passed */
             conditions_passed: boolean;
+        };
+        /** SaveProjectTemplateIn */
+        SaveProjectTemplateIn: {
+            /** Description */
+            description?: string | null;
+            /** Name */
+            name: string;
+            /**
+             * Project Id
+             * Format: uuid
+             */
+            project_id: string;
         };
         /** ScreenIn */
         ScreenIn: {
@@ -5157,6 +5301,41 @@ export interface components {
             description?: string | null;
             /** Name */
             name?: string | null;
+        };
+        /** TemplateOut */
+        TemplateOut: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Created By
+             * Format: uuid
+             */
+            created_by: string;
+            /** Description */
+            description: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Kind */
+            kind: string;
+            /** Name */
+            name: string;
+            /** Payload */
+            payload: {
+                [key: string]: unknown;
+            };
+            /** Project Id */
+            project_id: string | null;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
         };
         /** Trigger */
         Trigger: {
@@ -10311,6 +10490,167 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MutationOut_OkOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_templates_api_v1_templates_get: {
+        parameters: {
+            query?: {
+                kind?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListOut_TemplateOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_project_template_api_v1_templates_from_project_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SaveProjectTemplateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationOut_TemplateOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_template_api_v1_templates__template_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                template_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TemplateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_template_api_v1_templates__template_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                template_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OkOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    new_project_from_template_api_v1_templates__template_id__new_project_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                template_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewProjectFromTemplateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationOut_NewProjectOut_"];
                 };
             };
             /** @description Validation Error */

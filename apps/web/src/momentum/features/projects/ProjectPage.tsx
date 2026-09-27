@@ -1,6 +1,7 @@
 import {
   Archive,
   ArchiveRestore,
+  BookmarkPlus,
   ClipboardList,
   Download,
   Lock,
@@ -40,6 +41,7 @@ import { CsvImportDialog } from '@/features/csvImport';
 import { FieldsDialog } from '@/features/fields';
 import { FormsDialog } from '@/features/forms';
 import { RulesDialog } from '@/features/rules';
+import { SaveAsTemplateDialog } from '@/features/templates';
 import { StatusChip, StatusOverview, type Status } from '@/features/status';
 import { useMomentumConfig } from '@/lib/config';
 import { useProject, useProjectLifecycle, useToggleFavorite, useUpdateProject } from './queries';
@@ -85,6 +87,7 @@ export function ProjectPage() {
   const [fieldsOpen, setFieldsOpen] = useState(false);
   const [rulesOpen, setRulesOpen] = useState(false);
   const [formsOpen, setFormsOpen] = useState(false);
+  const [saveTemplateOpen, setSaveTemplateOpen] = useState(false);
   const [csvImportOpen, setCsvImportOpen] = useState(false);
   useCrumbs(project.data ? [project.data.team_name, project.data.name] : null);
 
@@ -203,6 +206,9 @@ export function ProjectPage() {
                   <DropdownMenuItem onSelect={() => setFormsOpen(true)}>
                     <Icon icon={ClipboardList} /> Forms
                   </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => setSaveTemplateOpen(true)}>
+                    <Icon icon={BookmarkPlus} /> Save as template
+                  </DropdownMenuItem>
                   <DropdownMenuItem onSelect={() => setCsvImportOpen(true)}>
                     <Icon icon={Download} /> Import from CSV
                   </DropdownMenuItem>
@@ -266,6 +272,7 @@ export function ProjectPage() {
       <FieldsDialog projectId={p.id} canEdit={canEdit} open={fieldsOpen} onOpenChange={setFieldsOpen} />
       <RulesDialog projectId={p.id} canEdit={isAdmin} open={rulesOpen} onOpenChange={setRulesOpen} />
       <FormsDialog projectId={p.id} canEdit={isAdmin} open={formsOpen} onOpenChange={setFormsOpen} />
+      <SaveAsTemplateDialog projectId={p.id} open={saveTemplateOpen} onOpenChange={setSaveTemplateOpen} />
       <CsvImportDialog projectId={p.id} open={csvImportOpen} onOpenChange={setCsvImportOpen} />
       {p.my_role === 'viewer' || p.my_role === 'commenter' ? (
         <div role="status" className="bg-info-tint px-4 md:px-8 py-1.5 text-xs text-ink-2">
