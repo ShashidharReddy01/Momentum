@@ -4,6 +4,8 @@
 #
 # Users (from the seed): ravi (Product lead), ana, priya, mei (Product); tom (Marketing only:
 # can't see Product's projects); lena (Marketing).
+# Tags (S4.1.4): rules cases refer to these by name.
+tags: ["Escalated", "Needs review"]
 projects:
   - name: "Launch Plan"
     team: "Product"

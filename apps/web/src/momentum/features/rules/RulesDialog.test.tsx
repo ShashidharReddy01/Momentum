@@ -1,5 +1,6 @@
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { MomentumApp } from '@/MomentumApp';
@@ -20,12 +21,12 @@ afterEach(() => {
 });
 afterAll(() => server.close());
 
-async function boot(seed: Record<string, unknown> = { my_role: 'admin' }) {
+async function boot(seed: Record<string, unknown> = { my_role: 'admin' }, sections = ['Backlog'], ai = true) {
   server.use(
-    ...authHandlers({ loggedIn: true }).handlers,
+    ...authHandlers({ loggedIn: true, config: { ai_enabled: ai } }).handlers,
     ...teamHandlers(),
     ...projectHandlers('', undefined, [{ name: 'Website Revamp', ...seed }]),
-    ...sectionHandlers('', { 'seed-1': ['Backlog'] }),
+    ...sectionHandlers('', { 'seed-1': sections }),
     ...taskHandlers(),
     ...fieldHandlers(),
     ...dependencyHandlers('', [{ id: 'task-1', title: 'Ship it', completed_at: null }]),
@@ -102,6 +103,55 @@ describe('Rule builder and run history (S4.1.3)', () => {
     await waitFor(() =>
       expect(within(screen.getByRole('dialog')).getByText('mark_complete')).toBeInTheDocument(),
     );
+  });
+
+  it('drafts a rule from a sentence and saves it with the prompt that made it (S4.1.4)', async () => {
+    const user = await boot({ my_role: 'admin' }, ['Review']);
+    let posted: Record<string, unknown> | null = null;
+    server.use(
+      http.post('*/api/v1/rules', async ({ request }) => {
+        posted = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json(
+          { data: { ...posted, id: 'rule-9', version: 1 }, meta: { version: 1 } },
+          { status: 201 },
+        );
+      }),
+    );
+    await openDialog(user);
+
+    const sentence = 'when a task moves to Review assign it to Ravi';
+    await user.type(screen.getByRole('textbox', { name: 'Describe a rule' }), sentence);
+    await user.click(screen.getByRole('button', { name: 'Draft it' }));
+
+    // the draft opens in the ordinary builder, prefilled and marked as Mo's
+    await waitFor(() =>
+      expect(screen.getByRole('textbox', { name: 'Rule name' })).toHaveValue('Review goes to Ravi'),
+    );
+    expect(screen.getByText(/Mo drafted this/)).toBeInTheDocument();
+    expect(screen.getByText(/moves to Review, then assign to Ravi Kumar/)).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Create rule' }));
+    await waitFor(() => expect(posted).not.toBeNull());
+    expect(posted).toMatchObject({ name: 'Review goes to Ravi', created_from_prompt: sentence });
+    await waitFor(() => expect(screen.getByRole('button', { name: 'New rule' })).toBeInTheDocument());
+  });
+
+  it('asks a question instead of guessing, and drafts nothing (S4.1.4)', async () => {
+    const user = await boot();
+    await openDialog(user);
+    await user.type(screen.getByRole('textbox', { name: 'Describe a rule' }), 'post it to Slack');
+    await user.click(screen.getByRole('button', { name: 'Draft it' }));
+    await waitFor(() =>
+      expect(screen.getByText(/Which section should the task move into/)).toBeInTheDocument(),
+    );
+    expect(screen.queryByRole('textbox', { name: 'Rule name' })).toBeNull();
+  });
+
+  it('hides "describe a rule" while AI is off', async () => {
+    const user = await boot({ my_role: 'admin' }, ['Backlog'], false);
+    await openDialog(user);
+    expect(screen.queryByRole('textbox', { name: 'Describe a rule' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'New rule' })).toBeInTheDocument();
   });
 
   it('a non-admin editor sees no project-actions menu (Rules is admin-only)', async () => {

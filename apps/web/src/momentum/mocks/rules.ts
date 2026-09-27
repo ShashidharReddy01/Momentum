@@ -1,4 +1,5 @@
 import { http, HttpResponse } from 'msw';
+import { ravi } from './fixtures';
 
 type Trigger = { type: string; [k: string]: unknown };
 type Condition = { field: string; op: string; value?: unknown };
@@ -30,9 +31,9 @@ type Run = {
   activity_batch_id: string | null;
 };
 
-/** In-memory S4.1.1-S4.1.3 rules API: CRUD, run history, and a canned "test run" (every action
- * comes back `ok: true` — the backend's own conditions/action logic is covered in
- * test_rules.py; this mock only needs to exercise the builder UI). */
+/** In-memory S4.1.1-S4.1.4 rules API: CRUD, run history, a canned "test run" (every action comes
+ * back `ok: true` — the backend's own conditions/action logic is covered in test_rules.py; this
+ * mock only needs to exercise the builder UI) and a canned NL compile. */
 export function ruleHandlers(base = '', seedRuns: Record<string, Run[]> = {}) {
   const rules: R[] = [];
   const runs: Record<string, Run[]> = { ...seedRuns };
@@ -87,6 +88,28 @@ export function ruleHandlers(base = '', seedRuns: Record<string, Run[]> = {}) {
     http.get(`*${base}/api/v1/rules/:id/runs`, ({ params }) =>
       HttpResponse.json({ data: runs[String(params.id)] ?? [], meta: { next_cursor: null } }),
     ),
+    // S4.1.4: a sentence naming a section and a person compiles; anything else asks back.
+    http.post(`*${base}/api/v1/ai/rules/compile`, async ({ request }) => {
+      const b = (await request.json()) as { project_id: string; text: string };
+      if (!/review/i.test(b.text))
+        return HttpResponse.json({
+          rule: null,
+          sentence: null,
+          question: "I can't do that yet. Which section should the task move into?",
+        });
+      return HttpResponse.json({
+        rule: {
+          name: 'Review goes to Ravi',
+          enabled: true,
+          trigger: { type: 'task.moved', to_section: 'sec-1' },
+          conditions: [],
+          actions: [{ type: 'assign', user_id: ravi.id }],
+          created_from_prompt: b.text,
+        },
+        sentence: 'When a task moves to Review, then assign to Ravi Kumar.',
+        question: null,
+      });
+    }),
     http.post(`*${base}/api/v1/rules/:id/test-run`, ({ params }) => {
       const r = rules.find((x) => x.id === params.id);
       return HttpResponse.json({

@@ -61,6 +61,7 @@ KNOWN = frozenset(
         "due_before_end",
         "tasks_between",
         "fields",
+        "rule_exact",
     }
 )
 
@@ -270,6 +271,11 @@ def score(obs: Observation, expect: dict[str, Any], *, today: date, asked: str =
         lo, hi = expect["tasks_between"]
         n = int(obs.data.get("tasks", 0))
         add(Check("tasks_between", lo <= n <= hi, f"{n} tasks"))
+
+    # natural language → rule: the compiled rule, with names in place of ids, exactly as expected
+    if "rule_exact" in expect:
+        got = obs.data.get("rule")
+        add(Check("rule_exact", got == expect["rule_exact"], json.dumps(got, default=str)[:300]))
 
     # quick add
     fields = expect.get("fields") or {}

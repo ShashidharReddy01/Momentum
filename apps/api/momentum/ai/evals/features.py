@@ -24,6 +24,7 @@ from momentum.ai.evals.workspace import EvalWorld
 from momentum.ai.from_brief import plan_from_brief
 from momentum.ai.llm import LLM
 from momentum.ai.models import AiAction
+from momentum.ai.nl_rule import compile_rule
 from momentum.ai.plan_day import plan_day
 from momentum.ai.status_draft import draft_status
 from momentum.ai.tools.registry import ToolRegistry
@@ -46,6 +47,7 @@ FEATURES = (
     "write",
     "quick_add",
     "from_brief",
+    "nl_rule",
 )
 
 
@@ -272,6 +274,13 @@ async def _run(
             "tasks": brief.tasks,
         }
         obs.operations, obs.risk = await _operations(session, brief.action_id)
+    elif feature == "nl_rule":
+        compiled = await compile_rule(
+            session, llm, ctx, world.projects[case.get("project", "Launch Plan")], inp
+        )
+        obs.clarified = compiled.question is not None
+        obs.text = compiled.question or compiled.sentence or ""
+        obs.data = {"rule": compiled.named, "sentence": compiled.sentence}
     else:
         raise ValueError(f"unknown eval feature {feature!r}")
 

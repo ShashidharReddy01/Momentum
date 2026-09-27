@@ -19,6 +19,7 @@ from momentum.ai import (
     citations,
     from_brief,
     memory,
+    nl_rule,
     plan_day,
     prefs,
     quick_add,
@@ -702,6 +703,60 @@ async def ai_project_from_brief(
             end_on=body.end_on,
         )
         return FromBriefOut(**r.__dict__)
+
+
+# ---------------- natural language → rule (S4.1.4) ----------------
+
+
+class RuleCompileIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    project_id: uuid.UUID
+    text: str = Field(min_length=1, max_length=nl_rule.MAX_TEXT)
+
+
+class RuleDraftOut(BaseModel):
+    """Exactly what ``POST /rules`` accepts, so the builder can show it and save it unchanged."""
+
+    name: str
+    enabled: bool
+    trigger: dict[str, Any]
+    conditions: list[dict[str, Any]]
+    actions: list[dict[str, Any]]
+    created_from_prompt: str | None
+
+
+class RuleCompileOut(BaseModel):
+    """Either ``rule`` + ``sentence``, or ``question`` when Mo needs to ask rather than guess."""
+
+    rule: RuleDraftOut | None = None
+    sentence: str | None = None
+    question: str | None = None
+
+
+@router.post(
+    "/rules/compile",
+    response_model=RuleCompileOut,
+    summary="Turn a sentence into a rule draft for the rule builder (saves nothing)",
+)
+async def ai_compile_rule(
+    body: RuleCompileIn, ctx: CtxDep, uow: UowDep, rt: RuntimeDep
+) -> RuleCompileOut:
+    llm = require_llm(rt)
+    ctx = ctx.with_(via="ai")
+    async with uow.transaction() as s:
+        r = await nl_rule.compile_rule(s, llm, ctx, body.project_id, body.text)
+    draft = None
+    if r.rule is not None:
+        dump = r.rule.model_dump(mode="json", exclude_unset=True)  # only the params that were set
+        draft = RuleDraftOut(
+            name=r.rule.name,
+            enabled=r.rule.enabled,
+            trigger=dump["trigger"],
+            conditions=dump.get("conditions", []),
+            actions=dump["actions"],
+            created_from_prompt=r.rule.created_from_prompt,
+        )
+    return RuleCompileOut(rule=draft, sentence=r.sentence, question=r.question)
 
 
 # ---------------- AI usage and settings (admin, S3.5.2) ----------------

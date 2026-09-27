@@ -314,6 +314,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/ai/rules/compile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Turn a sentence into a rule draft for the rule builder (saves nothing) */
+        post: operations["ai_compile_rule_api_v1_ai_rules_compile_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/ai/summarize": {
         parameters: {
             query?: never;
@@ -3766,6 +3783,51 @@ export interface components {
              */
             workdays_only: boolean;
         };
+        /** RuleCompileIn */
+        RuleCompileIn: {
+            /**
+             * Project Id
+             * Format: uuid
+             */
+            project_id: string;
+            /** Text */
+            text: string;
+        };
+        /**
+         * RuleCompileOut
+         * @description Either ``rule`` + ``sentence``, or ``question`` when Mo needs to ask rather than guess.
+         */
+        RuleCompileOut: {
+            /** Question */
+            question?: string | null;
+            rule?: components["schemas"]["RuleDraftOut"] | null;
+            /** Sentence */
+            sentence?: string | null;
+        };
+        /**
+         * RuleDraftOut
+         * @description Exactly what ``POST /rules`` accepts, so the builder can show it and save it unchanged.
+         */
+        RuleDraftOut: {
+            /** Actions */
+            actions: {
+                [key: string]: unknown;
+            }[];
+            /** Conditions */
+            conditions: {
+                [key: string]: unknown;
+            }[];
+            /** Created From Prompt */
+            created_from_prompt: string | null;
+            /** Enabled */
+            enabled: boolean;
+            /** Name */
+            name: string;
+            /** Trigger */
+            trigger: {
+                [key: string]: unknown;
+            };
+        };
         /** RuleIn */
         RuleIn: {
             /** Actions */
@@ -5505,6 +5567,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["QuickAddParseOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ai_compile_rule_api_v1_ai_rules_compile_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RuleCompileIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RuleCompileOut"];
                 };
             };
             /** @description Validation Error */

@@ -45,6 +45,16 @@ export interface RuleSpec {
   trigger: RuleTrigger;
   conditions: RuleCondition[];
   actions: RuleAction[];
+  /** Set only on a rule Mo compiled from a sentence (S4.1.4); never sent on an edit. */
+  created_from_prompt?: string | null;
+}
+
+/** S4.1.4: what `POST /ai/rules/compile` answers with — a draft the builder can show as-is, or a
+ * question Mo asks instead of guessing. Never both. */
+export interface CompiledRule {
+  rule: RuleSpec | null;
+  sentence: string | null;
+  question: string | null;
 }
 
 export const ruleKeys = {
@@ -121,6 +131,21 @@ export function useRuleMutations(projectId: string) {
   });
 
   return { create, update, setEnabled, remove };
+}
+
+/** S4.1.4 "describe it": a sentence → a rule draft for the builder (the draft is saved through
+ * the normal create endpoint, so there's no second write path). Errors show inline, not as a
+ * toast: the box the user typed in is right there. */
+export function useCompileRule(projectId: string) {
+  const api = useApi();
+  return useMutation({
+    mutationFn: async (text: string) =>
+      (
+        await api.POST('/api/v1/ai/rules/compile', {
+          body: { project_id: projectId, text },
+        })
+      ).data! as unknown as CompiledRule,
+  });
 }
 
 export function useTestRun(ruleId: string) {

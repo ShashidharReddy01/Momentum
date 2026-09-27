@@ -25,6 +25,9 @@ from momentum.domain.projects.models import Project
 from momentum.domain.projects.schemas import ProjectCreateIn
 from momentum.domain.projects.service import create_project
 from momentum.domain.sections.service import create_section, list_sections, rename_section
+from momentum.domain.tags.models import Tag
+from momentum.domain.tags.schemas import TagCreateIn
+from momentum.domain.tags.service import create_tag
 from momentum.domain.tasks import service as tasks
 from momentum.domain.tasks.models import Task
 from momentum.domain.teams.models import Team
@@ -74,6 +77,12 @@ async def build_workspace(
 ) -> EvalWorld:
     spec: dict[str, Any] = yaml.safe_load((WORKSPACES / f"{name}.yaml").read_text(encoding="utf-8"))
     world = EvalWorld(users=await _users(session))
+    for name in spec.get("tags", []):  # workspace tags the rules cases refer to by name
+        exists = (
+            await session.execute(select(Tag.id).where(Tag.name == name))
+        ).scalar_one_or_none()
+        if exists is None:
+            await create_tag(session, world.ctx("ravi", settings), TagCreateIn(name=name))
     for p in spec["projects"]:
         exists = (
             await session.execute(select(Project.id).where(Project.name == p["name"]))

@@ -52,6 +52,15 @@ async def _authorize(
     require_project_role(role, needed, what)
 
 
+async def authorize_manage(session: AsyncSession, ctx: Ctx, project_id: uuid.UUID) -> Project:
+    """The permission ``create_rule`` needs on a project, and the project itself. S4.1.4's
+    natural-language compiler checks this before it spends a model call, and needs the project's
+    own sections, people, tags and fields to resolve what the user described."""
+    await _authorize(session, ctx, project_id, "admin", "manage rules")
+    project, _role = await get_visible_project(session, ctx, project_id)
+    return project
+
+
 async def _load(
     session: AsyncSession, ctx: Ctx, rule_id: uuid.UUID, needed: str, what: str
 ) -> Rule:

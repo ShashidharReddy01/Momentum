@@ -1,0 +1,115 @@
+# Mock responses for S4.1.4 natural language → rule (feature "nl_rule"). Synthetic only. The
+# model answers in names (the server resolves them to ids in the rule's own project), so these
+# fixtures don't depend on any database's uuids. The first three back the eval cases marked
+# `mock: true`; the rest drive `tests/test_ai_nl_rule.py`'s resolution and refusal branches.
+responses:
+  - match: {contains: "moves into launch"}
+    tool_calls:
+      - name: submit_result
+        arguments:
+          name: "Assign Launch work to Mei"
+          trigger: {type: task.moved, section: "Launch"}
+          actions: [{type: assign, person: "Mei Chen"}]
+  - match: {contains: "due date is approaching"}
+    tool_calls:
+      - name: submit_result
+        arguments:
+          name: "Nudge before the due date"
+          trigger: {type: task.due_approaching}
+          actions: [{type: add_comment, text: "Due tomorrow - is this on track?"}]
+  - match: {contains: "post a message in our slack channel"}
+    tool_calls:
+      - name: submit_result
+        arguments:
+          question: "I can't post to Slack yet. Should I add a comment on the task instead?"
+
+  # tests/test_ai_nl_rule.py
+  - match: {contains: "moves to doing, assign it to ana and add the beta tag"}
+    tool_calls:
+      - name: submit_result
+        arguments:
+          name: "Ana picks up Doing"
+          trigger: {type: task.moved, section: "Doing"}
+          conditions: [{field: priority, op: eq, value: "High"}]
+          actions: [{type: assign, person: "ana"}, {type: add_tag, tag: "Beta"}]
+  - match: {contains: "moves to review and assign mei"}
+    tool_calls:
+      - name: submit_result
+        arguments:
+          name: "Mei reviews"
+          trigger: {type: task.moved, section: "Review"}
+          actions: [{type: assign, person: "Mei Chen"}]
+  - match: {contains: "unknown section please"}
+    tool_calls:
+      - name: submit_result
+        arguments:
+          name: "Review handoff"
+          trigger: {type: task.moved, section: "Review"}
+          actions: [{type: mark_complete}]
+  - match: {contains: "ambiguous person please"}
+    tool_calls:
+      - name: submit_result
+        arguments:
+          name: "Assign to A"
+          trigger: {type: task.added}
+          actions: [{type: assign, person: "A"}]
+  - match: {contains: "invalid comparison please"}
+    tool_calls:
+      - name: submit_result
+        arguments:
+          name: "Priority over high"
+          trigger: {type: task.added}
+          conditions: [{field: priority, op: gt, value: "high"}]
+          actions: [{type: mark_complete}]
+  - match: {contains: "nothing but a question"}
+    tool_calls:
+      - name: submit_result
+        arguments:
+          question: "Do you mean every task, or only the ones assigned to you?"
+  - match: {contains: "both a rule and a question"}
+    tool_calls:
+      - name: submit_result
+        arguments:
+          name: "Complete on arrival"
+          trigger: {type: task.added}
+          actions: [{type: mark_complete}]
+          question: "Should this only apply to subtasks?"
+  - match: {contains: "empty draft please"}
+    tool_calls:
+      - name: submit_result
+        arguments: {name: "Nothing at all"}
+  - match: {contains: "bad action type"}
+    tool_calls:
+      - name: submit_result
+        arguments:
+          name: "Slack it"
+          trigger: {type: task.completed}
+          actions: [{type: slack_message, text: "done"}]
+  - match: {contains: "cross-project move"}
+    tool_calls:
+      - name: submit_result
+        arguments:
+          name: "Mirror into Side Quest"
+          trigger: {type: task.completed}
+          actions: [{type: add_to_project, project: "Side Quest"}]
+  - match: {contains: "into this very project"}
+    tool_calls:
+      - name: submit_result
+        arguments:
+          name: "Add to itself"
+          trigger: {type: task.completed}
+          actions: [{type: add_to_project, project: "AI Tools Lab"}]
+  - match: {contains: "unassign whoever has it"}
+    tool_calls:
+      - name: submit_result
+        arguments:
+          name: "Clear the assignee"
+          trigger: {type: task.moved, section: "To do"}
+          actions: [{type: assign}]
+  - match: {contains: "assign it to me"}
+    tool_calls:
+      - name: submit_result
+        arguments:
+          name: "Mine on completion"
+          trigger: {type: task.completed}
+          actions: [{type: assign, person: "me"}]

@@ -372,25 +372,30 @@ function ActionRow({
   );
 }
 
-/** A rule's trigger → conditions → actions, with a readable sentence preview. Used both for a
- * new rule and for editing one (S4.1.3). */
+/** A rule's trigger → conditions → actions, with a readable sentence preview. Used for a new
+ * rule, for editing one (S4.1.3), and for a draft Mo compiled from a sentence (S4.1.4) — a draft
+ * is an ordinary new rule here: editable, and saved through the same create call, keeping the
+ * prompt it came from. */
 export function RuleBuilder({
   projectId,
   initial,
+  draft,
   onSave,
   onCancel,
   saving,
 }: {
   projectId: string;
   initial?: RuleOut;
+  draft?: RuleSpec;
   onSave: (spec: RuleSpec) => void;
   onCancel: () => void;
   saving: boolean;
 }) {
-  const [name, setName] = useState(initial?.name ?? '');
-  const [trigger, setTrigger] = useState<RuleTrigger>(initial?.trigger ?? defaultTrigger('task.added'));
-  const [conditions, setConditions] = useState<RuleCondition[]>(initial?.conditions ?? []);
-  const [actions, setActions] = useState<RuleAction[]>(initial?.actions ?? [defaultAction('mark_complete')]);
+  const prefill = initial ?? draft;
+  const [name, setName] = useState(prefill?.name ?? '');
+  const [trigger, setTrigger] = useState<RuleTrigger>(prefill?.trigger ?? defaultTrigger('task.added'));
+  const [conditions, setConditions] = useState<RuleCondition[]>(prefill?.conditions ?? []);
+  const [actions, setActions] = useState<RuleAction[]>(prefill?.actions ?? [defaultAction('mark_complete')]);
   const lookups = useRuleLookups(projectId);
 
   const sentence = describeRule(trigger, conditions, actions, lookups.lookups);
@@ -468,7 +473,14 @@ export function RuleBuilder({
           disabled={!canSave}
           loading={saving}
           onClick={() =>
-            onSave({ name: name.trim(), enabled: initial?.enabled ?? true, trigger, conditions, actions })
+            onSave({
+              name: name.trim(),
+              enabled: prefill?.enabled ?? true,
+              trigger,
+              conditions,
+              actions,
+              ...(draft?.created_from_prompt ? { created_from_prompt: draft.created_from_prompt } : {}),
+            })
           }
         >
           {initial ? 'Save rule' : 'Create rule'}

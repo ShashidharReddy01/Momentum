@@ -13,6 +13,7 @@ mock:
   write: 1.0
   quick_add: 1.0
   from_brief: 1.0
+  nl_rule: 1.0
 live:
   command: 0.9
   chat: 0.85
@@ -24,3 +25,4 @@ live:
   write: 0.9
   quick_add: 0.85
   from_brief: 0.9
+  nl_rule: 0.9

@@ -1,0 +1,144 @@
+# Natural language → rule (S4.1.4). The AC's 20 fixture phrases: 18 must compile to exactly the
+# rule below (`rule_exact` compares the compiled trigger/conditions/actions with names in place
+# of ids, so a case doesn't depend on this database's uuids), and 2 must ask a question back
+# instead of guessing. All phrases are about the synthetic "Launch Plan" project (sections
+# Planning, Build, Launch, Done; people Ravi Kumar, Ana Souza, Priya Nair, Mei Chen, Avery Admin;
+# tags Escalated, Needs review) — ravi is its admin, so every case runs as ravi.
+feature: nl_rule
+cases:
+  - id: moved_to_launch_assign_mei
+    mock: true
+    input: "When a task moves into Launch, assign it to Mei Chen."
+    expect:
+      rule_exact:
+        trigger: {type: task.moved, to_section: "Launch"}
+        conditions: []
+        actions: [{type: assign, user_id: "Mei Chen"}]
+  - id: completed_move_to_done
+    input: "When a task is completed, move it to Done."
+    expect:
+      rule_exact:
+        trigger: {type: task.completed}
+        conditions: []
+        actions: [{type: move_section, section_id: "Done"}]
+  - id: urgent_added_notify_ravi
+    input: 'When an urgent task is added, notify Ravi Kumar with "Urgent work landed".'
+    expect:
+      rule_exact:
+        trigger: {type: task.added}
+        conditions: [{field: priority, op: eq, value: urgent}]
+        actions: [{type: notify_user, user_id: "Ravi Kumar", text: "Urgent work landed"}]
+  - id: assigned_to_ana_add_tag
+    input: "When a task is assigned to Ana Souza, add the Escalated tag."
+    expect:
+      rule_exact:
+        trigger: {type: task.assigned, user_id: "Ana Souza"}
+        conditions: []
+        actions: [{type: add_tag, tag_id: "Escalated"}]
+  - id: priority_changed_to_urgent_move
+    input: "When a task's priority changes to urgent, move it to Build."
+    expect:
+      rule_exact:
+        trigger: {type: task.field_changed, field: priority, to: urgent}
+        conditions: []
+        actions: [{type: move_section, section_id: "Build"}]
+  - id: due_approaching_comment
+    mock: true
+    input: 'When a task''s due date is approaching, add a comment saying "Due tomorrow - is this on track?"'
+    expect:
+      rule_exact:
+        trigger: {type: task.due_approaching}
+        conditions: []
+        actions: [{type: add_comment, text: "Due tomorrow - is this on track?"}]
+  - id: added_unassigned_assign_ravi
+    input: "When a task is added with no assignee, assign it to Ravi Kumar."
+    expect:
+      rule_exact:
+        trigger: {type: task.added}
+        conditions: [{field: assignee, op: empty}]
+        actions: [{type: assign, user_id: "Ravi Kumar"}]
+  - id: escalated_done_notify_priya
+    input: 'When a task moves to Done and it has the Escalated tag, notify Priya Nair with "An escalated task is done".'
+    expect:
+      rule_exact:
+        trigger: {type: task.moved, to_section: "Done"}
+        conditions: [{field: tag, op: eq, value: "Escalated"}]
+        actions: [{type: notify_user, user_id: "Priya Nair", text: "An escalated task is done"}]
+  - id: moved_to_build_set_priority
+    input: "When a task moves to Build, set its priority to high."
+    expect:
+      rule_exact:
+        trigger: {type: task.moved, to_section: "Build"}
+        conditions: []
+        actions: [{type: set_field, field_id: priority, value: high}]
+  - id: added_create_subtasks
+    input: 'When a task is added to this project, create subtasks "Draft", "Review" and "Publish".'
+    expect:
+      rule_exact:
+        trigger: {type: task.added}
+        conditions: []
+        actions: [{type: create_subtasks, titles: ["Draft", "Review", "Publish"]}]
+  - id: moved_to_build_due_in_three_days
+    input: "When a task moves to Build, set the due date to 3 days later."
+    expect:
+      rule_exact:
+        trigger: {type: task.moved, to_section: "Build"}
+        conditions: []
+        actions: [{type: set_due_relative, days: 3}]
+  - id: moved_to_launch_add_to_website_revamp
+    input: "When a task moves to Launch, also add it to Website Revamp."
+    expect:
+      rule_exact:
+        trigger: {type: task.moved, to_section: "Launch"}
+        conditions: []
+        actions: [{type: add_to_project, project_id: "Website Revamp"}]
+  - id: moved_to_done_mark_complete
+    input: "When a task moves to Done, mark it complete."
+    expect:
+      rule_exact:
+        trigger: {type: task.moved, to_section: "Done"}
+        conditions: []
+        actions: [{type: mark_complete}]
+  - id: high_or_urgent_notify_mei
+    input: 'When a task is added with high or urgent priority, notify Mei Chen with "New important task".'
+    expect:
+      rule_exact:
+        trigger: {type: task.added}
+        conditions: [{field: priority, op: in, value: [high, urgent]}]
+        actions: [{type: notify_user, user_id: "Mei Chen", text: "New important task"}]
+  - id: assignee_not_ravi_add_tag
+    input: "When a task moves to Launch and the assignee is not Ravi Kumar, add the Escalated tag."
+    expect:
+      rule_exact:
+        trigger: {type: task.moved, to_section: "Launch"}
+        conditions: [{field: assignee, op: neq, value: "Ravi Kumar"}]
+        actions: [{type: add_tag, tag_id: "Escalated"}]
+  - id: completed_remove_from_website_revamp
+    input: "When a task is completed, remove it from Website Revamp."
+    expect:
+      rule_exact:
+        trigger: {type: task.completed}
+        conditions: []
+        actions: [{type: remove_from_project, project_id: "Website Revamp"}]
+  - id: first_name_only_assign
+    input: "When a task moves to Planning, assign it to Priya."
+    expect:
+      rule_exact:
+        trigger: {type: task.moved, to_section: "Planning"}
+        conditions: []
+        actions: [{type: assign, user_id: "Priya Nair"}]
+  - id: no_due_date_notify_ana
+    input: 'When a task is added without a due date, notify Ana Souza with "Needs a due date".'
+    expect:
+      rule_exact:
+        trigger: {type: task.added}
+        conditions: [{field: due_on, op: empty}]
+        actions: [{type: notify_user, user_id: "Ana Souza", text: "Needs a due date"}]
+  # The two that must ask rather than guess.
+  - id: slack_is_not_an_action_yet
+    mock: true
+    input: "When a task is completed, post a message in our Slack channel."
+    expect: {clarifies: true}
+  - id: unknown_section_asks
+    input: "When a task moves to Review, assign it to Mei Chen."
+    expect: {clarifies: true, text_include_any: ["Planning", "section"]}
