@@ -32,6 +32,8 @@ Triggers: task added to project, moved to section, field changed, completed, ass
 **Scope:** project "Rules" (⋯ → Rules): list with toggles, builder (trigger → conditions → actions with pickers), readable sentence preview, run history with status and errors, test-run on a chosen task (dry-run).
 **Size:** L
 
+**Built (2026-09-27):** backend: `POST /rules/{id}/test-run` (`RuleTestRunIn`/`RuleTestRunOut`/`ActionResultOut` in `schemas.py`) — conditions are checked, then each action runs as the rule's author inside its own savepoint that's always rolled back (`engine.test_run`), so a later action still gets tried even if an earlier one fails and nothing is ever persisted; `service.test_run_rule` needs the same "admin" permission as editing the rule plus a visible task (`get_visible_task`). Frontend: `apps/web/src/momentum/features/rules/` — `RulesDialog` (list, enable/disable toggle, inline create/edit, delete), `RuleBuilder` (trigger → conditions → actions pickers built from hand-kept metadata mirroring `TRIGGER_PARAMS`/`ACTION_PARAMS`/`ACTION_REQUIRED`, live readable-sentence preview), `RuleRunHistory` (run history list + "Test on a task…" picker showing per-action ok/error). Wired into `ProjectPage.tsx` (⋯ → Rules, admin-only). `lib/realtime/handlers.ts` now handles `entity_type: 'rule'` (invalidates the project's rule list; `rule.ran` also invalidates that rule's run history). `slack_message`/`ai_step` are left out of the action picker (refused on write until P7/S4.1.5).
+
 ### S4.1.4: NL → rule
 **Scope:** `POST /ai/rules/compile` → rule JSON (validated) + readable sentence; ambiguous references ask back; saved with `created_from_prompt`.
 **AC:** 20 fixture phrases → correct JSON (≥ 90% exact, rest ask for clarification rather than guess).

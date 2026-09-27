@@ -9,7 +9,15 @@ from fastapi import APIRouter, status
 from momentum.api.deps import CtxDep, UowDep
 from momentum.api.schemas import ListOut, MutationOut, OkOut
 from momentum.domain.rules import service
-from momentum.domain.rules.schemas import RuleIn, RuleOut, RulePatchIn, RuleRunOut
+from momentum.domain.rules.schemas import (
+    ActionResultOut,
+    RuleIn,
+    RuleOut,
+    RulePatchIn,
+    RuleRunOut,
+    RuleTestRunIn,
+    RuleTestRunOut,
+)
 
 router = APIRouter(tags=["rules"])
 
@@ -74,3 +82,19 @@ async def list_runs(rule_id: uuid.UUID, ctx: CtxDep, uow: UowDep) -> ListOut[Rul
     async with uow.transaction() as s:
         runs = await service.list_runs(s, ctx, rule_id)
         return ListOut(data=[RuleRunOut.model_validate(r) for r in runs])
+
+
+@router.post(
+    "/rules/{rule_id}/test-run",
+    response_model=RuleTestRunOut,
+    summary="Preview a rule's actions against a chosen task; nothing is persisted",
+)
+async def test_run(
+    rule_id: uuid.UUID, body: RuleTestRunIn, ctx: CtxDep, uow: UowDep
+) -> RuleTestRunOut:
+    async with uow.transaction() as s:
+        result = await service.test_run_rule(s, ctx, rule_id, body.task_id)
+        return RuleTestRunOut(
+            conditions_passed=result.conditions_passed,
+            actions=[ActionResultOut(type=a.type, ok=a.ok, error=a.error) for a in result.actions],
+        )

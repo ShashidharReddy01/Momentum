@@ -1287,6 +1287,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/rules/{rule_id}/test-run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Preview a rule's actions against a chosen task; nothing is persisted */
+        post: operations["test_run_api_v1_rules__rule_id__test_run_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/search": {
         parameters: {
             query?: never;
@@ -1957,6 +1974,15 @@ export interface components {
             user_id?: string | null;
             /** Value */
             value?: unknown;
+        };
+        /** ActionResultOut */
+        ActionResultOut: {
+            /** Error */
+            error: string | null;
+            /** Ok */
+            ok: boolean;
+            /** Type */
+            type: string;
         };
         /** ActivityItemOut */
         ActivityItemOut: {
@@ -3849,6 +3875,26 @@ export interface components {
             started_at: string;
             /** Status */
             status: string;
+        };
+        /** RuleTestRunIn */
+        RuleTestRunIn: {
+            /**
+             * Task Id
+             * Format: uuid
+             */
+            task_id: string;
+        };
+        /**
+         * RuleTestRunOut
+         * @description S4.1.3: what would happen if this rule fired on the given task, right now. Nothing is
+         *     persisted: each action runs inside its own savepoint that's always rolled back, so a later
+         *     action still gets tried even if an earlier one would fail.
+         */
+        RuleTestRunOut: {
+            /** Actions */
+            actions: components["schemas"]["ActionResultOut"][];
+            /** Conditions Passed */
+            conditions_passed: boolean;
         };
         /** ScreenIn */
         ScreenIn: {
@@ -7768,6 +7814,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ListOut_RuleRunOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    test_run_api_v1_rules__rule_id__test_run_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                rule_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RuleTestRunIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RuleTestRunOut"];
                 };
             };
             /** @description Validation Error */

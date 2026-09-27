@@ -8,6 +8,7 @@ import {
   Star,
   Trash2,
   Users,
+  Zap,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
@@ -36,6 +37,7 @@ import { cn } from '@/lib/cn';
 import { useCrumbs } from '@/lib/crumbs';
 import { CsvImportDialog } from '@/features/csvImport';
 import { FieldsDialog } from '@/features/fields';
+import { RulesDialog } from '@/features/rules';
 import { StatusChip, StatusOverview, type Status } from '@/features/status';
 import { useMomentumConfig } from '@/lib/config';
 import { useProject, useProjectLifecycle, useToggleFavorite, useUpdateProject } from './queries';
@@ -79,6 +81,7 @@ export function ProjectPage() {
   const aiEnabled = useMomentumConfig().ai_enabled;
   const [share, setShare] = useState(false);
   const [fieldsOpen, setFieldsOpen] = useState(false);
+  const [rulesOpen, setRulesOpen] = useState(false);
   const [csvImportOpen, setCsvImportOpen] = useState(false);
   useCrumbs(project.data ? [project.data.team_name, project.data.name] : null);
 
@@ -191,6 +194,9 @@ export function ProjectPage() {
                     ))}
                   </DropdownMenuRadioGroup>
                   <DropdownMenuSeparator />
+                  <DropdownMenuItem onSelect={() => setRulesOpen(true)}>
+                    <Icon icon={Zap} /> Rules
+                  </DropdownMenuItem>
                   <DropdownMenuItem onSelect={() => setCsvImportOpen(true)}>
                     <Icon icon={Download} /> Import from CSV
                   </DropdownMenuItem>
@@ -252,6 +258,7 @@ export function ProjectPage() {
 
       <ShareDialog project={p} open={share} onOpenChange={setShare} />
       <FieldsDialog projectId={p.id} canEdit={canEdit} open={fieldsOpen} onOpenChange={setFieldsOpen} />
+      <RulesDialog projectId={p.id} canEdit={isAdmin} open={rulesOpen} onOpenChange={setRulesOpen} />
       <CsvImportDialog projectId={p.id} open={csvImportOpen} onOpenChange={setCsvImportOpen} />
       {p.my_role === 'viewer' || p.my_role === 'commenter' ? (
         <div role="status" className="bg-info-tint px-4 md:px-8 py-1.5 text-xs text-ink-2">

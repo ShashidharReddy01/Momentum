@@ -1,7 +1,14 @@
 export { BoardView } from './BoardView';
 export { CalendarView } from './CalendarView';
 export { ProjectTasksView } from './ProjectTasksView';
-export { taskKeys, useProjectTasks, useTaskMutations, type Task } from './queries';
+export {
+  taskKeys,
+  useProjectTasks,
+  useSearchProjectTasks,
+  useTaskMutations,
+  type Task,
+  type TaskSummary,
+} from './queries';
 export { TaskNavProvider, useTaskNav } from './pane/nav';
 export { TaskPane } from './pane/TaskPane';
 export { TaskPage } from './pane/TaskPage';

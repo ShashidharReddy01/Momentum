@@ -240,3 +240,23 @@ class RuleRunOut(BaseModel):
     started_at: datetime
     finished_at: datetime | None
     activity_batch_id: uuid.UUID | None
+
+
+class RuleTestRunIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    task_id: uuid.UUID
+
+
+class ActionResultOut(BaseModel):
+    type: str
+    ok: bool
+    error: str | None
+
+
+class RuleTestRunOut(BaseModel):
+    """S4.1.3: what would happen if this rule fired on the given task, right now. Nothing is
+    persisted: each action runs inside its own savepoint that's always rolled back, so a later
+    action still gets tried even if an earlier one would fail."""
+
+    conditions_passed: bool
+    actions: list[ActionResultOut]

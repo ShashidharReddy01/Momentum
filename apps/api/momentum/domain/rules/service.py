@@ -24,9 +24,10 @@ from momentum.core.errors import Forbidden, NotFound, ValidationFailed, VersionC
 from momentum.core.events import emit
 from momentum.core.mutation import Mutation
 from momentum.core.permissions import Action, can
-from momentum.domain.access import get_visible_project, require_project_role
+from momentum.domain.access import get_visible_project, get_visible_task, require_project_role
 from momentum.domain.fields.models import FieldDef
 from momentum.domain.projects.models import Project
+from momentum.domain.rules import engine
 from momentum.domain.rules.models import Rule, RuleRun
 from momentum.domain.rules.schemas import RuleIn, RulePatchIn, RuleSpec, is_custom_field
 from momentum.domain.sections.models import Section
@@ -248,6 +249,18 @@ async def update_rule(
         activity_id=act.id,
     )
     return Mutation(rule, act.id, version=rule.version)
+
+
+async def test_run_rule(
+    session: AsyncSession, ctx: Ctx, rule_id: uuid.UUID, task_id: uuid.UUID
+) -> engine.TestRunResult:
+    """Preview a rule's actions against a chosen task without persisting anything (S4.1.3's
+    "test run"). Same permission as editing the rule: this runs the rule's actions for real
+    (rolled back afterward), so it's not something a viewer of the rule should be able to
+    trigger."""
+    rule = await _load(session, ctx, rule_id, "admin", "test this rule")
+    task, _placement, _role = await get_visible_task(session, ctx, task_id)
+    return await engine.test_run(session, ctx.settings, rule, task)
 
 
 async def delete_rule(session: AsyncSession, ctx: Ctx, rule_id: uuid.UUID) -> Mutation[Rule]:

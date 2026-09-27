@@ -848,3 +848,81 @@ async def test_a_new_actions_events_carry_the_depth_of_the_run_that_caused_them(
     ev = await _query(session_factory, events)
     assert ev["task.completed"] == [0]
     assert ev["task.tagged"] == [1]
+
+
+# ---------------- test-run (S4.1.3) ----------------
+
+
+async def test_test_run_previews_actions_without_persisting_anything(
+    as_user: Clients, session_factory: SessionFactory
+) -> None:
+    ravi = await as_user("ravi")
+    pid, mei_id = await _project(ravi), await _user_id(ravi, "mei")
+    sec = await _sections(ravi, pid)
+    tag = (await ravi.post("/api/v1/tags", json={"name": "Preview"})).json()["data"]["id"]
+    rid = await _rule(
+        ravi,
+        pid,
+        {"type": "task.completed"},
+        [
+            {"type": "add_tag", "tag_id": tag},
+            {"type": "notify_user", "user_id": mei_id, "text": "hi"},
+        ],
+    )
+    task = await _task(ravi, pid, sec["Backlog"])
+    r = await ravi.post(f"/api/v1/rules/{rid}/test-run", json={"task_id": task})
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["conditions_passed"] is True
+    assert [(a["type"], a["ok"], a["error"]) for a in body["actions"]] == [
+        ("add_tag", True, None),
+        ("notify_user", True, None),
+    ]
+
+    async def tagged(s: AsyncSession) -> bool:
+        row = await s.get(TaskTag, (uuid.UUID(task), uuid.UUID(tag)))
+        return row is not None
+
+    async def notifications(s: AsyncSession) -> list[Notification]:
+        rows = await s.execute(
+            select(Notification).where(Notification.user_id == uuid.UUID(mei_id))
+        )
+        return list(rows.scalars())
+
+    # nothing from the preview survived: no tag, no notification, no run row
+    assert await _query(session_factory, tagged) is False
+    assert await _query(session_factory, notifications) == []
+    assert await _runs(session_factory, rid) == []
+
+
+async def test_test_run_reports_conditions_failed_and_skips_actions(as_user: Clients) -> None:
+    ravi = await as_user("ravi")
+    pid = await _project(ravi)
+    sec = await _sections(ravi, pid)
+    rid = await _rule(
+        ravi,
+        pid,
+        {"type": "task.completed"},
+        [{"type": "add_comment", "text": "done"}],
+        conditions=[{"field": "priority", "op": "eq", "value": "urgent"}],
+    )
+    task = await _task(ravi, pid, sec["Backlog"])  # default priority isn't urgent
+    r = await ravi.post(f"/api/v1/rules/{rid}/test-run", json={"task_id": task})
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body == {"conditions_passed": False, "actions": []}
+
+
+async def test_test_run_needs_admin_and_a_visible_task(as_user: Clients) -> None:
+    ravi, mei = await as_user("ravi"), await as_user("mei")
+    pid = await _project(ravi)
+    sec = await _sections(ravi, pid)
+    rid = await _rule(ravi, pid, {"type": "task.completed"}, [{"type": "mark_complete"}])
+    task = await _task(ravi, pid, sec["Backlog"])
+    # mei is an editor via her team: she can see the rule but not test-run it
+    assert (
+        await mei.post(f"/api/v1/rules/{rid}/test-run", json={"task_id": task})
+    ).status_code == 403
+    assert (
+        await ravi.post(f"/api/v1/rules/{rid}/test-run", json={"task_id": str(uuid.uuid4())})
+    ).status_code == 404

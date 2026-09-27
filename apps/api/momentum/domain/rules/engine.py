@@ -449,6 +449,64 @@ async def _handle(
         await _fire(session, settings, rule, ev, project_id, stats)
 
 
+@dataclass
+class ActionResult:
+    type: str
+    ok: bool
+    error: str | None
+
+
+@dataclass
+class TestRunResult:
+    conditions_passed: bool
+    actions: list[ActionResult]
+
+
+async def test_run(
+    session: AsyncSession, settings: Settings, rule: Rule, task: Task
+) -> TestRunResult:
+    """Preview ``rule`` against ``task`` for the builder's "test run": conditions are checked,
+    then (if they pass) each action runs as the rule's author inside its own savepoint that's
+    always rolled back, so nothing is persisted and a later action still gets tried even if an
+    earlier one would fail. Not a real run: no ``RuleRun`` row, no ``rule.ran`` event."""
+    conditions_passed = await _conditions_pass(session, rule, task)
+    results: list[ActionResult] = []
+    if conditions_passed:
+        user = await session.get(User, rule.created_by)
+        actor = (
+            Actor(
+                id=user.id,
+                workspace_id=user.workspace_id,
+                role=user.role,
+                is_agent=user.is_agent,
+                email=user.email,
+                name=user.name,
+                timezone=user.timezone,
+            )
+            if user is not None
+            else Actor(id=rule.created_by, workspace_id=rule.workspace_id)
+        )
+        ctx = Ctx(
+            actor=actor,
+            settings=settings,
+            via="rule",
+            request_id=f"rule-test:{rule.id}",
+            rule_depth=MAX_DEPTH,  # rolled back regardless; belt and suspenders against chaining
+        )
+        task_id = task.id
+        for spec in rule.actions:
+            savepoint = await session.begin_nested()
+            try:
+                await ACTIONS[spec["type"]](session, ctx, task_id, spec, uuid.uuid4())
+                results.append(ActionResult(spec["type"], True, None))
+            except Exception as e:  # a preview must never raise; the row records the error
+                error = (str(e) or type(e).__name__)[:500]
+                results.append(ActionResult(spec["type"], False, error))
+            finally:
+                await savepoint.rollback()
+    return TestRunResult(conditions_passed, results)
+
+
 async def _cursor(session: AsyncSession) -> ConsumerOffset:
     row = (
         await session.execute(

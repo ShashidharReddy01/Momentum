@@ -72,7 +72,7 @@ Event payloads share an envelope:
 | `ai_action.proposed` / `ai_action.applied` / `ai_action.rejected` / `ai_action.undone` | 3 | ai_action_id, summary |
 | `approval.requested` / `approval.decided` | 4 | state |
 | `form.submitted` | 4 | form_id, task_id |
-| `rule.created` / `rule.updated` / `rule.deleted` | 4 | `project_id` (created, deleted); `changes` (names), `version` (updated); channel `project:<id>` or `workspace:<id>` (S4.1.1; no frontend handler until the rule UI, S4.1.3) |
+| `rule.created` / `rule.updated` / `rule.deleted` | 4 | `project_id` (created, deleted); `changes` (names), `version` (updated); channel `project:<id>` or `workspace:<id>` (S4.1.1; frontend handler in `lib/realtime/handlers.ts` since S4.1.3) |
 | `rule.ran` | 4 | rule_id, status (`success`/`skipped`/`failed`), task_id (S4.1.1; carries the run's depth) |
 | `task.due_approaching` | 4 | `due_on` (S4.1.2; emitted by the hourly `scan_due_approaching` job, deduped per (task, due date); actor `system`) |
 | `agent_run.started` / `agent_run.finished` | 5 | agent_id, status, cost |
