@@ -59,7 +59,7 @@ async def require_team_manager(session: AsyncSession, ctx: Ctx, team: Team) -> N
 async def project_role(session: AsyncSession, ctx: Ctx, project: Project) -> str | None:
     """Effective role: explicit membership wins; otherwise team members are editors on
     team-visible projects and workspace admins are admins of them. Private projects are only
-    visible to explicit members (admins included)."""
+    visible to explicit members (admins included). Agents only ever have explicit roles."""
     if ctx.actor.id is None:
         return None
     explicit = (
@@ -71,6 +71,10 @@ async def project_role(session: AsyncSession, ctx: Ctx, project: Project) -> str
     ).scalar_one_or_none()
     if explicit is not None:
         return explicit
+    if ctx.actor.is_agent:
+        # S5.1.1 (kickoff Q1): an agent sees only projects its account was explicitly given,
+        # never through team membership or an admin role.
+        return None
     if project.privacy == "team":
         if ctx.actor.is_admin:
             return "admin"
@@ -94,7 +98,10 @@ def visible_projects_clause(ctx: Ctx) -> ColumnElement[bool]:
         Project.workspace_id == ctx.workspace_id,
         Project.deleted_at.is_(None),
         Project.team_id.in_(live_teams),
-        or_(Project.id.in_(explicit), team_visible),
+        # agents: explicit membership only (project_role says the same)
+        Project.id.in_(explicit)
+        if ctx.actor.is_agent
+        else or_(Project.id.in_(explicit), team_visible),
     )
 
 

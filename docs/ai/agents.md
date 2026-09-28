@@ -26,6 +26,14 @@ limits: { max_steps: 12, timeout_s: 300 }
 
 Definitions for starter agents live in `momentum/agents/definitions/*.yaml`. A workspace install copies them into the `agents` table (editable). A custom agent is created from the UI (or "create agent from description", which Mo drafts).
 
+**As built (S5.1.1):**
+- **Schema:** `domain/agents/schemas.AgentDefinition` validates files, and the same `AgentConfig` validates the admin API, so a file and a UI-made agent obey one set of rules. Beyond the example above: `kind` (`llm` default, or `handler` + `handler`: a host-registered function, ADR-0009), `budget_monthly_tokens` (default 2M; the cap while the model is unpriced, kickoff Q4), `limits` capped by `MOMENTUM_AGENT_MAX_STEPS`/`MOMENTUM_AGENT_TIMEOUT_S`. Cron triggers must be 5-field and valid; `timezone` is `workspace`, `user` (each user's own, for per-user agents) or an IANA name. Tools must exist in the registry, and `delete_task`/`decide_approval` are refused on every agent.
+- **Files:** one per agent, named `<key>.yaml`; keys are unique across Momentum's starters and any host directories (`create_app(agent_definition_dirs=…)`, `mount_momentum(…)`, or `momentum agents install --definitions-dir`). A host can't replace a starter; it defines its own keys.
+- **Install:** `momentum agents install [--only KEY] [--force]` or `POST /api/v1/agents/install` (admins). Idempotent by key: new → `installed`, **disabled** (kickoff Q3); same definition → `unchanged`; a changed definition updates an agent nobody edited (`updated`); an agent an admin edited is `drifted` and kept unless `--force`. `enabled` is never touched by an install. `momentum agents list` shows the result.
+- **Accounts:** each agent gets its own user (`is_agent`, email `<key>@agents.momentum.invalid`) that never signs in. **Access is explicit project membership** (kickoff Q1): `POST /agents/{id}/projects {project_id, role}` (needs admin on that project, undoable), never through teams or the admin role; `scope` only narrows. See `architecture/auth-and-permissions.md` §8.
+- **API:** `GET /agents` (members), `GET /agents/{id}` (with the projects it can access that *you* can see), `POST /agents` (custom, admins, disabled until enabled), `PATCH /agents/{id}` (admins; `kind`/`handler`/`key` can't change), `POST/DELETE /agents/{id}/projects[/{project_id}]`. Agent changes record activity and `agent.created`/`agent.updated` events, no undo payload (configuration, like rules).
+- **Starter defaults (kickoff Q2, Q4):** autonomy as in the §4 table; Pulse $10/month, the others $5; `model_alias` `fast` for Sorter and Nudge, `smart` for Architect, `default` otherwise. Their instructions are first charters; each starter slice (S5.3.x) refines its own agent's instructions and adds its evals.
+
 ## 2. Runtime
 
 ```

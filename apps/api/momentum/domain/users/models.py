@@ -30,7 +30,10 @@ class User(IdMixin, TimestampMixin, Base):
     role: Mapped[str] = mapped_column(String(16), default="member")
     status: Mapped[str] = mapped_column(String(16), default="active")
     is_agent: Mapped[bool] = mapped_column(Boolean, default=False)
-    agent_id: Mapped[uuid.UUID | None]
+    # S5.1.1: the agent this account belongs to. `use_alter`: agents.user_id points back here.
+    agent_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("agents.id", use_alter=True, name="fk_users_agent_id_agents")
+    )
     timezone: Mapped[str] = mapped_column(String(64), default="UTC")
     prefs: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
     last_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

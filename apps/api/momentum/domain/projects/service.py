@@ -297,6 +297,12 @@ async def _explicit_admins(session: AsyncSession, project_id: uuid.UUID) -> int:
     )
 
 
+def _check_agent_role(user: User, role: str) -> None:
+    """S5.1.1 (kickoff Q1): an agent works in a project but never administers it."""
+    if user.is_agent and role == "admin":
+        raise ValidationFailed("Agents can't be project admins")
+
+
 async def add_member(
     session: AsyncSession, ctx: Ctx, project_id: uuid.UUID, user_id: uuid.UUID, role: str
 ) -> Mutation[ProjectMember]:
@@ -305,6 +311,7 @@ async def add_member(
     user = await session.get(User, user_id)
     if user is None or user.workspace_id != ctx.workspace_id or user.status == "disabled":
         raise NotFound("User not found")
+    _check_agent_role(user, role)
     if await session.get(ProjectMember, (project_id, user_id)) is not None:
         raise Conflict("Already a member of this project", code="duplicate")
     member = ProjectMember(project_id=project_id, user_id=user_id, role=role)
@@ -340,6 +347,9 @@ async def set_member_role(
     member = await session.get(ProjectMember, (project_id, user_id))
     if member is None:
         raise NotFound("Not a member of this project")
+    target = await session.get(User, user_id)
+    if target is not None:
+        _check_agent_role(target, role)
     if member.role == role:
         return Mutation(member)
     if member.role == "admin" and await _explicit_admins(session, project_id) <= 1:

@@ -5,6 +5,7 @@ from momentum.core.activity import Activity
 from momentum.core.db import Base
 from momentum.core.events import OutboxEvent
 from momentum.core.idempotency import IdempotencyKey
+from momentum.domain.agents.models import Agent, AgentRun
 from momentum.domain.attachments.models import Attachment
 from momentum.domain.comments.models import Comment, Mention, Reaction
 from momentum.domain.fields.models import FieldDef, FieldValue, ProjectField
@@ -25,6 +26,8 @@ metadata = Base.metadata
 
 __all__ = [
     "Activity",
+    "Agent",
+    "AgentRun",
     "AiAction",
     "AiMemory",
     "AiSummary",

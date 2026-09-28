@@ -22,6 +22,7 @@ const KIND_LABEL: Record<Notification['kind'], string> = {
   approval_decided: 'Approval decided',
   agent_proposal: 'Agent proposal',
   digest: 'Digest',
+  agent_alert: 'Agent alert',
 };
 
 export function InboxPage() {

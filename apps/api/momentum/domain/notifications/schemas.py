@@ -19,6 +19,7 @@ NotificationKind = Literal[
     "approval_decided",
     "agent_proposal",
     "digest",
+    "agent_alert",
 ]
 
 # The kinds a user can actually toggle in this slice (the rest have no producer yet).

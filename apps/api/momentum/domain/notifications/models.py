@@ -12,6 +12,8 @@ from momentum.core.db import Base, IdMixin
 # `approval_requested`/`approval_decided` (Phase 4 workflow) and `agent_proposal`/`digest`
 # (Phase 5 Pulse agent) are valid per data-model.md's own check constraint but nothing produces
 # them yet — listed so a later phase's migration doesn't need to touch this constraint.
+# `agent_alert` (migration 0028, S5.1.1): an agent needs an admin's attention (budget exceeded,
+# repeated failure, auto-demotion); produced from S5.1.2.
 NOTIFICATION_KINDS = (
     "assigned",
     "mentioned",
@@ -24,6 +26,7 @@ NOTIFICATION_KINDS = (
     "approval_decided",
     "agent_proposal",
     "digest",
+    "agent_alert",
 )
 
 

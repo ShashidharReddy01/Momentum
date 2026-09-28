@@ -24,6 +24,7 @@ dependencies = [
   "python-multipart>=0.0.12",
   "openai>=1.40",
   "pyyaml>=6.0",
+  "croniter>=6.0",
 ]
 
 [project.scripts]
@@ -67,7 +68,7 @@ plugins = ["pydantic.mypy"]
 packages = ["momentum"]
 
 [[tool.mypy.overrides]]
-module = ["procrastinate.*", "uuid_utils.*", "filetype.*", "docx.*", "pypdf.*"]
+module = ["procrastinate.*", "uuid_utils.*", "filetype.*", "docx.*", "pypdf.*", "croniter.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

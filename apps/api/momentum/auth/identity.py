@@ -98,6 +98,10 @@ async def resolve_user(
             )
         ).scalar_one()
 
+    if user.is_agent:
+        # S5.1.1: an agent account never signs in, whatever an identity provider claims (its
+        # email is on a .invalid domain, but link-by-email must not be the only thing in the way)
+        raise NotInvited()
     if user.status == "disabled":
         raise AccountDisabled()
     if user.status == "invited":

@@ -36,7 +36,7 @@ Baseline on `claude/intelligent-meitner-9ne4e8`, fast-forwarded to the Phase 4 e
 | Nudge "respects snooze" | A snooze | **No snooze concept exists** | Q7 |
 | "Review" section | Move task to Review if present | No convention | Match a section named "Review" (case-insensitive) in the task's project; else reassign to creator |
 | Frontend | `/agents`, runs UI, ✦ ring in pickers | **Nothing** agent-related in `apps/web` (no route, no placeholder). `is_agent` is in the generated API types | S5.1.3 / S5.2.3 add routes; the amber ✦ accent already exists for AI content |
-| Tool catalog | agents.md §4 tool lists | All the tools named are already registered: `search_tasks`, `semantic_search`, `get_project_activity`, `create_status_update`, `update_task`, `set_field_value`, `add_comment`, `create_subtasks`, `create_project_from_plan`, `create_task` | No new tools needed for the starter set, except a read tool for Pulse's "changes since the last digest" (S5.3.1) |
+| Tool catalog | agents.md §4 tool lists | **Corrected in S5.1.1:** `set_field_value`, `create_rule`, `request_approval` and `decide_approval` are in ai-architecture's catalog but were never registered (Sorter needs `set_field_value` → S5.3.2). The rest are registered: `search_tasks`, `semantic_search`, `get_project_activity`, `create_status_update`, `update_task`, `set_field_value`, `add_comment`, `create_subtasks`, `create_project_from_plan`, `create_task` | No new tools needed for the starter set, except a read tool for Pulse's "changes since the last digest" (S5.3.1) |
 | J10 | "Assign task to Teammate agent → result comment → review" (testing-strategy.md) | Not written | Needs S5.2.1 + S5.3.8; see Q3 on ordering |
 
 **Lessons from earlier retros that apply here:**

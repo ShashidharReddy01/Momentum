@@ -209,6 +209,93 @@ def evals(
         raise typer.Exit(code=1)
 
 
+agents_cli = typer.Typer(no_args_is_help=True, help="Agents: install and inspect (Phase 5)")
+cli.add_typer(agents_cli, name="agents")
+
+
+@agents_cli.command("install")
+def agents_install(
+    only: list[str] = typer.Option([], "--only", help="Only these agent keys (repeatable)"),
+    force: bool = typer.Option(
+        False, "--force", help="Overwrite agents an admin has edited since they were installed"
+    ),
+    definitions_dir: list[str] = typer.Option(
+        [], "--definitions-dir", help="A host application's own definitions (repeatable)"
+    ),
+) -> None:
+    """Install or refresh agents from their definitions. New agents start disabled; an admin
+    enables each one. Safe to re-run: unchanged agents are left alone, edited ones are reported
+    as drifted and kept (unless --force)."""
+    from momentum.agents.loader import DefinitionError, load_definitions
+    from momentum.ai.tools.catalog import build_registry
+    from momentum.core.context import Actor, Ctx
+    from momentum.core.db import UnitOfWork, create_engine, create_session_factory
+    from momentum.domain.agents.service import install_definitions
+    from momentum.domain.workspace.service import ensure_default_workspace
+
+    settings = Settings()
+    try:
+        definitions = load_definitions(definitions_dir)
+    except DefinitionError as e:
+        raise typer.BadParameter(str(e)) from e
+
+    async def _run() -> list[str]:
+        engine = create_engine(settings)
+        uow = UnitOfWork(create_session_factory(engine)())
+        try:
+            async with uow.transaction() as session:
+                ws = await ensure_default_workspace(session, settings)
+                # the operator running the CLI acts as the system, with admin rights
+                ctx = Ctx(
+                    actor=Actor(id=None, workspace_id=ws.id, role="admin"),
+                    settings=settings,
+                    via="system",
+                )
+                results = await install_definitions(
+                    session,
+                    ctx,
+                    definitions,
+                    build_registry().names,
+                    keys=only or None,
+                    force=force,
+                )
+                return [f"{r.outcome:<10} {r.key}  ({r.agent.name})" for r in results]
+        finally:
+            await uow.close()
+            await engine.dispose()
+
+    for line in run_async(_run()):
+        typer.echo(line)
+
+
+@agents_cli.command("list")
+def agents_list() -> None:
+    """The workspace's agents: key, enabled, autonomy, monthly budget."""
+    from sqlalchemy import select
+
+    from momentum.core.db import create_engine, create_session_factory
+    from momentum.domain.agents.models import Agent
+    from momentum.domain.agents.service import is_drifted
+
+    settings = Settings()
+
+    async def _run() -> list[str]:
+        engine = create_engine(settings)
+        try:
+            async with create_session_factory(engine)() as session:
+                rows = (await session.execute(select(Agent).order_by(Agent.key))).scalars()
+                return [
+                    f"{a.key:<18} {'on ' if a.enabled else 'off'}  {a.autonomy:<8} "
+                    f"${a.budget_monthly_usd}/mo  {a.source}{'  (edited)' if is_drifted(a) else ''}"
+                    for a in rows
+                ]
+        finally:
+            await engine.dispose()
+
+    lines = run_async(_run())
+    typer.echo("\n".join(lines) if lines else "No agents installed. Run: momentum agents install")
+
+
 def main() -> None:
     cli()
 

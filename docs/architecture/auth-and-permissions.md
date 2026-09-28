@@ -136,5 +136,7 @@ Actions are string constants (`"project.view"`, `"project.edit"`, `"project.mana
 ## 8. Agents and permissions
 
 - **Acting for a user** (chat, ⌘K, inline AI): `ctx.user = the human`, `ctx.via="ai"`. The AI can do exactly what the user can.
-- **Acting as itself** (scheduled/event agents): `ctx.user = agent user`. Visibility = the agent's `scope` (projects/teams) ∩ what the scope grants. Agents are project members with a role (default `editor` for write agents, `commenter` for suggest-only agents).
+- **Acting as itself** (scheduled/event agents): `ctx.user = agent user`. **Access is explicit project membership only** (Phase 5 kickoff Q1, as built in S5.1.1): an agent account sees a project only when it was added as a member (`POST /agents/{id}/projects`, or the Share dialog), never through a team (agents can't join teams) or the admin role (`access.project_role` and `visible_projects_clause` skip both for agents). The agent's `scope` only **narrows** what it acts on inside that access. Agents are `editor`, `commenter` or `viewer`, never project `admin`. Adding an agent to a project needs admin on that project, like sharing it with a person, and is undoable.
+- **Acting for a recipient** (per-user agents such as Pulse, S5.3.1): `ctx.user = the recipient`, `ctx.via="agent"`, so the output contains only what that person can already see.
+- **Agent accounts never sign in**: `resolve_user` refuses them whatever the identity provider claims, and dev login refuses them too. Their email is `<key>@agents.momentum.invalid`.
 - Even with permission, AI writes follow the autonomy and risk policy (`ai/ai-architecture.md` §4).

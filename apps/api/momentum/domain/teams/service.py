@@ -212,6 +212,10 @@ async def add_member(
     user = await session.get(User, user_id)
     if user is None or user.workspace_id != ctx.workspace_id or user.status == "disabled":
         raise NotFound("User not found")
+    if user.is_agent:
+        # S5.1.1 (kickoff Q1): team members are implicit editors of every team-visible project;
+        # agents only get access project by project, explicitly.
+        raise ValidationFailed("Agents can't join teams. Give them access project by project.")
     if await session.get(TeamMember, (team_id, user_id)) is not None:
         raise Conflict("Already a member of this team", code="duplicate")
     member = TeamMember(team_id=team_id, user_id=user_id, role=role)

@@ -5,8 +5,8 @@
 > Older session handoff notes, the Phase 2 exit record and the Phase 0-1 retros live in `docs/progress/handoff-archive.md` (read them only when a slice touches that area). At the end of every slice, move the previous session's handoff there and keep only the latest one here.
 
 ## Current focus
-- **Phase:** 5: Agents v1 ("Teammates") — **kickoff done** (2026-09-28, `docs/roadmap/phase-5-kickoff.md`; all questions answered). Phase 4 complete (exit criteria met 2026-09-28).
-- **Next up:** J1 quick-entry flake check, then S5.1.1 Agent model and accounts (on the product owner's go-ahead).
+- **Phase:** 5: Agents v1 ("Teammates") — in progress: kickoff done (2026-09-28, `docs/roadmap/phase-5-kickoff.md`), S5.1.1 done. Phase 4 complete (exit criteria met 2026-09-28).
+- **Next up:** S5.1.2 Runtime loop and triggers.
 - **Product-owner instruction (2026-09-26):** finish all remaining slices, then one big local test run against the real gateway (100+ questions/actions covering edge cases), then fix from that run.
 - **Scope note (product owner, 2026-09-26):** the customer-operations capabilities (SQQ, pricing, contracts, invoices, pushes to internal systems as tools and assignable agents) will be done later in the product owner's own codebase, **not in this repo**. Finish the roadmap as written.
 - **Branch:** Phases 3–4 are on `claude/clever-hopper-pbv7yr` (ahead of `main`). Phase 5 continues on `claude/intelligent-meitner-9ne4e8`, which starts from that branch's Phase 4 exit commit.
@@ -20,14 +20,26 @@
 - **Phase 5 AI mode:** mock mode throughout (no gateway in this environment). Deferred to the product owner's machine: `momentum llm-check`, `EVALS_LIVE=1 make evals` at phase exit. The dogfood exit criterion is a post-ship observation, not blocking.
 - **Carried past Phase 4 exit** (kickoff Q6: the inbox/bell gap → S5.0.1 and the forms security review → S5.0.2 are now Phase 5 slices; J1 flake **fixed** 2026-09-28, see handoff; the other two stay deferred): a security review pass of S4.2.1's public form endpoint (member-name exposure on assignee questions, no `X-Forwarded-For` handling); wiring `conversational_intake` into the `momentum/ai/evals/` harness (its `EvalWorld` has no notion of a form and the harness models one-shot input → output, not a stateless multi-turn feature); a real per-turn spam counter for conversational intake (currently reuses the submission rate limiter as a coarse guard); the inbox/bell live-update gap and the J1 quick-entry flake found at exit (both described in the Phase 4 exit handoff, now in `handoff-archive.md`).
 
-## Handoff notes (latest session: 2026-09-28, Phase 5 kickoff)
-- **Kickoff written:** `docs/roadmap/phase-5-kickoff.md` (mock-mode prerequisite, state check, refinements, risks, questions). **All 7 questions answered by the product owner (every recommendation accepted)**; refinements applied to `docs/roadmap/phase-5.md` (new E5.0 with S5.0.1/S5.0.2, "Kickoff refinements" on S5.1.1/S5.1.2/S5.1.4, starter-table notes).
-- **Branch:** this session's branch `claude/intelligent-meitner-9ne4e8` was at the Phase 2 exit commit; it was fast-forwarded (no commits of its own, nothing lost) onto `claude/clever-hopper-pbv7yr` at the Phase 4 exit commit `300bbc7`. Continue Phase 5 on `claude/intelligent-meitner-9ne4e8`.
-- **Environment:** cloud container, **no LLM gateway access**: the whole phase is built in mock mode (see kickoff §1). Fresh-container Postgres setup as in the archive (pgvector via apt, `initdb` in `/home/user/.pgdata`, extensions in `template1`). Baseline `make check` green: **594 backend / 311 web**.
-- **Key findings from the state check:** `users.is_agent`/`agent_id` already exist (0001); people listings deliberately exclude agents; only `decide_approval` guards against agents; **per-agent dollar caps would never trip while `MOMENTUM_LLM_PRICE_TABLE` is unset** (hence the token fallback, Q4); no workspace timezone, no snooze, no project settings column, no agent UI at all; `croniter` is only transitive.
-- **Added after the kickoff (Q8, ADR-0009):** extension points for the product owner's own customer-operations agents: S5.1.5 (host tools and agents, `handler` agents running Python code, `get_attachment_text`) and S5.1.6 (API tokens, moved from S7.1). S5.1.1/S5.1.2 carry `agents.kind` and loader directories from the start.
-- **J1 flake fixed (pre-slice, 2026-09-28) — a real product bug, not a test problem:** when the server confirmed a task created from the new-task row, its temporary id was replaced by the real id; the open draft row still pointed at the temporary id, `findIndex` returned -1, and the row **jumped to the top of the section**. In a real browser, moving the focused input drops focus, so whatever was typed at that moment was lost. Fast typists could hit it too. Fix: `ProjectTasksView` remembers temporary → real ids and anchors the draft to either. New unit test `keeps the new-task row in place and focused when the server confirms the row above it` (failed before the fix). Also fixed a separate order dependency in `quick-add.e2e.ts` (J4 leaves Website Revamp remembered on Board, so the test now opens List explicitly). e2e 10/10 on two full runs, J1 5/5 on fresh databases; web 312/312.
-- **Next up:** **S5.1.1 Agent model and accounts** (go-ahead given 2026-09-28).
+## Handoff notes (latest session: 2026-09-28, S5.1.1 Agent model and accounts)
+- **Before S5.1.1:** J1 flake fixed. It was a real rapid-entry bug: the new-task row jumped and lost focus when a create was confirmed. Commit `4eb5dc0`; details in the archive's kickoff handoff.
+- **Shipped (S5.1.1):**
+  - **Data:** migration 0028 (`agents`, `agent_runs` with a per-agent unique `dedupe_key`; the deferred FKs `users.agent_id` and `llm_calls.agent_run_id`; notification kind `agent_alert`).
+  - **Code:** `domain/agents/` (models, schemas, service, router) and `momentum/agents/loader.py`, plus 8 starter YAML definitions with the Q2 autonomy and Q4 budgets.
+  - **Install:** `momentum agents install|list` and `POST /agents/install`. Idempotent; new agents are **disabled**; agents an admin edited are reported `drifted` and kept unless `--force`.
+  - **Admin API** under `/api/v1/agents`.
+  - **Host extension point:** `create_app`/`mount_momentum(agent_definition_dirs=…)`.
+  - **Settings:** `MOMENTUM_AGENT_MAX_STEPS` (15), `MOMENTUM_AGENT_TIMEOUT_S` (300).
+  - **Dependency:** `croniter` is now explicit. It was already installed through Procrastinate; the schemas validate cron triggers with it now, and S5.1.2 will evaluate them.
+- **Access guards (kickoff Q1), in services, not just the API:**
+  - Agents get explicit project roles only. `access.project_role` and `visible_projects_clause` skip the team and admin shortcuts for agent actors.
+  - An agent can't be a project admin (`projects.add_member`/`set_member_role`) and can't join a team (`teams.add_member`).
+  - An agent account can't sign in (`auth/identity.resolve_user`; dev login already refused them).
+  - These touch permission and auth code, as the Q1 answer requires.
+- **Found:** the tools `set_field_value`, `create_rule`, `request_approval` and `decide_approval` are in ai-architecture's catalog but were never registered. The catalog and the kickoff doc are corrected; S5.3.2 registers `set_field_value` for Sorter.
+- **For S5.1.2 to decide:** an agent that creates a project (Architect's `create_project_from_plan`) would become that project's admin through the normal create path, which contradicts "agents are never project admins". Proposal: when a human applies an agent's proposal, the human is the actor; an agent in `auto` mode never gets medium-risk tools anyway.
+- **Verification:** `make check` green: backend **639** (594 + 45 in `tests/test_agents.py`), web **312** (types regenerated; the inbox gained the `agent_alert` label). The CLI was smoke-tested on the dev database (`install` 8 installed → re-run unchanged → `list`).
+- **Live check:** not needed for this slice (no model calls). Next checkpoint: after S5.1.2.
+- **Next up:** S5.1.2 Runtime loop and triggers.
 
 ## Open questions
 | # | Question | Needed by | Status |
@@ -87,7 +99,7 @@
 ### Phase 5: Agents v1 ("Teammates")
 - [x] Kickoff (`docs/roadmap/phase-5-kickoff.md`, 2026-09-28)
 - [ ] S5.0.1 Inbox and bell live updates · [ ] S5.0.2 Public forms security review
-- [ ] S5.1.1 Agent model and accounts · [ ] S5.1.2 Runtime loop and triggers · [ ] S5.1.3 Runs UI · [ ] S5.1.4 Autonomy, budgets, kill switches · [ ] S5.1.5 Extension points and code-backed agents · [ ] S5.1.6 API tokens
+- [x] S5.1.1 Agent model and accounts (2026-09-28) · [ ] S5.1.2 Runtime loop and triggers · [ ] S5.1.3 Runs UI · [ ] S5.1.4 Autonomy, budgets, kill switches · [ ] S5.1.5 Extension points and code-backed agents · [ ] S5.1.6 API tokens
 - [ ] S5.2.1 Assign a task to an agent · [ ] S5.2.2 @mention an agent · [ ] S5.2.3 Agent gallery + create from description
 - [ ] S5.3.1 Pulse · [ ] S5.3.2 Sorter · [ ] S5.3.3 Herald · [ ] S5.3.4 Nudge · [ ] S5.3.5 Architect · [ ] S5.3.6 Scribe · [ ] S5.3.7 Radar · [ ] S5.3.8 Teammate
 - Build order (kickoff Q3, Q8): S5.0.1 before S5.1.3 · E5.1 (incl. S5.1.5, S5.1.6) → S5.2.1 + S5.3.8 (J10) → S5.2.2 → S5.2.3 → Pulse, Sorter (after S5.0.2), Herald, Nudge, Radar → Architect, Scribe

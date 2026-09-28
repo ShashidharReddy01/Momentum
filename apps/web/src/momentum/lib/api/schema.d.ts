@@ -4,6 +4,93 @@
  */
 
 export interface paths {
+    "/api/v1/agents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** All agents in the workspace */
+        get: operations["list_agents_api_v1_agents_get"];
+        put?: never;
+        /** Create a custom agent, disabled until enabled (workspace admins) */
+        post: operations["create_agent_api_v1_agents_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/agents/install": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Install or refresh agents from their definitions; new ones start disabled (admins) */
+        post: operations["install_agents_api_v1_agents_install_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/agents/{agent_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One agent, with the projects it has access to that you can see */
+        get: operations["get_agent_api_v1_agents__agent_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Edit, enable or disable an agent (workspace admins) */
+        patch: operations["patch_agent_api_v1_agents__agent_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/agents/{agent_id}/projects": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Give an agent access to a project (needs admin on that project, like sharing) */
+        post: operations["add_agent_project_api_v1_agents__agent_id__projects_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/agents/{agent_id}/projects/{project_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove an agent's access to a project */
+        delete: operations["remove_agent_project_api_v1_agents__agent_id__projects__project_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/ai/actions/{action_id}": {
         parameters: {
             query?: never;
@@ -2344,6 +2431,319 @@ export interface components {
             effective: components["schemas"]["EffectiveAi"];
             models: components["schemas"]["ModelAliasesOut"];
         };
+        /** AgentDetailOut */
+        AgentDetailOut: {
+            /**
+             * Autonomy
+             * @enum {string}
+             */
+            autonomy: "suggest" | "confirm" | "auto";
+            /** Avatar */
+            avatar: string;
+            /** Budget Monthly Tokens */
+            budget_monthly_tokens: number;
+            /** Budget Monthly Usd */
+            budget_monthly_usd: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Description */
+            description: string;
+            /**
+             * Drifted
+             * @default false
+             */
+            drifted: boolean;
+            /** Enabled */
+            enabled: boolean;
+            /** Handler */
+            handler: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Instructions */
+            instructions: string;
+            /** Key */
+            key: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "llm" | "handler";
+            /** Limits */
+            limits: {
+                [key: string]: unknown;
+            };
+            /**
+             * Model Alias
+             * @enum {string}
+             */
+            model_alias: "fast" | "default" | "smart";
+            /** Name */
+            name: string;
+            /** Projects */
+            projects?: components["schemas"]["AgentProjectOut"][];
+            /** Scope */
+            scope: {
+                [key: string]: unknown;
+            };
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "starter" | "host" | "custom";
+            /** Tools */
+            tools: string[];
+            /** Triggers */
+            triggers: {
+                [key: string]: unknown;
+            }[];
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /**
+             * User Id
+             * Format: uuid
+             */
+            user_id: string;
+            /** Version */
+            version: number;
+        };
+        /**
+         * AgentIn
+         * @description Create a custom agent. ``key`` defaults to one derived from the name.
+         */
+        AgentIn: {
+            /**
+             * Autonomy
+             * @default confirm
+             * @enum {string}
+             */
+            autonomy: "suggest" | "confirm" | "auto";
+            /**
+             * Avatar
+             * @default teammate
+             */
+            avatar: string;
+            /**
+             * Budget Monthly Tokens
+             * @default 2000000
+             */
+            budget_monthly_tokens: number;
+            /**
+             * Budget Monthly Usd
+             * @default 5
+             */
+            budget_monthly_usd: number | string;
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+            /** Handler */
+            handler?: string | null;
+            /**
+             * Instructions
+             * @default
+             */
+            instructions: string;
+            /** Key */
+            key?: string | null;
+            /**
+             * Kind
+             * @default llm
+             * @enum {string}
+             */
+            kind: "llm" | "handler";
+            limits?: components["schemas"]["AgentLimits"];
+            /**
+             * Model Alias
+             * @default default
+             * @enum {string}
+             */
+            model_alias: "fast" | "default" | "smart";
+            /** Name */
+            name: string;
+            scope?: components["schemas"]["AgentScope"];
+            /** Tools */
+            tools?: string[];
+            /** Triggers */
+            triggers?: (components["schemas"]["ScheduleTrigger"] | components["schemas"]["EventTrigger"] | components["schemas"]["SimpleTrigger"])[];
+        };
+        /**
+         * AgentLimits
+         * @description Per-run limits. Null = the deployment's ceiling (``MOMENTUM_AGENT_MAX_STEPS`` /
+         *     ``MOMENTUM_AGENT_TIMEOUT_S``); a value above the ceiling is refused.
+         */
+        AgentLimits: {
+            /** Max Steps */
+            max_steps?: number | null;
+            /** Timeout S */
+            timeout_s?: number | null;
+        };
+        /** AgentOut */
+        AgentOut: {
+            /**
+             * Autonomy
+             * @enum {string}
+             */
+            autonomy: "suggest" | "confirm" | "auto";
+            /** Avatar */
+            avatar: string;
+            /** Budget Monthly Tokens */
+            budget_monthly_tokens: number;
+            /** Budget Monthly Usd */
+            budget_monthly_usd: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Description */
+            description: string;
+            /**
+             * Drifted
+             * @default false
+             */
+            drifted: boolean;
+            /** Enabled */
+            enabled: boolean;
+            /** Handler */
+            handler: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Instructions */
+            instructions: string;
+            /** Key */
+            key: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "llm" | "handler";
+            /** Limits */
+            limits: {
+                [key: string]: unknown;
+            };
+            /**
+             * Model Alias
+             * @enum {string}
+             */
+            model_alias: "fast" | "default" | "smart";
+            /** Name */
+            name: string;
+            /** Scope */
+            scope: {
+                [key: string]: unknown;
+            };
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "starter" | "host" | "custom";
+            /** Tools */
+            tools: string[];
+            /** Triggers */
+            triggers: {
+                [key: string]: unknown;
+            }[];
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /**
+             * User Id
+             * Format: uuid
+             */
+            user_id: string;
+            /** Version */
+            version: number;
+        };
+        /**
+         * AgentPatchIn
+         * @description Edit an agent. ``kind``/``handler``/``key`` can't change: they're what the agent *is*.
+         */
+        AgentPatchIn: {
+            /** Autonomy */
+            autonomy?: ("suggest" | "confirm" | "auto") | null;
+            /** Avatar */
+            avatar?: string | null;
+            /** Budget Monthly Tokens */
+            budget_monthly_tokens?: number | null;
+            /** Budget Monthly Usd */
+            budget_monthly_usd?: number | string | null;
+            /** Description */
+            description?: string | null;
+            /** Enabled */
+            enabled?: boolean | null;
+            /** Expected Version */
+            expected_version?: number | null;
+            /** Instructions */
+            instructions?: string | null;
+            limits?: components["schemas"]["AgentLimits"] | null;
+            /** Model Alias */
+            model_alias?: ("fast" | "default" | "smart") | null;
+            /** Name */
+            name?: string | null;
+            scope?: components["schemas"]["AgentScope"] | null;
+            /** Tools */
+            tools?: string[] | null;
+            /** Triggers */
+            triggers?: (components["schemas"]["ScheduleTrigger"] | components["schemas"]["EventTrigger"] | components["schemas"]["SimpleTrigger"])[] | null;
+        };
+        /**
+         * AgentProjectIn
+         * @description Give an agent access to a project (its account becomes a member, visible in Share).
+         */
+        AgentProjectIn: {
+            /**
+             * Project Id
+             * Format: uuid
+             */
+            project_id: string;
+            /**
+             * Role
+             * @default editor
+             * @enum {string}
+             */
+            role: "editor" | "commenter" | "viewer";
+        };
+        /** AgentProjectOut */
+        AgentProjectOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Role */
+            role: string;
+        };
+        /**
+         * AgentScope
+         * @description What the agent may act on, **narrowing** what its account can see (kickoff Q1: scope never
+         *     grants access). ``member_of`` = every project its account is a member of.
+         */
+        AgentScope: {
+            /**
+             * Projects
+             * @default member_of
+             */
+            projects: "member_of" | string[];
+            /** Teams */
+            teams?: string[] | null;
+        };
         /** AiActionEnvelope */
         AiActionEnvelope: {
             data: components["schemas"]["AiActionOut"];
@@ -2885,6 +3285,22 @@ export interface components {
             /** Monthly Budget Usd */
             monthly_budget_usd: number;
         };
+        /** EventFilter */
+        EventFilter: {
+            /** Project Ids */
+            project_ids?: string[] | null;
+        };
+        /** EventTrigger */
+        EventTrigger: {
+            /** Event */
+            event: string;
+            filter?: components["schemas"]["EventFilter"];
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "event";
+        };
         /** FavoriteIn */
         FavoriteIn: {
             /** After Id */
@@ -3284,10 +3700,47 @@ export interface components {
              */
             status: "pending" | "running" | "done" | "failed";
         };
+        /** InstallIn */
+        InstallIn: {
+            /**
+             * Force
+             * @default false
+             */
+            force: boolean;
+            /** Keys */
+            keys?: string[] | null;
+        };
+        /** InstallOut */
+        InstallOut: {
+            /** Results */
+            results: components["schemas"]["InstallRowOut"][];
+        };
+        /** InstallRowOut */
+        InstallRowOut: {
+            /**
+             * Agent Id
+             * Format: uuid
+             */
+            agent_id: string;
+            /** Key */
+            key: string;
+            /**
+             * Outcome
+             * @enum {string}
+             */
+            outcome: "installed" | "updated" | "unchanged" | "drifted" | "forced";
+        };
         /** ListMeta */
         ListMeta: {
             /** Next Cursor */
             next_cursor?: string | null;
+        };
+        /** ListOut[AgentOut] */
+        ListOut_AgentOut_: {
+            /** Data */
+            data: components["schemas"]["AgentOut"][];
+            /** @default {} */
+            meta: components["schemas"]["ListMeta"];
         };
         /** ListOut[AttachmentOut] */
         ListOut_AttachmentOut_: {
@@ -3591,6 +4044,11 @@ export interface components {
             /** Version */
             version?: number | null;
         };
+        /** MutationOut[AgentOut] */
+        MutationOut_AgentOut_: {
+            data: components["schemas"]["AgentOut"];
+            meta: components["schemas"]["MutationMeta"];
+        };
         /** MutationOut[AttachmentOut] */
         MutationOut_AttachmentOut_: {
             data: components["schemas"]["AttachmentOut"];
@@ -3875,7 +4333,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "assigned" | "mentioned" | "commented" | "completed" | "due_soon" | "overdue" | "rule" | "approval_requested" | "approval_decided" | "agent_proposal" | "digest";
+            kind: "assigned" | "mentioned" | "commented" | "completed" | "due_soon" | "overdue" | "rule" | "approval_requested" | "approval_decided" | "agent_proposal" | "digest" | "agent_alert";
             /** Read At */
             read_at: string | null;
             /** Snippet */
@@ -4702,6 +5160,25 @@ export interface components {
             /** Title */
             title: string;
         };
+        /**
+         * ScheduleTrigger
+         * @description ``timezone``: ``workspace`` (workspaces.settings['timezone'], default UTC), ``user`` (each
+         *     user's own timezone, for per-user agents such as Pulse) or an IANA name.
+         */
+        ScheduleTrigger: {
+            /** Cron */
+            cron: string;
+            /**
+             * Timezone
+             * @default workspace
+             */
+            timezone: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "schedule";
+        };
         /** ScreenIn */
         ScreenIn: {
             /**
@@ -4824,6 +5301,17 @@ export interface components {
             equals?: unknown;
             /** Question Id */
             question_id: string;
+        };
+        /**
+         * SimpleTrigger
+         * @description Triggered by a person: a task assigned to the agent, an @mention, or "Run now".
+         */
+        SimpleTrigger: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "assigned" | "manual" | "mentioned";
         };
         /** StatusCitationOut */
         StatusCitationOut: {
@@ -5741,6 +6229,225 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    list_agents_api_v1_agents_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListOut_AgentOut_"];
+                };
+            };
+        };
+    };
+    create_agent_api_v1_agents_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AgentIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationOut_AgentOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    install_agents_api_v1_agents_install_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InstallIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InstallOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_agent_api_v1_agents__agent_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                agent_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentDetailOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    patch_agent_api_v1_agents__agent_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                agent_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AgentPatchIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationOut_AgentOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_agent_project_api_v1_agents__agent_id__projects_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                agent_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AgentProjectIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationOut_OkOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_agent_project_api_v1_agents__agent_id__projects__project_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                agent_id: string;
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationOut_OkOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_ai_action_api_v1_ai_actions__action_id__get: {
         parameters: {
             query?: never;

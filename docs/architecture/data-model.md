@@ -39,7 +39,7 @@ All tables live in the Postgres schema configured by `MOMENTUM_DB_SCHEMA` (defau
 | avatar_url | text null | |
 | role | text check in (`admin`,`member`,`guest`) | Workspace role |
 | status | text check in (`active`,`invited`,`disabled`) | |
-| is_agent | bool not null default false | Agent accounts |
+| is_agent | bool not null default false | Agent accounts (S5.1.1: one per agent, email `<key>@agents.momentum.invalid`, never signs in, never a team member or project admin) |
 | agent_id | uuid null fk agents | Set when `is_agent` |
 | timezone | text not null default 'UTC' | IANA |
 | prefs | jsonb not null default '{}' | Notification prefs, default views, shortcuts |
@@ -209,7 +209,7 @@ id bigserial pk, workspace_id, type text, entity_type, entity_id, payload jsonb,
 consumer text pk, last_outbox_id bigint, updated_at. Tracks outbox consumers for idempotent dispatch.
 
 ### `notifications`
-id, workspace_id, user_id, kind (`assigned`,`mentioned`,`commented`,`completed`,`due_soon`,`overdue`,`rule`,`approval_requested`,`approval_decided`,`agent_proposal`,`digest`), entity_type, entity_id, activity_id null, title, snippet, priority_score real, read_at, archived_at, created_at. Index (user_id, archived_at, created_at desc). `rule` added in migration 0022 (S4.1.2's `notify_user` action).
+id, workspace_id, user_id, kind (`assigned`,`mentioned`,`commented`,`completed`,`due_soon`,`overdue`,`rule`,`approval_requested`,`approval_decided`,`agent_proposal`,`digest`), entity_type, entity_id, activity_id null, title, snippet, priority_score real, read_at, archived_at, created_at. Index (user_id, archived_at, created_at desc). `rule` added in migration 0022 (S4.1.2's `notify_user` action); `agent_alert` added in migration 0028 (S5.1.1; an agent needs an admin's attention, produced from S5.1.2).
 
 ### `idempotency_keys`
 key text, user_id, method, path, response_status, response_body jsonb, created_at. pk (user_id, key). Purged after 24h by a periodic job.
@@ -261,8 +261,11 @@ key text, user_id, method, path, response_status, response_body jsonb, created_a
 ### `agents`
 id, workspace_id, user_id (agent account), key (e.g., `daily_digest`), name, avatar, description, instructions text, tools text[], scope jsonb (`{projects:[..], teams:[..]}`), autonomy (`suggest`,`confirm`,`auto`), triggers jsonb (`[{type: schedule, cron}, {type: event, event: task.created, filter}, {type: assigned}, {type: mentioned}]`), model_alias, budget_monthly_usd numeric, enabled, version, created_by, timestamps.
 
+**As built (S5.1.1, migration 0028):** `user_id` unique FK (the agent's own account; `users.agent_id` points back, FK added in 0028); `key` varchar(60), unique per workspace; `name` varchar(80); `avatar` varchar(40) (an avatar key, not a URL); `kind` (`llm`,`handler`) + `handler` varchar(120) (set iff `kind='handler'`, a host-registered function, ADR-0009); `tools` text[]; `scope` jsonb `{projects: "member_of" | [ids], teams: [ids] | null}` (narrows, never grants); `triggers` jsonb (`schedule {cron, timezone: workspace|user|IANA}`, `event {event, filter {project_ids}}`, `assigned`, `mentioned`, `manual`); `model_alias` (`fast`,`default`,`smart`); `budget_monthly_usd` numeric(10,2); **`budget_monthly_tokens` bigint** (kickoff Q4: the cap while the agent's model is unpriced); `limits` jsonb `{max_steps, timeout_s}` (null = the `MOMENTUM_AGENT_*` ceilings); `enabled` (default **false**); `source` (`starter`,`host`,`custom`); `installed_hash` (sha256 of the definition as last installed, null for custom agents: tells an admin's edits apart from an untouched row); `created_by` null (null = installed by the CLI). No soft delete: agents are disabled, never deleted. Validated by `domain/agents/schemas.AgentConfig`, the same schema the YAML definitions use.
+
 ### `agent_runs`
 id, agent_id, workspace_id, trigger jsonb, status (`queued`,`running`,`succeeded`,`failed`,`cancelled`,`budget_exceeded`), steps int, input jsonb, output jsonb, trace jsonb (list of steps: thought summary, tool call, result digest), tokens_in, tokens_out, cost_usd, started_at, finished_at, error.
+**As built (S5.1.1, migration 0028):** plus `dedupe_key` varchar(200) null, **unique per agent** `(agent_id, dedupe_key)` (the same trigger delivered twice runs once) and `created_at`; `cost_usd` numeric(12,6). Indexes (agent_id, created_at), (workspace_id, created_at). Written by the runtime (S5.1.2); `llm_calls.agent_run_id` now has its FK here (`ON DELETE SET NULL`).
 
 ### `llm_calls`
 id, workspace_id, feature (`chat`,`command`,`summarize`,`status_draft`,`agent:<key>`,`embed`,…), alias (`fast`,`default`,`smart`,`embed`), model (as reported by the gateway), prompt_version null, user_id null (null for agents and system calls), agent_run_id null (FK added with `agent_runs` in Phase 5), tokens_in, tokens_out, cost_usd numeric(12,6), latency_ms, status (`ok`,`error`,`budget_exceeded`), error_code null (the failure kind: `timeout`,`connection`,`rate_limited`,`server_error`,`bad_request`,`auth`,`bad_response`), created_at. Index (workspace_id, created_at) for budgets and the usage page. Written in its own transaction, so usage of a rolled-back request still counts. (No prompt bodies. Optional debug capture goes to a separate table behind a flag with a TTL.) Migration 0015 (S3.1.1).

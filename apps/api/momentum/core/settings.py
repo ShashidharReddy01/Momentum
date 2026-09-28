@@ -127,6 +127,11 @@ class Settings(BaseSettings):
     evals_database_url: str = ""
     ai_monthly_budget_usd: float = Field(default=0, ge=0)  # 0 = unlimited
 
+    # S5.1.1: ceilings for every agent's per-run limits (ai-architecture §10). An agent's own
+    # `limits` may be lower, never higher.
+    agent_max_steps: int = Field(default=15, ge=1, le=50)
+    agent_timeout_s: int = Field(default=300, ge=10, le=3600)
+
     # Integrations (S2.7.1) — overridable so J6's e2e journey can point this at a local recorded
     # fixture server instead of the real Asana API (see tools/e2e/asana_fixture_server.py).
     asana_base_url: str = "https://app.asana.com/api/1.0"

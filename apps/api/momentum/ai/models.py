@@ -41,8 +41,9 @@ class LlmCall(IdMixin, Base):
     model: Mapped[str] = mapped_column(String(200))
     prompt_version: Mapped[str | None] = mapped_column(String(40))
     user_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
-    # agent_runs arrives in Phase 5; the FK is added then.
-    agent_run_id: Mapped[uuid.UUID | None]
+    agent_run_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("agent_runs.id", ondelete="SET NULL")
+    )
     tokens_in: Mapped[int] = mapped_column(default=0)
     tokens_out: Mapped[int] = mapped_column(default=0)
     cost_usd: Mapped[Decimal] = mapped_column(Numeric(12, 6), default=Decimal(0))

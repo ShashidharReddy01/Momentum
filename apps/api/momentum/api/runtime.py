@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
@@ -38,4 +39,6 @@ class MomentumRuntime:
     realtime: RealtimeState | None = None
     llm: LLM | None = None  # built in the lifespan (S3.1.1); None only outside a running app
     tools: ToolRegistry = field(default_factory=_default_tools)  # S3.1.2 catalog
+    # S5.1.1: host agent-definition directories, added to Momentum's starters (ADR-0009)
+    agent_definition_dirs: tuple[Path, ...] = ()
     extras: dict[str, Any] = field(default_factory=dict)
