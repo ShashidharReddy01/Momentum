@@ -54,6 +54,25 @@ describe('Task list', () => {
     await waitFor(() => expect(within(backlog).queryAllByText('…')).toHaveLength(0));
   });
 
+  it('keeps the new-task row in place and focused when the server confirms the row above it', async () => {
+    const user = boot();
+    await screen.findByRole('listitem', { name: 'Existing B' });
+    const backlog = screen.getByRole('list', { name: 'Tasks in Backlog' });
+    await user.click(within(backlog).getByRole('button', { name: /Add task/ }));
+    await user.type(screen.getByRole('textbox', { name: 'New task name' }), 'First{Enter}');
+    const input = screen.getByRole('textbox', { name: 'New task name' });
+    await user.type(input, 'Sec');
+    // "First" is confirmed (its temporary id swapped for the real one) mid-typing
+    await waitFor(() => expect(within(backlog).queryAllByText('…')).toHaveLength(0));
+    expect(input).toHaveFocus();
+    const rows = within(backlog)
+      .queryAllByRole('listitem')
+      .map((li) => li.getAttribute('aria-label'));
+    expect(rows.indexOf('New task')).toBe(rows.indexOf('First') + 1);
+    await user.keyboard('ond{Enter}{Escape}');
+    expect(titles('Backlog')).toEqual(['Existing A', 'Existing B', 'First', 'Second']);
+  });
+
   it('Enter on an existing task opens a new row right below it', async () => {
     const user = boot();
     await user.click(await screen.findByRole('button', { name: 'Existing A' }));

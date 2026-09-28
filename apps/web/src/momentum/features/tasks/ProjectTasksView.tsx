@@ -105,6 +105,10 @@ export function ProjectTasksView({ projectId, canEdit }: { projectId: string; ca
     [],
   );
   const draftKey = useRef(0);
+  // Temporary id → real id of tasks created from the draft row. The draft stays anchored to the
+  // task it was opened after even once the server confirms that task (its id changes), so the
+  // row doesn't jump, and lose focus mid-typing, when a create lands.
+  const confirmedIds = useRef(new Map<string, string>());
   const container = useRef<HTMLDivElement>(null);
   const meId = useMe().data?.user.id;
   const nav = useTaskNav();
@@ -555,9 +559,10 @@ export function ProjectTasksView({ projectId, canEdit }: { projectId: string; ca
       <DraftRow
         key={`draft-${draftHere.key}`}
         onSubmit={(title) => {
-          const id = m.create({ title, sectionId: section.id, afterId: draftHere.afterId }, (real) =>
-            keep([real]),
-          );
+          const id = m.create({ title, sectionId: section.id, afterId: draftHere.afterId }, (real) => {
+            confirmedIds.current.set(id, real);
+            keep([real]);
+          });
           openDraft(section.id, id);
         }}
         onPasteLines={(lines) => {
@@ -581,9 +586,11 @@ export function ProjectTasksView({ projectId, canEdit }: { projectId: string; ca
         }}
       />
     ) : null;
+    const anchor = draftHere?.afterId ?? null;
+    const anchorIds = anchor ? [anchor, confirmedIds.current.get(anchor)] : [];
     const draftIndex = draftHere
-      ? draftHere.afterId
-        ? tasks.findIndex((t) => t.id === draftHere.afterId) + 1
+      ? anchor
+        ? tasks.findIndex((t) => anchorIds.includes(t.id)) + 1
         : tasks.length
       : -1;
     type Item = { kind: 'task'; task: Task } | { kind: 'draft' };

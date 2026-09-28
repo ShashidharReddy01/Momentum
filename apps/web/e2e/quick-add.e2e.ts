@@ -5,6 +5,8 @@ import { login, row } from './helpers';
 test('quick add from a project page', async ({ page }) => {
   await login(page);
   await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Website Revamp' }).click();
+  // the project may open on a view an earlier journey left remembered (J4 leaves Board)
+  await page.getByRole('navigation', { name: 'Project views' }).getByRole('link', { name: 'List' }).click();
   await expect(page.locator('[data-task-id]').first()).toBeVisible();
   await page.keyboard.press('q');
   const dialog = page.getByRole('dialog', { name: 'New task' });
