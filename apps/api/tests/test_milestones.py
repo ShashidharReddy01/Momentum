@@ -41,12 +41,15 @@ async def test_converting_to_the_same_type_is_a_noop(as_user: Clients) -> None:
     assert r.json()["meta"]["activity_id"] is None
 
 
-async def test_approval_type_is_not_a_valid_conversion_target(as_user: Clients) -> None:
+async def test_approval_is_a_valid_conversion_target(as_user: Clients) -> None:
+    """S4.4.1: converting to `approval` starts a pending review; see test_approvals.py."""
     ravi = await as_user("ravi")
     pid = await _project(ravi)
     t = await _task(ravi, pid)
     r = await ravi.post(f"/api/v1/tasks/{t['id']}/convert", json={"type": "approval"})
-    assert r.status_code == 422
+    assert r.status_code == 200, r.text
+    assert r.json()["data"]["type"] == "approval"
+    assert r.json()["data"]["approval_state"] == "pending"
 
 
 async def test_editor_access_required_to_convert(as_user: Clients) -> None:

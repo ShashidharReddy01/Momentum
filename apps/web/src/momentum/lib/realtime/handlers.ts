@@ -173,6 +173,11 @@ function applyTaskEvent(
         void qc.invalidateQueries({ queryKey: taskKeys.otherPlacements(ctx.projectId) });
       }
       return;
+    case 'approval.decided':
+      void qc.invalidateQueries({ queryKey: taskKeys.detail(id) });
+      void qc.invalidateQueries({ predicate: (q) => isTaskList(q.queryKey) });
+      refreshMineAndHome(qc);
+      return;
     case 'task.dependency_added':
     case 'task.dependency_removed': {
       void qc.invalidateQueries({ queryKey: taskKeys.dependencies(id) });

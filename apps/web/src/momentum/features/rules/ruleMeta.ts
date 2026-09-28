@@ -10,6 +10,13 @@ export const TRIGGERS: { type: string; label: string; params: string[] }[] = [
   { type: 'task.assigned', label: 'A task is assigned', params: ['user_id'] },
   { type: 'task.due_approaching', label: "A task's due date is approaching", params: [] },
   { type: 'form.submitted', label: 'A form is submitted', params: ['form_id'] },
+  { type: 'approval.decided', label: 'An approval is decided', params: ['decision'] },
+];
+
+export const DECISIONS: { id: string; label: string }[] = [
+  { id: 'approved', label: 'Approved' },
+  { id: 'changes_requested', label: 'Changes requested' },
+  { id: 'rejected', label: 'Rejected' },
 ];
 
 export const TRIGGER_FIELDS = ['priority', 'due_on', 'start_on'] as const;
@@ -121,6 +128,10 @@ function describeTrigger(t: RuleTrigger, l: RuleLookups): string {
       return "a task's due date is tomorrow";
     case 'form.submitted':
       return t.form_id ? `the ${l.forms.get(t.form_id) ?? 'form'} form is submitted` : 'a form is submitted';
+    case 'approval.decided':
+      return t.decision
+        ? `an approval is ${DECISIONS.find((d) => d.id === t.decision)?.label.toLowerCase() ?? t.decision}`
+        : 'an approval is decided';
     default:
       return t.type;
   }

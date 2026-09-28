@@ -1652,6 +1652,23 @@ export interface paths {
         patch: operations["patch_task_api_v1_tasks__task_id__patch"];
         trace?: never;
     };
+    "/api/v1/tasks/{task_id}/approval/decide": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Approve, request changes on, or reject a pending approval task */
+        post: operations["decide_approval_api_v1_tasks__task_id__approval_decide_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tasks/{task_id}/attachments": {
         parameters: {
             query?: never;
@@ -2429,6 +2446,19 @@ export interface components {
              * @enum {string}
              */
             outcome: "applied" | "repreviewed" | "failed";
+        };
+        /**
+         * ApprovalDecisionIn
+         * @description Decide a pending approval task (S4.4.1).
+         */
+        ApprovalDecisionIn: {
+            /** Comment */
+            comment?: string | null;
+            /**
+             * Decision
+             * @enum {string}
+             */
+            decision: "approved" | "changes_requested" | "rejected";
         };
         /** AsanaImportIn */
         AsanaImportIn: {
@@ -3690,6 +3720,8 @@ export interface components {
         };
         /** MyTaskOut */
         MyTaskOut: {
+            /** Approval State */
+            approval_state?: string | null;
             /** Assignee Id */
             assignee_id: string | null;
             /** Bucket */
@@ -5019,14 +5051,14 @@ export interface components {
         };
         /**
          * TaskConvertIn
-         * @description Convert a task to a milestone, or back (S2.4.3).
+         * @description Convert a task to a milestone or approval, or back (S2.4.3, S4.4.1).
          */
         TaskConvertIn: {
             /**
              * Type
              * @enum {string}
              */
-            type: "task" | "milestone";
+            type: "task" | "milestone" | "approval";
         };
         /** TaskCreateIn */
         TaskCreateIn: {
@@ -5053,6 +5085,8 @@ export interface components {
          * @description A task with everything the task pane needs.
          */
         TaskDetailOut: {
+            /** Approval State */
+            approval_state?: string | null;
             /** Assignee Id */
             assignee_id: string | null;
             /** Completed At */
@@ -5202,6 +5236,8 @@ export interface components {
         };
         /** TaskOut */
         TaskOut: {
+            /** Approval State */
+            approval_state?: string | null;
             /** Assignee Id */
             assignee_id: string | null;
             /** Completed At */
@@ -5482,6 +5518,8 @@ export interface components {
         };
         /** Trigger */
         Trigger: {
+            /** Decision */
+            decision?: string | null;
             /** Field */
             field?: string | null;
             /** Form Id */
@@ -9588,6 +9626,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MutationOut_TaskDetailOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    decide_approval_api_v1_tasks__task_id__approval_decide_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApprovalDecisionIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationOut_TaskOut_"];
                 };
             };
             /** @description Validation Error */

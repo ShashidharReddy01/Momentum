@@ -15,6 +15,7 @@ import {
   actionComplete,
   AI_STEP_KINDS,
   CONDITION_FIELDS,
+  DECISIONS,
   defaultAction,
   defaultCondition,
   defaultTrigger,
@@ -188,6 +189,15 @@ function TriggerEditor({
           onChange={(v) => onChange({ ...trigger, form_id: v || null })}
           placeholder="Any form"
           options={lookups.formOptions}
+        />
+      ) : null}
+      {meta.params.includes('decision') ? (
+        <Select
+          aria-label="Decision"
+          value={trigger.decision ?? ''}
+          onChange={(v) => onChange({ ...trigger, decision: v || null })}
+          placeholder="Any decision"
+          options={DECISIONS}
         />
       ) : null}
     </div>

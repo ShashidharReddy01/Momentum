@@ -18,8 +18,7 @@ from pydantic import (
     model_validator,
 )
 
-# Triggers the executor can fire on today. The others in the roadmap (form submitted, approval
-# decided) are refused rather than accepted and never fired.
+# Triggers the executor can fire on today.
 TRIGGER_PARAMS: dict[str, set[str]] = {
     "task.added": set(),
     "task.moved": {"to_section"},
@@ -28,8 +27,9 @@ TRIGGER_PARAMS: dict[str, set[str]] = {
     "task.assigned": {"user_id"},
     "task.due_approaching": set(),
     "form.submitted": {"form_id"},
+    "approval.decided": {"decision"},
 }
-NOT_YET_TRIGGERS = {"approval.decided"}
+NOT_YET_TRIGGERS: set[str] = set()
 
 TRIGGER_FIELDS = ("priority", "due_on", "start_on")
 CONDITION_FIELDS = ("priority", "assignee", "due_on", "start_on", "tag")
@@ -87,6 +87,7 @@ class Trigger(BaseModel):
     to: Any = None
     user_id: uuid.UUID | None = None
     form_id: uuid.UUID | None = None  # form.submitted: null means any form in the project
+    decision: str | None = None  # approval.decided: null means any decision
 
     @model_validator(mode="after")
     def _check(self) -> Trigger:
@@ -102,6 +103,13 @@ class Trigger(BaseModel):
             self.field in TRIGGER_FIELDS or (self.field is not None and is_custom_field(self.field))
         ):
             raise ValueError("field must be priority, due_on, start_on or a custom field id")
+        if self.type == "approval.decided" and self.decision not in (
+            None,
+            "approved",
+            "changes_requested",
+            "rejected",
+        ):
+            raise ValueError("decision must be approved, changes_requested or rejected")
         return self
 
 

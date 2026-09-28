@@ -8,6 +8,7 @@ import {
   Diamond,
   Maximize2,
   MoreHorizontal,
+  ShieldCheck,
   Trash2,
   UserRound,
   X,
@@ -228,6 +229,12 @@ function PaneBody({
                 <Icon icon={Diamond} />{' '}
                 {task.type === 'milestone' ? 'Convert to task' : 'Convert to milestone'}
               </DropdownMenuItem>
+              <DropdownMenuItem
+                onSelect={() => m.convert.mutate(task.type === 'approval' ? 'task' : 'approval')}
+              >
+                <Icon icon={ShieldCheck} />{' '}
+                {task.type === 'approval' ? 'Convert to task' : 'Convert to approval'}
+              </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 className="text-crit"
@@ -258,6 +265,10 @@ function PaneBody({
           </button>
         ) : null}
         <TitleField task={task} canEdit={canEdit} onSave={(title) => m.update.mutate({ patch: { title } })} />
+
+        {task.type === 'approval' ? (
+          <ApprovalBanner task={task} meId={meId} decide={m.decideApproval} />
+        ) : null}
 
         <dl className="mt-4 grid grid-cols-[112px_1fr] items-center gap-x-3 gap-y-1 text-sm">
           <Field label="Assignee">
@@ -396,6 +407,68 @@ function PaneBody({
         </p>
       </div>
     </>
+  );
+}
+
+const APPROVAL_LABELS: Record<string, string> = {
+  pending: 'Pending approval',
+  approved: 'Approved',
+  changes_requested: 'Changes requested',
+  rejected: 'Rejected',
+};
+const APPROVAL_TONE: Record<string, string> = {
+  pending: 'text-warn',
+  approved: 'text-ok',
+  changes_requested: 'text-warn',
+  rejected: 'text-crit',
+};
+
+/** S4.4.1: the approve/request-changes/reject controls for a task of type "approval". Only the
+ * assignee (the approver) or a project admin may decide — everyone else just sees the state. */
+function ApprovalBanner({
+  task,
+  meId,
+  decide,
+}: {
+  task: TaskDetail;
+  meId: string | undefined;
+  decide: ReturnType<typeof useTaskDetailMutations>['decideApproval'];
+}) {
+  const state = task.approval_state ?? 'pending';
+  const canDecide = state === 'pending' && (meId === task.assignee_id || task.my_role === 'admin');
+  return (
+    <div className="mt-3 flex flex-wrap items-center gap-2 rounded-md border border-hairline bg-surface-2 px-3 py-2 text-sm">
+      <Icon icon={ShieldCheck} size={15} className={APPROVAL_TONE[state]} />
+      <span className={cn('font-medium', APPROVAL_TONE[state])}>{APPROVAL_LABELS[state] ?? state}</span>
+      {canDecide ? (
+        <div className="ml-auto flex gap-2">
+          <Button
+            size="sm"
+            variant="primary"
+            loading={decide.isPending}
+            onClick={() => decide.mutate({ decision: 'approved' })}
+          >
+            Approve
+          </Button>
+          <Button
+            size="sm"
+            loading={decide.isPending}
+            onClick={() => decide.mutate({ decision: 'changes_requested' })}
+          >
+            Request changes
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="text-crit"
+            loading={decide.isPending}
+            onClick={() => decide.mutate({ decision: 'rejected' })}
+          >
+            Reject
+          </Button>
+        </div>
+      ) : null}
+    </div>
   );
 }
 

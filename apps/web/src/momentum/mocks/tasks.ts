@@ -6,6 +6,7 @@ type T = {
   key: string;
   title: string;
   type: string;
+  approval_state?: string | null;
   project_id: string;
   section_id: string;
   position: string;
@@ -437,6 +438,14 @@ export function taskHandlers(
       const t = tasks.find((x) => x.id === params.id)!;
       const b = (await request.json()) as { type: string };
       t.type = b.type;
+      t.approval_state = b.type === 'approval' ? 'pending' : null;
+      return HttpResponse.json({ data: t, meta });
+    }),
+    http.post(`*${base}/api/v1/tasks/:id/approval/decide`, async ({ params, request }) => {
+      const t = tasks.find((x) => x.id === params.id)!;
+      const b = (await request.json()) as { decision: string };
+      t.approval_state = b.decision;
+      if (b.decision === 'approved') t.completed_at = new Date().toISOString();
       return HttpResponse.json({ data: t, meta });
     }),
     http.post(`*${base}/api/v1/undo`, () => {

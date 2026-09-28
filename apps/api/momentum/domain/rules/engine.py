@@ -73,6 +73,7 @@ TRIGGER_EVENTS: dict[str, tuple[str, ...]] = {
     "task.assigned": ("task.assigned",),
     "task.due_approaching": ("task.due_approaching",),
     "form.submitted": ("form.submitted",),
+    "approval.decided": ("approval.decided",),
 }
 WATCHED = {e for events in TRIGGER_EVENTS.values() for e in events}
 
@@ -331,6 +332,9 @@ async def _trigger_matches(session: AsyncSession, trig: dict[str, Any], ev: Outb
     if kind == "form.submitted":
         form_id = trig.get("form_id")
         return form_id is None or form_id == data.get("form_id")
+    if kind == "approval.decided":
+        decision = trig.get("decision")
+        return decision is None or decision == data.get("state")
     return kind in ("task.completed", "task.due_approaching")
 
 

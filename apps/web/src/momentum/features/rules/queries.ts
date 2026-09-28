@@ -14,6 +14,8 @@ export interface RuleTrigger {
   user_id?: string | null;
   /** form.submitted (S4.2.1): null/omitted matches any form in the project. */
   form_id?: string | null;
+  /** approval.decided (S4.4.1): null/omitted matches any decision. */
+  decision?: string | null;
 }
 export interface RuleCondition {
   field: string;

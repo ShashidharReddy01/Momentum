@@ -102,7 +102,7 @@ export function useTaskDetailMutations(taskId: string) {
   });
 
   const convert = useMutation({
-    mutationFn: async (type: 'task' | 'milestone') =>
+    mutationFn: async (type: 'task' | 'milestone' | 'approval') =>
       (
         await api.POST('/api/v1/tasks/{task_id}/convert', {
           params: { path: { task_id: taskId } },
@@ -111,7 +111,13 @@ export function useTaskDetailMutations(taskId: string) {
       ).data!,
     onSuccess: (res, type) => {
       syncTask(qc, taskId, res.data);
-      undoToast(type === 'milestone' ? 'Converted to milestone' : 'Converted to task', res.meta, refetch);
+      const label =
+        type === 'milestone'
+          ? 'Converted to milestone'
+          : type === 'approval'
+            ? 'Converted to approval'
+            : 'Converted to task';
+      undoToast(label, res.meta, refetch);
     },
     onError: (e) => {
       toastError(e, "Couldn't convert this task");
@@ -119,5 +125,22 @@ export function useTaskDetailMutations(taskId: string) {
     },
   });
 
-  return { update, setCompleted, remove, convert };
+  const decideApproval = useMutation({
+    mutationFn: async (body: { decision: 'approved' | 'changes_requested' | 'rejected'; comment?: string }) =>
+      (
+        await api.POST('/api/v1/tasks/{task_id}/approval/decide', {
+          params: { path: { task_id: taskId } },
+          body,
+        })
+      ).data!,
+    onSuccess: (res) => {
+      syncTask(qc, taskId, res.data);
+    },
+    onError: (e) => {
+      toastError(e, "Couldn't record that decision");
+      refetch();
+    },
+  });
+
+  return { update, setCompleted, remove, convert, decideApproval };
 }

@@ -16,6 +16,7 @@ from momentum.domain.sections.models import Section
 from momentum.domain.tasks import service
 from momentum.domain.tasks.models import Task, TaskProject
 from momentum.domain.tasks.schemas import (
+    ApprovalDecisionIn,
     BlockedTaskOut,
     DependenciesOut,
     DependencyIn,
@@ -51,6 +52,7 @@ def task_out(t: Task, p: TaskProject | None, counts: tuple[int, int] | None = No
         key=task_key(t.number),
         title=t.title,
         type=t.type,
+        approval_state=t.approval_state,
         project_id=p.project_id if p else None,
         section_id=None if sub or not p else p.section_id,
         position=t.parent_position if sub else (p.position if p else None),
@@ -281,6 +283,23 @@ async def convert_task(
 ) -> MutationOut[TaskOut]:
     async with uow.transaction() as s:
         m = await service.convert_task_type(s, ctx, task_id, body.type)
+        _, p, _ = await service.get_task(s, ctx, task_id)
+        return MutationOut(
+            data=task_out(m.entity, p),
+            meta=MutationMeta(activity_id=m.activity_id, version=m.version),
+        )
+
+
+@router.post(
+    "/tasks/{task_id}/approval/decide",
+    response_model=MutationOut[TaskOut],
+    summary="Approve, request changes on, or reject a pending approval task",
+)
+async def decide_approval(
+    task_id: uuid.UUID, body: ApprovalDecisionIn, ctx: CtxDep, uow: UowDep
+) -> MutationOut[TaskOut]:
+    async with uow.transaction() as s:
+        m = await service.decide_approval(s, ctx, task_id, body.decision, comment=body.comment)
         _, p, _ = await service.get_task(s, ctx, task_id)
         return MutationOut(
             data=task_out(m.entity, p),

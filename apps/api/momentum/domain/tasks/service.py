@@ -14,7 +14,7 @@ from sqlalchemy.orm import aliased
 
 from momentum.core.activity import Activity, Diff, jsonable_diff, record_activity
 from momentum.core.context import Ctx
-from momentum.core.errors import Conflict, NotFound, ValidationFailed, VersionConflict
+from momentum.core.errors import Conflict, Forbidden, NotFound, ValidationFailed, VersionConflict
 from momentum.core.events import emit
 from momentum.core.mutation import Mutation
 from momentum.core.ordering import even_keys, key_between, keys_between, needs_rebalance
@@ -29,6 +29,7 @@ from momentum.domain.access import (
     task_ancestors,
     visible_projects_clause,
 )
+from momentum.domain.comments.service import create_comment
 from momentum.domain.notifications.service import notify
 from momentum.domain.projects.models import Project
 from momentum.domain.sections.models import Section
@@ -668,32 +669,59 @@ def _apply_dates(task: Task, patch: dict[str, Any], ctx: Ctx, changes: Diff) -> 
             changes[field] = (getattr(task, field), new)
 
 
-CONVERTIBLE_TYPES = ("task", "milestone")
+CONVERTIBLE_TYPES = ("task", "milestone", "approval")
+APPROVAL_DECISIONS = ("approved", "changes_requested", "rejected")
+
+
+def _text_doc(text: str) -> dict[str, Any]:
+    lines = [" ".join(line.split()) for line in text.splitlines()]
+    return {
+        "type": "doc",
+        "content": [
+            {"type": "paragraph", "content": [{"type": "text", "text": line}]}
+            for line in lines
+            if line
+        ],
+    }
 
 
 async def convert_task_type(
-    session: AsyncSession, ctx: Ctx, task_id: uuid.UUID, new_type: str, *, record_undo: bool = True
+    session: AsyncSession,
+    ctx: Ctx,
+    task_id: uuid.UUID,
+    new_type: str,
+    *,
+    record_undo: bool = True,
+    restore_approval_state: str | None = None,
 ) -> Mutation[Task]:
-    """Convert a task to a milestone or back (S2.4.3). `approval` is a valid `type` at the schema
-    level (data-model.md) but isn't offered by this conversion — it has no UI or behavior of its
-    own yet, so exposing it here would just be a state nothing else understands."""
+    """Convert a task to a milestone, approval or back (S2.4.3, S4.4.1). Entering `approval`
+    starts a fresh `pending` review (its approver is the assignee); leaving it clears
+    `approval_state` — the decision no longer means anything once the task isn't an approval.
+    `restore_approval_state` is for undo only: it puts back the exact prior state (e.g. an
+    already-decided approval converted away and undone) instead of restarting the review."""
     if new_type not in CONVERTIBLE_TYPES:
         raise ValidationFailed(f"Can't convert to '{new_type}'")
     task, placement, role = await get_visible_task(session, ctx, task_id)
     require_project_role(role, "editor", "convert this task")
     if task.type == new_type:
         return Mutation(task, version=task.version)
-    old_type = task.type
+    old_type, old_state = task.type, task.approval_state
     task.type = new_type
+    task.approval_state = (restore_approval_state or "pending") if new_type == "approval" else None
     task.version += 1
+    changes: Diff = {"type": (old_type, new_type)}
+    if old_state != task.approval_state:
+        changes["approval_state"] = (old_state, task.approval_state)
     act = await record_activity(
         session,
         ctx,
         entity_type="task",
         entity_id=task.id,
         verb="task.type_changed",
-        changes={"type": (old_type, new_type)},
-        undo=undo_op("tasks.convert_type", task_id=task.id, new_type=old_type)
+        changes=changes,
+        undo=undo_op(
+            "tasks.convert_type", task_id=task.id, new_type=old_type, approval_state=old_state
+        )
         if record_undo
         else None,
     )
@@ -705,6 +733,113 @@ async def convert_task_type(
         entity_id=task.id,
         data={"type": new_type},
         channels=channels(task, placement),
+        activity_id=act.id,
+    )
+    if new_type == "approval" and restore_approval_state is None:
+        await emit(
+            session,
+            ctx,
+            type="approval.requested",
+            entity_type="task",
+            entity_id=task.id,
+            data={"state": "pending"},
+            channels=channels(task, placement),
+            activity_id=act.id,
+        )
+        if task.assignee_id is not None:
+            await notify(
+                session,
+                ctx,
+                user_id=task.assignee_id,
+                kind="approval_requested",
+                entity_type="task",
+                entity_id=task.id,
+                title=f'Approval requested: "{task.title}"',
+                activity_id=act.id,
+            )
+    return Mutation(task, act.id, version=task.version)
+
+
+async def decide_approval(
+    session: AsyncSession,
+    ctx: Ctx,
+    task_id: uuid.UUID,
+    decision: str,
+    *,
+    comment: str | None = None,
+    record_undo: bool = True,
+) -> Mutation[Task]:
+    """Decide a pending approval task (S4.4.1). Only the assignee (the approver) or a project
+    admin may decide, and never an agent — an approval needs a person's judgment, not an
+    automated one. Approving also completes the task (there's nothing left to do); requesting
+    changes or rejecting leaves it open for the requester to act on."""
+    if decision not in APPROVAL_DECISIONS:
+        raise ValidationFailed(f"Unknown decision '{decision}'")
+    task, placement, role = await get_visible_task(session, ctx, task_id)
+    if task.type != "approval":
+        raise ValidationFailed("This task isn't an approval")
+    if task.approval_state != "pending":
+        raise Conflict("This approval was already decided", code="already_decided")
+    if ctx.actor.is_agent:
+        raise Forbidden("Agents can't decide approvals")
+    if ctx.actor.id != task.assignee_id and role != "admin":
+        raise Forbidden("Only the assignee or a project admin can decide this approval")
+    task.approval_state = decision
+    old_completed_at, old_completed_by = task.completed_at, task.completed_by
+    if decision == "approved" and task.completed_at is None:
+        task.completed_at = datetime.now(UTC)
+        task.completed_by = ctx.actor.id
+    task.version += 1
+    changes: Diff = {"approval_state": ("pending", decision)}
+    if task.completed_at != old_completed_at:
+        changes["completed_at"] = (old_completed_at, task.completed_at)
+    act = await record_activity(
+        session,
+        ctx,
+        entity_type="task",
+        entity_id=task.id,
+        verb="approval.decided",
+        changes=changes,
+        undo=undo_op(
+            "tasks.reopen_approval",
+            task_id=task.id,
+            previous_completed_at=old_completed_at,
+            previous_completed_by=old_completed_by,
+        )
+        if record_undo
+        else None,
+    )
+    if comment:
+        await create_comment(session, ctx, task_id=task.id, body=_text_doc(comment))
+    await emit(
+        session,
+        ctx,
+        type="approval.decided",
+        entity_type="task",
+        entity_id=task.id,
+        data={"state": decision},
+        channels=channels(task, placement),
+        activity_id=act.id,
+    )
+    if "completed_at" in changes:
+        await emit(
+            session,
+            ctx,
+            type="task.completed",
+            entity_type="task",
+            entity_id=task.id,
+            data={"version": task.version, "completed_by": str(ctx.actor.id)},
+            channels=channels(task, placement),
+            activity_id=act.id,
+        )
+    await notify(
+        session,
+        ctx,
+        user_id=task.created_by,
+        kind="approval_decided",
+        entity_type="task",
+        entity_id=task.id,
+        title=f'"{task.title}" was {decision.replace("_", " ")}',
         activity_id=act.id,
     )
     return Mutation(task, act.id, version=task.version)
@@ -1832,7 +1967,50 @@ async def _undo_remove_dependency(session: AsyncSession, ctx: Ctx, args: dict[st
 
 @undo_handler("tasks.convert_type")
 async def _undo_convert_type(session: AsyncSession, ctx: Ctx, args: dict[str, Any]) -> None:
-    await convert_task_type(session, ctx, _tid(args), str(args["new_type"]), record_undo=False)
+    approval_state = args.get("approval_state")
+    await convert_task_type(
+        session,
+        ctx,
+        _tid(args),
+        str(args["new_type"]),
+        record_undo=False,
+        restore_approval_state=str(approval_state) if approval_state else None,
+    )
+
+
+@undo_handler("tasks.reopen_approval")
+async def _undo_decide_approval(session: AsyncSession, ctx: Ctx, args: dict[str, Any]) -> None:
+    task, placement, role = await get_visible_task(session, ctx, _tid(args))
+    if ctx.actor.id != task.assignee_id and role != "admin":
+        raise Forbidden("Only the assignee or a project admin can undo this decision")
+    task.approval_state = "pending"
+    task.completed_at = (
+        datetime.fromisoformat(str(args["previous_completed_at"]))
+        if args.get("previous_completed_at")
+        else None
+    )
+    task.completed_by = (
+        uuid.UUID(str(args["previous_completed_by"])) if args.get("previous_completed_by") else None
+    )
+    task.version += 1
+    act = await record_activity(
+        session,
+        ctx,
+        entity_type="task",
+        entity_id=task.id,
+        verb="approval.decided",
+        changes={"approval_state": (None, "pending")},
+    )
+    await emit(
+        session,
+        ctx,
+        type="approval.requested",
+        entity_type="task",
+        entity_id=task.id,
+        data={"state": "pending"},
+        channels=channels(task, placement),
+        activity_id=act.id,
+    )
 
 
 @undo_handler("tasks.set_completed")

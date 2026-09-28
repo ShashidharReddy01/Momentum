@@ -59,6 +59,7 @@ TriggerType = Literal[
     "task.assigned",
     "task.due_approaching",
     "form.submitted",
+    "approval.decided",
 ]
 ActionType = Literal[
     "assign",
@@ -106,6 +107,9 @@ class DraftTrigger(BaseModel):
     person: str | None = Field(default=None, max_length=200, description="task.assigned")
     form: str | None = Field(
         default=None, max_length=200, description="form.submitted: its name, if named"
+    )
+    decision: Literal["approved", "changes_requested", "rejected"] | None = Field(
+        default=None, description="approval.decided: which decision, if named"
     )
 
 
@@ -289,6 +293,8 @@ def _resolve_trigger(
     elif t.type == "form.submitted" and t.form:
         form_id, name = _pick("form", t.form, refs.forms)
         spec["form_id"], named["form_id"] = str(form_id), name
+    elif t.type == "approval.decided" and t.decision:
+        spec["decision"], named["decision"] = t.decision, t.decision
     return spec, named
 
 

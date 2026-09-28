@@ -29,6 +29,7 @@ class TaskOut(BaseModel):
     key: str
     title: str
     type: str
+    approval_state: str | None = None
     project_id: uuid.UUID | None
     section_id: uuid.UUID | None
     position: str | None
@@ -108,10 +109,18 @@ class TaskMoveIn(BaseModel):
 
 
 class TaskConvertIn(BaseModel):
-    """Convert a task to a milestone, or back (S2.4.3)."""
+    """Convert a task to a milestone or approval, or back (S2.4.3, S4.4.1)."""
 
     model_config = ConfigDict(extra="forbid")
-    type: Literal["task", "milestone"]
+    type: Literal["task", "milestone", "approval"]
+
+
+class ApprovalDecisionIn(BaseModel):
+    """Decide a pending approval task (S4.4.1)."""
+
+    model_config = ConfigDict(extra="forbid")
+    decision: Literal["approved", "changes_requested", "rejected"]
+    comment: str | None = Field(default=None, max_length=2000)
 
 
 class TaskBulkIn(BaseModel):
