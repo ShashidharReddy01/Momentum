@@ -174,6 +174,7 @@ async def detail_out(
         description=t.description,
         description_hash=doc_hash(t.description),
         recurrence=t.recurrence,
+        recurrence_parent_id=t.recurrence_parent_id,
         project=ProjectRef(id=project.id, name=project.name, color=project.color)
         if project
         else None,

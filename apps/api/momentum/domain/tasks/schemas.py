@@ -11,15 +11,27 @@ Priority = Literal["urgent", "high", "medium", "low"]
 
 
 class RecurrenceIn(BaseModel):
-    """A repeat rule, stored as given (S3.2.1). Generating the next occurrence is Phase 4."""
+    """A repeat rule, stored as given (S3.2.1). S4.4.2 generates the next occurrence from it."""
 
     model_config = ConfigDict(extra="forbid")
     freq: Literal["daily", "weekly", "monthly", "yearly"]
     interval: int = Field(default=1, ge=1, le=99)
     by_weekday: list[int] | None = Field(
-        default=None, description="0 = Monday … 6 = Sunday (weekly rules)"
+        default=None,
+        description="0 = Monday … 6 = Sunday (weekly rules; or exactly one, for week_of_month)",
     )
     workdays_only: bool = False
+    day_of_month: int | None = Field(
+        default=None, description="monthly only: 1-31, or -1 for the last day of the month"
+    )
+    week_of_month: Literal[1, 2, 3, 4, -1] | None = Field(
+        default=None, description="monthly only: the nth (or -1 = last) by_weekday of the month"
+    )
+    mode: Literal["on_complete", "on_schedule"] = Field(
+        default="on_complete",
+        description="on_complete: spawn the next instance when this one is completed. "
+        "on_schedule: spawn it once this instance's due date arrives, completed or not.",
+    )
     text: str | None = Field(default=None, max_length=100, description="As the user wrote it")
 
 
@@ -88,6 +100,7 @@ class TaskPatchIn(BaseModel):
         "actor's timezone; clearing due_on clears due_at.",
     )
     priority: Priority | None = None
+    recurrence: RecurrenceIn | None = None
 
 
 class TaskFieldsIn(BaseModel):
@@ -156,8 +169,10 @@ class TaskDetailOut(TaskOut):
     )
     description: dict[str, Any] | None
     description_hash: str
-    recurrence: dict[str, Any] | None = Field(
-        default=None, description="Repeat rule (stored; generating occurrences is Phase 4)"
+    recurrence: dict[str, Any] | None = Field(default=None, description="Repeat rule")
+    recurrence_parent_id: uuid.UUID | None = Field(
+        default=None,
+        description="Set if this task was auto-created as another one's next occurrence",
     )
     project: ProjectRef | None
     section: NamedRef | None

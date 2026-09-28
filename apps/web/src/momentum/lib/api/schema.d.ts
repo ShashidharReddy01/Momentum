@@ -4365,14 +4365,19 @@ export interface components {
         };
         /**
          * RecurrenceIn
-         * @description A repeat rule, stored as given (S3.2.1). Generating the next occurrence is Phase 4.
+         * @description A repeat rule, stored as given (S3.2.1). S4.4.2 generates the next occurrence from it.
          */
         RecurrenceIn: {
             /**
              * By Weekday
-             * @description 0 = Monday … 6 = Sunday (weekly rules)
+             * @description 0 = Monday … 6 = Sunday (weekly rules; or exactly one, for week_of_month)
              */
             by_weekday?: number[] | null;
+            /**
+             * Day Of Month
+             * @description monthly only: 1-31, or -1 for the last day of the month
+             */
+            day_of_month?: number | null;
             /**
              * Freq
              * @enum {string}
@@ -4384,10 +4389,22 @@ export interface components {
              */
             interval: number;
             /**
+             * Mode
+             * @description on_complete: spawn the next instance when this one is completed. on_schedule: spawn it once this instance's due date arrives, completed or not.
+             * @default on_complete
+             * @enum {string}
+             */
+            mode: "on_complete" | "on_schedule";
+            /**
              * Text
              * @description As the user wrote it
              */
             text?: string | null;
+            /**
+             * Week Of Month
+             * @description monthly only: the nth (or -1 = last) by_weekday of the month
+             */
+            week_of_month?: (1 | 2 | 3 | 4 | -1) | null;
             /**
              * Workdays Only
              * @default false
@@ -4398,9 +4415,14 @@ export interface components {
         RecurrenceRule: {
             /**
              * By Weekday
-             * @description 0 = Monday … 6 = Sunday
+             * @description 0 = Monday … 6 = Sunday; exactly one if week_of_month is set
              */
             by_weekday?: number[] | null;
+            /**
+             * Day Of Month
+             * @description monthly only: 1-31, or -1 for the last day of the month
+             */
+            day_of_month?: number | null;
             /**
              * Freq
              * @enum {string}
@@ -4411,6 +4433,11 @@ export interface components {
              * @default 1
              */
             interval: number;
+            /**
+             * Week Of Month
+             * @description monthly only: the nth (or -1 = last) by_weekday of the month
+             */
+            week_of_month?: (1 | 2 | 3 | 4 | -1) | null;
             /**
              * Workdays Only
              * @default false
@@ -5143,11 +5170,16 @@ export interface components {
             project_id: string | null;
             /**
              * Recurrence
-             * @description Repeat rule (stored; generating occurrences is Phase 4)
+             * @description Repeat rule
              */
             recurrence?: {
                 [key: string]: unknown;
             } | null;
+            /**
+             * Recurrence Parent Id
+             * @description Set if this task was auto-created as another one's next occurrence
+             */
+            recurrence_parent_id?: string | null;
             section: components["schemas"]["NamedRef"] | null;
             /** Section Id */
             section_id: string | null;
@@ -5317,6 +5349,7 @@ export interface components {
             due_on?: string | null;
             /** Priority */
             priority?: ("urgent" | "high" | "medium" | "low") | null;
+            recurrence?: components["schemas"]["RecurrenceIn"] | null;
             /** Start On */
             start_on?: string | null;
             /** Title */

@@ -49,6 +49,7 @@ class Task(IdMixin, TimestampMixin, SoftDeleteMixin, Base):
     parent_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("tasks.id"))
     parent_position: Mapped[str | None] = mapped_column(POSITION)
     recurrence: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    recurrence_parent_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("tasks.id"))
     estimate_minutes: Mapped[int | None] = mapped_column(Integer)
     priority: Mapped[str | None] = mapped_column(String(16))
     search_tsv: Mapped[Any] = mapped_column(TSVECTOR, Computed(SEARCH_EXPR, persisted=True))
@@ -70,6 +71,7 @@ class Task(IdMixin, TimestampMixin, SoftDeleteMixin, Base):
         CheckConstraint("start_on is null or due_on is null or start_on <= due_on", name="dates"),
         Index("ix_tasks_assignee_open", "assignee_id", "completed_at", "due_on"),
         Index("ix_tasks_parent", "parent_id", "parent_position"),
+        Index("ix_tasks_recurrence_parent", "recurrence_parent_id"),
         Index("ix_tasks_search", "search_tsv", postgresql_using="gin"),
         Index(
             "ix_tasks_title_trgm",

@@ -17,6 +17,8 @@ type T = {
   completed_at: string | null;
   parent_id: string | null;
   priority: null;
+  recurrence?: Record<string, unknown> | null;
+  recurrence_parent_id?: string | null;
   subtask_count?: number;
   completed_subtask_count?: number;
   version: number;
@@ -222,6 +224,7 @@ export function taskHandlers(
         assignee_id?: string | null;
         due_on?: string | null;
         due_at?: string | null;
+        recurrence?: Record<string, unknown> | null;
       };
       // like the API: no section → the project's first one
       const sid = b.section_id ?? tasks.find((x) => x.project_id === params.pid)?.section_id ?? 'sec-1';
@@ -229,6 +232,7 @@ export function taskHandlers(
       t.assignee_id = b.assignee_id ?? null;
       t.due_at = b.due_at ?? null;
       t.due_on = b.due_on ?? (b.due_at ? b.due_at.slice(0, 10) : null);
+      t.recurrence = b.recurrence ?? null;
       tasks.push(t);
       lastCreated.push(b);
       place(t, b.after_id);

@@ -35,6 +35,7 @@ from momentum.domain.projects.models import Project
 from momentum.domain.sections.models import Section
 from momentum.domain.sections.service import list_sections, on_section_delete, on_section_restore
 from momentum.domain.tasks.models import Follower, Task, TaskDependency, TaskProject
+from momentum.domain.tasks.recurrence import next_occurrence
 from momentum.domain.users.models import User
 from momentum.domain.workspace.models import Workspace
 
@@ -185,6 +186,8 @@ def _as_datetime(v: Any) -> datetime | None:
 
 PRIORITIES = ("urgent", "high", "medium", "low")
 RECURRENCE_FREQS = ("daily", "weekly", "monthly", "yearly")
+RECURRENCE_MODES = ("on_complete", "on_schedule")
+MONTHLY_WEEKS = (1, 2, 3, 4, -1)
 
 
 def _check_priority(value: Any) -> str | None:
@@ -198,16 +201,19 @@ def _check_priority(value: Any) -> str | None:
 
 
 def _check_recurrence(value: Any) -> dict[str, Any] | None:
-    """A repeat rule as stored in ``tasks.recurrence`` (generation arrives in Phase 4):
-    ``{freq, interval, by_weekday?, workdays_only?, text?}``."""
+    """A repeat rule as stored in ``tasks.recurrence`` (S4.4.2 generates the next instance from
+    it): ``{freq, interval, by_weekday?, workdays_only?, day_of_month?, week_of_month?, mode?,
+    text?}``. `day_of_month` and `week_of_month` only apply to (and are mutually exclusive on) a
+    `monthly` rule; `week_of_month` needs exactly one `by_weekday`."""
     if value is None:
         return None
     if not isinstance(value, dict) or value.get("freq") not in RECURRENCE_FREQS:
         raise ValidationFailed("Invalid repeat rule", code="invalid_recurrence")
+    freq = value["freq"]
     interval = value.get("interval", 1)
     if not isinstance(interval, int) or not 1 <= interval <= 99:
         raise ValidationFailed("Invalid repeat interval", code="invalid_recurrence")
-    out: dict[str, Any] = {"freq": value["freq"], "interval": interval}
+    out: dict[str, Any] = {"freq": freq, "interval": interval}
     days = value.get("by_weekday")
     if days:
         if not isinstance(days, list) or not all(isinstance(d, int) and 0 <= d <= 6 for d in days):
@@ -215,6 +221,31 @@ def _check_recurrence(value: Any) -> dict[str, Any] | None:
         out["by_weekday"] = sorted(set(days))
     if value.get("workdays_only"):
         out["workdays_only"] = True
+    day_of_month, week_of_month = value.get("day_of_month"), value.get("week_of_month")
+    if (day_of_month is not None or week_of_month is not None) and freq != "monthly":
+        raise ValidationFailed(
+            "day_of_month/week_of_month only apply to a monthly rule", code="invalid_recurrence"
+        )
+    if day_of_month is not None and week_of_month is not None:
+        raise ValidationFailed(
+            "day_of_month and week_of_month are mutually exclusive", code="invalid_recurrence"
+        )
+    if day_of_month is not None:
+        if not isinstance(day_of_month, int) or not (1 <= day_of_month <= 31 or day_of_month == -1):
+            raise ValidationFailed("Invalid day_of_month", code="invalid_recurrence")
+        out["day_of_month"] = day_of_month
+    if week_of_month is not None:
+        if week_of_month not in MONTHLY_WEEKS:
+            raise ValidationFailed("Invalid week_of_month", code="invalid_recurrence")
+        if "by_weekday" not in out or len(out["by_weekday"]) != 1:
+            raise ValidationFailed(
+                "week_of_month needs exactly one by_weekday", code="invalid_recurrence"
+            )
+        out["week_of_month"] = week_of_month
+    mode = value.get("mode", "on_complete")
+    if mode not in RECURRENCE_MODES:
+        raise ValidationFailed("Invalid recurrence mode", code="invalid_recurrence")
+    out["mode"] = mode
     if value.get("text"):
         out["text"] = str(value["text"])[:100]
     return out
@@ -366,10 +397,12 @@ async def create_task(
     before_id: uuid.UUID | None = None,
     batch_id: uuid.UUID | None = None,
     assignee_id: uuid.UUID | None = None,
+    start_on: date | None = None,
     due_on: date | None = None,
     due_at: datetime | None = None,
     priority: str | None = None,
     recurrence: dict[str, Any] | None = None,
+    recurrence_parent_id: uuid.UUID | None = None,
 ) -> Mutation[tuple[Task, TaskProject]]:
     """Create a task (optionally already assigned, dated, prioritized and with a repeat rule:
     quick add is one change, one undo)."""
@@ -393,8 +426,9 @@ async def create_task(
         assignee_id=assignee_id,
         priority=priority,
         recurrence=recurrence,
+        recurrence_parent_id=recurrence_parent_id,
         created_by=ctx.actor.id,
-        created_via=ctx.via,
+        created_via="system" if recurrence_parent_id is not None else ctx.via,
     )
     created: Diff = {"title": (None, title)}
     if assignee_id is not None:
@@ -403,9 +437,13 @@ async def create_task(
         created["priority"] = (None, priority)
     if recurrence is not None:
         created["recurrence"] = (None, recurrence)
-    dates = {k: v for k, v in (("due_on", due_on), ("due_at", due_at)) if v is not None}
+    dates = {
+        k: v
+        for k, v in (("start_on", start_on), ("due_on", due_on), ("due_at", due_at))
+        if v is not None
+    }
     _apply_dates(task, dates, ctx, created)  # same rules as editing (due_at → local due_on)
-    for field in ("due_on", "due_at"):
+    for field in ("start_on", "due_on", "due_at"):
         if field in created:
             setattr(task, field, created[field][1])
     session.add(task)
@@ -845,6 +883,69 @@ async def decide_approval(
     return Mutation(task, act.id, version=task.version)
 
 
+async def _has_child_occurrence(session: AsyncSession, task_id: uuid.UUID) -> bool:
+    row = await session.execute(
+        select(Task.id).where(Task.recurrence_parent_id == task_id).limit(1)
+    )
+    return row.first() is not None
+
+
+async def spawn_next_occurrence(
+    session: AsyncSession, ctx: Ctx, task: Task, placement: TaskProject | None
+) -> Mutation[tuple[Task, TaskProject]] | None:
+    """S4.4.2: create the next instance of a recurring task, copying its title, description,
+    assignee, priority, dates (shifted to the next occurrence, keeping any start/due gap) and
+    direct subtasks (titles only). A no-op when there's nothing to base the next date on (no
+    `due_on`), the task isn't multi-homed anywhere visible, or a next instance already exists
+    (`recurrence_parent_id` makes this idempotent, so both `set_completed` and the scheduled job
+    can call it without double-spawning)."""
+    recur = task.recurrence
+    if recur is None or task.due_on is None or placement is None:
+        return None
+    if await _has_child_occurrence(session, task.id):
+        return None
+    try:
+        next_due = next_occurrence(task.due_on, recur)
+    except ValueError:
+        return None
+    next_start = next_due - (task.due_on - task.start_on) if task.start_on is not None else None
+    batch_id = uuid.uuid4()
+    m = await create_task(
+        session,
+        ctx,
+        placement.project_id,
+        task.title,
+        section_id=placement.section_id,
+        assignee_id=task.assignee_id,
+        start_on=next_start,
+        due_on=next_due,
+        priority=task.priority,
+        recurrence=recur,
+        recurrence_parent_id=task.id,
+        batch_id=batch_id,
+    )
+    new_task, new_placement = m.entity
+    if task.description is not None:
+        await update_task(
+            session,
+            ctx,
+            new_task.id,
+            {"description": task.description},
+            record_undo=False,
+            batch_id=batch_id,
+        )
+    children = (
+        await session.execute(
+            select(Task)
+            .where(Task.parent_id == task.id, Task.deleted_at.is_(None))
+            .order_by(Task.parent_position)
+        )
+    ).scalars()
+    for child in children:
+        await create_subtask(session, ctx, new_task.id, child.title, batch_id=batch_id)
+    return Mutation((new_task, new_placement), m.activity_id, batch_id=batch_id)
+
+
 async def set_completed(
     session: AsyncSession,
     ctx: Ctx,
@@ -899,6 +1000,8 @@ async def set_completed(
             title=f'"{task.title}" was completed',
             activity_id=act.id,
         )
+        if (task.recurrence or {}).get("mode", "on_complete") == "on_complete":
+            await spawn_next_occurrence(session, ctx, task, placement)
     return Mutation(task, act.id, batch_id=batch_id, version=task.version)
 
 

@@ -116,7 +116,8 @@ id, workspace_id, project_id, name, position, version, timestamps, deleted_at. I
 | completed_by | uuid null | |
 | parent_id | uuid null fk tasks | Subtask |
 | parent_position | text null | Order among siblings |
-| recurrence | jsonb null | RRULE-like spec (Phase 4). **Written since S3.2.1** (quick add, `POST …/tasks` `recurrence`): `{freq: daily|weekly|monthly|yearly, interval 1–99, by_weekday? [0=Mon…6], workdays_only?, text?}`, validated by the task service; nothing generates occurrences until Phase 4 |
+| recurrence | jsonb null | Repeat rule: `{freq: daily\|weekly\|monthly\|yearly, interval 1–99, by_weekday? [0=Mon…6], workdays_only?, day_of_month? (1–31 or -1 for last, monthly only), week_of_month? (1–4 or -1, needs exactly one by_weekday, monthly only), mode? on_complete\|on_schedule (default on_complete), text?}`, validated by `domain/tasks/service._check_recurrence`. Written since S3.2.1 (quick add); **generates the next instance since S4.4.2** (`domain/tasks/recurrence.py`'s `next_occurrence` + `service.spawn_next_occurrence`) |
+| recurrence_parent_id | uuid null fk tasks | S4.4.2: set on a task auto-created as another recurring task's next occurrence. Doubles as the idempotency guard — a task with a child never spawns a second one |
 | estimate_minutes | int null | Effort (Phase 6 workload) |
 | priority | text null | Convenience built-in (`urgent`,`high`,`medium`,`low`). Settable since S3.2.1 (create, `PATCH`, bulk, AI tools), undoable |
 | search_tsv | tsvector | Generated from title + description_text (weighted) |

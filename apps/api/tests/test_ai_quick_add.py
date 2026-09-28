@@ -97,7 +97,9 @@ async def test_ai_phrases(
     assert (out.project.name if out.project else None) == want.get("project")
     assert out.due_on == want.get("due_on")
     assert out.priority == want.get("priority")
-    assert (out.recurrence.model_dump() if out.recurrence else None) == want.get("recurrence")
+    assert (out.recurrence.model_dump(exclude_none=True) if out.recurrence else None) == want.get(
+        "recurrence"
+    )
     assert len(out.unresolved) == want.get("unresolved", 0)
 
 
@@ -164,7 +166,7 @@ async def test_structured_output_gets_one_repair_retry(settings: Settings, world
 
 def test_prompt_loader() -> None:
     p = prompts.load("quick_add")
-    assert p.version == "quick_add/v1" and p.alias == "fast" and p.temperature == 0
+    assert p.version == "quick_add/v2" and p.alias == "fast" and p.temperature == 0
     assert "{today}" in p.body and "submit_result" in p.body
     assert "2026-09-26" in p.render(today="2026-09-26", weekday="Saturday", tz="UTC")
 
@@ -182,6 +184,7 @@ async def test_task_service_priority_and_recurrence(uow: UnitOfWork, world: Worl
         "freq": "weekly",
         "interval": 1,
         "by_weekday": [0, 3],
+        "mode": "on_complete",
         "text": "every mon & thu",
     }
     async with uow.transaction() as s:
@@ -228,4 +231,9 @@ async def test_quick_add_endpoint(as_user: Clients) -> None:
     )
     assert r.status_code == 201 and r.json()["data"]["priority"] == "low"
     detail = (await ravi.get(f"/api/v1/tasks/{r.json()['data']['id']}")).json()
-    assert detail["recurrence"] == {"freq": "weekly", "interval": 1, "by_weekday": [0]}
+    assert detail["recurrence"] == {
+        "freq": "weekly",
+        "interval": 1,
+        "by_weekday": [0],
+        "mode": "on_complete",
+    }

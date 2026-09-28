@@ -11,7 +11,7 @@ export type Task = components['schemas']['TaskOut'];
 /** Field edits from the list (title has its own `rename`). */
 export type TaskPatch = Pick<
   components['schemas']['TaskPatchIn'],
-  'assignee_id' | 'start_on' | 'due_on' | 'due_at'
+  'assignee_id' | 'start_on' | 'due_on' | 'due_at' | 'recurrence'
 >;
 
 export const taskKeys = {

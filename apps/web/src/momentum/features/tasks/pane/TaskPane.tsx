@@ -8,6 +8,7 @@ import {
   Diamond,
   Maximize2,
   MoreHorizontal,
+  Repeat,
   ShieldCheck,
   Trash2,
   UserRound,
@@ -59,6 +60,49 @@ const EDITABLE = 'input, textarea, [contenteditable="true"]';
 const RichTextEditor = lazy(() =>
   import('@/components/editor/RichTextEditor').then((m) => ({ default: m.RichTextEditor })),
 );
+
+const WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+const ORDINALS: Record<number, string> = { 1: '1st', 2: '2nd', 3: '3rd', 4: '4th', [-1]: 'last' };
+
+interface RecurrenceShape {
+  freq?: string;
+  interval?: number;
+  by_weekday?: number[];
+  workdays_only?: boolean;
+  day_of_month?: number;
+  week_of_month?: number;
+}
+
+/** S4.4.2: a plain-English summary of `tasks.recurrence` for the pane (setting/editing one
+ * happens through NL quick-add, not a form here — see `quickAddParse.ts`/`ai/quick_add.py`). */
+function recurrenceLabel(raw: TaskDetail['recurrence']): string {
+  if (!raw) return '';
+  const r = raw as RecurrenceShape;
+  const every = r.interval && r.interval > 1 ? `every ${r.interval} ` : 'every ';
+  switch (r.freq) {
+    case 'daily':
+      return r.workdays_only ? 'Every weekday' : `${every}day`.replace(/^every /, 'Every ');
+    case 'weekly': {
+      const days = (r.by_weekday ?? []).map((d) => WEEKDAYS[d]).filter((d): d is string => !!d);
+      const suffix = days.length ? ` on ${days.join(', ')}` : '';
+      return `${every}week${suffix}`.replace(/^every /, 'Every ');
+    }
+    case 'monthly':
+      if (r.day_of_month != null) {
+        const day = r.day_of_month === -1 ? 'the last day' : `day ${r.day_of_month}`;
+        return `${every}month on ${day}`.replace(/^every /, 'Every ');
+      }
+      if (r.week_of_month != null && r.by_weekday?.length) {
+        const nth = ORDINALS[r.week_of_month] ?? `${r.week_of_month}th`;
+        return `${every}month on the ${nth} ${WEEKDAYS[r.by_weekday[0]!]}`.replace(/^every /, 'Every ');
+      }
+      return `${every}month`.replace(/^every /, 'Every ');
+    case 'yearly':
+      return `${every}year`.replace(/^every /, 'Every ');
+    default:
+      return 'Repeats';
+  }
+}
 
 /** Task details: in a side pane next to a list, or as a full page (`/task/:id`). */
 export function TaskPane({
@@ -356,6 +400,24 @@ function PaneBody({
               </FieldButton>
             </DatePicker>
           </Field>
+          {task.recurrence ? (
+            <Field label="Repeat">
+              <div className="flex h-8 items-center gap-2 px-2 text-sm">
+                <Icon icon={Repeat} size={15} className="text-muted" />
+                {recurrenceLabel(task.recurrence)}
+                {canEdit ? (
+                  <IconButton
+                    icon={X}
+                    label="Remove repeat"
+                    size="icon-sm"
+                    onClick={() =>
+                      m.update.mutate({ patch: { recurrence: null }, message: 'Repeat removed' })
+                    }
+                  />
+                ) : null}
+              </div>
+            </Field>
+          ) : null}
           {task.project ? (
             <Field label="Projects">
               <TaskProjects taskId={task.id} canEdit={canEdit} />

@@ -176,6 +176,7 @@ export function QuickAddDialog({
                   interval: fields.recurrence.interval,
                   by_weekday: fields.recurrence.by_weekday ?? null,
                   workdays_only: fields.recurrence.workdays_only ?? false,
+                  mode: 'on_complete',
                   text: fields.recurrence.text ?? null,
                 }
               : null,

@@ -31,8 +31,16 @@ class RecurrenceRule(BaseModel):
     model_config = ConfigDict(extra="forbid")
     freq: Literal["daily", "weekly", "monthly", "yearly"]
     interval: int = Field(default=1, ge=1, le=99)
-    by_weekday: list[int] | None = Field(default=None, description="0 = Monday … 6 = Sunday")
+    by_weekday: list[int] | None = Field(
+        default=None, description="0 = Monday … 6 = Sunday; exactly one if week_of_month is set"
+    )
     workdays_only: bool = False
+    day_of_month: int | None = Field(
+        default=None, description="monthly only: 1-31, or -1 for the last day of the month"
+    )
+    week_of_month: Literal[1, 2, 3, 4, -1] | None = Field(
+        default=None, description="monthly only: the nth (or -1 = last) by_weekday of the month"
+    )
 
 
 class Extraction(BaseModel):
