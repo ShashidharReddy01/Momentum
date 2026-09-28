@@ -90,6 +90,8 @@ Recommendations first; the answers go in here and in STATUS "Open questions".
   **Answered 2026-09-28: fold the two** (inbox/bell live update before S5.1.3; forms security review before S5.3.2); check the J1 flake first; the other two stay deferred.
 - **Q7 (Nudge snooze):** no snooze exists. Recommendation: a per-user, per-task **"Snooze nudges until…"** on the assignee's own task row, stored on `my_task_placements` (already per user per task; one nullable column), plus a user-level "don't nudge me" pref. Nudge also skips completed tasks and tasks blocked by someone else's open work.
   **Answered 2026-09-28: per-task snooze on `my_task_placements` + a user-level "don't nudge me" pref** (as recommended).
+- **Q8 (added after the kickoff, 2026-09-28): make agents extensible for the owner's customer-operations work?** Context: the product owner's own codebase will add SQQ, discovery, invoice, contract and data-upload agents and scripts. Recommendation: add host tools and agent definitions, code-backed `handler` agents, API tokens (moved from S7.1) and a `get_attachment_text` tool to Phase 5. That is cheap now and expensive to retrofit after eight agents. Onboarding-specific workflow features (conditional template items, template versions applied to running projects, agent pre-fill of forms, document generation) stay out of the roadmap.
+  **Answered 2026-09-28: yes** ("add them in the phases"). The product owner will do customer onboarding later and wants the base kept flexible. Recorded in **ADR-0009**; new slices S5.1.5 and S5.1.6 in `phase-5.md`.
 
 ## 6. Exit criteria (as written, with the deferrals above)
 

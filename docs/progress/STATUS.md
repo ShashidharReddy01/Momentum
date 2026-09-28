@@ -25,6 +25,7 @@
 - **Branch:** this session's branch `claude/intelligent-meitner-9ne4e8` was at the Phase 2 exit commit; it was fast-forwarded (no commits of its own, nothing lost) onto `claude/clever-hopper-pbv7yr` at the Phase 4 exit commit `300bbc7`. Continue Phase 5 on `claude/intelligent-meitner-9ne4e8`.
 - **Environment:** cloud container, **no LLM gateway access**: the whole phase is built in mock mode (see kickoff §1). Fresh-container Postgres setup as in the archive (pgvector via apt, `initdb` in `/home/user/.pgdata`, extensions in `template1`). Baseline `make check` green: **594 backend / 311 web**.
 - **Key findings from the state check:** `users.is_agent`/`agent_id` already exist (0001); people listings deliberately exclude agents; only `decide_approval` guards against agents; **per-agent dollar caps would never trip while `MOMENTUM_LLM_PRICE_TABLE` is unset** (hence the token fallback, Q4); no workspace timezone, no snooze, no project settings column, no agent UI at all; `croniter` is only transitive.
+- **Added after the kickoff (Q8, ADR-0009):** extension points for the product owner's own customer-operations agents: S5.1.5 (host tools and agents, `handler` agents running Python code, `get_attachment_text`) and S5.1.6 (API tokens, moved from S7.1). S5.1.1/S5.1.2 carry `agents.kind` and loader directories from the start.
 - **Next up:** check the J1 quick-entry flake (kickoff Q6), then **S5.1.1 Agent model and accounts**, on the product owner's go-ahead.
 
 ## Open questions
@@ -35,7 +36,7 @@
 | 3 | Target host project for plugging in (stack/auth) | Before Phase 8 | open (INTEGRATION_GUIDE.md covers all modes) |
 | 4 | Add an optional Cohere rerank step (rerank-v3.5 via the gateway) to S3.1.4 hybrid retrieval, off by default? (kickoff Q2) | S3.1.4 | **answered 2026-09-26: yes**, off by default |
 | 6 | Phase 5 kickoff Q1–Q7 (agent access, autonomy defaults, rollout, budgets, Pulse default time, carry-overs, Nudge snooze) | S5.1.1 | **answered 2026-09-28:** all recommendations accepted (see `phase-5-kickoff.md` §5) |
-| 5 | MCP server dropped. Keep personal API tokens (so internal scripts can call Momentum's API), or drop S7.1 entirely? | Phase 7 | open |
+| 5 | MCP server dropped. Keep personal API tokens (so internal scripts can call Momentum's API), or drop S7.1 entirely? | Phase 7 | **answered 2026-09-28: keep**, moved to Phase 5 as S5.1.6 (ADR-0009) |
 
 ## Progress
 
@@ -85,10 +86,10 @@
 ### Phase 5: Agents v1 ("Teammates")
 - [x] Kickoff (`docs/roadmap/phase-5-kickoff.md`, 2026-09-28)
 - [ ] S5.0.1 Inbox and bell live updates · [ ] S5.0.2 Public forms security review
-- [ ] S5.1.1 Agent model and accounts · [ ] S5.1.2 Runtime loop and triggers · [ ] S5.1.3 Runs UI · [ ] S5.1.4 Autonomy, budgets, kill switches
+- [ ] S5.1.1 Agent model and accounts · [ ] S5.1.2 Runtime loop and triggers · [ ] S5.1.3 Runs UI · [ ] S5.1.4 Autonomy, budgets, kill switches · [ ] S5.1.5 Extension points and code-backed agents · [ ] S5.1.6 API tokens
 - [ ] S5.2.1 Assign a task to an agent · [ ] S5.2.2 @mention an agent · [ ] S5.2.3 Agent gallery + create from description
 - [ ] S5.3.1 Pulse · [ ] S5.3.2 Sorter · [ ] S5.3.3 Herald · [ ] S5.3.4 Nudge · [ ] S5.3.5 Architect · [ ] S5.3.6 Scribe · [ ] S5.3.7 Radar · [ ] S5.3.8 Teammate
-- Build order (kickoff Q3): S5.0.1 before S5.1.3 · E5.1 → S5.2.1 + S5.3.8 (J10) → S5.2.2 → S5.2.3 → Pulse, Sorter (after S5.0.2), Herald, Nudge, Radar → Architect, Scribe
+- Build order (kickoff Q3, Q8): S5.0.1 before S5.1.3 · E5.1 (incl. S5.1.5, S5.1.6) → S5.2.1 + S5.3.8 (J10) → S5.2.2 → S5.2.3 → Pulse, Sorter (after S5.0.2), Herald, Nudge, Radar → Architect, Scribe
 - [ ] Phase 5 exit: J10 (mock); budget-cap test; runs page explains every action · deferred: `llm-check` + `EVALS_LIVE=1 make evals` (product owner's machine), dogfood week (post-ship)
 
 ### Phases 6–9
@@ -117,6 +118,7 @@ Tracked in their phase files; copy the slice list here at each phase kickoff.
 | 2026-09-26 | Phase 3 exit: eval scorer takes the asker's text (echoing it is not a leak); `clarifies` accepts a question in words; the judge sees proposed operations; three cases corrected | The first live run's failures were mostly harness/case faults, found by reading each failure (see phase-3.md "Phase 3 exit") |
 | 2026-09-26 | Phase 3 exit: `search_tasks.blocked`, `blocked_by` in task briefs, `from`/`to` for moved dates in project activity | Real gaps: Mo could not answer "which tasks are blocked" or "did anything slip" from list results |
 | 2026-09-28 | Phase 5 kickoff: new E5.0 (S5.0.1 inbox/bell live updates, S5.0.2 public forms security review) carried from Phase 4; kickoff refinements on S5.1.1/S5.1.2/S5.1.4 and the starter table (token-fallback budget, `agent_alert` kind, workspace timezone, explicit `croniter`, Sorter enabled via scope, Nudge snooze on `my_task_placements`); build order changed to put S5.3.8 with S5.2.1 (J10) | Product-owner answers to kickoff Q1–Q7; state check in `phase-5-kickoff.md` §2 |
+| 2026-09-28 | ADR-0009: agent extension points. Host tools and agent definitions, code-backed `handler` agents, `get_attachment_text` (new S5.1.5); API tokens moved from S7.1 to S5.1.6 | Product owner's customer-operations work (SQQ, discovery, invoices, contracts, data uploads) will live in their own codebase and plug into Momentum; kickoff Q8. Onboarding-specific workflow features (conditional template items, template versions applied to running projects, agent form pre-fill, document generation) are deliberately not on the roadmap; the product owner will do them later |
 | 2026-09-24 | Phase 2 started without a human sign-off gate on Phase 1, at explicit product-owner instruction ("finish off Phase 2 as you have all the context", "do not ask any permission... just finish this whole phase at ur own pace") given while unavailable | Phase 1 exit criteria were already met and the product owner asked to proceed rather than wait; noted here per that same instruction to record decisions/blockers instead of stopping |
 
 ## Phase retros

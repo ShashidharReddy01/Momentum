@@ -7,7 +7,7 @@
 ---
 
 ### S7.1: API tokens and MCP server (M) — **MCP dropped (product owner, 2026-09-26)**
-**Decision:** no MCP server. Whether personal API tokens (for scripts calling Momentum) stay in scope is an open question (STATUS #5).
+**Decision:** no MCP server. **Personal API tokens moved to Phase 5 as S5.1.6** (product owner, 2026-09-28; ADR-0009), so nothing from S7.1 remains here.
 
 **Scope:** settings UI for personal API tokens (create with scopes/expiry, shown once, revoke); FastMCP server at `/mcp` (streamable HTTP) exposing registry tools (read + write with the same preview/confirm semantics. Write tools return a proposal link unless the token has the `ai:auto_apply` scope); docs page "Connect Claude/VS Code to Momentum".
 **AC:** a token without `tasks:write` can't create tasks; all MCP writes appear with `created_via=mcp`.
