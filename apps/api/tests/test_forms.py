@@ -389,6 +389,55 @@ async def test_form_submitted_trigger_fires_a_rule(
     assert any("Thanks for the submission" in t for t in texts), feed.json()
 
 
+async def test_form_to_triage_to_assignment_end_to_end(
+    as_user: Clients, uow: UnitOfWork, settings: Settings
+) -> None:
+    """Phase 4 exit: "a form → triage → assignment flow works end to end" — a public submission
+    creates the task (intake), a form.submitted rule leaves a triage note and assigns it to a
+    team member (triage + assignment), all through the ordinary write paths."""
+    ravi = await as_user("ravi")
+    pid = await _project(ravi)
+    member = await _member(ravi, pid)
+    form = await _form(ravi, pid, _questions(), public_enabled=True)
+    rule = await ravi.post(
+        "/api/v1/rules",
+        json={
+            "name": "Triage intake",
+            "project_id": pid,
+            "trigger": {"type": "form.submitted", "form_id": form["id"]},
+            "actions": [
+                {"type": "add_comment", "text": "Triaged from intake form."},
+                {"type": "assign", "user_id": member},
+            ],
+        },
+    )
+    assert rule.status_code == 201, rule.text
+
+    public = _public_client(as_user)
+    submitted = await public.post(
+        f"/api/v1/public/forms/{form['public_token']}/submit",
+        json={"answers": {"q_title": "Customer reported a bug"}},
+    )
+    assert submitted.status_code == 201, submitted.text
+
+    async with uow.transaction() as s:
+        await run_rules(s, settings)
+
+    listing = await ravi.get(f"/api/v1/projects/{pid}/tasks")
+    task = next(t for t in listing.json()["data"] if t["title"] == "Customer reported a bug")
+    assert task["assignee_id"] == member
+
+    feed = await ravi.get(f"/api/v1/tasks/{task['id']}/feed")
+    comments = [i["comment"] for i in feed.json()["data"] if i.get("kind") == "comment"]
+    texts = [
+        span["text"]
+        for c in comments
+        for para in c["body"]["content"]
+        for span in para.get("content", [])
+    ]
+    assert any("Triaged from intake form." in t for t in texts), feed.json()
+
+
 @pytest.mark.parametrize("field", ["due_on"])
 async def test_invalid_due_date_answer_is_rejected(as_user: Clients, field: str) -> None:
     ravi = await as_user("ravi")
