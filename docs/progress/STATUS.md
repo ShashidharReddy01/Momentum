@@ -5,25 +5,26 @@
 > Older session handoff notes, the Phase 2 exit record and the Phase 0-1 retros live in `docs/progress/handoff-archive.md` (read them only when a slice touches that area). At the end of every slice, move the previous session's handoff there and keep only the latest one here.
 
 ## Current focus
-- **Phase:** 4: Workflow and Intake — **complete; exit criteria met** (2026-09-28; see the Phase 4 retro below and `docs/roadmap/phase-4.md` "Phase 4 exit"). Awaiting the product owner's sign-off. All slices S4.1.1–S4.4.2 done. Phase 3 is complete (2026-09-27).
-- **Next up:** **Phase 5 kickoff**, on the product owner's go-ahead — the standing instruction ("finish the rest of Phase 4 in one continuous session") was scoped to Phase 4, now done; this session stops here rather than assuming continuation into Phase 5.
+- **Phase:** 5: Agents v1 ("Teammates") — **kickoff done** (2026-09-28, `docs/roadmap/phase-5-kickoff.md`; all questions answered). Phase 4 complete (exit criteria met 2026-09-28).
+- **Next up:** J1 quick-entry flake check, then S5.1.1 Agent model and accounts (on the product owner's go-ahead).
 - **Product-owner instruction (2026-09-26):** finish all remaining slices, then one big local test run against the real gateway (100+ questions/actions covering edge cases), then fix from that run.
 - **Scope note (product owner, 2026-09-26):** the customer-operations capabilities (SQQ, pricing, contracts, invoices, pushes to internal systems as tools and assignable agents) will be done later in the product owner's own codebase, **not in this repo**. Finish the roadmap as written.
-- **Branch:** all Phase 3 work is on `claude/clever-hopper-pbv7yr` (ahead of `main`). Continue from that branch.
+- **Branch:** Phases 3–4 are on `claude/clever-hopper-pbv7yr` (ahead of `main`). Phase 5 continues on `claude/intelligent-meitner-9ne4e8`, which starts from that branch's Phase 4 exit commit.
 - **Standing instruction (product owner, 2026-09-26):** "push it all and finish the remaining slices": continue slice by slice through Phase 3, committing and pushing each.
-- **Model:** Phase 3 is a whole-phase Opus 5.5 phase (`docs/process/model-guide.md` §2); S3.1.1–S3.1.5 were built on Opus 5.5. (Phase 1 Opus; Phase 2 switched to Sonnet 5 mid-phase by product-owner instruction.)
+- **Model:** Phase 5 is a whole-phase Opus 5.5 phase (`docs/process/model-guide.md` §2); the kickoff ran on Opus 5.5. (Phases 1 and 3 Opus; Phase 2 switched to Sonnet 5 mid-phase by product-owner instruction.)
 - **Aliases (product owner, 2026-09-26):** keep the same Bedrock Sonnet 4 id for `fast`, `default` and `smart` for now. **Rerank:** approved for S3.1.4 as optional Cohere rerank, off by default.
 - **AI mode:** everything through S3.5.1 was built and tested in **mock mode** (no LLM access in the build environment used then). The product owner's gateway is **Portkey**. **Real-gateway `llm-check` (product owner, 2026-09-26): 8/8 PASS, then 9/9 PASS after S3.1.2 added the catalog-schema row** — chat on all three aliases (all currently the same Bedrock Sonnet 4 id), tool calling (1.4 s), streaming, streaming with tool calls (so `LLM_SUPPORTS_STREAMING_TOOLS` stays `true`), embeddings for both input types at 1024 dims (vectors differ, so Portkey passes `input_type` through). A first run's streaming probe took 13 s in 2 chunks; a second run the same day took 1.5 s in 3 chunks, so that was a one-off. Coarse chunks (a few words each) are normal for Bedrock on a reply that short, and streaming works through Portkey.
-- **This session's environment (2026-09-26, S3.5.2):** native Windows dev machine (not a Linux container), with a real Portkey key already configured in `apps/api/.env` (`MOMENTUM_LLM_MODE=gateway`) — so the product owner's "one big local test run" can actually run from here (`EVALS_LIVE=1 make evals`), unlike earlier sessions.
+- **Product owner's local machine (2026-09-26, S3.5.2):** native Windows dev machine (not a Linux container), with a real Portkey key already configured in `apps/api/.env` (`MOMENTUM_LLM_MODE=gateway`) — so the product owner's "one big local test run" can actually run from here (`EVALS_LIVE=1 make evals`), unlike earlier sessions.
 - **Blockers:** none
-- **Carried past Phase 4 exit, not resolved this phase:** a security review pass of S4.2.1's public form endpoint (member-name exposure on assignee questions, no `X-Forwarded-For` handling); wiring `conversational_intake` into the `momentum/ai/evals/` harness (its `EvalWorld` has no notion of a form and the harness models one-shot input → output, not a stateless multi-turn feature); a real per-turn spam counter for conversational intake (currently reuses the submission rate limiter as a coarse guard); the inbox/bell live-update gap and the J1 quick-entry flake found at exit (both below).
+- **Phase 5 AI mode:** mock mode throughout (no gateway in this environment). Deferred to the product owner's machine: `momentum llm-check`, `EVALS_LIVE=1 make evals` at phase exit. The dogfood exit criterion is a post-ship observation, not blocking.
+- **Carried past Phase 4 exit** (kickoff Q6: the inbox/bell gap → S5.0.1 and the forms security review → S5.0.2 are now Phase 5 slices; J1 flake checked first; the other two stay deferred): a security review pass of S4.2.1's public form endpoint (member-name exposure on assignee questions, no `X-Forwarded-For` handling); wiring `conversational_intake` into the `momentum/ai/evals/` harness (its `EvalWorld` has no notion of a form and the harness models one-shot input → output, not a stateless multi-turn feature); a real per-turn spam counter for conversational intake (currently reuses the submission rate limiter as a coarse guard); the inbox/bell live-update gap and the J1 quick-entry flake found at exit (both described in the Phase 4 exit handoff, now in `handoff-archive.md`).
 
-## Handoff notes (latest session: 2026-09-28, Phase 4 exit)
-- **Exit criteria met** — see `docs/roadmap/phase-4.md` "Phase 4 exit" for the full account. Summary: J9 (`e2e/j9-rule.e2e.ts`, new) passes against the real embedded worker; rule loop protection proven by existing `test_rules.py` coverage; `EVALS_LIVE=1 make evals` — nl_rule 20/20 (100%), every feature above threshold (one ai_step judge miss, still above its own threshold); a new `test_form_to_triage_to_assignment_end_to_end` (`test_forms.py`) proves the form → triage → assignment chain through the real rules executor.
-- **Two real product findings from writing J9 (flagged, not fixed this session):** (1) the rules executor's cron genuinely ticks once a minute — real wall-clock, worth remembering for anything that needs to react to a rule quickly; (2) **the inbox page and the topbar bell have no live realtime subscription** — S2.5.1/S2.5.2's `notification.created` push only reaches Home/My Tasks (where `useChannel('user:<id>', …)` happens to be mounted), so a notification created while `/inbox` is already open never appears without a reload. Real gap, needs its own slice.
-- **A pre-existing e2e flake found running the full suite (not a Phase 4 regression):** `j1-core-flow.e2e.ts` failed twice in a row — S1.2.2's rapid keyboard quick-entry dropped the middle of three typed tasks. Neither file that flow lives in has been touched since S3.3.2. `quick-add.e2e.ts` also failed once, passed on retry. Open item for a future session on this machine.
-- **Verification:** backend **594/594** (593 from S4.4.2 + 1 new integration test), web **311/311** unchanged from S4.4.2 (no frontend code touched this pass). e2e: J9 2/2 passing runs; 9/10 other journeys pass reliably (J1 excepted, see above).
-- **Next up:** Phase 5 kickoff, on the product owner's go-ahead.
+## Handoff notes (latest session: 2026-09-28, Phase 5 kickoff)
+- **Kickoff written:** `docs/roadmap/phase-5-kickoff.md` (mock-mode prerequisite, state check, refinements, risks, questions). **All 7 questions answered by the product owner (every recommendation accepted)**; refinements applied to `docs/roadmap/phase-5.md` (new E5.0 with S5.0.1/S5.0.2, "Kickoff refinements" on S5.1.1/S5.1.2/S5.1.4, starter-table notes).
+- **Branch:** this session's branch `claude/intelligent-meitner-9ne4e8` was at the Phase 2 exit commit; it was fast-forwarded (no commits of its own, nothing lost) onto `claude/clever-hopper-pbv7yr` at the Phase 4 exit commit `300bbc7`. Continue Phase 5 on `claude/intelligent-meitner-9ne4e8`.
+- **Environment:** cloud container, **no LLM gateway access**: the whole phase is built in mock mode (see kickoff §1). Fresh-container Postgres setup as in the archive (pgvector via apt, `initdb` in `/home/user/.pgdata`, extensions in `template1`). Baseline `make check` green: **594 backend / 311 web**.
+- **Key findings from the state check:** `users.is_agent`/`agent_id` already exist (0001); people listings deliberately exclude agents; only `decide_approval` guards against agents; **per-agent dollar caps would never trip while `MOMENTUM_LLM_PRICE_TABLE` is unset** (hence the token fallback, Q4); no workspace timezone, no snooze, no project settings column, no agent UI at all; `croniter` is only transitive.
+- **Next up:** check the J1 quick-entry flake (kickoff Q6), then **S5.1.1 Agent model and accounts**, on the product owner's go-ahead.
 
 ## Open questions
 | # | Question | Needed by | Status |
@@ -32,6 +33,7 @@
 | 2 | Office Azure constraints (region, networking, Entra app registration owner) | Phase 9 kickoff (ask during Phase 7) | open |
 | 3 | Target host project for plugging in (stack/auth) | Before Phase 8 | open (INTEGRATION_GUIDE.md covers all modes) |
 | 4 | Add an optional Cohere rerank step (rerank-v3.5 via the gateway) to S3.1.4 hybrid retrieval, off by default? (kickoff Q2) | S3.1.4 | **answered 2026-09-26: yes**, off by default |
+| 6 | Phase 5 kickoff Q1–Q7 (agent access, autonomy defaults, rollout, budgets, Pulse default time, carry-overs, Nudge snooze) | S5.1.1 | **answered 2026-09-28:** all recommendations accepted (see `phase-5-kickoff.md` §5) |
 | 5 | MCP server dropped. Keep personal API tokens (so internal scripts can call Momentum's API), or drop S7.1 entirely? | Phase 7 | open |
 
 ## Progress
@@ -79,7 +81,16 @@
 - [x] S4.1.1 Rule model and executor (2026-09-27) · [x] S4.1.2 Actions library (2026-09-27) · [x] S4.1.3 Rule builder UI and run history (2026-09-27) · [x] S4.1.4 NL → rule (2026-09-27) · [x] S4.1.5 AI step action (2026-09-27)
 - [x] S4.2.1 Form builder (+ public forms) (2026-09-27) · [x] S4.2.2 Conversational intake (2026-09-28) · [x] S4.3.1 Project templates (2026-09-28) · [x] S4.3.2 Task templates (2026-09-28) · [x] S4.3.3 Template from description (2026-09-28) · [x] S4.4.1 Approvals (2026-09-28) · [x] S4.4.2 Recurring tasks (2026-09-28) · [x] Phase 4 exit (2026-09-28)
 
-### Phases 5–9
+### Phase 5: Agents v1 ("Teammates")
+- [x] Kickoff (`docs/roadmap/phase-5-kickoff.md`, 2026-09-28)
+- [ ] S5.0.1 Inbox and bell live updates · [ ] S5.0.2 Public forms security review
+- [ ] S5.1.1 Agent model and accounts · [ ] S5.1.2 Runtime loop and triggers · [ ] S5.1.3 Runs UI · [ ] S5.1.4 Autonomy, budgets, kill switches
+- [ ] S5.2.1 Assign a task to an agent · [ ] S5.2.2 @mention an agent · [ ] S5.2.3 Agent gallery + create from description
+- [ ] S5.3.1 Pulse · [ ] S5.3.2 Sorter · [ ] S5.3.3 Herald · [ ] S5.3.4 Nudge · [ ] S5.3.5 Architect · [ ] S5.3.6 Scribe · [ ] S5.3.7 Radar · [ ] S5.3.8 Teammate
+- Build order (kickoff Q3): S5.0.1 before S5.1.3 · E5.1 → S5.2.1 + S5.3.8 (J10) → S5.2.2 → S5.2.3 → Pulse, Sorter (after S5.0.2), Herald, Nudge, Radar → Architect, Scribe
+- [ ] Phase 5 exit: J10 (mock); budget-cap test; runs page explains every action · deferred: `llm-check` + `EVALS_LIVE=1 make evals` (product owner's machine), dogfood week (post-ship)
+
+### Phases 6–9
 Tracked in their phase files; copy the slice list here at each phase kickoff.
 
 ## Plan changes log
@@ -104,6 +115,7 @@ Tracked in their phase files; copy the slice list here at each phase kickoff.
 | 2026-09-26 | Aliases: `fast`/`default`/`smart` all point at the same Sonnet 4 id for now; S3.1.4 gets optional Cohere rerank, off by default | Product-owner answers to kickoff Q1/Q2 |
 | 2026-09-26 | Phase 3 exit: eval scorer takes the asker's text (echoing it is not a leak); `clarifies` accepts a question in words; the judge sees proposed operations; three cases corrected | The first live run's failures were mostly harness/case faults, found by reading each failure (see phase-3.md "Phase 3 exit") |
 | 2026-09-26 | Phase 3 exit: `search_tasks.blocked`, `blocked_by` in task briefs, `from`/`to` for moved dates in project activity | Real gaps: Mo could not answer "which tasks are blocked" or "did anything slip" from list results |
+| 2026-09-28 | Phase 5 kickoff: new E5.0 (S5.0.1 inbox/bell live updates, S5.0.2 public forms security review) carried from Phase 4; kickoff refinements on S5.1.1/S5.1.2/S5.1.4 and the starter table (token-fallback budget, `agent_alert` kind, workspace timezone, explicit `croniter`, Sorter enabled via scope, Nudge snooze on `my_task_placements`); build order changed to put S5.3.8 with S5.2.1 (J10) | Product-owner answers to kickoff Q1–Q7; state check in `phase-5-kickoff.md` §2 |
 | 2026-09-24 | Phase 2 started without a human sign-off gate on Phase 1, at explicit product-owner instruction ("finish off Phase 2 as you have all the context", "do not ask any permission... just finish this whole phase at ur own pace") given while unavailable | Phase 1 exit criteria were already met and the product owner asked to proceed rather than wait; noted here per that same instruction to record decisions/blockers instead of stopping |
 
 ## Phase retros
