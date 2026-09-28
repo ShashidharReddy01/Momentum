@@ -1,0 +1,36 @@
+# Mock responses for S4.3.3 "template from description" (feature "template_from_brief").
+# Synthetic only.
+responses:
+  - match: {contains: "onboard a new hire"}
+    tool_calls:
+      - name: submit_result
+        arguments:
+          name: "New hire onboarding"
+          description: "Standard steps for a new team member's first two weeks."
+          sections:
+            - name: "Before day one"
+              tasks:
+                - title: "Order equipment"
+                  role: "IT"
+                  due_in_days: 0
+                - title: "Send welcome email"
+                  role: "Manager"
+                  due_in_days: 0
+            - name: "Week one"
+              tasks:
+                - title: "Set up accounts"
+                  role: "IT"
+                  due_in_days: 1
+                  subtasks: ["Email", "Chat", "VPN"]
+                - title: "Intro meetings"
+                  role: "Manager"
+                  due_in_days: 3
+  - match: {contains: "single step no details"}
+    tool_calls:
+      - name: submit_result
+        arguments:
+          name: "Minimal"
+          sections:
+            - name: "To do"
+              tasks:
+                - title: "Do the thing"

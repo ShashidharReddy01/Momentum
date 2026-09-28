@@ -6,7 +6,13 @@ import { Input } from '@/components/ui/Input';
 import { Segmented } from '@/components/ui/Tabs';
 import { usePeople } from '@/features/people';
 import { ColorPicker, useTeams } from '@/features/teams';
-import { useNewProjectFromTemplate, useTemplates, type RoleMapping } from '@/features/templates';
+import {
+  DraftTemplateFromBrief,
+  useNewProjectFromTemplate,
+  useTemplates,
+  type RoleMapping,
+} from '@/features/templates';
+import { useMomentumConfig } from '@/lib/config';
 import { useCreateProject } from './queries';
 
 function FromTemplateForm({
@@ -22,12 +28,19 @@ function FromTemplateForm({
 }) {
   const templates = useTemplates('project');
   const people = usePeople();
+  const aiEnabled = useMomentumConfig().ai_enabled;
   const [templateId, setTemplateId] = useState('');
   const [name, setName] = useState('');
   const [startDate, setStartDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [mapping, setMapping] = useState<Record<string, string>>({});
   const create = useNewProjectFromTemplate(templateId);
   const template = (templates.data ?? []).find((t) => t.id === templateId);
+
+  const selectTemplate = (id: string) => {
+    setTemplateId(id);
+    const t = templates.data?.find((x) => x.id === id);
+    if (t) setName(t.name);
+  };
 
   useEffect(() => {
     if (!templateId && templates.data && templates.data.length > 0) {
@@ -50,84 +63,83 @@ function FromTemplateForm({
   };
 
   if (templates.isPending) return <p className="p-5 text-sm text-muted">Loading templates…</p>;
-  if ((templates.data ?? []).length === 0) {
-    return (
-      <p className="p-5 text-sm text-muted">
-        No project templates yet — save one from a project's ⋯ menu first.
-      </p>
-    );
-  }
+  const hasTemplates = (templates.data ?? []).length > 0;
 
   return (
-    <form onSubmit={submit} className="flex flex-col gap-4 p-5">
-      <div className="flex flex-col gap-1.5 text-sm font-medium">
-        <label htmlFor="template-pick">Template</label>
-        <select
-          id="template-pick"
-          value={templateId}
-          onChange={(e) => {
-            setTemplateId(e.target.value);
-            const t = templates.data?.find((x) => x.id === e.target.value);
-            if (t) setName(t.name);
-          }}
-          className="h-8 rounded-md border border-hairline bg-surface-2 px-2 text-sm"
-        >
-          {(templates.data ?? []).map((t) => (
-            <option key={t.id} value={t.id}>
-              {t.name}
-            </option>
-          ))}
-        </select>
-      </div>
-      <div className="flex flex-col gap-1.5 text-sm font-medium">
-        <label htmlFor="template-project-name">Name</label>
-        <Input
-          id="template-project-name"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          maxLength={200}
-          required
-        />
-      </div>
-      <div className="flex flex-col gap-1.5 text-sm font-medium">
-        <label htmlFor="template-start-date">Start date</label>
-        <Input
-          id="template-start-date"
-          type="date"
-          value={startDate}
-          onChange={(e) => setStartDate(e.target.value)}
-          required
-        />
-      </div>
-      {(template?.payload.roles.length ?? 0) > 0 ? (
-        <div className="flex flex-col gap-1.5">
-          <span className="text-sm font-medium">Who's doing what</span>
-          {template!.payload.roles.map((role) => (
-            <label key={role.id} className="flex items-center gap-2 text-sm text-muted">
-              <span className="w-32 shrink-0 truncate text-ink">{role.label}</span>
-              <select
-                aria-label={`Assign ${role.label} to`}
-                value={mapping[role.id] ?? ''}
-                onChange={(e) => setMapping((m) => ({ ...m, [role.id]: e.target.value }))}
-                className="h-8 flex-1 rounded-md border border-hairline bg-surface-2 px-2 text-sm"
-              >
-                <option value="">Leave unassigned</option>
-                {(people.data ?? []).map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-          ))}
-        </div>
-      ) : null}
-      <div className="flex justify-end gap-2 pt-1">
-        <Button type="submit" variant="primary" loading={create.isPending} disabled={!name.trim()}>
-          Create project
-        </Button>
-      </div>
-    </form>
+    <div className="flex flex-col gap-3 p-5">
+      {aiEnabled ? <DraftTemplateFromBrief onSaved={selectTemplate} /> : null}
+      {!hasTemplates ? (
+        <p className="text-sm text-muted">
+          No project templates yet — save one from a project's ⋯ menu, or describe one above.
+        </p>
+      ) : (
+        <form onSubmit={submit} className="flex flex-col gap-4">
+          <div className="flex flex-col gap-1.5 text-sm font-medium">
+            <label htmlFor="template-pick">Template</label>
+            <select
+              id="template-pick"
+              value={templateId}
+              onChange={(e) => selectTemplate(e.target.value)}
+              className="h-8 rounded-md border border-hairline bg-surface-2 px-2 text-sm"
+            >
+              {(templates.data ?? []).map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="flex flex-col gap-1.5 text-sm font-medium">
+            <label htmlFor="template-project-name">Name</label>
+            <Input
+              id="template-project-name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              maxLength={200}
+              required
+            />
+          </div>
+          <div className="flex flex-col gap-1.5 text-sm font-medium">
+            <label htmlFor="template-start-date">Start date</label>
+            <Input
+              id="template-start-date"
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              required
+            />
+          </div>
+          {(template?.payload.roles.length ?? 0) > 0 ? (
+            <div className="flex flex-col gap-1.5">
+              <span className="text-sm font-medium">Who's doing what</span>
+              {template!.payload.roles.map((role) => (
+                <label key={role.id} className="flex items-center gap-2 text-sm text-muted">
+                  <span className="w-32 shrink-0 truncate text-ink">{role.label}</span>
+                  <select
+                    aria-label={`Assign ${role.label} to`}
+                    value={mapping[role.id] ?? ''}
+                    onChange={(e) => setMapping((m) => ({ ...m, [role.id]: e.target.value }))}
+                    className="h-8 flex-1 rounded-md border border-hairline bg-surface-2 px-2 text-sm"
+                  >
+                    <option value="">Leave unassigned</option>
+                    {(people.data ?? []).map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ))}
+            </div>
+          ) : null}
+          <div className="flex justify-end gap-2 pt-1">
+            <Button type="submit" variant="primary" loading={create.isPending} disabled={!name.trim()}>
+              Create project
+            </Button>
+          </div>
+        </form>
+      )}
+    </div>
   );
 }
 

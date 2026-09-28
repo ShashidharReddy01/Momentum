@@ -207,6 +207,7 @@ Workspace memory:
 | Project from brief | `POST /ai/projects/from-brief` | smart | 3 |
 | NL → rule | `POST /ai/rules/compile` | default | 4 |
 | Conversational intake | `POST /forms/{id}/converse` + `.../submit` (also `/public/forms/{token}/converse[/submit]`) | fast | 4 |
+| Template from description | `POST /ai/templates/from-brief` + `.../from-brief/save` | smart | 4 |
 | Agents | worker | per agent | 5 |
 | Ask for a chart | `POST /ai/dashboards/query` | default | 6 |
 | Risk explanation / rebalancing | worker + endpoints | default | 6 |

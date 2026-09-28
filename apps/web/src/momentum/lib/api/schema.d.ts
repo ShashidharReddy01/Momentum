@@ -365,6 +365,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/ai/templates/from-brief": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Draft a template from a description */
+        post: operations["from_brief_api_v1_ai_templates_from_brief_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ai/templates/from-brief/save": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Save a (possibly edited) drafted template */
+        post: operations["save_from_brief_api_v1_ai_templates_from_brief_save_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/ai/write": {
         parameters: {
             query?: never;
@@ -2498,6 +2532,11 @@ export interface components {
             /** Notes */
             notes: string[];
         };
+        /** BriefIn */
+        BriefIn: {
+            /** Brief */
+            brief: string;
+        };
         /** ChatIn */
         ChatIn: {
             /** Conversation Id */
@@ -2781,6 +2820,28 @@ export interface components {
             label: string;
             /** Verb */
             verb: string;
+        };
+        /** DraftSection */
+        DraftSection: {
+            /** Name */
+            name: string;
+            /** Tasks */
+            tasks?: components["schemas"]["DraftTask"][];
+        };
+        /** DraftTask */
+        DraftTask: {
+            /** Description */
+            description?: string | null;
+            /** Due In Days */
+            due_in_days?: number | null;
+            /** Priority */
+            priority?: ("urgent" | "high" | "medium" | "low") | null;
+            /** Role */
+            role?: string | null;
+            /** Subtasks */
+            subtasks?: string[];
+            /** Title */
+            title: string;
         };
         /**
          * EffectiveAi
@@ -4542,6 +4603,14 @@ export interface components {
             /** Conditions Passed */
             conditions_passed: boolean;
         };
+        /** SaveDraftIn */
+        SaveDraftIn: {
+            /** Description */
+            description?: string | null;
+            draft: components["schemas"]["TemplateDraft"];
+            /** Name */
+            name: string;
+        };
         /** SaveProjectTemplateIn */
         SaveProjectTemplateIn: {
             /** Description */
@@ -5366,6 +5435,15 @@ export interface components {
             description?: string | null;
             /** Name */
             name?: string | null;
+        };
+        /** TemplateDraft */
+        TemplateDraft: {
+            /** Description */
+            description?: string | null;
+            /** Name */
+            name: string;
+            /** Sections */
+            sections: components["schemas"]["DraftSection"][];
         };
         /** TemplateOut */
         TemplateOut: {
@@ -6343,6 +6421,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["BreakdownOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    from_brief_api_v1_ai_templates_from_brief_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BriefIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TemplateDraft"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_from_brief_api_v1_ai_templates_from_brief_save_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SaveDraftIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationOut_TemplateOut_"];
                 };
             };
             /** @description Validation Error */

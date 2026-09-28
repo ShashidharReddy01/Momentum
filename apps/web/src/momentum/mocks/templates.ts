@@ -83,6 +83,30 @@ export function templateHandlers(base = '') {
       if (i >= 0) templates.splice(i, 1);
       return HttpResponse.json({ ok: true });
     }),
+    http.post(`*${base}/api/v1/ai/templates/from-brief`, async ({ request }) => {
+      const b = (await request.json()) as { brief: string };
+      return HttpResponse.json({
+        name: 'Drafted process',
+        description: `Drafted from: ${b.brief}`,
+        sections: [{ name: 'Step one', tasks: [{ title: 'Do the first thing', subtasks: [] }] }],
+      });
+    }),
+    http.post(`*${base}/api/v1/ai/templates/from-brief/save`, async ({ request }) => {
+      const b = (await request.json()) as { name: string; description?: string | null };
+      const t: T = {
+        id: `tpl-${++n}`,
+        project_id: null,
+        kind: 'project',
+        name: b.name,
+        description: b.description ?? null,
+        payload: { roles: [], fields: [], sections: [], rules: [] },
+        created_by: 'user-1',
+        created_at: now,
+        updated_at: now,
+      };
+      templates.push(t);
+      return HttpResponse.json({ data: t, meta: { activity_id: null, batch_id: null, version: 1 } });
+    }),
     http.post(`*${base}/api/v1/templates/:id/new-task`, ({ params }) => {
       const t = templates.find((x) => x.id === params.id);
       const payload = (t?.payload ?? {}) as { title?: string };

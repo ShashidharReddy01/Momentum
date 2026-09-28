@@ -101,6 +101,45 @@ export function useDeleteTemplate(kind: 'project' | 'task' = 'project', projectI
   });
 }
 
+// ---------------- S4.3.3 template from description (AI) ----------------
+
+export interface DraftTask {
+  title: string;
+  description?: string | null;
+  priority?: 'urgent' | 'high' | 'medium' | 'low' | null;
+  due_in_days?: number | null;
+  role?: string | null;
+  subtasks: string[];
+}
+export interface DraftSection {
+  name: string;
+  tasks: DraftTask[];
+}
+export interface TemplateDraft {
+  name: string;
+  description?: string | null;
+  sections: DraftSection[];
+}
+
+export function useDraftTemplateFromBrief() {
+  const api = useApi();
+  return useMutation({
+    mutationFn: async (brief: string) =>
+      (await api.POST('/api/v1/ai/templates/from-brief', { body: { brief } })).data! as TemplateDraft,
+  });
+}
+
+export function useSaveTemplateFromBrief() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (body: { name: string; description?: string | null; draft: TemplateDraft }) =>
+      (await api.POST('/api/v1/ai/templates/from-brief/save', { body })).data!,
+    onError: (e) => toastError(e, "Couldn't save this template"),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: templateKeys.byKind('project') }),
+  });
+}
+
 export interface RoleMapping {
   role_id: string;
   user_id: string | null;

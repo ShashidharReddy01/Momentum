@@ -34,6 +34,7 @@ def _api_router(settings: Settings) -> APIRouter:
     from momentum.ai.forms_intake_router import public_router as forms_intake_public_router
     from momentum.ai.forms_intake_router import router as forms_intake_router
     from momentum.ai.router import router as ai_router
+    from momentum.ai.templates_router import router as ai_templates_router
     from momentum.api.undo import router as undo_router
     from momentum.domain.attachments.router import router as attachments_router
     from momentum.domain.comments.router import router as comments_router
@@ -85,6 +86,7 @@ def _api_router(settings: Settings) -> APIRouter:
     api.include_router(asana_router)
     api.include_router(undo_router)
     api.include_router(ai_router)
+    api.include_router(ai_templates_router)
     if settings.is_dev_auth:
         api.include_router(dev_router)
     return api

@@ -6,7 +6,7 @@
 
 ## Current focus
 - **Phase:** 3: AI Layer v1 ("Mo") — **complete; exit criteria met** (2026-09-27; see the Phase 3 retro and `docs/roadmap/phase-3.md` "Phase 3 exit"). Awaiting the product owner's sign-off. Kickoff done (`docs/roadmap/phase-3-kickoff.md`); S3.1.1–S3.5.2 done. Phase 2 is complete.
-- **Next up:** **Phase 4, S4.3.3 Template from description (AI) (Sonnet)** (S4.1.1-S4.3.2 done). **Standing instruction (product owner, 2026-09-28): finish the rest of Phase 4 in one continuous session** — proceeding slice by slice without stopping to ask, per `docs/process/slice-session.md`, committing and pushing after each.
+- **Next up:** **Phase 4, S4.4.1 Approvals (Sonnet)** (S4.1.1-S4.3.3 done). **Standing instruction (product owner, 2026-09-28): finish the rest of Phase 4 in one continuous session** — proceeding slice by slice without stopping to ask, per `docs/process/slice-session.md`, committing and pushing after each.
 - **Product-owner instruction (2026-09-26):** finish all remaining slices, then one big local test run against the real gateway (100+ questions/actions covering edge cases), then fix from that run.
 - **Scope note (product owner, 2026-09-26):** the customer-operations capabilities (SQQ, pricing, contracts, invoices, pushes to internal systems as tools and assignable agents) will be done later in the product owner's own codebase, **not in this repo**. Finish the roadmap as written.
 - **Branch:** all Phase 3 work is on `claude/clever-hopper-pbv7yr` (ahead of `main`). Continue from that branch.
@@ -18,11 +18,10 @@
 - **Blockers:** none
 - **Deferred across the rest of Phase 4 (revisit before/at exit):** a security review pass of S4.2.1's public form endpoint (member-name exposure on assignee questions, no `X-Forwarded-For` handling); wiring `conversational_intake` into the `momentum/ai/evals/` harness (its `EvalWorld` has no notion of a form and the harness models one-shot input → output, not a stateless multi-turn feature — a bigger investment than S4.2.2's slice budget); a real per-turn spam counter for conversational intake (currently reuses the submission rate limiter as a coarse guard).
 
-## Handoff notes (latest session: 2026-09-28, S4.3.2 Task templates)
-- **Shipped:** reuses S4.3.1's `templates` table (`kind="task"`, `project_id` set — no new migration). Unlike a project template, a task template is **authored directly**: `POST /templates/from-task` takes `{project_id, name, title, description, subtasks, field_values}`; `POST /templates/{id}/new-task` replays it through `create_task`/`update_task`/`set_task_field_value`/`create_subtask` with an optional title override, section and assignee/due date. `GET /templates?kind=task&project_id=` scopes the list. Permissions: **editor** (not admin — matches ordinary task creation) to save/delete their own; a project admin can also delete someone else's. Frontend: `TaskTemplatesDialog` (project ⋯ → Task templates) — list + inline "New task template" form + expandable "create a task" row per template. Details in `docs/roadmap/phase-4.md` S4.3.2 "Built".
-- **Scope cut:** the roadmap's "+ Add task ▾ from template" inline dropdown in the task list wasn't built — that list is a heavily-tested, high-regression-risk surface, so a standalone dialog was used instead. The save-template form also has no field-value editor yet (API supports it; empty by default from the UI).
-- **Verification:** backend **561/561** green (ruff, mypy strict, import-linter, pytest, 3 chunks). Web: prettier/tsc/eslint green, vitest **308/308** (60 files, 3 shards).
-- **Deferred:** the inline list-row entry point; a field-value editor in the save-template form; title "patterns" (placeholders) — title is a plain editable default string.
+## Handoff notes (latest session: 2026-09-28, S4.3.3 Template from description (AI))
+- **Shipped:** `momentum/ai/template_from_brief.py` (`draft_template()`, alias `smart`) + `momentum/ai/templates_router.py`: `POST /ai/templates/from-brief` drafts a structured `TemplateDraft` (sections of tasks, optional priority/due-in-days/role label/subtasks) via `momentum.ai.structured.extract()`; `POST /ai/templates/from-brief/save` converts it into the exact same `{roles, fields: [], sections, rules: []}` payload S4.3.1 saves, through a new `templates.service.save_template_payload()` — an AI-drafted template is indistinguishable from a hand-saved one afterward. Reuses S4.3.1's role-**placeholder** design directly: since a project template's payload already stores `role_id`s instead of real people, the model can invent role labels with zero database lookups — no name-resolution step like S3.4.6/S4.1.4 needed. Frontend: `DraftTemplateFromBrief` (brief input + "Draft it") inside `NewProjectDialog`'s "From template" tab, gated on `ai_enabled`; amber preview with Discard/Save, saving selects the template immediately. Details in `docs/roadmap/phase-4.md` S4.3.3 "Built".
+- **Verification:** backend **564/564** green (ruff, mypy strict, import-linter, pytest, 3 chunks). Web: prettier/tsc/eslint green, vitest **309/309** (61 files, 3 shards).
+- **Deferred:** not wired into `momentum/ai/evals/` (same call as S4.2.2 — mirrors "Deferred across the rest of Phase 4" below); no live-gateway run yet; the draft never proposes fields or rules, only sections/tasks/roles.
 
 ## Open questions
 | # | Question | Needed by | Status |
@@ -76,7 +75,7 @@
 
 ### Phase 4: Workflow and Intake
 - [x] S4.1.1 Rule model and executor (2026-09-27) · [x] S4.1.2 Actions library (2026-09-27) · [x] S4.1.3 Rule builder UI and run history (2026-09-27) · [x] S4.1.4 NL → rule (2026-09-27) · [x] S4.1.5 AI step action (2026-09-27)
-- [x] S4.2.1 Form builder (+ public forms) (2026-09-27) · [x] S4.2.2 Conversational intake (2026-09-28) · [x] S4.3.1 Project templates (2026-09-28) · [x] S4.3.2 Task templates (2026-09-28) · [ ] S4.3.3 Template from description · [ ] S4.4.1 Approvals · [ ] S4.4.2 Recurring tasks · [ ] Phase 4 exit
+- [x] S4.2.1 Form builder (+ public forms) (2026-09-27) · [x] S4.2.2 Conversational intake (2026-09-28) · [x] S4.3.1 Project templates (2026-09-28) · [x] S4.3.2 Task templates (2026-09-28) · [x] S4.3.3 Template from description (2026-09-28) · [ ] S4.4.1 Approvals · [ ] S4.4.2 Recurring tasks · [ ] Phase 4 exit
 
 ### Phases 5–9
 Tracked in their phase files; copy the slice list here at each phase kickoff.

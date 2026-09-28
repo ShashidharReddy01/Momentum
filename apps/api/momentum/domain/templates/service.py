@@ -25,6 +25,7 @@ from momentum.core.context import Ctx
 from momentum.core.errors import DomainError, Forbidden, NotFound, ValidationFailed
 from momentum.core.events import emit
 from momentum.core.mutation import Mutation
+from momentum.core.permissions import Action, can
 from momentum.domain.access import get_visible_project, require_project_role
 from momentum.domain.fields.models import FieldDef
 from momentum.domain.fields.service import (
@@ -288,6 +289,50 @@ async def save_project_template(
         kind="project",
         name=data.name,
         description=data.description,
+        payload=payload,
+        created_by=ctx.actor.id,
+    )
+    session.add(template)
+    await session.flush()
+    act = await record_activity(
+        session,
+        ctx,
+        entity_type="template",
+        entity_id=template.id,
+        verb="template.created",
+        changes={"name": (None, template.name)},
+    )
+    await emit(
+        session,
+        ctx,
+        type="template.created",
+        entity_type="template",
+        entity_id=template.id,
+        data={"kind": "project"},
+        channels=[f"workspace:{ctx.workspace_id}"],
+        activity_id=act.id,
+    )
+    return Mutation(template, act.id, version=1)
+
+
+async def save_template_payload(
+    session: AsyncSession, ctx: Ctx, name: str, description: str | None, payload: dict[str, Any]
+) -> Mutation[Template]:
+    """S4.3.3: persist an already-built project-template payload (from
+    ``ai.template_from_brief.to_payload``) directly — there's no source project to walk, so this
+    skips straight to the same row `save_project_template` ends with. Same bar as creating a
+    project (`Action.PROJECT_CREATE`): a template only ever produces a new project, never touches
+    an existing one, so anyone who could create a project by hand can save one as a shortcut."""
+    if ctx.actor.id is None:
+        raise Forbidden("Templates need a person to act as")
+    if not can(ctx, Action.PROJECT_CREATE):
+        raise Forbidden("You don't have permission to create projects, so not templates either")
+    template = Template(
+        workspace_id=ctx.workspace_id,
+        project_id=None,
+        kind="project",
+        name=name,
+        description=description,
         payload=payload,
         created_by=ctx.actor.id,
     )
