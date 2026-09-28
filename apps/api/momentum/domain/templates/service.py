@@ -44,7 +44,12 @@ from momentum.domain.sections.service import create_section, rename_section
 from momentum.domain.tasks.models import Task, TaskProject
 from momentum.domain.tasks.service import create_subtask, create_task, update_task
 from momentum.domain.templates.models import Template
-from momentum.domain.templates.schemas import NewProjectFromTemplateIn, SaveProjectTemplateIn
+from momentum.domain.templates.schemas import (
+    NewProjectFromTemplateIn,
+    NewTaskFromTemplateIn,
+    SaveProjectTemplateIn,
+    SaveTaskTemplateIn,
+)
 from momentum.domain.users.models import User
 
 
@@ -59,19 +64,22 @@ async def _load(session: AsyncSession, ctx: Ctx, template_id: uuid.UUID) -> Temp
     return t
 
 
-async def list_templates(session: AsyncSession, ctx: Ctx, kind: str) -> list[Template]:
-    """Any workspace member can browse templates — they're a starting point for a new project,
-    not sensitive data of their own (the project they were built from stays under its own
-    permissions)."""
-    rows = await session.execute(
-        select(Template)
-        .where(
-            Template.workspace_id == ctx.workspace_id,
-            Template.kind == kind,
-            Template.deleted_at.is_(None),
-        )
-        .order_by(Template.name)
+async def list_templates(
+    session: AsyncSession, ctx: Ctx, kind: str, project_id: uuid.UUID | None = None
+) -> list[Template]:
+    """Any workspace member can browse project templates — they're a starting point for a new
+    project, not sensitive data of their own (the project they were built from stays under its
+    own permissions). Task templates are scoped to one project (S4.3.2: "per-project"), so
+    ``project_id`` filters those down to what that project's own viewers should see."""
+    stmt = select(Template).where(
+        Template.workspace_id == ctx.workspace_id,
+        Template.kind == kind,
+        Template.deleted_at.is_(None),
     )
+    if project_id is not None:
+        await get_visible_project(session, ctx, project_id)
+        stmt = stmt.where(Template.project_id == project_id)
+    rows = await session.execute(stmt.order_by(Template.name))
     return list(rows.scalars())
 
 
@@ -81,8 +89,14 @@ async def get_template(session: AsyncSession, ctx: Ctx, template_id: uuid.UUID) 
 
 async def delete_template(session: AsyncSession, ctx: Ctx, template_id: uuid.UUID) -> None:
     t = await _load(session, ctx, template_id)
-    if t.created_by != ctx.actor.id and not ctx.actor.is_admin:
-        raise Forbidden("Only the template's creator or a workspace admin can delete it")
+    allowed = t.created_by == ctx.actor.id
+    if not allowed and t.kind == "task" and t.project_id is not None:
+        _, role = await get_visible_project(session, ctx, t.project_id)
+        allowed = role == "admin"
+    elif not allowed:
+        allowed = ctx.actor.is_admin
+    if not allowed:
+        raise Forbidden("Only the template's creator or an admin can delete it")
     t.deleted_at = datetime.now(UTC)
     await session.flush()
 
@@ -472,4 +486,99 @@ async def create_project_from_template(
             # A reference this rule needs no longer resolves; skip it, not the whole template.
             continue
 
+    return m
+
+
+# ---------------- task templates (S4.3.2) ----------------
+
+
+def _text_doc(text: str) -> dict[str, Any]:
+    lines = [" ".join(line.split()) for line in text.splitlines()]
+    return {
+        "type": "doc",
+        "content": [
+            {"type": "paragraph", "content": [{"type": "text", "text": line}]}
+            for line in lines
+            if line
+        ],
+    }
+
+
+async def save_task_template(
+    session: AsyncSession, ctx: Ctx, data: SaveTaskTemplateIn
+) -> Mutation[Template]:
+    if ctx.actor.id is None:
+        raise Forbidden("Templates need a person to act as")
+    _, role = await get_visible_project(session, ctx, data.project_id)
+    require_project_role(role, "editor", "save a task template")
+    payload = {
+        "title": data.title,
+        "description": data.description,
+        "subtasks": list(data.subtasks),
+        "field_values": dict(data.field_values),
+    }
+    template = Template(
+        workspace_id=ctx.workspace_id,
+        project_id=data.project_id,
+        kind="task",
+        name=data.name,
+        description=None,
+        payload=payload,
+        created_by=ctx.actor.id,
+    )
+    session.add(template)
+    await session.flush()
+    act = await record_activity(
+        session,
+        ctx,
+        entity_type="template",
+        entity_id=template.id,
+        verb="template.created",
+        changes={"name": (None, template.name)},
+    )
+    await emit(
+        session,
+        ctx,
+        type="template.created",
+        entity_type="template",
+        entity_id=template.id,
+        data={"kind": "task", "project_id": str(data.project_id)},
+        channels=_channels(data.project_id),
+        activity_id=act.id,
+    )
+    return Mutation(template, act.id, version=1)
+
+
+async def create_task_from_template(
+    session: AsyncSession, ctx: Ctx, template_id: uuid.UUID, data: NewTaskFromTemplateIn
+) -> Mutation[tuple[Task, TaskProject]]:
+    template = await get_template(session, ctx, template_id)
+    if template.kind != "task" or template.project_id is None:
+        raise ValidationFailed("That isn't a task template")
+    payload = template.payload
+    title = (data.title or payload["title"])[:500]
+
+    m = await create_task(
+        session,
+        ctx,
+        template.project_id,
+        title,
+        section_id=data.section_id,
+        assignee_id=data.assignee_id,
+        due_on=data.due_on,
+    )
+    task = m.entity[0]
+    if payload.get("description"):
+        await update_task(session, ctx, task.id, {"description": _text_doc(payload["description"])})
+    for field_id_str, value in (payload.get("field_values") or {}).items():
+        field = await session.get(FieldDef, uuid.UUID(field_id_str))
+        if field is None or field.deleted_at is not None or value is None:
+            continue
+        try:
+            clean = validate_value(field, value)
+        except ValidationFailed:
+            continue
+        await set_task_field_value(session, ctx, task.id, field.id, clean)
+    for subtask_title in payload.get("subtasks") or []:
+        await create_subtask(session, ctx, task.id, subtask_title)
     return m

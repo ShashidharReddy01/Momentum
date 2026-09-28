@@ -2043,7 +2043,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Templates (`?kind=`) */
+        /** Templates (`?kind=`, `?project_id=`) */
         get: operations["list_templates_api_v1_templates_get"];
         put?: never;
         post?: never;
@@ -2064,6 +2064,23 @@ export interface paths {
         put?: never;
         /** Save a project as a reusable template (project admins) */
         post: operations["save_project_template_api_v1_templates_from_project_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/templates/from-task": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Save a task template (project editors) */
+        post: operations["save_task_template_api_v1_templates_from_task_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2099,6 +2116,23 @@ export interface paths {
         put?: never;
         /** Create a new project from a template */
         post: operations["new_project_from_template_api_v1_templates__template_id__new_project_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/templates/{template_id}/new-task": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create a task from a task template */
+        post: operations["new_task_from_template_api_v1_templates__template_id__new_task_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3710,6 +3744,17 @@ export interface components {
             /** Name */
             name: string;
         };
+        /** NewTaskFromTemplateIn */
+        NewTaskFromTemplateIn: {
+            /** Assignee Id */
+            assignee_id?: string | null;
+            /** Due On */
+            due_on?: string | null;
+            /** Section Id */
+            section_id?: string | null;
+            /** Title */
+            title?: string | null;
+        };
         /** NotificationOut */
         NotificationOut: {
             /** Activity Id */
@@ -4508,6 +4553,26 @@ export interface components {
              * Format: uuid
              */
             project_id: string;
+        };
+        /** SaveTaskTemplateIn */
+        SaveTaskTemplateIn: {
+            /** Description */
+            description?: string | null;
+            /** Field Values */
+            field_values?: {
+                [key: string]: unknown;
+            };
+            /** Name */
+            name: string;
+            /**
+             * Project Id
+             * Format: uuid
+             */
+            project_id: string;
+            /** Subtasks */
+            subtasks?: string[];
+            /** Title */
+            title: string;
         };
         /** ScreenIn */
         ScreenIn: {
@@ -10507,6 +10572,7 @@ export interface operations {
         parameters: {
             query?: {
                 kind?: string;
+                project_id?: string | null;
             };
             header?: never;
             path?: never;
@@ -10544,6 +10610,39 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["SaveProjectTemplateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationOut_TemplateOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_task_template_api_v1_templates_from_task_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SaveTaskTemplateIn"];
             };
         };
         responses: {
@@ -10651,6 +10750,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MutationOut_NewProjectOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    new_task_from_template_api_v1_templates__template_id__new_task_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                template_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewTaskFromTemplateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationOut_TaskOut_"];
                 };
             };
             /** @description Validation Error */

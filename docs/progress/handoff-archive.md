@@ -2,6 +2,13 @@
 
 > Moved out of `STATUS.md` (2026-09-27) to keep it small: every AI session reads STATUS in full. Newest first. Nothing here is current instruction; the code and the docs are.
 
+## Handoff notes (2026-09-28, S4.3.1 Project templates)
+- **Shipped:** migration 0026 (`templates`, shared with S4.3.2's task templates via `kind`), `domain/templates/`. API: `GET /templates?kind=`, `POST /templates/from-project`, `GET/DELETE /templates/{id}`, `POST /templates/{id}/new-project`. "Save as template" walks sections and top-level tasks (recursing into subtasks), replacing each assignee with a `role_id` and computing date offsets relative to the earliest date among the project's own tasks; captures fields and rules (translating `to_section`/`user_id` to `section_index`/`role_id`). "New from template" creates a plain project and replays everything through the ordinary services with a chosen start date and role→person mapping. Permissions: saving needs project admin; any workspace member can browse/instantiate; deleting needs the creator or a workspace admin. Frontend: `SaveAsTemplateDialog`; `NewProjectDialog` gained a "Blank"/"From template" toggle.
+- **Mutation checks (2, all killed):** dropped the admin-only check on save; recreated a rule's `user_id` unchanged instead of resolving it through role mapping.
+- **Verification:** backend 558/558, web 307/307.
+- **Gotcha:** `ProjectDetailOut.members` only lists explicit `ProjectMember` rows, not team-only visibility — use `/api/v1/dev/users` in tests instead.
+- **Deferred:** editing a saved template; nested subtask depth beyond one level untested; role-mapping UI is a plain `<select>`.
+
 ## Handoff notes (2026-09-28, S4.2.2 Conversational intake)
 - **Shipped:** migration 0025 (`forms.conversational`). `momentum/ai/conversational_intake.py` (`converse()`, `fast`, temperature 0.3) + `momentum/ai/forms_intake_router.py` (its own module — domain must not import AI): `POST /forms/{id}/converse` + `.../converse/submit`, and public equivalents. **Stateless**: each turn resends the whole transcript + the form's question reference; the model keeps a cumulative `answers`, `done` once every required, currently-shown question has a good answer. Submitting reuses `service.submit_form` unchanged, then attaches the transcript as a comment. Frontend: `ConversationalFiller` (chat UI) shared by `PublicFormPage`/`FormFillPage`. Details in `docs/roadmap/phase-4.md` S4.2.2 "Built".
 - **Real bug fixed in passing:** the internal submit endpoint used `service.get_form` (editor-gated) instead of a viewer-level check. Added `get_form_to_submit` (viewer floor).

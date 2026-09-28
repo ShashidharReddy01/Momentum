@@ -1,9 +1,11 @@
-"""S4.3.1/S4.3.2: templates. A project template's payload captures sections, tasks (and their
+"""S4.3.1/S4.3.2: templates. A **project** template's payload captures sections, tasks (and their
 subtasks) with dates relative to a chosen start date, assignees replaced by "roles" (so the
-template doesn't depend on specific people), the fields it used, and its rules. Nothing here is
-free-form JSON from the caller: the payload is always built server-side from a real project by
-``service.save_project_template`` and only ever replayed by ``service.create_project_from_template``
-— the schemas below are the API's read/write shapes around that, not a payload the client sends."""
+template doesn't depend on specific people), the fields it used, and its rules — built server-side
+from a real project by ``service.save_project_template``, never free-form JSON from the caller.
+
+A **task** template is authored directly (title, description, a subtask checklist, field values)
+rather than captured from an existing task — there's no project-worth of structure to walk, so
+``SaveTaskTemplateIn`` is close to the stored payload shape itself."""
 
 from __future__ import annotations
 
@@ -63,3 +65,26 @@ class TemplateOut(BaseModel):
     created_by: uuid.UUID
     created_at: datetime
     updated_at: datetime
+
+
+# ---------------- S4.3.2 task templates ----------------
+
+MAX_SUBTASKS = 20
+
+
+class SaveTaskTemplateIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    project_id: uuid.UUID
+    name: Name
+    title: Name
+    description: Description | None = None
+    subtasks: list[Name] = Field(default_factory=list, max_length=MAX_SUBTASKS)
+    field_values: dict[str, Any] = Field(default_factory=dict, max_length=50)
+
+
+class NewTaskFromTemplateIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    section_id: uuid.UUID | None = None
+    title: Name | None = None
+    assignee_id: uuid.UUID | None = None
+    due_on: date | None = None

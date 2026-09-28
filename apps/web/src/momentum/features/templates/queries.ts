@@ -14,6 +14,7 @@ export type TemplateOut = Omit<components['schemas']['TemplateOut'], 'payload'> 
 
 export const templateKeys = {
   byKind: (kind: 'project' | 'task') => ['templates', kind] as const,
+  byProject: (projectId: string) => ['templates', 'task', projectId] as const,
 };
 
 export function useTemplates(kind: 'project' | 'task', enabled = true) {
@@ -24,6 +25,56 @@ export function useTemplates(kind: 'project' | 'task', enabled = true) {
     queryFn: async () =>
       (await api.GET('/api/v1/templates', { params: { query: { kind } } })).data!
         .data as unknown as TemplateOut[],
+  });
+}
+
+/** S4.3.2: a project's own task templates. */
+export function useTaskTemplates(projectId: string, enabled = true) {
+  const api = useApi();
+  return useQuery({
+    queryKey: templateKeys.byProject(projectId),
+    enabled: enabled && !!projectId,
+    queryFn: async () =>
+      (
+        await api.GET('/api/v1/templates', {
+          params: { query: { kind: 'task', project_id: projectId } },
+        })
+      ).data!.data as unknown as TemplateOut[],
+  });
+}
+
+export function useSaveTaskTemplate(projectId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (body: {
+      name: string;
+      title: string;
+      description?: string | null;
+      subtasks: string[];
+      field_values: Record<string, unknown>;
+    }) => (await api.POST('/api/v1/templates/from-task', { body: { ...body, project_id: projectId } })).data!,
+    onError: (e) => toastError(e, "Couldn't save this task template"),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: templateKeys.byProject(projectId) }),
+  });
+}
+
+export function useNewTaskFromTemplate(templateId: string) {
+  const api = useApi();
+  return useMutation({
+    mutationFn: async (body: {
+      section_id?: string | null;
+      title?: string | null;
+      assignee_id?: string | null;
+      due_on?: string | null;
+    }) =>
+      (
+        await api.POST('/api/v1/templates/{template_id}/new-task', {
+          params: { path: { template_id: templateId } },
+          body,
+        })
+      ).data!,
+    onError: (e) => toastError(e, "Couldn't create a task from this template"),
   });
 }
 
@@ -38,14 +89,15 @@ export function useSaveProjectTemplate() {
   });
 }
 
-export function useDeleteTemplate(kind: 'project' | 'task' = 'project') {
+export function useDeleteTemplate(kind: 'project' | 'task' = 'project', projectId?: string) {
   const api = useApi();
   const qc = useQueryClient();
+  const key = kind === 'task' && projectId ? templateKeys.byProject(projectId) : templateKeys.byKind(kind);
   return useMutation({
     mutationFn: async (id: string) =>
       await api.DELETE('/api/v1/templates/{template_id}', { params: { path: { template_id: id } } }),
     onError: (e) => toastError(e, "Couldn't delete the template"),
-    onSuccess: () => void qc.invalidateQueries({ queryKey: templateKeys.byKind(kind) }),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: key }),
   });
 }
 

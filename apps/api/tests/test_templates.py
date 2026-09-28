@@ -170,3 +170,76 @@ async def test_anyone_can_list_and_a_creator_or_admin_can_delete(as_user: Client
     assert any(t["id"] == template_id for t in listed.json()["data"])
     assert (await mei.delete(f"/api/v1/templates/{template_id}")).status_code == 403
     assert (await admin.delete(f"/api/v1/templates/{template_id}")).status_code == 200
+
+
+# ---------------- S4.3.2 task templates ----------------
+
+
+async def test_save_and_apply_a_task_template(as_user: Clients) -> None:
+    ravi = await as_user("ravi")
+    pid = await _project(ravi)
+    sections = await _sections(ravi, pid)
+    field = await ravi.post(
+        f"/api/v1/projects/{pid}/fields", json={"name": "Severity", "type": "text"}
+    )
+    field_id = field.json()["data"]["id"]
+
+    saved = await ravi.post(
+        "/api/v1/templates/from-task",
+        json={
+            "project_id": pid,
+            "name": "Bug report",
+            "title": "Bug: ",
+            "description": "Steps to reproduce:",
+            "subtasks": ["Reproduce", "Fix", "Verify"],
+            "field_values": {field_id: "Unknown"},
+        },
+    )
+    assert saved.status_code == 201, saved.text
+    template = saved.json()["data"]
+    assert template["kind"] == "task" and template["project_id"] == pid
+
+    made = await ravi.post(
+        f"/api/v1/templates/{template['id']}/new-task",
+        json={"section_id": sections["Backlog"], "title": "Bug: checkout crashes"},
+    )
+    assert made.status_code == 201, made.text
+    task = made.json()["data"]
+    assert task["title"] == "Bug: checkout crashes"
+
+    field_values = await ravi.get(f"/api/v1/tasks/{task['id']}/fields")
+    assert field_values.json()["data"] == [{"field_id": field_id, "value": "Unknown"}]
+    subtasks = await ravi.get(f"/api/v1/tasks/{task['id']}/subtasks")
+    assert [t["title"] for t in subtasks.json()["data"]] == ["Reproduce", "Fix", "Verify"]
+
+
+async def test_task_templates_are_scoped_to_their_project(as_user: Clients) -> None:
+    ravi = await as_user("ravi")
+    pid = await _project(ravi)
+    team = await _team_id(ravi, "Product")
+    other = await ravi.post("/api/v1/projects", json={"team_id": team, "name": "A second project"})
+    other_pid = other.json()["data"]["id"]
+    saved = await ravi.post(
+        "/api/v1/templates/from-task",
+        json={"project_id": pid, "name": "Only here", "title": "Task"},
+    )
+    template_id = saved.json()["data"]["id"]
+    same = await ravi.get(f"/api/v1/templates?kind=task&project_id={pid}")
+    assert any(t["id"] == template_id for t in same.json()["data"])
+    other_listing = await ravi.get(f"/api/v1/templates?kind=task&project_id={other_pid}")
+    assert not any(t["id"] == template_id for t in other_listing.json()["data"])
+
+
+async def test_an_editor_can_save_and_delete_their_own_task_template(as_user: Clients) -> None:
+    """Task templates need only editor (not admin, unlike project templates) — mei is an editor
+    on this project via her team."""
+    ravi, mei = await as_user("ravi"), await as_user("mei")
+    pid = await _project(ravi)
+    r = await mei.post(
+        "/api/v1/templates/from-task",
+        json={"project_id": pid, "name": "Mei's template", "title": "Task"},
+    )
+    assert r.status_code == 201, r.text
+
+    template_id = r.json()["data"]["id"]
+    assert (await mei.delete(f"/api/v1/templates/{template_id}")).status_code == 200
