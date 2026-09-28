@@ -91,6 +91,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/agents/{agent_id}/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Run an agent now, on a task or project you can see; it starts within a minute */
+        post: operations["run_agent_api_v1_agents__agent_id__run_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/ai/actions/{action_id}": {
         parameters: {
             query?: never;
@@ -2345,6 +2362,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/workspace/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Workspace settings */
+        get: operations["get_settings_api_v1_workspace_settings_get"];
+        /** Change workspace settings: the timezone agent schedules use (admins) */
+        put: operations["put_settings_api_v1_workspace_settings_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/healthz": {
         parameters: {
             query?: never;
@@ -4164,6 +4199,11 @@ export interface components {
             data: components["schemas"]["TemplateOut"];
             meta: components["schemas"]["MutationMeta"];
         };
+        /** MutationOut[WorkspaceSettingsOut] */
+        MutationOut_WorkspaceSettingsOut_: {
+            data: components["schemas"]["WorkspaceSettingsOut"];
+            meta: components["schemas"]["MutationMeta"];
+        };
         /** MyTaskMoveIn */
         MyTaskMoveIn: {
             /** After Id */
@@ -5119,6 +5159,25 @@ export interface components {
             actions: components["schemas"]["ActionResultOut"][];
             /** Conditions Passed */
             conditions_passed: boolean;
+        };
+        /** RunIn */
+        RunIn: {
+            /** Project Id */
+            project_id?: string | null;
+            /** Task Id */
+            task_id?: string | null;
+            /** Text */
+            text?: string | null;
+        };
+        /** RunQueuedOut */
+        RunQueuedOut: {
+            /**
+             * Run Id
+             * Format: uuid
+             */
+            run_id: string;
+            /** Status */
+            status: string;
         };
         /** SaveDraftIn */
         SaveDraftIn: {
@@ -6201,6 +6260,16 @@ export interface components {
             /** Slug */
             slug: string;
         };
+        /** WorkspaceSettingsIn */
+        WorkspaceSettingsIn: {
+            /** Timezone */
+            timezone: string;
+        };
+        /** WorkspaceSettingsOut */
+        WorkspaceSettingsOut: {
+            /** Timezone */
+            timezone: string;
+        };
         /** WriteIn */
         WriteIn: {
             /**
@@ -6435,6 +6504,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MutationOut_OkOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_agent_api_v1_agents__agent_id__run_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                agent_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RunIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunQueuedOut"];
                 };
             };
             /** @description Validation Error */
@@ -11869,6 +11973,59 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ListOut_UserOut_"];
+                };
+            };
+        };
+    };
+    get_settings_api_v1_workspace_settings_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkspaceSettingsOut"];
+                };
+            };
+        };
+    };
+    put_settings_api_v1_workspace_settings_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WorkspaceSettingsIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationOut_WorkspaceSettingsOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

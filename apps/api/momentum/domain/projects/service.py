@@ -17,6 +17,7 @@ from momentum.core.mutation import Mutation
 from momentum.core.ordering import key_between
 from momentum.core.undo import UndoConflict, undo_handler, undo_op
 from momentum.domain.access import (
+    forbid_agent,
     get_visible_project,
     get_visible_team,
     require_project_role,
@@ -258,6 +259,7 @@ async def set_archived(
 async def delete_project(
     session: AsyncSession, ctx: Ctx, project_id: uuid.UUID
 ) -> Mutation[Project]:
+    forbid_agent(ctx, "delete projects")
     project, role = await get_visible_project(session, ctx, project_id)
     require_project_role(role, "admin", "delete this project")
     project.deleted_at = datetime.now(UTC)

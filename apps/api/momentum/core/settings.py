@@ -129,6 +129,9 @@ class Settings(BaseSettings):
 
     # S5.1.1: ceilings for every agent's per-run limits (ai-architecture §10). An agent's own
     # `limits` may be lower, never higher.
+    # S5.1.2: kill switch for the agent scheduler, event consumer and runner (agents stay
+    # editable; nothing runs). The global AI switch and each agent's `enabled` apply as well.
+    agents_enabled: bool = True
     agent_max_steps: int = Field(default=15, ge=1, le=50)
     agent_timeout_s: int = Field(default=300, ge=10, le=3600)
 

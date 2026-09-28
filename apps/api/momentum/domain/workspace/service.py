@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Any
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
@@ -9,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from momentum.core.activity import record_activity
 from momentum.core.context import Ctx
-from momentum.core.errors import NotFound
+from momentum.core.errors import NotFound, ValidationFailed
 from momentum.core.events import emit
 from momentum.core.ids import new_id
 from momentum.core.mutation import Mutation
@@ -147,3 +148,53 @@ async def set_ai_config(session: AsyncSession, ctx: Ctx, config: AiConfig) -> Mu
 @undo_handler("workspace.set_ai_settings")
 async def _undo_set_ai_config(session: AsyncSession, ctx: Ctx, args: dict[str, Any]) -> None:
     await set_ai_config(session, ctx, AiConfig.model_validate(args))
+
+
+# ---------------- workspace timezone (S5.1.2) ----------------
+
+
+def workspace_timezone(ws: Workspace) -> str:
+    """The workspace's timezone (IANA name), for schedules that say ``timezone: workspace``
+    (agents, S5.1.2). Stored in ``workspaces.settings['timezone']``; default UTC."""
+    return str((ws.settings or {}).get("timezone") or "UTC")
+
+
+async def set_workspace_timezone(session: AsyncSession, ctx: Ctx, tz: str) -> Mutation[str]:
+    require(ctx, Action.WORKSPACE_ADMIN)
+    try:
+        ZoneInfo(tz)
+    except (ZoneInfoNotFoundError, ValueError) as e:
+        raise ValidationFailed(f"Unknown timezone {tz!r}") from e
+    ws = await session.get(Workspace, ctx.workspace_id)
+    if ws is None:
+        raise NotFound("Workspace not found")
+    before = workspace_timezone(ws)
+    if before == tz:
+        return Mutation(tz)
+    ws.settings = {**(ws.settings or {}), "timezone": tz}
+    act = await record_activity(
+        session,
+        ctx,
+        entity_type="workspace",
+        entity_id=ws.id,
+        verb="workspace.timezone_changed",
+        changes={"timezone": (before, tz)},
+        undo=undo_op("workspace.set_timezone", tz=before),
+    )
+    await emit(
+        session,
+        ctx,
+        type="workspace.settings_changed",
+        entity_type="workspace",
+        entity_id=ws.id,
+        data={"timezone": tz},
+        channels=[f"workspace:{ws.id}"],
+        activity_id=act.id,
+    )
+    await session.flush()
+    return Mutation(tz, act.id)
+
+
+@undo_handler("workspace.set_timezone")
+async def _undo_set_timezone(session: AsyncSession, ctx: Ctx, args: dict[str, Any]) -> None:
+    await set_workspace_timezone(session, ctx, str(args["tz"]))

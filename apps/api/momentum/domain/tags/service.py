@@ -31,6 +31,7 @@ from momentum.core.events import emit
 from momentum.core.mutation import Mutation
 from momentum.core.permissions import Action, require
 from momentum.domain.access import (
+    forbid_agent,
     get_visible_project,
     get_visible_task,
     require_project_role,
@@ -141,6 +142,7 @@ async def patch_tag(
 async def delete_tag(session: AsyncSession, ctx: Ctx, tag_id: uuid.UUID) -> None:
     """Soft-delete the tag everywhere (its `task_tags` rows are left as-is; a deleted tag just
     stops showing up, same as an archived field)."""
+    forbid_agent(ctx, "delete tags")
     require(ctx, Action.PROJECT_CREATE)
     tag = await _get_tag(session, ctx, tag_id)
     tag.deleted_at = datetime.now(UTC)

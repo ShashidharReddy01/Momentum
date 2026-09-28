@@ -78,6 +78,7 @@ async def run_tool_loop(
     prompt_version: str | None = None,
     max_tokens: int = 1000,
     stream: bool = False,
+    agent_run_id: uuid.UUID | None = None,
 ) -> LoopResult:
     """Run until the model answers without tool calls (or ``max_steps`` model calls).
 
@@ -100,6 +101,7 @@ async def run_tool_loop(
                 feature,
                 prompt_version,
                 max_tokens,
+                agent_run_id,
             )
         else:
             c = await llm.complete(
@@ -111,6 +113,7 @@ async def run_tool_loop(
                 prompt_version=prompt_version,
                 max_tokens=max_tokens,
                 temperature=0,
+                agent_run_id=agent_run_id,
             )
         result.tokens_in += c.tokens_in
         result.tokens_out += c.tokens_out
@@ -172,6 +175,7 @@ async def _streamed_step(
     feature: str,
     prompt_version: str | None,
     max_tokens: int,
+    agent_run_id: uuid.UUID | None = None,
 ) -> Completion:
     first = True
     async for ev in llm.stream(
@@ -183,6 +187,7 @@ async def _streamed_step(
         prompt_version=prompt_version,
         max_tokens=max_tokens,
         temperature=0,
+        agent_run_id=agent_run_id,
     ):
         if isinstance(ev, TokenEvent) and ev.text:
             if first:  # a new step's text starts a new paragraph

@@ -64,6 +64,8 @@ class Agent(IdMixin, TimestampMixin, Base):
     budget_monthly_tokens: Mapped[int] = mapped_column(BigInteger)
     limits: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
     enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    # S5.1.2 (migration 0029): when it was last switched on; triggers ignore older events
+    enabled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     source: Mapped[str] = mapped_column(String(16))
     installed_hash: Mapped[str | None] = mapped_column(String(64))
     version: Mapped[int] = mapped_column(Integer, default=1)

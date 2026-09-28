@@ -29,6 +29,12 @@ class BudgetExceeded(DomainError):
     status, code, title = 429, "ai_budget_exceeded", "The monthly AI budget has been used up"
 
 
+class AgentBudgetExceeded(BudgetExceeded):
+    """S5.1.2: one agent's own monthly budget (not the workspace's) is used up."""
+
+    code, title = "agent_budget_exceeded", "This agent's monthly budget has been used up"
+
+
 class TransportError(Exception):
     """Raised by transports; the gateway decides whether to retry based on ``kind``."""
 

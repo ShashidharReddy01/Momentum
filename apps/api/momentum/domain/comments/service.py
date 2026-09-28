@@ -18,6 +18,7 @@ from momentum.core.mutation import Mutation
 from momentum.core.richtext import doc_hash, plain_text, preview, sanitize_doc
 from momentum.core.undo import UndoConflict, undo_handler, undo_op
 from momentum.domain.access import (
+    forbid_agent,
     get_visible_project,
     get_visible_task,
     require_project_role,
@@ -187,7 +188,7 @@ async def create_comment(
         author_id=ctx.actor.id,
         body=doc,
         body_text=plain_text(doc),
-        is_ai=ctx.via == "ai",
+        is_ai=ctx.via in ("ai", "agent"),  # AI-authored content is always marked
         created_via=ctx.via,
     )
     session.add(comment)
@@ -302,6 +303,7 @@ async def edit_comment(
 async def delete_comment(
     session: AsyncSession, ctx: Ctx, comment_id: uuid.UUID, *, record_undo: bool = True
 ) -> Mutation[Comment]:
+    forbid_agent(ctx, "delete comments")
     comment, task, role = await _get_comment(session, ctx, comment_id)
     if not can_delete(ctx, comment, role):
         raise Forbidden("Only the author or a project admin can delete a comment")

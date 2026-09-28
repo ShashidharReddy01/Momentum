@@ -94,6 +94,7 @@ Frontend build-time variables use the `VITE_MOMENTUM_` prefix, but the SPA prefe
 | `MOMENTUM_LLM_FIXTURES_DIR` | (packaged) | Mock/record fixture directory; empty = `momentum/ai/evals/fixtures/mock_responses` |
 | `MOMENTUM_EVALS_DATABASE_URL` | (empty) | S3.5.1: the throwaway database `momentum evals` drops and rebuilds on every run (migrate, seed, eval workspace, reindex). Its name must end in `_evals`. Empty = the main database's name + `_evals` on the same server (the role needs `CREATEDB`) |
 | `MOMENTUM_AI_MONTHLY_BUDGET_USD` | `0` (= unlimited) | Workspace cap on estimated cost (sum of `llm_calls.cost_usd` since 00:00 UTC on the 1st); checked before every call. Only models priced in `MOMENTUM_LLM_PRICE_TABLE` count, so an unpriced model never trips it (the usage page, `llm-check` and the startup log say so) |
+| `MOMENTUM_AGENTS_ENABLED` | `true` | Kill switch for agents: nothing is scheduled, triggered or run while false (agents stay editable; events meanwhile are skipped, not replayed). The AI master switch and each agent's own `enabled` apply too (S5.1.2) |
 | `MOMENTUM_AGENT_MAX_STEPS` | `15` | Ceiling on model steps per agent run (1–50). An agent's own `limits.max_steps` may be lower, never higher (S5.1.1) |
 | `MOMENTUM_AGENT_TIMEOUT_S` | `300` | Ceiling on an agent run's wall-clock time in seconds (10–3600). An agent's own `limits.timeout_s` may be lower, never higher (S5.1.1) |
 | `MOMENTUM_AI_AUTO_APPLY_LOW_RISK` | `false` | Workspace default for ⌘K/chat |

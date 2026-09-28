@@ -289,7 +289,11 @@ class LLM:
             raise AIDisabled()
         await self.usage.check_enabled(ctx)  # the workspace's own switch (S3.5.2)
         try:
-            await self.usage.check_budget(ctx)
+            await self.usage.check_budget(
+                ctx,
+                agent_run_id=rec.agent_run_id,
+                priced=not self.prices.unpriced([rec.model]),
+            )
         except BudgetExceeded:
             await self.usage.record(ctx, rec.to_record("budget_exceeded"))
             raise

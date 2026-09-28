@@ -24,7 +24,12 @@ from momentum.core.errors import Forbidden, NotFound, ValidationFailed, VersionC
 from momentum.core.events import emit
 from momentum.core.mutation import Mutation
 from momentum.core.permissions import Action, can
-from momentum.domain.access import get_visible_project, get_visible_task, require_project_role
+from momentum.domain.access import (
+    forbid_agent,
+    get_visible_project,
+    get_visible_task,
+    require_project_role,
+)
 from momentum.domain.fields.models import FieldDef
 from momentum.domain.forms.models import Form
 from momentum.domain.projects.models import Project
@@ -295,6 +300,7 @@ async def test_run_rule(
 
 async def delete_rule(session: AsyncSession, ctx: Ctx, rule_id: uuid.UUID) -> Mutation[Rule]:
     """Soft delete: the run history stays."""
+    forbid_agent(ctx, "delete rules")
     rule = await _load(session, ctx, rule_id, "admin", "manage rules")
     rule.deleted_at = datetime.now(UTC)
     rule.version += 1

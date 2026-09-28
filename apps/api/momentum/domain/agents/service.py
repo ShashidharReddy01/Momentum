@@ -330,6 +330,8 @@ async def update_agent(
     if data.enabled is not None and data.enabled != agent.enabled:
         changes["enabled"] = (agent.enabled, data.enabled)
         agent.enabled = data.enabled
+        if data.enabled:
+            agent.enabled_at = datetime.now(UTC)
     activity_id = await _updated(session, ctx, agent, changes)
     return Mutation(agent, activity_id, version=agent.version)
 

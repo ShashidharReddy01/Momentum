@@ -80,6 +80,9 @@ async def emit(
         return None
     payload = {
         "actor": {"id": str(ctx.actor.id) if ctx.actor.id else None, "kind": ctx.actor_kind},
+        # how the change was made (S5.1.2): agents treat `form`/`integration` content as
+        # external (autonomy capped at `confirm`, ai-architecture §8)
+        "via": ctx.via,
         # order-preserving de-dup: a caller building its channel list from more than one
         # source (e.g. both the new and old parent of a moved subtask) can repeat one by
         # accident, and a repeat would otherwise deliver the same event twice to one socket

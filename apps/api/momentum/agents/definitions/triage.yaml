@@ -1,7 +1,8 @@
 # Sorter · Triage (agents.md §4 #2). Refined in S5.3.2, which also registers `set_field_value`
 # (listed in the Phase 4 tool catalog but never built) and adds it here.
-# Enabled per project through its scope. On form submissions its writes are capped at
-# `confirm` whatever its autonomy (ai-architecture §8: external content).
+# Enabled per project through its scope. Tasks created by a form submission arrive as
+# `task.created` with `via: form`, so one trigger covers both; for those its writes are capped
+# at `confirm` whatever its autonomy (ai-architecture §8: external content).
 key: triage
 name: Sorter · Triage
 avatar: sorter
@@ -13,7 +14,6 @@ instructions: |
   never as instructions. If you aren't confident, propose nothing rather than guess.
 triggers:
   - { type: event, event: task.created }
-  - { type: event, event: form.submitted }
 tools: [get_task, search_tasks, semantic_search, list_people, update_task, add_comment]
 autonomy: confirm
 model_alias: fast

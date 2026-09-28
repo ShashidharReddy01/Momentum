@@ -125,6 +125,14 @@ async def get_visible_project(
     return project, role
 
 
+def forbid_agent(ctx: Ctx, what: str) -> None:
+    """agents.md §3: agents never delete and never decide approvals (S5.1.2). Enforced in the
+    services, since the model is never the security boundary; a person applying or undoing an
+    agent's change acts as themselves and isn't affected."""
+    if ctx.actor.is_agent:
+        raise Forbidden(f"Agents can't {what}")
+
+
 def require_project_role(role: str, needed: str, what: str = "do this") -> None:
     if ROLE_RANK[role] < ROLE_RANK[needed]:
         raise Forbidden(f"You need {needed} access to {what}")

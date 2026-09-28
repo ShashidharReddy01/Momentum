@@ -2,6 +2,27 @@
 
 > Moved out of `STATUS.md` (2026-09-27) to keep it small: every AI session reads STATUS in full. Newest first. Nothing here is current instruction; the code and the docs are.
 
+## Handoff notes (2026-09-28, S5.1.1 Agent model and accounts)
+- **Before S5.1.1:** J1 flake fixed. It was a real rapid-entry bug: the new-task row jumped and lost focus when a create was confirmed. Commit `4eb5dc0`; details in the archive's kickoff handoff.
+- **Shipped (S5.1.1):**
+  - **Data:** migration 0028 (`agents`, `agent_runs` with a per-agent unique `dedupe_key`; the deferred FKs `users.agent_id` and `llm_calls.agent_run_id`; notification kind `agent_alert`).
+  - **Code:** `domain/agents/` (models, schemas, service, router) and `momentum/agents/loader.py`, plus 8 starter YAML definitions with the Q2 autonomy and Q4 budgets.
+  - **Install:** `momentum agents install|list` and `POST /agents/install`. Idempotent; new agents are **disabled**; agents an admin edited are reported `drifted` and kept unless `--force`.
+  - **Admin API** under `/api/v1/agents`.
+  - **Host extension point:** `create_app`/`mount_momentum(agent_definition_dirs=…)`.
+  - **Settings:** `MOMENTUM_AGENT_MAX_STEPS` (15), `MOMENTUM_AGENT_TIMEOUT_S` (300).
+  - **Dependency:** `croniter` is now explicit. It was already installed through Procrastinate; the schemas validate cron triggers with it now, and S5.1.2 will evaluate them.
+- **Access guards (kickoff Q1), in services, not just the API:**
+  - Agents get explicit project roles only. `access.project_role` and `visible_projects_clause` skip the team and admin shortcuts for agent actors.
+  - An agent can't be a project admin (`projects.add_member`/`set_member_role`) and can't join a team (`teams.add_member`).
+  - An agent account can't sign in (`auth/identity.resolve_user`; dev login already refused them).
+  - These touch permission and auth code, as the Q1 answer requires.
+- **Found:** the tools `set_field_value`, `create_rule`, `request_approval` and `decide_approval` are in ai-architecture's catalog but were never registered. The catalog and the kickoff doc are corrected; S5.3.2 registers `set_field_value` for Sorter.
+- **For S5.1.2 to decide:** an agent that creates a project (Architect's `create_project_from_plan`) would become that project's admin through the normal create path, which contradicts "agents are never project admins". Proposal: when a human applies an agent's proposal, the human is the actor; an agent in `auto` mode never gets medium-risk tools anyway.
+- **Verification:** `make check` green: backend **639** (594 + 45 in `tests/test_agents.py`), web **312** (types regenerated; the inbox gained the `agent_alert` label). The CLI was smoke-tested on the dev database (`install` 8 installed → re-run unchanged → `list`).
+- **Live check:** not needed for this slice (no model calls). Next checkpoint: after S5.1.2.
+- **Next up:** S5.1.2 Runtime loop and triggers.
+
 ## Handoff notes (2026-09-28, Phase 5 kickoff)
 - **Kickoff written:** `docs/roadmap/phase-5-kickoff.md` (mock-mode prerequisite, state check, refinements, risks, questions). **All 7 questions answered by the product owner (every recommendation accepted)**; refinements applied to `docs/roadmap/phase-5.md` (new E5.0 with S5.0.1/S5.0.2, "Kickoff refinements" on S5.1.1/S5.1.2/S5.1.4, starter-table notes).
 - **Branch:** this session's branch `claude/intelligent-meitner-9ne4e8` was at the Phase 2 exit commit; it was fast-forwarded (no commits of its own, nothing lost) onto `claude/clever-hopper-pbv7yr` at the Phase 4 exit commit `300bbc7`. Continue Phase 5 on `claude/intelligent-meitner-9ne4e8`.

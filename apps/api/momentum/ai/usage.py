@@ -16,9 +16,10 @@ from typing import Protocol
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from momentum.ai.errors import AIDisabled, BudgetExceeded
+from momentum.ai.errors import AgentBudgetExceeded, AIDisabled, BudgetExceeded
 from momentum.ai.models import LlmCall
 from momentum.core.context import Ctx
+from momentum.domain.agents.models import Agent, AgentRun
 from momentum.domain.workspace.service import AiConfig, get_ai_config
 
 
@@ -40,7 +41,9 @@ class CallRecord:
 class UsageLog(Protocol):
     async def check_enabled(self, ctx: Ctx) -> None: ...
 
-    async def check_budget(self, ctx: Ctx) -> None: ...
+    async def check_budget(
+        self, ctx: Ctx, *, agent_run_id: uuid.UUID | None = None, priced: bool = True
+    ) -> None: ...
 
     async def record(self, ctx: Ctx, rec: CallRecord) -> None: ...
 
@@ -51,7 +54,9 @@ class NullUsageLog:
     async def check_enabled(self, ctx: Ctx) -> None:
         return None
 
-    async def check_budget(self, ctx: Ctx) -> None:
+    async def check_budget(
+        self, ctx: Ctx, *, agent_run_id: uuid.UUID | None = None, priced: bool = True
+    ) -> None:
         return None
 
     async def record(self, ctx: Ctx, rec: CallRecord) -> None:
@@ -95,15 +100,62 @@ class DbUsageLog:
         override = (await self._config(ctx)).monthly_budget_usd
         return self._budget if override is None else Decimal(str(override))
 
-    async def check_budget(self, ctx: Ctx) -> None:
+    async def check_budget(
+        self, ctx: Ctx, *, agent_run_id: uuid.UUID | None = None, priced: bool = True
+    ) -> None:
         budget = await self._limit(ctx)
-        if budget <= 0:
+        if budget > 0:
+            spent = await self.month_spend(ctx.workspace_id)
+            if spent >= budget:
+                raise BudgetExceeded(
+                    f"This workspace has used ${spent:.2f} of its ${budget:.2f} monthly AI "
+                    "budget. An admin can raise it.",
+                )
+        if agent_run_id is not None:
+            await self._check_agent_budget(agent_run_id, priced=priced)
+
+    async def agent_month_usage(
+        self, agent_id: uuid.UUID, now: datetime | None = None
+    ) -> tuple[Decimal, int]:
+        """An agent's estimated spend and tokens (in + out) since 00:00 UTC on the 1st."""
+        since = month_start(now or datetime.now(UTC))
+        async with self._sf() as session:
+            row = (
+                await session.execute(
+                    select(
+                        func.coalesce(func.sum(LlmCall.cost_usd), 0),
+                        func.coalesce(func.sum(LlmCall.tokens_in + LlmCall.tokens_out), 0),
+                    )
+                    .join(AgentRun, AgentRun.id == LlmCall.agent_run_id)
+                    .where(AgentRun.agent_id == agent_id, LlmCall.created_at >= since)
+                )
+            ).one()
+        return Decimal(row[0] or 0), int(row[1] or 0)
+
+    async def _check_agent_budget(self, agent_run_id: uuid.UUID, *, priced: bool) -> None:
+        """S5.1.2 (kickoff Q4): an agent's own monthly cap. Dollars while its model is priced in
+        MOMENTUM_LLM_PRICE_TABLE; otherwise tokens, so the cap means something before prices are
+        set. A cap of 0 is unlimited, like the workspace budget."""
+        async with self._sf() as session:
+            agent = (
+                await session.execute(
+                    select(Agent)
+                    .join(AgentRun, AgentRun.agent_id == Agent.id)
+                    .where(AgentRun.id == agent_run_id)
+                )
+            ).scalar_one_or_none()
+        if agent is None:
             return
-        spent = await self.month_spend(ctx.workspace_id)
-        if spent >= budget:
-            raise BudgetExceeded(
-                f"This workspace has used ${spent:.2f} of its ${budget:.2f} monthly AI "
-                "budget. An admin can raise it.",
+        spent, tokens = await self.agent_month_usage(agent.id)
+        if priced and agent.budget_monthly_usd > 0 and spent >= agent.budget_monthly_usd:
+            raise AgentBudgetExceeded(
+                f"{agent.name} has used ${spent:.2f} of its ${agent.budget_monthly_usd:.2f} "
+                "monthly budget. An admin can raise it."
+            )
+        if not priced and agent.budget_monthly_tokens > 0 and tokens >= agent.budget_monthly_tokens:
+            raise AgentBudgetExceeded(
+                f"{agent.name} has used {tokens:,} of its {agent.budget_monthly_tokens:,} monthly "
+                "tokens. An admin can raise it."
             )
 
     async def record(self, ctx: Ctx, rec: CallRecord) -> None:

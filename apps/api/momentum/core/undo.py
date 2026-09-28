@@ -64,8 +64,12 @@ async def undo(
     *,
     activity_id: uuid.UUID | None = None,
     batch_id: uuid.UUID | None = None,
+    also_by: uuid.UUID | None = None,
 ) -> list[Activity]:
-    """Undo one activity or a whole batch (newest first). Returns the undone rows."""
+    """Undo one activity or a whole batch (newest first). Returns the undone rows.
+
+    ``also_by``: rows made by this actor may be undone too (S5.1.2: an agent's applied action
+    can be undone by the person it was for; the caller checks that relationship first)."""
     if (activity_id is None) == (batch_id is None):
         raise NotFound("Give exactly one of activity_id or batch_id")
     query = select(Activity).where(Activity.workspace_id == ctx.workspace_id)
@@ -83,7 +87,7 @@ async def undo(
         raise NotFound()
     now = datetime.now(UTC)
     for row in rows:
-        if row.actor_id != ctx.actor.id and not ctx.actor.is_admin:
+        if row.actor_id not in (ctx.actor.id, also_by) and not ctx.actor.is_admin:
             raise Forbidden("Only the person who made a change (or an admin) can undo it")
         if row.undone_at is not None:
             raise UndoConflict("This change was already undone")

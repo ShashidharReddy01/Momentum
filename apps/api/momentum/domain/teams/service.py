@@ -16,7 +16,7 @@ from momentum.core.events import emit
 from momentum.core.mutation import Mutation
 from momentum.core.permissions import Action, require
 from momentum.core.undo import UndoConflict, undo_handler, undo_op
-from momentum.domain.access import get_visible_team, require_team_manager, team_role
+from momentum.domain.access import forbid_agent, get_visible_team, require_team_manager, team_role
 from momentum.domain.teams.models import Team, TeamMember
 from momentum.domain.teams.schemas import TeamCreateIn, TeamPatchIn
 from momentum.domain.users.models import User
@@ -168,6 +168,7 @@ async def update_team(
 
 
 async def delete_team(session: AsyncSession, ctx: Ctx, team_id: uuid.UUID) -> Mutation[Team]:
+    forbid_agent(ctx, "delete teams")
     team = await get_visible_team(session, ctx, team_id)
     await require_team_manager(session, ctx, team)
     team.deleted_at = datetime.now(UTC)

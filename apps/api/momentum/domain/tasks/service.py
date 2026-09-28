@@ -22,6 +22,7 @@ from momentum.core.richtext import doc_hash, plain_text, preview, sanitize_doc
 from momentum.core.undo import UndoConflict, undo_handler, undo_op
 from momentum.domain.access import (
     MAX_TASK_DEPTH,
+    forbid_agent,
     get_visible_project,
     get_visible_task,
     project_role,
@@ -958,6 +959,9 @@ async def set_completed(
 ) -> Mutation[Task]:
     task, placement, role = await get_visible_task(session, ctx, task_id)
     require_project_role(role, "editor", "complete this task")
+    if ctx.actor.is_agent and task.assignee_id != ctx.actor.id:
+        # agents.md §3: an agent finishes its own assignments, never someone else's
+        raise Forbidden("Agents only complete tasks assigned to them")
     if (task.completed_at is not None) == completed:
         return Mutation(task, version=task.version)
     if completed and not force and await _has_incomplete_blockers(session, task_id):
@@ -1008,6 +1012,7 @@ async def set_completed(
 async def delete_task(
     session: AsyncSession, ctx: Ctx, task_id: uuid.UUID, *, batch_id: uuid.UUID | None = None
 ) -> Mutation[Task]:
+    forbid_agent(ctx, "delete tasks")
     task, placement, role = await get_visible_task(session, ctx, task_id)
     require_project_role(role, "editor", "delete this task")
     task.deleted_at = datetime.now(UTC)

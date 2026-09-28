@@ -26,7 +26,7 @@ from momentum.core.errors import DomainError, Forbidden, NotFound, ValidationFai
 from momentum.core.events import emit
 from momentum.core.mutation import Mutation
 from momentum.core.permissions import Action, can
-from momentum.domain.access import get_visible_project, require_project_role
+from momentum.domain.access import forbid_agent, get_visible_project, require_project_role
 from momentum.domain.fields.models import FieldDef
 from momentum.domain.fields.service import (
     attach_field,
@@ -89,6 +89,7 @@ async def get_template(session: AsyncSession, ctx: Ctx, template_id: uuid.UUID) 
 
 
 async def delete_template(session: AsyncSession, ctx: Ctx, template_id: uuid.UUID) -> None:
+    forbid_agent(ctx, "delete templates")
     t = await _load(session, ctx, template_id)
     allowed = t.created_by == ctx.actor.id
     if not allowed and t.kind == "task" and t.project_id is not None:

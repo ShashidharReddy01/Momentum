@@ -29,7 +29,7 @@ from momentum.core.errors import Forbidden, NotFound
 from momentum.core.events import emit
 from momentum.core.mutation import Mutation
 from momentum.core.undo import UndoConflict, undo_handler, undo_op
-from momentum.domain.access import get_visible_task, require_project_role
+from momentum.domain.access import forbid_agent, get_visible_task, require_project_role
 from momentum.domain.attachments.models import Attachment
 from momentum.domain.comments.models import Comment
 
@@ -158,6 +158,7 @@ def can_delete(ctx: Ctx, att: Attachment, role: str) -> bool:
 async def delete_attachment(
     session: AsyncSession, ctx: Ctx, attachment_id: uuid.UUID, *, record_undo: bool = True
 ) -> Mutation[Attachment]:
+    forbid_agent(ctx, "remove attachments")
     att, task_id, role = await _get_attachment(session, ctx, attachment_id)
     if not can_delete(ctx, att, role):
         raise Forbidden("Only the uploader or a project admin can remove an attachment")

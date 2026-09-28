@@ -14,7 +14,11 @@ If any operation fails while applying, all of them are rolled back and the actio
 ``failed`` with the error. Undo reverses the whole batch (``core.undo``) and marks it ``undone``.
 
 Permissions are the approver's: operations run as ``ctx.actor`` (who must be ``proposed_for``),
-through the same services the UI uses. An action is bookkeeping about a change, not a change,
+through the same services the UI uses. An agent's proposal (S5.1.2, ``source="agent"``) is
+previewed as the agent and proposed *for* a person; when that person applies it, it runs with
+their permissions and is marked ``via="agent"``, so the change stays attributed to the agent's
+suggestion. An agent allowed to act on its own (``auto`` autonomy, low risk) applies its action
+itself (``apply_as_agent``). An action is bookkeeping about a change, not a change,
 so proposing/rejecting/expiring one records no ``activity`` row; the applied operations do,
 each tagged with ``ai_action_id``.
 """
@@ -139,6 +143,7 @@ async def propose(
     source: Source,
     source_id: uuid.UUID | None = None,
     summary: str | None = None,
+    proposed_for: uuid.UUID | None = None,
 ) -> Proposal:
     """Preview ``calls`` for ``ctx.actor`` and store them as one proposed action.
 
@@ -149,7 +154,8 @@ async def propose(
         raise ValidationFailed("Nothing to propose")
     if len(calls) > MAX_OPERATIONS:
         raise ValidationFailed(f"At most {MAX_OPERATIONS} operations in one action")
-    if ctx.actor.id is None:
+    proposed_for = proposed_for or ctx.actor.id
+    if proposed_for is None:
         raise ValidationFailed("AI actions are proposed for a person")
     ops, failures = await _preview(session, ctx, registry, calls)
     if failures:
@@ -158,7 +164,7 @@ async def propose(
         workspace_id=ctx.workspace_id,
         source=source,
         source_id=source_id,
-        proposed_for=ctx.actor.id,
+        proposed_for=proposed_for,
         summary=(summary or _summary(ops))[:500],
         operations=ops,
         risk=_max_risk(ops),
@@ -246,6 +252,19 @@ async def apply_action(
         await session.flush()
         return ApplyResult(action, "repreviewed" if not failures else "failed")
 
+    if action.source == "agent":
+        ctx = ctx.with_(via="agent")
+    return await _execute(session, ctx, registry, action, calls)
+
+
+async def _execute(
+    session: AsyncSession,
+    ctx: Ctx,
+    registry: ToolRegistry,
+    action: AiAction,
+    calls: list[ProposedCall],
+) -> ApplyResult:
+    """Run every operation for real under one batch; all or nothing."""
     batch_id = uuid.uuid4()
     held = list(session.identity_map.values())
     savepoint = await session.begin_nested()
@@ -272,6 +291,19 @@ async def apply_action(
     return ApplyResult(action, "failed" if error else "applied")
 
 
+async def apply_as_agent(
+    session: AsyncSession, ctx: Ctx, registry: ToolRegistry, action: AiAction
+) -> ApplyResult:
+    """S5.1.2: an agent applying its own just-proposed action (``auto`` autonomy, or a
+    suggestion comment). Runs as the agent (``ctx.actor.is_agent``), so the services' agent
+    guards apply; the action's ``proposed_for`` person can still undo it."""
+    if not ctx.actor.is_agent or action.source != "agent":
+        raise ValidationFailed("Only an agent applies its own actions")
+    _require_proposed(action)
+    calls = [ProposedCall(op["tool"], op["args"]) for op in action.operations]
+    return await _execute(session, ctx, registry, action, calls)
+
+
 async def reject_action(session: AsyncSession, ctx: Ctx, action_id: uuid.UUID) -> AiAction:
     action = await get_action(session, ctx, action_id, for_update=True)
     _require_proposed(action)
@@ -286,7 +318,14 @@ async def undo_action(session: AsyncSession, ctx: Ctx, action_id: uuid.UUID) -> 
     action = await get_action(session, ctx, action_id, for_update=True)
     if action.state != "applied" or action.applied_batch_id is None:
         raise Conflict("Only an applied suggestion can be undone", code="action_not_applied")
-    await undo(session, ctx, batch_id=action.applied_batch_id)
+    # an agent applied its own action (auto): the person it was for may undo the agent's rows
+    by_agent = action.source == "agent" and action.decided_by not in (None, ctx.actor.id)
+    await undo(
+        session,
+        ctx,
+        batch_id=action.applied_batch_id,
+        also_by=action.decided_by if by_agent else None,
+    )
     action.state = "undone"
     await session.flush()
     return action

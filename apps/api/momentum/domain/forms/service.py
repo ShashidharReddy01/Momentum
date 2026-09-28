@@ -35,7 +35,7 @@ from momentum.core.errors import (
 from momentum.core.events import emit
 from momentum.core.mutation import Mutation
 from momentum.core.settings import Settings
-from momentum.domain.access import get_visible_project, require_project_role
+from momentum.domain.access import forbid_agent, get_visible_project, require_project_role
 from momentum.domain.comments.service import create_comment
 from momentum.domain.fields.models import FieldDef, ProjectField
 from momentum.domain.fields.service import set_task_field_value, validate_value
@@ -257,6 +257,7 @@ async def update_form(
 
 
 async def delete_form(session: AsyncSession, ctx: Ctx, form_id: uuid.UUID) -> Mutation[Form]:
+    forbid_agent(ctx, "delete forms")
     form = await _load(session, ctx, form_id, "admin", "manage forms")
     form.deleted_at = datetime.now(UTC)
     form.version += 1

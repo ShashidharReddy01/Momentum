@@ -17,7 +17,7 @@ from momentum.core.events import emit
 from momentum.core.mutation import Mutation
 from momentum.core.ordering import key_between
 from momentum.core.undo import UndoConflict, undo_handler, undo_op
-from momentum.domain.access import get_visible_project, require_project_role
+from momentum.domain.access import forbid_agent, get_visible_project, require_project_role
 from momentum.domain.sections.models import Section
 
 # Hook for the tasks module to move or delete a section's tasks before the section is deleted
@@ -218,6 +218,7 @@ async def delete_section(
 ) -> Mutation[Section]:
     """Soft-delete a section. Its tasks are moved to ``target_section_id`` (default: the first
     remaining section) or deleted, via handlers registered by the tasks module."""
+    forbid_agent(ctx, "delete sections")
     section = await _get_editable(session, ctx, section_id)
     remaining = [s for s in await list_sections(session, section.project_id) if s.id != section.id]
     if not remaining:

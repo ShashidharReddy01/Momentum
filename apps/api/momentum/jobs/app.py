@@ -5,6 +5,7 @@ from __future__ import annotations
 import procrastinate
 
 from momentum.core.settings import Settings
+from momentum.jobs import agents as _agents  # noqa: F401 - agent triggers and runs (S5.1.2)
 from momentum.jobs import ai as _ai  # noqa: F401 - registers `expire_ai_actions`
 from momentum.jobs import attachments as _attachments  # noqa: F401 - registers `extract_text`
 from momentum.jobs import due_approaching as _due_approaching  # noqa: F401 - due-approaching scan
