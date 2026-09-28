@@ -47,17 +47,14 @@ test('J9: a rule fires and delivers a notification', async ({ browser }) => {
   await settled(ravi);
   await expect(done.getByRole('listitem', { name: title })).toBeVisible();
 
-  // Ana's inbox: the rules executor only ticks once a minute (real wall-clock, not simulated),
-  // and the inbox page has no live subscription of its own (S2.5.2's realtime push covers Home/
-  // My Tasks, not this page) — so, like a person who'd just refresh, poll by reloading rather
-  // than waiting on one static page load to update itself.
+  // Ana's inbox, opened once and never reloaded: the rules executor ticks once a minute (real
+  // wall-clock), and since S5.0.1 the inbox is live, so the notification appears on the page
+  // she is already looking at.
   await login(ana, 'Ana Souza');
-  await expect(async () => {
-    await ana.goto('/inbox');
-    await expect(ana.getByRole('button', { name: 'J9: a task reached Done' })).toBeVisible({
-      timeout: 3_000,
-    });
-  }).toPass({ timeout: 90_000, intervals: [5_000] });
+  await ana.goto('/inbox');
+  await expect(ana.getByRole('button', { name: 'J9: a task reached Done' })).toBeVisible({
+    timeout: 90_000,
+  });
 
   await ctxA.close();
   await ctxB.close();

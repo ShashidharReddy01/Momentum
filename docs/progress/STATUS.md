@@ -6,7 +6,7 @@
 
 ## Current focus
 - **Phase:** 5: Agents v1 ("Teammates") — in progress: kickoff done (2026-09-28, `docs/roadmap/phase-5-kickoff.md`), S5.1.1–S5.1.2 done. Phase 4 complete (exit criteria met 2026-09-28).
-- **Next up:** S5.0.1 inbox and bell live updates, then S5.1.3 Runs UI.
+- **Next up:** S5.1.3 Runs UI.
 - **Product-owner instruction (2026-09-26):** finish all remaining slices, then one big local test run against the real gateway (100+ questions/actions covering edge cases), then fix from that run.
 - **Scope note (product owner, 2026-09-26):** the customer-operations capabilities (SQQ, pricing, contracts, invoices, pushes to internal systems as tools and assignable agents) will be done later in the product owner's own codebase, **not in this repo**. Finish the roadmap as written.
 - **Branch:** Phases 3–4 are on `claude/clever-hopper-pbv7yr` (ahead of `main`). Phase 5 continues on `claude/intelligent-meitner-9ne4e8`, which starts from that branch's Phase 4 exit commit.
@@ -19,7 +19,7 @@
 - **Standing instruction (product owner, 2026-09-28):** finish all remaining Phase 5 slices one by one, committing and pushing each with a short report, without waiting for the live checkpoints; stop only for decisions that are the product owner's (CLAUDE.md §6) or if a live finding would change the design.
 - **Phase 5 live checkpoints (agreed 2026-09-28):** the product owner pulls and runs the real gateway at 3 checkpoints, not every slice: **(1) after S5.1.2** (set `MOMENTUM_LLM_PRICE_TABLE`, `llm-check`, one manual agent run), **(2) after S5.2.1 + S5.3.8** (J10 by hand against the real model), **(3) phase exit** (`EVALS_LIVE=1 make evals`). Each slice report says whether a live check is needed; findings get fixed in the next slice.
 - **Phase 5 AI mode:** mock mode throughout (no gateway in this environment). Deferred to the product owner's machine: `momentum llm-check`, `EVALS_LIVE=1 make evals` at phase exit. The dogfood exit criterion is a post-ship observation, not blocking.
-- **Carried past Phase 4 exit** (kickoff Q6: the inbox/bell gap → S5.0.1 and the forms security review → S5.0.2 are now Phase 5 slices; J1 flake **fixed** 2026-09-28, see handoff; the other two stay deferred): a security review pass of S4.2.1's public form endpoint (member-name exposure on assignee questions, no `X-Forwarded-For` handling); wiring `conversational_intake` into the `momentum/ai/evals/` harness (its `EvalWorld` has no notion of a form and the harness models one-shot input → output, not a stateless multi-turn feature); a real per-turn spam counter for conversational intake (currently reuses the submission rate limiter as a coarse guard); the inbox/bell live-update gap and the J1 quick-entry flake found at exit (both described in the Phase 4 exit handoff, now in `handoff-archive.md`).
+- **Carried past Phase 4 exit** (kickoff Q6: the inbox/bell gap → S5.0.1 and the forms security review → S5.0.2 are now Phase 5 slices; J1 flake **fixed** 2026-09-28, see handoff; the other two stay deferred): a security review pass of S4.2.1's public form endpoint (member-name exposure on assignee questions, no `X-Forwarded-For` handling); wiring `conversational_intake` into the `momentum/ai/evals/` harness (its `EvalWorld` has no notion of a form and the harness models one-shot input → output, not a stateless multi-turn feature); a real per-turn spam counter for conversational intake (currently reuses the submission rate limiter as a coarse guard); the inbox/bell live-update gap (**fixed in S5.0.1**) and the J1 quick-entry flake (**fixed**) found at exit (both described in the Phase 4 exit handoff, now in `handoff-archive.md`).
 
 ## Handoff notes (latest session: 2026-09-28, S5.1.2 Runtime loop and triggers)
 - **Shipped:** agents run.
@@ -47,7 +47,8 @@
   4. `momentum agents install`; enable Teammate; give it access to a project
   5. assign it a task; the worker must run (`make dev` runs it embedded)
   6. within a minute, a reply appears in the thread
-- **Next up:** S5.0.1 inbox and bell live updates (it goes before S5.1.3, per the kickoff), then S5.1.3 Runs UI.
+- **S5.0.1 done (2026-09-28):** the inbox and the bell are live on every page (`useLiveNotifications` in the shell). There's a new regression test, and J9 now waits on the live inbox instead of reloading. Web **313**; e2e 10/10; backend untouched (665).
+- **Next up:** S5.1.3 Runs UI.
 
 ## Open questions
 | # | Question | Needed by | Status |
@@ -106,7 +107,7 @@
 
 ### Phase 5: Agents v1 ("Teammates")
 - [x] Kickoff (`docs/roadmap/phase-5-kickoff.md`, 2026-09-28)
-- [ ] S5.0.1 Inbox and bell live updates · [ ] S5.0.2 Public forms security review
+- [x] S5.0.1 Inbox and bell live updates (2026-09-28) · [ ] S5.0.2 Public forms security review
 - [x] S5.1.1 Agent model and accounts (2026-09-28) · [x] S5.1.2 Runtime loop and triggers (2026-09-28) · [ ] S5.1.3 Runs UI · [ ] S5.1.4 Autonomy, budgets, kill switches · [ ] S5.1.5 Extension points and code-backed agents · [ ] S5.1.6 API tokens
 - [ ] S5.2.1 Assign a task to an agent · [ ] S5.2.2 @mention an agent · [ ] S5.2.3 Agent gallery + create from description
 - [ ] S5.3.1 Pulse · [ ] S5.3.2 Sorter · [ ] S5.3.3 Herald · [ ] S5.3.4 Nudge · [ ] S5.3.5 Architect · [ ] S5.3.6 Scribe · [ ] S5.3.7 Radar · [ ] S5.3.8 Teammate

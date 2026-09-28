@@ -21,6 +21,7 @@
 ### S5.0.1: Inbox and bell live updates
 **Scope:** subscribe `/inbox` and the topbar bell to `user:<id>` so `notification.created` appears without a reload (gap found at the Phase 4 exit). Agents deliver through notifications (`agent_proposal`, `digest`, `agent_alert`), so this lands before S5.1.3.
 **Size:** S
+**Built (2026-09-28):** `useLiveNotifications()` (`features/notifications/live.ts`) is mounted once in the app shell (`shell/Layout.tsx`): a `notification.*` event on `user:<me>` refetches the inbox lists and the unread count on any page. It shares the wire subscription with Home and My Tasks. A new realtime integration test (fails without the fix) covers it. J9 no longer reloads the inbox: it opens it once and waits for the rule's notification to arrive live (2/2 runs against the real worker).
 
 ### S5.0.2: Public forms security review
 **Scope:** review S4.2.1's public form endpoints: member-name exposure on assignee questions; `X-Forwarded-For` handling for the per-IP rate limit (trusted-proxy setting). Fix what the review finds. Before S5.3.2, because Sorter acts on form submissions.

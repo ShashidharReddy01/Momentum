@@ -1,4 +1,5 @@
 import { Outlet } from 'react-router';
+import { useLiveNotifications } from '@/features/notifications';
 import { QuickAddDialog } from '@/features/tasks';
 import { useUndoShortcut } from '@/lib/undo';
 import { useHotkey } from '@/lib/keyboard';
@@ -13,6 +14,7 @@ import { TopBar } from './TopBar';
 export function Layout() {
   const ui = useUi((s) => s);
   useUndoShortcut();
+  useLiveNotifications(); // the inbox and the bell update on every page (S5.0.1)
   useHotkey('mod+k', () => ui.setPaletteOpen(!ui.paletteOpen));
   useHotkey('mod+j', () => ui.setAskMoOpen(!ui.askMoOpen));
   useHotkey('mod+\\', ui.toggleSidebar);

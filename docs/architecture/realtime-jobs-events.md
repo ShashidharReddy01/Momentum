@@ -81,7 +81,7 @@ Event payloads share an envelope:
 | `rule.ran` | 4 | rule_id, status (`success`/`skipped`/`failed`), task_id (S4.1.1; carries the run's depth) |
 | `task.due_approaching` | 4 | `due_on` (S4.1.2; emitted by the hourly `scan_due_approaching` job, deduped per (task, due date); actor `system`) |
 | `agent_run.started` / `agent_run.finished` | 5 | agent_id, status, cost |
-| `notification.created` | 2 | notification summary (channel `user:<id>` only) |
+| `notification.created` | 2 | notification summary (channel `user:<id>` only). Since S5.0.1 the app shell subscribes to `user:<me>` on every page (`features/notifications/live.ts`), so the inbox and the bell update live wherever the person is |
 | `import.progress` / `import.finished` | 2 | stats |
 | `ai_memory.changed` | 3 | `{scope}` (created, edited, removed or restored; channel `workspace:<id>`, `team:<id>` or `project:<id>`) |
 
