@@ -142,6 +142,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/agents/{agent_id}/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** An agent's track record (for promotion to auto) and this month's spend (admins) */
+        get: operations["get_agent_stats_api_v1_agents__agent_id__stats_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/ai/actions/{action_id}": {
         parameters: {
             query?: never;
@@ -2904,6 +2921,34 @@ export interface components {
             /** Teams */
             teams?: string[] | null;
         };
+        /**
+         * AgentStatsOut
+         * @description S5.1.4: the track record behind the autonomy toggle, and this month's spend.
+         */
+        AgentStatsOut: {
+            /** Acceptance Rate */
+            acceptance_rate: number | null;
+            /** Accepted */
+            accepted: number;
+            /** Auto Applied 7D */
+            auto_applied_7d: number;
+            /** Auto Undone 7D */
+            auto_undone_7d: number;
+            /** Decided */
+            decided: number;
+            /** Eligible For Auto */
+            eligible_for_auto: boolean;
+            /** Month Tokens */
+            month_tokens: number;
+            /** Month Usd */
+            month_usd: string;
+            /** Priced */
+            priced: boolean;
+            /** Reasons */
+            reasons: string[];
+            /** Undos 14D */
+            undos_14d: number;
+        };
         /** AiActionEnvelope */
         AiActionEnvelope: {
             data: components["schemas"]["AiActionOut"];
@@ -2959,6 +3004,8 @@ export interface components {
         AiConfig: {
             /** Allow Auto Apply */
             allow_auto_apply?: boolean | null;
+            /** Allow Medium Auto */
+            allow_medium_auto?: boolean | null;
             /** Enabled */
             enabled?: boolean | null;
             /** Monthly Budget Usd */
@@ -3440,6 +3487,8 @@ export interface components {
         EffectiveAi: {
             /** Allow Auto Apply */
             allow_auto_apply: boolean;
+            /** Allow Medium Auto */
+            allow_medium_auto: boolean;
             /** Enabled */
             enabled: boolean;
             /** Monthly Budget Usd */
@@ -6812,6 +6861,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ListOut_AgentRunOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_agent_stats_api_v1_agents__agent_id__stats_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                agent_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentStatsOut"];
                 };
             };
             /** @description Validation Error */

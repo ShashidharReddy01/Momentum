@@ -258,6 +258,8 @@ key text, user_id, method, path, response_status, response_body jsonb, created_a
 
 **As built (S3.1.3, migration 0016):** each operation is `{tool, args, summary, risk, diff, watch}`: `diff` is the registry's `DiffRow` list from the dry run, `watch` is `[{type: task|project, id, version}]` for every existing entity the operation changes (the stale check). `source_id` has no FK (its targets arrive with chat/agents). Indexes: `(proposed_for, state)`, and `expires_at` where `state = 'proposed'` (the expiry job). Applied operations' activity rows carry `ai_action_id`. `approved` is reserved for agent `confirm` flows (Phase 5); a human apply goes straight from `proposed` to `applied`.
 
+**Workspace AI policy (`workspaces.settings['ai']`, S3.5.2):** `enabled`, `monthly_budget_usd`, `allow_auto_apply`, and since S5.1.4 `allow_medium_auto` (null = off).
+
 **Workspace timezone (S5.1.2):** `workspaces.settings['timezone']` (IANA name, default `UTC`; `GET/PUT /workspace/settings`, admins) is the zone agent schedules with `timezone: workspace` use. No migration: `settings` is the existing JSONB.
 
 ### `agents`

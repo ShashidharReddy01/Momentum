@@ -1,10 +1,10 @@
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { setupServer } from 'msw/node';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { MomentumApp } from '@/MomentumApp';
 import { aiActionFixture, aiHandlers } from '@/mocks/ai';
-import { agentFixture, agentHandlers, runFixture } from '@/mocks/agents';
+import { agentFixture, agentHandlers, runFixture, statsFixture } from '@/mocks/agents';
 import { authHandlers } from '@/mocks/handlers';
 import { projectHandlers } from '@/mocks/projects';
 import { teamHandlers } from '@/mocks/teams';
@@ -18,9 +18,10 @@ function boot(
   path: string,
   agents: ReturnType<typeof agentHandlers>,
   extra: Parameters<typeof server.use> = [],
+  role = 'member',
 ) {
   server.use(
-    ...authHandlers({ loggedIn: true }).handlers,
+    ...authHandlers({ loggedIn: true, me: { role } }).handlers,
     ...teamHandlers(),
     ...projectHandlers(),
     ...agents.handlers,
@@ -121,5 +122,52 @@ describe('Agent runs (S5.1.3)', () => {
 
     await user.selectOptions(screen.getByLabelText('Trigger'), 'schedule');
     expect(await screen.findByText('No runs match these filters.')).toBeInTheDocument();
+  });
+
+  it('shows members no settings, and admins the controls with the promotion rule', async () => {
+    boot('/agents/agent-1', agentHandlers());
+    expect(await screen.findByRole('heading', { name: 'Teammate' })).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Agent settings' })).toBeNull();
+  });
+
+  it('lets an admin turn the agent off and set its budget, but not promote it before it has earned it', async () => {
+    const agents = agentHandlers();
+    const user = boot('/agents/agent-1', agents, [], 'admin');
+    const panel = await screen.findByRole('region', { name: 'Agent settings' });
+    expect(
+      await within(panel).findByText(/Accepted 11 of its last 12 proposals \(92%\)/),
+    ).toBeInTheDocument();
+    expect(within(panel).getByText(/Needs 30 decided proposals/)).toBeInTheDocument();
+    expect(
+      within(panel).getByRole('option', { name: /Acts on low-risk changes \(not earned yet\)/ }),
+    ).toBeDisabled();
+    expect(
+      within(panel).getByText(/This month: \$1\.25 · 120,000 tokens\. The dollar budget applies\./),
+    ).toBeInTheDocument();
+
+    await user.click(within(panel).getByRole('checkbox', { name: /Teammate is on/ }));
+    await user.clear(within(panel).getByLabelText('Monthly budget (USD)'));
+    await user.type(within(panel).getByLabelText('Monthly budget (USD)'), '8');
+    await user.click(within(panel).getByRole('button', { name: 'Save budget' }));
+    await waitFor(() => expect(agents.patches).toHaveLength(2));
+    expect(agents.patches[0]).toMatchObject({ enabled: false });
+    expect(agents.patches[1]).toMatchObject({ budget_monthly_usd: '8', budget_monthly_tokens: 2000000 });
+  });
+
+  it('offers promotion once the stats allow it', async () => {
+    const agents = agentHandlers({
+      stats: statsFixture({
+        decided: 30,
+        accepted: 28,
+        acceptance_rate: 28 / 30,
+        eligible_for_auto: true,
+        reasons: [],
+      }),
+    });
+    const user = boot('/agents/agent-1', agents, [], 'admin');
+    const panel = await screen.findByRole('region', { name: 'Agent settings' });
+    expect(await within(panel).findByText('It can be promoted to act on its own.')).toBeInTheDocument();
+    await user.selectOptions(within(panel).getByLabelText('Autonomy'), 'auto');
+    await waitFor(() => expect(agents.patches).toEqual([{ autonomy: 'auto', expected_version: 1 }]));
   });
 });

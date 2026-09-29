@@ -46,6 +46,7 @@ from momentum.domain.agents.schemas import (
     AgentPatchIn,
     InstallOutcome,
 )
+from momentum.domain.agents.stats import agent_stats
 from momentum.domain.projects import service as projects_service
 from momentum.domain.projects.models import Project, ProjectMember
 from momentum.domain.users.models import User
@@ -265,6 +266,11 @@ async def get_agent(session: AsyncSession, ctx: Ctx, agent_id: uuid.UUID) -> Age
     return await _load(session, ctx, agent_id)
 
 
+async def get_agent_for_admin(session: AsyncSession, ctx: Ctx, agent_id: uuid.UUID) -> Agent:
+    _require_admin(ctx)
+    return await _load(session, ctx, agent_id)
+
+
 async def agent_projects(
     session: AsyncSession, ctx: Ctx, agent: Agent
 ) -> list[tuple[Project, str]]:
@@ -294,6 +300,12 @@ async def create_agent(
     if data.kind == "handler":
         raise ValidationFailed(
             "Code-backed agents come from the host application's agent definitions"
+        )
+    if data.autonomy == "auto":
+        # S5.1.4 (agents.md §5): acting alone is earned with a track record, never a default
+        raise ValidationFailed(
+            "A new agent starts at confirm or suggest; promote it to auto once it has earned it",
+            code="not_eligible",
         )
     _check(ctx, data, tool_names)
     if data.key is not None:
@@ -326,6 +338,13 @@ async def update_agent(
     except ValueError as e:
         raise ValidationFailed(str(e)) from e
     _check(ctx, cfg, tool_names)
+    if cfg.autonomy == "auto" and agent.autonomy != "auto":
+        stats = await agent_stats(session, agent)
+        if not stats.eligible_for_auto:
+            raise ValidationFailed(
+                f"{agent.name} can't act on its own yet: " + "; ".join(stats.reasons),
+                code="not_eligible",
+            )
     changes = _apply(agent, cfg)
     if data.enabled is not None and data.enabled != agent.enabled:
         changes["enabled"] = (agent.enabled, data.enabled)
@@ -408,3 +427,14 @@ async def remove_from_project(
     if agent.user_id == ctx.actor.id:
         raise Forbidden("An agent can't change its own access")
     return await projects_service.remove_member(session, ctx, project_id, agent.user_id)
+
+
+async def demote(session: AsyncSession, ctx: Ctx, agent: Agent, reason: str) -> Mutation[Agent]:
+    """S5.1.4: back to ``confirm`` after too many of its own changes were undone (the daily
+    job decides; see ``stats.should_demote``). The reason is kept on the activity row."""
+    if agent.autonomy != "auto":
+        return Mutation(agent, version=agent.version)
+    agent.autonomy = "confirm"
+    changes: Diff = {"autonomy": ("auto", "confirm"), "reason": (None, reason)}
+    activity_id = await _updated(session, ctx, agent, changes)
+    return Mutation(agent, activity_id, version=agent.version)

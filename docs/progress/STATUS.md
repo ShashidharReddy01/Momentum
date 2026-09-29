@@ -5,8 +5,8 @@
 > Older session handoff notes, the Phase 2 exit record and the Phase 0-1 retros live in `docs/progress/handoff-archive.md` (read them only when a slice touches that area). At the end of every slice, move the previous session's handoff there and keep only the latest one here.
 
 ## Current focus
-- **Phase:** 5: Agents v1 ("Teammates") — in progress: kickoff done (2026-09-28, `docs/roadmap/phase-5-kickoff.md`), S5.1.1–S5.1.3 and S5.0.1 done. Phase 4 complete (exit criteria met 2026-09-28).
-- **Next up:** S5.1.4 Autonomy, budgets, kill switches.
+- **Phase:** 5: Agents v1 ("Teammates") — in progress: kickoff done (2026-09-28, `docs/roadmap/phase-5-kickoff.md`), S5.1.1–S5.1.4 and S5.0.1 done. Phase 4 complete (exit criteria met 2026-09-28).
+- **Next up:** S5.1.5 Extension points and code-backed agents.
 - **Product-owner instruction (2026-09-26):** finish all remaining slices, then one big local test run against the real gateway (100+ questions/actions covering edge cases), then fix from that run.
 - **Scope note (product owner, 2026-09-26):** the customer-operations capabilities (SQQ, pricing, contracts, invoices, pushes to internal systems as tools and assignable agents) will be done later in the product owner's own codebase, **not in this repo**. Finish the roadmap as written.
 - **Branch:** Phases 3–4 are on `claude/clever-hopper-pbv7yr` (ahead of `main`). Phase 5 continues on `claude/intelligent-meitner-9ne4e8`, which starts from that branch's Phase 4 exit commit.
@@ -52,7 +52,13 @@
   - Run timeline page and an agent page with filterable run history. Your own proposals can be applied or rejected right on the run page.
   - Your 2026-09-29 decision is built: a person asking an agent gets only what both can see (`ctx.acting_for` in `access.py`).
   - Run details are full for admins and the requester, summary for other viewers.
-- **Next up:** S5.1.4 Autonomy, budgets, kill switches.
+- **S5.1.4 done (2026-09-29):**
+  - Acting alone must be earned: at least 85% of the last 30 decided proposals accepted, and nothing undone in 14 days. The server refuses otherwise and gives the reasons.
+  - A daily job demotes an agent back to asking first when more than 10% of its own changes were undone in a week, and alerts the admins.
+  - Workspace setting "agents may apply medium-risk changes" (off by default).
+  - Admin panel on the agent page: on/off, autonomy with its stats, budget next to this month's spend.
+  - Verification: backend **674**, web **320**, types current.
+- **Next up:** S5.1.5 Extension points and code-backed agents.
 
 ## Open questions
 | # | Question | Needed by | Status |

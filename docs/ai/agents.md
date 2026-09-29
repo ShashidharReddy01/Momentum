@@ -100,6 +100,12 @@ trigger (schedule | outbox event | assigned | mentioned | manual)
 
 An admin can promote `confirm → auto` for an agent when its **acceptance rate ≥ 85% over the last 30 proposals** and there were no undo events for 14 days. The UI shows these stats next to the toggle. Demotion is automatic if the undo rate goes above 10% in a week.
 
+**As built (S5.1.4):** `domain/agents/stats.py`.
+- **Promotion:** "the last 30 proposals" = the 30 most recently decided (applied, undone, rejected or expired) proposals a person decided; applied or undone counts as accepted. Fewer than 30 is "not enough evidence yet". An undo means any activity row of the agent's actions undone in the last 14 days. `PATCH /agents/{id} {autonomy: "auto"}` is refused (`not_eligible`, with the reasons) unless the agent qualifies. A new custom agent can't start at `auto`. The shipped starter defaults (Pulse, Nudge) are the only agents that start there, per kickoff Q2.
+- **Demotion:** the daily `demote_agents` job (03:20 UTC, maintenance queue). An `auto` agent with more than 10% of its own applied changes from the last 7 days undone goes back to `confirm`; the activity row records why, and admins get an `agent_alert`.
+- **Medium risk:** the workspace's `allow_medium_auto` (AI settings, off by default) lets `auto` agents apply medium-risk changes; high risk is always proposed.
+- **Admin panel on `/agents/:id`:** on/off, autonomy (the `auto` option is disabled with the reasons until earned), USD budget and token cap next to this month's spend (`GET /agents/{id}/stats`, admins).
+
 ## 6. Agent UI surfaces
 
 See `frontend/ux-specs.md` §9. Every agent action in the product shows: agent avatar (amber ring), "✦ via Herald", a "Why?" tooltip (trigger + summary), and Undo when applicable.

@@ -19,7 +19,9 @@ from momentum.domain.agents.schemas import (
     AgentPatchIn,
     AgentProjectIn,
     AgentProjectOut,
+    AgentStatsOut,
 )
+from momentum.domain.agents.stats import agent_stats
 
 router = APIRouter(tags=["agents"])
 
@@ -106,3 +108,31 @@ async def remove_agent_project(
     async with uow.transaction() as s:
         m = await service.remove_from_project(s, ctx, agent_id, project_id)
     return MutationOut(data=OkOut(), meta=MutationMeta(activity_id=m.activity_id))
+
+
+@router.get(
+    "/agents/{agent_id}/stats",
+    response_model=AgentStatsOut,
+    summary="An agent's track record (for promotion to auto) and this month's spend (admins)",
+)
+async def get_agent_stats(
+    agent_id: uuid.UUID, ctx: CtxDep, uow: UowDep, runtime: RuntimeDep
+) -> AgentStatsOut:
+    async with uow.transaction() as s:
+        agent = await service.get_agent_for_admin(s, ctx, agent_id)
+        stats = await agent_stats(s, agent)
+    llm = runtime.llm
+    priced = llm is not None and not llm.prices.unpriced([llm.model_for(agent.model_alias)])
+    return AgentStatsOut(
+        decided=stats.decided,
+        accepted=stats.accepted,
+        acceptance_rate=stats.acceptance_rate,
+        undos_14d=stats.undos_14d,
+        auto_applied_7d=stats.auto_applied_7d,
+        auto_undone_7d=stats.auto_undone_7d,
+        eligible_for_auto=stats.eligible_for_auto,
+        reasons=stats.reasons,
+        month_usd=stats.month_usd,
+        month_tokens=stats.month_tokens,
+        priced=priced,
+    )

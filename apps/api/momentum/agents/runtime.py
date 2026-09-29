@@ -189,7 +189,7 @@ async def _messages(
     ]
 
 
-async def _alert_admins(
+async def alert_admins(
     session: AsyncSession, ctx: Ctx, agent: Agent, title: str, snippet: str
 ) -> None:
     since = datetime.now(UTC) - ALERT_EVERY
@@ -254,7 +254,7 @@ async def _apply_policy(
     """Sort the previewed writes by the policy and act on them. Returns the run's output parts."""
     acting_as_agent = ctx.actor.is_agent
     config = await get_ai_config(session, agent.workspace_id)
-    allow_medium = bool(getattr(config, "allow_medium_auto", False))
+    allow_medium = config.allow_medium_auto is True
     to_apply: list[ProposedCall] = []
     to_propose: list[ProposedCall] = []
     suggestions: list[str] = []
@@ -424,7 +424,7 @@ async def execute_run(
     except BudgetExceeded as e:
         await savepoint.rollback()
         status, error = "budget_exceeded", e.detail
-        await _alert_admins(
+        await alert_admins(
             session, base_ctx, agent, f"{agent.name} stopped: budget used up", e.detail
         )
     except AIDisabled as e:
@@ -447,7 +447,7 @@ async def execute_run(
     if status == "failed":
         recent = await recent_statuses(session, agent.id, FAILURES_BEFORE_ALERT)
         if len(recent) == FAILURES_BEFORE_ALERT and all(s == "failed" for s in recent):
-            await _alert_admins(
+            await alert_admins(
                 session,
                 base_ctx,
                 agent,

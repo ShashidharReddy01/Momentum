@@ -61,6 +61,9 @@ class AiConfig(BaseModel):
     monthly_budget_usd: float | None = Field(default=None, ge=0)
     # Whether members' "apply low-risk changes without asking" preference is honoured at all.
     allow_auto_apply: bool | None = None
+    # S5.1.4: may agents at `auto` apply medium-risk changes on their own (ai-architecture §4)?
+    # Off unless an admin turns it on.
+    allow_medium_auto: bool | None = None
 
 
 class EffectiveAi(BaseModel):
@@ -71,6 +74,7 @@ class EffectiveAi(BaseModel):
     enabled: bool
     monthly_budget_usd: float
     allow_auto_apply: bool
+    allow_medium_auto: bool
 
 
 def effective_ai(settings: Settings, config: AiConfig) -> EffectiveAi:
@@ -85,6 +89,7 @@ def effective_ai(settings: Settings, config: AiConfig) -> EffectiveAi:
             else config.monthly_budget_usd
         ),
         allow_auto_apply=config.allow_auto_apply is not False,
+        allow_medium_auto=config.allow_medium_auto is True,
     )
 
 

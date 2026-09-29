@@ -54,3 +54,18 @@ async def run_agent_runs(timestamp: int) -> None:
         counts[status] = counts.get(status, 0) + 1
     if claimed.run_ids or claimed.timed_out:
         log.info("agent_runs_ran", timed_out=claimed.timed_out, timestamp=timestamp, **counts)
+
+
+@blueprint.periodic(cron="20 3 * * *", periodic_id="demote_agents")
+@blueprint.task(name="demote_agents", queue="momentum_maintenance", queueing_lock="demote_agents")
+async def demote_agents(timestamp: int) -> None:
+    """Daily: agents at `auto` whose changes were undone too often this week go back to
+    `confirm` (S5.1.4)."""
+    from momentum.agents.autonomy import run_demotions
+    from momentum.core.settings import Settings
+    from momentum.jobs.db import job_session
+
+    async with job_session() as session:
+        run = await run_demotions(session, Settings())
+    if run.demoted:
+        log.info("agents_demoted", agents=run.demoted, timestamp=timestamp)

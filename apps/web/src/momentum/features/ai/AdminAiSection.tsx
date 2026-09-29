@@ -66,6 +66,22 @@ export function AdminAiSection() {
             </span>
           </span>
         </label>
+        <label className="mt-4 flex items-start gap-2 text-sm">
+          <input
+            type="checkbox"
+            className="mt-0.5"
+            checked={effective.allow_medium_auto}
+            disabled={save.isPending}
+            onChange={(e) => patch({ allow_medium_auto: e.target.checked ? true : null })}
+          />
+          <span>
+            Agents may apply medium-risk changes on their own
+            <span className="block text-muted">
+              Applies only to agents set to act on their own. Off by default: medium-risk changes (new
+              projects, bulk edits) are proposed to a person first. High-risk changes are always proposed.
+            </span>
+          </span>
+        </label>
         <div className="mt-4 text-sm">
           <label htmlFor="ai-monthly-budget" className="block">
             Monthly budget (USD)

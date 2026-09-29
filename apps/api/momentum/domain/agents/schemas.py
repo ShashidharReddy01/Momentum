@@ -248,3 +248,19 @@ class InstallRowOut(BaseModel):
 
 class InstallOut(BaseModel):
     results: list[InstallRowOut]
+
+
+class AgentStatsOut(BaseModel):
+    """S5.1.4: the track record behind the autonomy toggle, and this month's spend."""
+
+    decided: int
+    accepted: int
+    acceptance_rate: float | None
+    undos_14d: int
+    auto_applied_7d: int
+    auto_undone_7d: int
+    eligible_for_auto: bool
+    reasons: list[str]
+    month_usd: Decimal
+    month_tokens: int
+    priced: bool

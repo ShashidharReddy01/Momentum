@@ -247,8 +247,14 @@ async def test_admin_settings_and_usage_endpoints(
     r = await admin.get("/api/v1/ai/admin/settings")
     assert r.status_code == 200, r.text
     body = r.json()
-    assert body["config"] == {"enabled": None, "monthly_budget_usd": None, "allow_auto_apply": None}
+    assert body["config"] == {
+        "enabled": None,
+        "monthly_budget_usd": None,
+        "allow_auto_apply": None,
+        "allow_medium_auto": None,  # S5.1.4
+    }
     assert body["effective"]["enabled"] is True
+    assert body["effective"]["allow_medium_auto"] is False  # off unless an admin turns it on
     assert body["models"]["default"]
     r = await admin.put("/api/v1/ai/admin/settings", json={"enabled": False})
     assert r.status_code == 200, r.text

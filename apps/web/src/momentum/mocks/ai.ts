@@ -155,6 +155,7 @@ function effectiveOf(c: AiConfig): EffectiveAi {
     enabled: c.enabled !== false,
     monthly_budget_usd: c.monthly_budget_usd ?? 0,
     allow_auto_apply: c.allow_auto_apply !== false,
+    allow_medium_auto: c.allow_medium_auto === true,
   };
 }
 

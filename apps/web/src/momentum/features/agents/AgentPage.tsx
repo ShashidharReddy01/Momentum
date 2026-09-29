@@ -4,7 +4,9 @@ import { Link, useParams } from 'react-router';
 import { MoMark } from '@/components/common/MoMark';
 import { EmptyState, ErrorState } from '@/components/common/States';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { useMe } from '@/features/auth';
 import { StatusBadge } from './AgentRunPage';
+import { AgentSettings } from './AgentSettings';
 import { useAgent, useAgentRuns, type AgentRun, type RunFilters } from './queries';
 import { AUTONOMY_LABEL, RUN_STATUS, TRIGGER_LABEL, money, when } from './runMeta';
 
@@ -15,6 +17,7 @@ export function AgentPage() {
   const agent = useAgent(agentId!);
   const [filters, setFilters] = useState<RunFilters>({});
   const runs = useAgentRuns(agentId!, filters);
+  const isAdmin = useMe().data?.user.role === 'admin';
   if (agent.isPending) {
     return (
       <div className="mx-auto w-full max-w-3xl px-6 py-8">
@@ -46,6 +49,8 @@ export function AgentPage() {
             : ' · not added to any project you can see'}
         </p>
       </header>
+
+      {isAdmin ? <AgentSettings agent={a} /> : null}
 
       <section aria-label="Run history" className="flex flex-col gap-3">
         <div className="flex flex-wrap items-center gap-2">
