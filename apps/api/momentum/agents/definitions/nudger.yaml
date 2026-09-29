@@ -1,15 +1,22 @@
-# Nudge · Nudger (agents.md §4 #4). Refined in S5.3.4: at most one nudge per task per 2 days,
-# escalation to the owner after 3, respects snooze (kickoff Q7), skips tasks blocked by others.
+# Nudge · Nudger (agents.md §4 #4). S5.3.4: a built-in code-backed agent
+# (momentum/agents/nudge.py). Weekdays at 10:00 (workspace time), one run per project it has been
+# added to. Reminds the assignee on tasks overdue by more than a day or untouched for 5 days, at
+# most once per task every 2 days; the 4th comment escalates to the project owner, then it stops.
+# Skips tasks waiting on someone else's open work, snoozed tasks (My Tasks placement, kickoff Q7)
+# and people who turned nudges off. The model only phrases the messages.
 key: nudger
 name: Nudge · Nudger
 avatar: nudge
 description: Polite reminders on overdue and stalled tasks, escalating to the owner if ignored.
+kind: handler
+handler: momentum.nudger
 instructions: |
-  Find tasks overdue by more than a day, or with no activity for five days, that are not done.
-  Leave one short, friendly comment for the assignee asking whether they need help or a new
-  date. Never nudge a completed task, or one waiting on someone else's unfinished work.
+  Built in: picks overdue (by more than a day) and stalled (5 days) open tasks in code, applies
+  the limits, snoozes and preferences, and leaves one short comment for the assignee; the model
+  only phrases the comments. These instructions aren't read by the model.
 triggers:
-  - { type: schedule, cron: "0 10 * * 1-5", timezone: workspace }
-tools: [search_tasks, get_task, add_comment]
+  - { type: schedule, cron: "0 10 * * 1-5", timezone: workspace, per: project }
+tools: []
 autonomy: auto
 model_alias: fast
+limits: { timeout_s: 120 }

@@ -144,7 +144,7 @@ tags: id, workspace_id, name (unique per workspace, case-insensitive), color. ta
 id, workspace_id, entity_type (`task`,`comment`), entity_id, user_id, emoji. Unique (entity_type, entity_id, user_id, emoji).
 
 ### `my_task_placements` (Phase 1)
-user_id, task_id, bucket (`recently_assigned`,`today`,`this_week`,`later`), position, pinned bool, updated_at. pk (user_id, task_id).
+user_id, task_id, bucket (`recently_assigned`,`today`,`this_week`,`later`), position, pinned bool, updated_at. pk (user_id, task_id). `nudge_snoozed_until` date null (S5.3.4, migration 0030): the person snoozed Nudge's reminders on this task until that day (kickoff Q7).
 
 ## 4. Custom fields (Phase 2)
 

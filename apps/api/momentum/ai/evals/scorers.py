@@ -25,6 +25,8 @@ KEY = re.compile(r"\bT-\d+\b")
 
 KNOWN = frozenset(
     {
+        "nudged_include",
+        "nudged_exclude",
         "sorter_priority_in",
         "sorter_priority_none",
         "sorter_field_in",
@@ -280,6 +282,13 @@ def score(obs: Observation, expect: dict[str, Any], *, today: date, asked: str =
                 "sorter_no_duplicate", "duplicate" not in comments, f"comments: {comments[:160]!r}"
             )
         )
+
+    # Nudge (S5.3.4): which tasks got a reminder
+    nudged = [str(t).lower() for t in obs.data.get("nudged", [])]
+    for t in expect.get("nudged_include", []):
+        add(Check(f"nudged_include:{t}", t.lower() in nudged, f"nudged: {nudged}"))
+    for t in expect.get("nudged_exclude", []):
+        add(Check(f"nudged_exclude:{t}", t.lower() not in nudged, f"nudged: {nudged}"))
 
     # Pulse digests (S5.3.1)
     if "digest_empty" in expect:

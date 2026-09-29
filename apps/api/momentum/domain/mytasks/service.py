@@ -303,3 +303,47 @@ async def _undo_move(session: AsyncSession, ctx: Ctx, args: dict[str, Any]) -> N
     placement.bucket = str(args["bucket"])
     placement.position = str(args["position"])
     placement.pinned = bool(args["pinned"])
+
+
+async def snooze_nudges(
+    session: AsyncSession, ctx: Ctx, task_id: uuid.UUID, until: date | None
+) -> Mutation[MyTaskPlacement]:
+    """S5.3.4: "Snooze nudges until…" on one of my own tasks (``None`` resumes them). Personal,
+    like the rest of My Tasks; undoable."""
+    assert ctx.actor.id is not None
+    await sync_my_tasks(session, ctx)
+    placement = await session.get(MyTaskPlacement, (ctx.actor.id, task_id))
+    if placement is None:
+        raise NotFound("Only the person a task is assigned to can snooze its reminders")
+    if until is not None and until < today_for(ctx):
+        raise ValidationFailed("Pick a date from today on")
+    if until is not None and until > today_for(ctx) + timedelta(days=90):
+        raise ValidationFailed("Snooze for at most 90 days")
+    old = placement.nudge_snoozed_until
+    placement.nudge_snoozed_until = until
+    act = await record_activity(
+        session,
+        ctx,
+        entity_type="my_task",  # personal: never shown in task feeds
+        entity_id=task_id,
+        verb="my_task.nudges_snoozed",
+        changes={"nudge_snoozed_until": (old, until)},
+        undo=undo_op(
+            "mytasks.snooze_back",
+            task_id=task_id,
+            until=old.isoformat() if old else None,
+            expect=until.isoformat() if until else None,
+        ),
+    )
+    await session.flush()
+    return Mutation(placement, act.id)
+
+
+@undo_handler("mytasks.snooze_back")
+async def _undo_snooze(session: AsyncSession, ctx: Ctx, args: dict[str, Any]) -> None:
+    assert ctx.actor.id is not None
+    placement = await session.get(MyTaskPlacement, (ctx.actor.id, uuid.UUID(str(args["task_id"]))))
+    current = placement.nudge_snoozed_until if placement is not None else None
+    if placement is None or (current.isoformat() if current else None) != args.get("expect"):
+        raise UndoConflict("The snooze was changed again since")
+    placement.nudge_snoozed_until = date.fromisoformat(args["until"]) if args.get("until") else None

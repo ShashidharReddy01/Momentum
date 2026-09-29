@@ -1074,6 +1074,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/tasks/{task_id}/nudge-snooze": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Snooze Nudge's reminders on one of my tasks until a date (S5.3.4) */
+        put: operations["snooze_nudges_api_v1_me_tasks__task_id__nudge_snooze_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me/tokens": {
         parameters: {
             query?: never;
@@ -4869,6 +4886,11 @@ export interface components {
              */
             mentioned: "in_app" | "email" | "slack" | "off";
             /**
+             * Nudge Me
+             * @default true
+             */
+            nudge_me: boolean;
+            /**
              * Overdue
              * @default in_app
              * @enum {string}
@@ -4923,11 +4945,24 @@ export interface components {
              */
             mentioned: "in_app" | "email" | "slack" | "off";
             /**
+             * Nudge Me
+             * @default true
+             */
+            nudge_me: boolean;
+            /**
              * Overdue
              * @default in_app
              * @enum {string}
              */
             overdue: "in_app" | "email" | "slack" | "off";
+        };
+        /** NudgeSnoozeIn */
+        NudgeSnoozeIn: {
+            /**
+             * Until
+             * @description Leave the task alone until this date; null resumes
+             */
+            until: string | null;
         };
         /** NumberOptions */
         NumberOptions: {
@@ -6246,6 +6281,11 @@ export interface components {
             id: string;
             /** Key */
             key: string;
+            /**
+             * My Nudge Snoozed Until
+             * @description S5.3.4: Nudge leaves this task alone for me until this date
+             */
+            my_nudge_snoozed_until?: string | null;
             /**
              * My Role
              * @description The caller's access: admin, editor, commenter or viewer
@@ -9246,6 +9286,41 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["MyTaskMoveIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationOut_OkOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    snooze_nudges_api_v1_me_tasks__task_id__nudge_snooze_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NudgeSnoozeIn"];
             };
         };
         responses: {

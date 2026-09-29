@@ -1,0 +1,22 @@
+# Nudge (S5.3.4; agents.md §4: tone check; no nudges on completed or blocked-by-others tasks).
+# Nudge's daily run on "Launch Plan" through the real runtime. Selection is code (overdue by more
+# than a day, or stalled 5 days; skips done tasks and tasks waiting on someone else's open work),
+# so the lists are exact; live, the judge reads the reminders' tone.
+feature: agent_nudge
+cases:
+  - id: launch_plan_selection
+    mock: true
+    user: ravi
+    expect:
+      nudged_include: ["Sign vendor contract"]
+      nudged_exclude:
+        - "Finalize pricing tiers"     # only a day overdue
+        - "Update pricing page copy"   # waits on Ravi's open "Finalize pricing tiers"
+        - "Kickoff meeting notes"      # done
+        - "Choose analytics tool"      # done
+        - "Book launch webinar"        # due in 10 days, recently touched
+        - "Payment provider approval"  # due in 2 days, and waits on Ana's contract
+  - id: launch_plan_tone
+    user: ravi
+    expect: {nudged_include: ["Sign vendor contract"], text_exclude: ["!"]}
+    judge: {rubric: "Short, friendly reminders a considerate colleague would leave: each asks whether the person needs help or a new date; no guilt, no pressure, no invented facts; one or two sentences each."}

@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import uuid
+from datetime import date
 
 from fastapi import APIRouter, Query
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -84,4 +86,23 @@ async def move_my_task(
         m = await service.move_my_task(
             s, ctx, task_id, body.bucket, after_id=body.after_id, before_id=body.before_id
         )
+    return MutationOut(data=OkOut(), meta=MutationMeta(activity_id=m.activity_id))
+
+
+class NudgeSnoozeIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    until: date | None = Field(description="Leave the task alone until this date; null resumes")
+
+
+@router.put(
+    "/tasks/{task_id}/nudge-snooze",
+    response_model=MutationOut[OkOut],
+    summary="Snooze Nudge's reminders on one of my tasks until a date (S5.3.4)",
+)
+async def snooze_nudges(
+    task_id: uuid.UUID, body: NudgeSnoozeIn, ctx: CtxDep, uow: UowDep
+) -> MutationOut[OkOut]:
+    async with uow.transaction() as s:
+        m = await service.snooze_nudges(s, ctx, task_id, body.until)
     return MutationOut(data=OkOut(), meta=MutationMeta(activity_id=m.activity_id))

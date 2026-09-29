@@ -104,6 +104,23 @@ export function NotificationSettingsPage() {
             </tbody>
           </table>
 
+          <div className="flex items-start gap-2 border-t border-hair-soft pt-4 text-sm">
+            <input
+              id="nudge-me"
+              type="checkbox"
+              className="mt-1"
+              checked={prefs.data.nudge_me ?? true}
+              onChange={(e) => prefs.data && setPrefs.mutate({ ...prefs.data, nudge_me: e.target.checked })}
+            />
+            <label htmlFor="nudge-me">
+              <span className="font-medium">Let Nudge remind me</span>
+              <span className="block text-xs text-muted">
+                A short comment on your tasks that are overdue or have stalled, at most every two days. To
+                pause it for one task, use “Snooze Nudge reminders” in the task’s menu.
+              </span>
+            </label>
+          </div>
+
           <div className="border-t border-hair-soft pt-4">
             <label htmlFor="digest-time" className="mb-1 block text-sm font-medium">
               Daily digest time

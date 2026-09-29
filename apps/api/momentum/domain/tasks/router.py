@@ -11,6 +11,7 @@ from momentum.api.schemas import ListOut, MutationMeta, MutationOut, OkOut
 from momentum.core.errors import ValidationFailed
 from momentum.core.ids import task_key
 from momentum.core.richtext import doc_hash
+from momentum.domain.mytasks.models import MyTaskPlacement
 from momentum.domain.projects.models import Project
 from momentum.domain.sections.models import Section
 from momentum.domain.tasks import service
@@ -160,9 +161,14 @@ async def create_tasks(
 
 
 async def detail_out(
-    s: AsyncSession, t: Task, p: TaskProject | None, role: str | None = None
+    s: AsyncSession,
+    t: Task,
+    p: TaskProject | None,
+    role: str | None = None,
+    viewer: uuid.UUID | None = None,
 ) -> TaskDetailOut:
     project = await s.get(Project, p.project_id) if p else None
+    mine = await s.get(MyTaskPlacement, (viewer, t.id)) if viewer is not None else None
     section = await s.get(Section, p.section_id) if p and t.parent_id is None else None
     parent = await s.get(Task, t.parent_id) if t.parent_id else None
     counts = (await service.subtask_counts(s, [t.id])).get(t.id)
@@ -182,6 +188,7 @@ async def detail_out(
         created_by=t.created_by,
         completed_by=t.completed_by,
         updated_at=t.updated_at,
+        my_nudge_snoozed_until=mine.nudge_snoozed_until if mine is not None else None,
     )
 
 
@@ -189,7 +196,7 @@ async def detail_out(
 async def get_task(task_id: uuid.UUID, ctx: CtxDep, uow: UowDep) -> TaskDetailOut:
     async with uow.transaction() as s:
         t, p, role = await service.get_task(s, ctx, task_id)
-        return await detail_out(s, t, p, role)
+        return await detail_out(s, t, p, role, ctx.actor.id)
 
 
 @router.patch("/tasks/{task_id}", response_model=MutationOut[TaskDetailOut], summary="Edit a task")
@@ -208,7 +215,7 @@ async def patch_task(
         await s.flush()
         await s.refresh(m.entity, ["updated_at"])
         return MutationOut(
-            data=await detail_out(s, m.entity, p, role),
+            data=await detail_out(s, m.entity, p, role, ctx.actor.id),
             meta=MutationMeta(activity_id=m.activity_id, version=m.version),
         )
 

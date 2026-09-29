@@ -73,6 +73,8 @@ class NotificationPrefsOut(BaseModel):
     overdue: NotificationChannel = "in_app"
     digest: NotificationChannel = "in_app"
     digest_time: str | None = None
+    # S5.3.4 (kickoff Q7): false = Nudge never reminds me (per task: snooze on My Tasks)
+    nudge_me: bool = True
 
     @field_validator("digest_time")
     @classmethod

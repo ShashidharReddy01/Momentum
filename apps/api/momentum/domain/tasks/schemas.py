@@ -179,6 +179,9 @@ class TaskDetailOut(TaskOut):
     created_by: uuid.UUID | None
     completed_by: uuid.UUID | None
     updated_at: datetime
+    my_nudge_snoozed_until: date | None = Field(
+        default=None, description="S5.3.4: Nudge leaves this task alone for me until this date"
+    )
 
 
 class SubtaskCreateIn(BaseModel):

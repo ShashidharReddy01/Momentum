@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 
-from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Index, String, func
+from sqlalchemy import Boolean, CheckConstraint, Date, DateTime, ForeignKey, Index, String, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from momentum.core.db import Base
@@ -21,6 +21,8 @@ class MyTaskPlacement(Base):
     bucket: Mapped[str] = mapped_column(String(24))
     position: Mapped[str] = mapped_column(String(64, collation="C"))
     pinned: Mapped[bool] = mapped_column(Boolean, default=False)
+    # S5.3.4 (migration 0030): Nudge leaves this task alone for this person until this date
+    nudge_snoozed_until: Mapped[date | None] = mapped_column(Date)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()

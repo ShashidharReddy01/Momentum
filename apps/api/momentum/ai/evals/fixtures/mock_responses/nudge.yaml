@@ -1,0 +1,6 @@
+# Nudge's phrasing (S5.3.4), mock mode: no messages, so every reminder uses the plain template
+# (the same path as a gateway outage). Tests script their own wording.
+default:
+  tool_calls:
+    - name: submit_result
+      arguments: {messages: []}

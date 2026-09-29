@@ -45,6 +45,9 @@ def _today_for(tz: str) -> date:
         return datetime.now(UTC).date()
 
 
+PLAIN_BOOLS = frozenset({"nudge_me"})  # real booleans, not S2.5.1-era channel flags
+
+
 async def _prefs_for(session: AsyncSession, user_id: uuid.UUID) -> NotificationPrefsOut:
     user = await session.get(User, user_id)
     stored = ((user.prefs or {}).get("notifications") or {}) if user else {}
@@ -53,7 +56,7 @@ async def _prefs_for(session: AsyncSession, user_id: uuid.UUID) -> NotificationP
     # written before this slice still has old-shape booleans sitting in it — coerce them
     # rather than let a still-live S2.5.1-era value fail validation here.
     coerced = {
-        k: ("in_app" if v is True else "off") if isinstance(v, bool) else v
+        k: ("in_app" if v is True else "off") if isinstance(v, bool) and k not in PLAIN_BOOLS else v
         for k, v in stored.items()
         if k in NotificationPrefsOut.model_fields
     }

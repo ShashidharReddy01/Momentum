@@ -1,5 +1,7 @@
 import type { JSONContent } from '@tiptap/react';
 import {
+  BellOff,
+  BellRing,
   CalendarDays,
   Check,
   CornerLeftUp,
@@ -45,7 +47,7 @@ import { formatDay, formatDue } from '@/lib/dates';
 import { applyRealtimeEvent, useChannel } from '@/lib/realtime';
 import { AssigneePicker, assignedMessage } from '../AssigneePicker';
 import { DatePicker } from '../DatePicker';
-import { useTaskDetail, useTaskDetailMutations, type TaskDetail } from '../detail';
+import { useSnoozeNudges, useTaskDetail, useTaskDetailMutations, type TaskDetail } from '../detail';
 import { SubtaskList } from '../SubtaskList';
 import { Collaborators } from './Collaborators';
 import { TaskAttachments } from './TaskAttachments';
@@ -208,6 +210,7 @@ function PaneBody({
   canEdit: boolean;
 }) {
   const m = useTaskDetailMutations(task.id);
+  const snooze = useSnoozeNudges(task.id);
   const config = useMomentumConfig();
   const people = usePeople('', 'all').data;
   const projectFields = useProjectFields(task.project?.id ?? '', !!task.project);
@@ -279,6 +282,26 @@ function PaneBody({
                 <Icon icon={ShieldCheck} />{' '}
                 {task.type === 'approval' ? 'Convert to task' : 'Convert to approval'}
               </DropdownMenuItem>
+              {task.assignee_id && task.assignee_id === meId ? (
+                <>
+                  <DropdownMenuSeparator />
+                  {task.my_nudge_snoozed_until ? (
+                    <DropdownMenuItem onSelect={() => snooze.mutate(null)}>
+                      <Icon icon={BellRing} /> Resume Nudge reminders (snoozed until{' '}
+                      {formatDay(task.my_nudge_snoozed_until)})
+                    </DropdownMenuItem>
+                  ) : (
+                    <>
+                      <DropdownMenuItem onSelect={() => snooze.mutate(daysFromToday(3))}>
+                        <Icon icon={BellOff} /> Snooze Nudge reminders for 3 days
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onSelect={() => snooze.mutate(daysFromToday(7))}>
+                        <Icon icon={BellOff} /> Snooze Nudge reminders for a week
+                      </DropdownMenuItem>
+                    </>
+                  )}
+                </>
+              ) : null}
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 className="text-crit"
@@ -718,4 +741,11 @@ function Description({ task, canEdit }: { task: TaskDetail; canEdit: boolean }) 
       </Suspense>
     </section>
   );
+}
+
+/** A date N days from today in the browser's timezone, as YYYY-MM-DD (snooze until). */
+function daysFromToday(n: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() + n);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }

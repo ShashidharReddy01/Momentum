@@ -144,3 +144,20 @@ export function useTaskDetailMutations(taskId: string) {
 
   return { update, setCompleted, remove, convert, decideApproval };
 }
+
+/** S5.3.4: snooze Nudge's reminders on one of my tasks until a date (null resumes them). */
+export function useSnoozeNudges(taskId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (until: string | null) =>
+      (
+        await api.PUT('/api/v1/me/tasks/{task_id}/nudge-snooze', {
+          params: { path: { task_id: taskId } },
+          body: { until },
+        })
+      ).data!,
+    onSuccess: (_data, until) => syncTask(qc, taskId, { my_nudge_snoozed_until: until }),
+    onError: (e) => toastError(e, "Couldn't change the reminders"),
+  });
+}

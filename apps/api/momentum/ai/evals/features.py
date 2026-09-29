@@ -42,6 +42,7 @@ from momentum.domain.agents import service as agents
 from momentum.domain.agents.models import AgentRun
 from momentum.domain.agents.runs import enqueue_run
 from momentum.domain.agents.schemas import AgentPatchIn
+from momentum.domain.comments.models import Comment
 from momentum.domain.comments.service import create_comment
 from momentum.domain.notifications.models import Notification
 from momentum.domain.projects.models import Project
@@ -67,6 +68,7 @@ FEATURES = (
     "agent_pulse",
     "agent_sorter",
     "agent_herald",
+    "agent_nudge",
 )
 
 
@@ -348,6 +350,25 @@ async def _run(
         obs.citations = [
             c.to_json() for c in await citations.resolve(session, ctx, "\n".join(texts))
         ]
+    elif feature == "agent_nudge":
+        project = case.get("project", "Launch Plan")
+        agent = await _install(session, registry, world, ctx, "nudger", project)
+        trigger = {
+            "type": "schedule",
+            "project_id": str(world.projects[project]),
+            "timezone": "UTC",
+            "requested_by": str(ctx.actor.id),
+        }
+        await _execute(session, llm, registry, ctx, agent, trigger, now, obs)
+        rows = (
+            await session.execute(
+                select(Task.title, Comment.body_text)
+                .join(Comment, Comment.task_id == Task.id)
+                .where(Comment.author_id == agent.user_id)
+            )
+        ).all()
+        obs.data = {"nudged": [t for t, _ in rows]}
+        obs.text = "\n".join(b for _, b in rows)
     elif feature == "agent_teammate":
         await _teammate(session, llm, registry, world, case, ctx, now, obs)
     else:
