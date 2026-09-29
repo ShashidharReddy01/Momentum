@@ -5,8 +5,8 @@
 > Older session handoff notes, the Phase 2 exit record and the Phase 0-1 retros live in `docs/progress/handoff-archive.md` (read them only when a slice touches that area). At the end of every slice, move the previous session's handoff there and keep only the latest one here.
 
 ## Current focus
-- **Phase:** 5: Agents v1 ("Teammates") — in progress: kickoff done (2026-09-28, `docs/roadmap/phase-5-kickoff.md`), S5.1.1–S5.1.2 done. Phase 4 complete (exit criteria met 2026-09-28).
-- **Next up:** S5.1.3 Runs UI.
+- **Phase:** 5: Agents v1 ("Teammates") — in progress: kickoff done (2026-09-28, `docs/roadmap/phase-5-kickoff.md`), S5.1.1–S5.1.3 and S5.0.1 done. Phase 4 complete (exit criteria met 2026-09-28).
+- **Next up:** S5.1.4 Autonomy, budgets, kill switches.
 - **Product-owner instruction (2026-09-26):** finish all remaining slices, then one big local test run against the real gateway (100+ questions/actions covering edge cases), then fix from that run.
 - **Scope note (product owner, 2026-09-26):** the customer-operations capabilities (SQQ, pricing, contracts, invoices, pushes to internal systems as tools and assignable agents) will be done later in the product owner's own codebase, **not in this repo**. Finish the roadmap as written.
 - **Branch:** Phases 3–4 are on `claude/clever-hopper-pbv7yr` (ahead of `main`). Phase 5 continues on `claude/intelligent-meitner-9ne4e8`, which starts from that branch's Phase 4 exit commit.
@@ -48,7 +48,11 @@
   5. assign it a task; the worker must run (`make dev` runs it embedded)
   6. within a minute, a reply appears in the thread
 - **S5.0.1 done (2026-09-28):** the inbox and the bell are live on every page (`useLiveNotifications` in the shell). There's a new regression test, and J9 now waits on the live inbox instead of reloading. Web **313**; e2e 10/10; backend untouched (665).
-- **Next up:** S5.1.3 Runs UI.
+- **S5.1.3 done (2026-09-29):** `make check` green, backend **668**, web **317**. Also fixed a calendar-dependent web test (`feedText.test.ts` broke on 2026-09-29 because Oct 5 came within a week; it now pins the clock).
+  - Run timeline page and an agent page with filterable run history. Your own proposals can be applied or rejected right on the run page.
+  - Your 2026-09-29 decision is built: a person asking an agent gets only what both can see (`ctx.acting_for` in `access.py`).
+  - Run details are full for admins and the requester, summary for other viewers.
+- **Next up:** S5.1.4 Autonomy, budgets, kill switches.
 
 ## Open questions
 | # | Question | Needed by | Status |
@@ -58,6 +62,7 @@
 | 3 | Target host project for plugging in (stack/auth) | Before Phase 8 | open (INTEGRATION_GUIDE.md covers all modes) |
 | 4 | Add an optional Cohere rerank step (rerank-v3.5 via the gateway) to S3.1.4 hybrid retrieval, off by default? (kickoff Q2) | S3.1.4 | **answered 2026-09-26: yes**, off by default |
 | 6 | Phase 5 kickoff Q1–Q7 (agent access, autonomy defaults, rollout, budgets, Pulse default time, carry-overs, Nudge snooze) | S5.1.1 | **answered 2026-09-28:** all recommendations accepted (see `phase-5-kickoff.md` §5) |
+| 7 | When a person asks an agent (assign/@mention/run now), may it use access that person lacks? | S5.1.3 | **answered 2026-09-29:** no, only what both see (lower role); scheduled/event runs keep the agent's own access |
 | 5 | MCP server dropped. Keep personal API tokens (so internal scripts can call Momentum's API), or drop S7.1 entirely? | Phase 7 | **answered 2026-09-28: keep**, moved to Phase 5 as S5.1.6 (ADR-0009) |
 
 ## Progress
@@ -141,6 +146,7 @@ Tracked in their phase files; copy the slice list here at each phase kickoff.
 | 2026-09-26 | Phase 3 exit: `search_tasks.blocked`, `blocked_by` in task briefs, `from`/`to` for moved dates in project activity | Real gaps: Mo could not answer "which tasks are blocked" or "did anything slip" from list results |
 | 2026-09-28 | Phase 5 kickoff: new E5.0 (S5.0.1 inbox/bell live updates, S5.0.2 public forms security review) carried from Phase 4; kickoff refinements on S5.1.1/S5.1.2/S5.1.4 and the starter table (token-fallback budget, `agent_alert` kind, workspace timezone, explicit `croniter`, Sorter enabled via scope, Nudge snooze on `my_task_placements`); build order changed to put S5.3.8 with S5.2.1 (J10) | Product-owner answers to kickoff Q1–Q7; state check in `phase-5-kickoff.md` §2 |
 | 2026-09-28 | ADR-0009: agent extension points. Host tools and agent definitions, code-backed `handler` agents, `get_attachment_text` (new S5.1.5); API tokens moved from S7.1 to S5.1.6 | Product owner's customer-operations work (SQQ, discovery, invoices, contracts, data uploads) will live in their own codebase and plug into Momentum; kickoff Q8. Onboarding-specific workflow features (conditional template items, template versions applied to running projects, agent form pre-fill, document generation) are deliberately not on the roadmap; the product owner will do them later |
+| 2026-09-29 | Requested agent runs see only what both the agent and the requester can see (`ctx.acting_for` honoured in `domain/access.py`, lower role of the two) | Product-owner answer to a permissions question raised while building S5.1.3 (kickoff Q9) |
 | 2026-09-24 | Phase 2 started without a human sign-off gate on Phase 1, at explicit product-owner instruction ("finish off Phase 2 as you have all the context", "do not ask any permission... just finish this whole phase at ur own pace") given while unavailable | Phase 1 exit criteria were already met and the product owner asked to proceed rather than wait; noted here per that same instruction to record decisions/blockers instead of stopping |
 
 ## Phase retros

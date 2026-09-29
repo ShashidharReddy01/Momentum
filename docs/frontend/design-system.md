@@ -93,6 +93,7 @@ Mo's text uses the same typography as everything else. Its identity comes from t
 - **Undo everywhere:** every mutation toast offers Undo; `⌘Z` triggers the last undo when focus isn't in a text field.
 - **Empty project:** EmptyState with "Add task", "Import", "✦ Generate from a brief".
 - **Loading:** skeletons matching final layout; never block the shell.
+- **Agent run (S5.1.3):** a header (the agent as an amber ✦ link, the trigger as the title, a status with icon, then a `dl` of task, project, for whom, times and usage), a plain `role="alert"` error line, **Waiting for you** (the person's own proposals as `PreviewCard`s, decidable in place), the agent's answer as an `AICallout`, then **Steps** as a hairline-left timeline (time · step label · tool name in mono · summary). Status icons and labels come from one map (`features/agents/runMeta.ts`), shared by the run history list.
 - **Home:** functional, not a hero. A modest greeting title plus the date, then working widgets.
 
 ## 6. Breakpoints and responsiveness

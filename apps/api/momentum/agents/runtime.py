@@ -5,7 +5,9 @@
 1. checks the kill switches (``MOMENTUM_AGENTS_ENABLED``, the agent's ``enabled``; the global and
    workspace AI switches are checked by the gateway on every call);
 2. builds the context it acts in: the agent's own account (``via="agent"``), or — for a per-user
-   run (``for_user_id``) — the person it works for, so it sees only what they see;
+   run (``for_user_id``) — the person it works for, so it sees only what they see. When a person
+   asked (assigned, mentioned, run now), the agent acts *for* them (``ctx.acting_for``): it sees
+   only what both can see, with the lower role of the two;
 3. checks access and scope for what the run is about (a task or project);
 4. runs the shared tool loop (``ai/loop.py``) with only the agent's own tools, its step limit and
    a wall-clock timeout; every model call carries ``agent_run_id``, so the gateway checks the
@@ -46,7 +48,7 @@ from momentum.ai.models import LlmCall
 from momentum.ai.prompts import load
 from momentum.ai.tools.registry import ToolRegistry
 from momentum.ai.tools.write_tools import text_doc
-from momentum.core.context import Ctx
+from momentum.core.context import Actor, Ctx
 from momentum.core.errors import NotFound
 from momentum.core.events import emit
 from momentum.core.richtext import plain_text
@@ -371,6 +373,18 @@ async def execute_run(
         if trigger.get("for_user_id") and for_user is None:
             raise _Cancelled("The person this run was for is no longer active")
         ctx = on_behalf_ctx(for_user, settings) if for_user is not None else base_ctx
+        if for_user is None and requester is not None and trigger.get("type") in ANSWERING:
+            # a person asked: the agent sees only what both of them can see (2026-09-29)
+            ctx = ctx.with_(
+                acting_for=Actor(
+                    id=requester.id,
+                    workspace_id=requester.workspace_id,
+                    role=requester.role,
+                    email=requester.email,
+                    name=requester.name,
+                    timezone=requester.timezone,
+                )
+            )
         await _check_access(session, agent, ctx, trigger)
         autonomy = policy.effective_autonomy(agent.autonomy, external=bool(trigger.get("external")))
         if autonomy != agent.autonomy:

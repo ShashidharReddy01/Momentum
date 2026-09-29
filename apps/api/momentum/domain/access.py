@@ -56,10 +56,34 @@ async def require_team_manager(session: AsyncSession, ctx: Ctx, team: Team) -> N
 # ---------------- projects ----------------
 
 
+def _for(ctx: Ctx) -> Ctx | None:
+    """S5.1.3 (product owner, 2026-09-29): an agent working for a person who asked (assigned,
+    @mentioned, run now) carries that person in ``ctx.acting_for``. It then sees only what
+    **both** can see, with the lower of the two roles, so it can't pass on content the person
+    couldn't reach, nor change what they couldn't change."""
+    if ctx.acting_for is None:
+        return None
+    return ctx.with_(actor=ctx.acting_for, acting_for=None)
+
+
+def _lower(a: str, b: str) -> str:
+    return a if ROLE_RANK[a] <= ROLE_RANK[b] else b
+
+
 async def project_role(session: AsyncSession, ctx: Ctx, project: Project) -> str | None:
     """Effective role: explicit membership wins; otherwise team members are editors on
     team-visible projects and workspace admins are admins of them. Private projects are only
-    visible to explicit members (admins included). Agents only ever have explicit roles."""
+    visible to explicit members (admins included). Agents only ever have explicit roles. With
+    ``ctx.acting_for``, the lower of both roles, and none unless both have one."""
+    role = await _own_project_role(session, ctx, project)
+    other = _for(ctx)
+    if role is None or other is None:
+        return role
+    theirs = await _own_project_role(session, other, project)
+    return None if theirs is None else _lower(role, theirs)
+
+
+async def _own_project_role(session: AsyncSession, ctx: Ctx, project: Project) -> str | None:
     if ctx.actor.id is None:
         return None
     explicit = (
@@ -84,7 +108,15 @@ async def project_role(session: AsyncSession, ctx: Ctx, project: Project) -> str
 
 
 def visible_projects_clause(ctx: Ctx) -> ColumnElement[bool]:
-    """SQL predicate for projects the caller can see (use in every project listing)."""
+    """SQL predicate for projects the caller can see (use in every project listing). With
+    ``ctx.acting_for``, only projects both can see."""
+    other = _for(ctx)
+    if other is not None:
+        return and_(_own_projects_clause(ctx), _own_projects_clause(other))
+    return _own_projects_clause(ctx)
+
+
+def _own_projects_clause(ctx: Ctx) -> ColumnElement[bool]:
     explicit = select(ProjectMember.project_id).where(ProjectMember.user_id == ctx.actor.id)
     live_teams = select(Team.id).where(
         Team.workspace_id == ctx.workspace_id, Team.deleted_at.is_(None)
@@ -166,8 +198,21 @@ async def get_visible_task(
     Visible through any visible project (role = project role); otherwise assignees get editor
     access and creators/followers get commenter access (auth-and-permissions.md §6).
     Subtasks have no placement of their own: they are visible through their top-level task's
-    projects, and hidden when any ancestor is deleted.
+    projects, and hidden when any ancestor is deleted. With ``ctx.acting_for``, the task must be
+    visible to both, and the role is the lower of the two.
     """
+    other = _for(ctx)
+    if other is None:
+        return await _own_visible_task(session, ctx, task_id, include_deleted)
+    mine_ctx = ctx.with_(acting_for=None)
+    task, placement, role = await _own_visible_task(session, mine_ctx, task_id, include_deleted)
+    _t, _p, theirs = await _own_visible_task(session, other, task_id, include_deleted)
+    return task, placement, _lower(role, theirs)
+
+
+async def _own_visible_task(
+    session: AsyncSession, ctx: Ctx, task_id: uuid.UUID, include_deleted: bool
+) -> tuple[Task, TaskProject | None, str]:
     task = await session.get(Task, task_id)
     if (
         task is None

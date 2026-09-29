@@ -39,6 +39,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/agents/runs/{run_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One run: its steps, proposals, answer, cost and errors */
+        get: operations["get_agent_run_api_v1_agents_runs__run_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/agents/{agent_id}": {
         parameters: {
             query?: never;
@@ -102,6 +119,23 @@ export interface paths {
         put?: never;
         /** Run an agent now, on a task or project you can see; it starts within a minute */
         post: operations["run_agent_api_v1_agents__agent_id__run_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/agents/{agent_id}/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** An agent's recent runs you may see, newest first (filter by status or trigger) */
+        get: operations["list_agent_runs_api_v1_agents__agent_id__runs_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -2765,6 +2799,97 @@ export interface components {
             /** Role */
             role: string;
         };
+        /** AgentRunDetailOut */
+        AgentRunDetailOut: {
+            /** Actions */
+            actions: components["schemas"]["RunActionOut"][];
+            agent: components["schemas"]["RunAgentOut"];
+            /** Answer */
+            answer: string | null;
+            /** Applied */
+            applied: number;
+            /** Comment Id */
+            comment_id: string | null;
+            /** Cost Usd */
+            cost_usd: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Detail
+             * @enum {string}
+             */
+            detail: "full" | "summary";
+            /** Error */
+            error: string | null;
+            /** Finished At */
+            finished_at: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            project: components["schemas"]["RunProjectOut"] | null;
+            /** Proposals */
+            proposals: number;
+            requested_by: components["schemas"]["RunPersonOut"] | null;
+            /** Started At */
+            started_at: string | null;
+            /** Status */
+            status: string;
+            /** Steps */
+            steps: number;
+            task: components["schemas"]["RunTaskOut"] | null;
+            /** Tokens In */
+            tokens_in: number;
+            /** Tokens Out */
+            tokens_out: number;
+            /** Trace */
+            trace: components["schemas"]["RunStepOut"][];
+            /** Trigger */
+            trigger: string;
+        };
+        /** AgentRunOut */
+        AgentRunOut: {
+            agent: components["schemas"]["RunAgentOut"];
+            /** Applied */
+            applied: number;
+            /** Cost Usd */
+            cost_usd: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Error */
+            error: string | null;
+            /** Finished At */
+            finished_at: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            project: components["schemas"]["RunProjectOut"] | null;
+            /** Proposals */
+            proposals: number;
+            requested_by: components["schemas"]["RunPersonOut"] | null;
+            /** Started At */
+            started_at: string | null;
+            /** Status */
+            status: string;
+            /** Steps */
+            steps: number;
+            task: components["schemas"]["RunTaskOut"] | null;
+            /** Tokens In */
+            tokens_in: number;
+            /** Tokens Out */
+            tokens_out: number;
+            /** Trigger */
+            trigger: string;
+        };
         /**
          * AgentScope
          * @description What the agent may act on, **narrowing** what its account can see (kickoff Q1: scope never
@@ -3774,6 +3899,13 @@ export interface components {
         ListOut_AgentOut_: {
             /** Data */
             data: components["schemas"]["AgentOut"][];
+            /** @default {} */
+            meta: components["schemas"]["ListMeta"];
+        };
+        /** ListOut[AgentRunOut] */
+        ListOut_AgentRunOut_: {
+            /** Data */
+            data: components["schemas"]["AgentRunOut"][];
             /** @default {} */
             meta: components["schemas"]["ListMeta"];
         };
@@ -5160,6 +5292,37 @@ export interface components {
             /** Conditions Passed */
             conditions_passed: boolean;
         };
+        /** RunActionOut */
+        RunActionOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Mine */
+            mine: boolean;
+            proposed_for: components["schemas"]["RunPersonOut"] | null;
+            /** Risk */
+            risk: string;
+            /** State */
+            state: string;
+            /** Summary */
+            summary: string;
+        };
+        /** RunAgentOut */
+        RunAgentOut: {
+            /** Avatar */
+            avatar: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Key */
+            key: string;
+            /** Name */
+            name: string;
+        };
         /** RunIn */
         RunIn: {
             /** Project Id */
@@ -5168,6 +5331,26 @@ export interface components {
             task_id?: string | null;
             /** Text */
             text?: string | null;
+        };
+        /** RunPersonOut */
+        RunPersonOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+        };
+        /** RunProjectOut */
+        RunProjectOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
         };
         /** RunQueuedOut */
         RunQueuedOut: {
@@ -5178,6 +5361,31 @@ export interface components {
             run_id: string;
             /** Status */
             status: string;
+        };
+        /** RunStepOut */
+        RunStepOut: {
+            /** At */
+            at: string;
+            /** Kind */
+            kind: string;
+            /** Name */
+            name?: string | null;
+            /** Ok */
+            ok?: boolean | null;
+            /** Summary */
+            summary: string;
+        };
+        /** RunTaskOut */
+        RunTaskOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Key */
+            key: string;
+            /** Title */
+            title: string;
         };
         /** SaveDraftIn */
         SaveDraftIn: {
@@ -6384,6 +6592,37 @@ export interface operations {
             };
         };
     };
+    get_agent_run_api_v1_agents_runs__run_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentRunDetailOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_agent_api_v1_agents__agent_id__get: {
         parameters: {
             query?: never;
@@ -6539,6 +6778,40 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RunQueuedOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_agent_runs_api_v1_agents__agent_id__runs_get: {
+        parameters: {
+            query?: {
+                status?: string | null;
+                trigger?: string | null;
+            };
+            header?: never;
+            path: {
+                agent_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListOut_AgentRunOut_"];
                 };
             };
             /** @description Validation Error */

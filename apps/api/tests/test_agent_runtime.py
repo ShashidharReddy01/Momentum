@@ -29,7 +29,7 @@ from momentum.ai.usage import DbUsageLog
 from momentum.core.activity import Activity
 from momentum.core.context import Ctx
 from momentum.core.db import UnitOfWork
-from momentum.core.errors import Forbidden, ValidationFailed
+from momentum.core.errors import Forbidden, NotFound, ValidationFailed
 from momentum.core.events import ConsumerOffset, OutboxEvent
 from momentum.core.settings import Settings
 from momentum.domain.agents import service
@@ -772,3 +772,122 @@ async def test_run_now_and_workspace_timezone_api(
         await admin.post("/api/v1/undo", json={"activity_id": r.json()["meta"]["activity_id"]})
     ).status_code == 200
     assert (await ravi.get("/api/v1/workspace/settings")).json()["timezone"] == "UTC"
+
+
+# ---------- acting for the person who asked (product owner, 2026-09-29) ----------
+
+
+async def test_an_agent_acting_for_someone_sees_only_what_both_see(
+    make_env: Callable[..., Env],
+) -> None:
+    env = make_env()
+    await env.install(_defn())
+    w = env.world
+    async with env.uow.transaction() as s:  # priya also gives it her private project
+        await service.add_to_project(s, w.priya, env.agent.id, w.secret.id, "editor")
+    from momentum.domain.access import get_visible_task
+    from momentum.domain.projects.service import list_projects
+
+    alone = env.ctx
+    for_ravi = alone.with_(acting_for=w.ravi.actor)  # ravi isn't in the private project
+    for_lena = alone.with_(acting_for=w.lena.actor)  # lena is a viewer on the shared one
+    async with env.uow.transaction() as s:
+        assert (await get_visible_task(s, alone, w.hidden.id))[0].id == w.hidden.id
+        with pytest.raises(NotFound):
+            await get_visible_task(s, for_ravi, w.hidden.id)
+        assert (await get_visible_task(s, for_ravi, w.copy.id))[2] == "editor"
+        assert (await get_visible_task(s, for_lena, w.copy.id))[2] == "viewer"  # the lower role
+        mine = {p.id for p in await list_projects(s, alone)}
+        theirs = {p.id for p in await list_projects(s, for_ravi)}
+    assert w.secret.id in mine and w.secret.id not in theirs and w.project.id in theirs
+
+
+async def test_a_requested_run_cannot_reach_what_the_requester_cannot(
+    make_env: Callable[..., Env],
+) -> None:
+    env = make_env()
+    await env.install(_defn())
+    w = env.world
+    async with env.uow.transaction() as s:
+        await service.add_to_project(s, w.priya, env.agent.id, w.secret.id, "editor")
+    env.script(
+        [
+            {
+                "match": {"contains": "asked you to run", "turn": 1},
+                "tool_calls": [
+                    {
+                        "name": "get_task",
+                        "arguments": {"task": {"title_query": "Draft pricing secret"}},
+                    }
+                ],
+            },
+            {
+                "match": {"contains": "asked you to run", "turn": 2},
+                "text": "(mock) I couldn't find it.",
+            },
+        ]
+    )
+    async with env.uow.transaction() as s:
+        await request_run(
+            s, w.ravi, env.agent, task_id=w.copy.id, text="what is in the secret task?"
+        )
+    assert await env.drain() == ["succeeded"]
+    [run] = await env.runs()
+    [lookup] = [step for step in run.trace if step["kind"] == "tool"]
+    assert lookup["ok"] is False and "secret" not in lookup["summary"].lower().replace(
+        "draft pricing secret", ""
+    )
+
+
+# ---------- S5.1.3 run views ----------
+
+
+async def test_run_views_show_full_summary_or_nothing(make_env: Callable[..., Env]) -> None:
+    from momentum.agents import runs_view
+
+    env = make_env()
+    await env.install(_defn())
+    w = env.world
+    env.script(
+        [
+            {
+                "match": {"contains": "asked you to run", "turn": 1},
+                "tool_calls": [
+                    {
+                        "name": "update_task",
+                        "arguments": {
+                            "task": {"title_query": "Draft pricing copy"},
+                            "priority": "high",
+                        },
+                    }
+                ],
+            },
+            {
+                "match": {"contains": "asked you to run", "turn": 2},
+                "text": "(mock) Proposed a higher priority.",
+            },
+        ]
+    )
+    async with env.uow.transaction() as s:
+        run_id = await request_run(s, w.ravi, env.agent, task_id=w.copy.id)
+    assert await env.drain() == ["succeeded"]
+    admin = await ctx_for(env.uow, env.settings, "admin")
+    async with env.uow.transaction() as s:
+        mine = await runs_view.get_run(s, w.ravi, run_id)
+        as_admin = await runs_view.get_run(s, admin, run_id)
+        other = await runs_view.get_run(s, w.ana, run_id)  # a Product editor, not the requester
+        with pytest.raises(NotFound):
+            await runs_view.get_run(s, w.tom, run_id)  # can't see the task
+        history = await runs_view.list_runs(s, w.ana, env.agent.id)
+        failed_only = await runs_view.list_runs(s, admin, env.agent.id, status="failed")
+        tom_history = await runs_view.list_runs(s, w.tom, env.agent.id)
+    assert mine.detail == as_admin.detail == "full" and other.detail == "summary"
+    assert mine.answer and "higher priority" in mine.answer and other.answer is None
+    [action] = mine.actions
+    assert action.mine and action.summary and action.proposed_for.name == "Ravi Kumar"  # type: ignore[union-attr]
+    assert not other.actions[0].mine and other.actions[0].summary == ""
+    tool_steps = [s for s in other.trace if s.kind == "tool"]
+    assert tool_steps and all(s.summary == "" and s.name for s in tool_steps)
+    assert mine.task is not None and mine.task.title == "Draft pricing copy"
+    assert (mine.proposals, mine.applied, mine.trigger) == (1, 0, "manual")
+    assert [r.id for r in history] == [run_id] and failed_only == [] and tom_history == []

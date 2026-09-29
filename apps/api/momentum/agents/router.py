@@ -8,9 +8,11 @@ import uuid
 from fastapi import APIRouter, status
 from pydantic import BaseModel, ConfigDict, Field
 
+from momentum.agents import runs_view
 from momentum.agents.loader import DefinitionError, load_definitions
 from momentum.agents.triggers import request_run
 from momentum.api.deps import CtxDep, RuntimeDep, UowDep
+from momentum.api.schemas import ListOut
 from momentum.core.errors import ValidationFailed
 from momentum.domain.agents import service
 from momentum.domain.agents.models import AgentRun
@@ -69,3 +71,31 @@ async def run_agent(agent_id: uuid.UUID, body: RunIn, ctx: CtxDep, uow: UowDep) 
         )
         run = await s.get(AgentRun, run_id)
         return RunQueuedOut(run_id=run_id, status=run.status if run else "queued")
+
+
+@router.get(
+    "/agents/{agent_id}/runs",
+    response_model=ListOut[runs_view.AgentRunOut],
+    summary="An agent's recent runs you may see, newest first (filter by status or trigger)",
+)
+async def list_agent_runs(
+    agent_id: uuid.UUID,
+    ctx: CtxDep,
+    uow: UowDep,
+    status: str | None = None,
+    trigger: str | None = None,
+) -> ListOut[runs_view.AgentRunOut]:
+    async with uow.transaction() as s:
+        return ListOut(
+            data=await runs_view.list_runs(s, ctx, agent_id, status=status, trigger=trigger)
+        )
+
+
+@router.get(
+    "/agents/runs/{run_id}",
+    response_model=runs_view.AgentRunDetailOut,
+    summary="One run: its steps, proposals, answer, cost and errors",
+)
+async def get_agent_run(run_id: uuid.UUID, ctx: CtxDep, uow: UowDep) -> runs_view.AgentRunDetailOut:
+    async with uow.transaction() as s:
+        return await runs_view.get_run(s, ctx, run_id)

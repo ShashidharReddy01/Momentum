@@ -1,6 +1,16 @@
-import { describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import type { FeedItem } from '../comments';
 import { buildFeed, describeActivity } from './feedText';
+
+// Dates near "today" read as weekday names, so pin today: this file's dates (Oct 2026) must
+// stay more than a week out, or the expectations change with the calendar.
+beforeAll(() => {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(new Date('2026-09-23T12:00:00Z'));
+});
+afterAll(() => {
+  vi.useRealTimers();
+});
 
 const names = {
   person: (id: string) => ({ ana: 'Ana Souza', ravi: 'Ravi Kumar' })[id],

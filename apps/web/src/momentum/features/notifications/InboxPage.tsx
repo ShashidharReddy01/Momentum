@@ -1,3 +1,4 @@
+import { useNavigate } from 'react-router';
 import { Archive, ArchiveRestore, Bell, Inbox as InboxIcon } from 'lucide-react';
 import { useMemo, useState, type KeyboardEvent } from 'react';
 import { EmptyState } from '@/components/common/States';
@@ -61,9 +62,13 @@ function InboxBody() {
     }
   };
 
+  const navigate = useNavigate();
   const open = (n: Notification) => {
     if (!n.read_at) m.setRead.mutate({ id: n.id, read: true });
     if (n.entity_type === 'task') nav.open(n.entity_id);
+    // S5.1.3: an agent's proposal without a task opens its run; an agent alert opens the agent
+    else if (n.entity_type === 'agent_run') navigate(`/agents/runs/${n.entity_id}`);
+    else if (n.entity_type === 'agent') navigate(`/agents/${n.entity_id}`);
   };
 
   return (

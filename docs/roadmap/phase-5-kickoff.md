@@ -92,6 +92,8 @@ Recommendations first; the answers go in here and in STATUS "Open questions".
   **Answered 2026-09-28: per-task snooze on `my_task_placements` + a user-level "don't nudge me" pref** (as recommended).
 - **Q8 (added after the kickoff, 2026-09-28): make agents extensible for the owner's customer-operations work?** Context: the product owner's own codebase will add SQQ, discovery, invoice, contract and data-upload agents and scripts. Recommendation: add host tools and agent definitions, code-backed `handler` agents, API tokens (moved from S7.1) and a `get_attachment_text` tool to Phase 5. That is cheap now and expensive to retrofit after eight agents. Onboarding-specific workflow features (conditional template items, template versions applied to running projects, agent pre-fill of forms, document generation) stay out of the roadmap.
   **Answered 2026-09-28: yes** ("add them in the phases"). The product owner will do customer onboarding later and wants the base kept flexible. Recorded in **ADR-0009**; new slices S5.1.5 and S5.1.6 in `phase-5.md`.
+- **Q9 (raised while building S5.1.3, 2026-09-29): when a person assigns, @mentions or runs an agent, what may the agent see?** Recommendation: only what both the agent and that person can see (lower role of the two); scheduled and event runs keep the agent's own access.
+  **Answered 2026-09-29: only what both see** (as recommended). Built in S5.1.3 via `ctx.acting_for`.
 
 ## 6. Exit criteria (as written, with the deferrals above)
 

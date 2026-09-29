@@ -47,6 +47,7 @@
 ### S5.1.3: Runs UI
 **Scope:** `/agents/runs/:id` timeline (steps, tool calls, result digests, proposals with apply/reject, cost, errors); agent detail run history with filters.
 **Size:** M
+**Built (2026-09-28/29):** `momentum/agents/runs_view.py` + `GET /agents/{id}/runs`, `GET /agents/runs/{run_id}`; `features/agents/` (`AgentRunPage`, `AgentPage`, `runMeta.ts`, `queries.ts`). A person's own proposals appear as `PreviewCard`s with Apply/Reject on the run page. **Product-owner decision (2026-09-29), built here:** runs a person asked for see only what both the agent and that person can see (`ctx.acting_for` in `domain/access.py`), with the lower role. Run visibility is full for admins and the requester, summary for other viewers of the task or project, and none otherwise. Inbox links for `agent_run`/`agent` notifications. Tests: 3 backend (access intersection, a requested run can't reach a private project, run views), 4 web.
 
 ### S5.1.4: Autonomy, budgets, kill switches
 **Scope:** per-agent autonomy setting with promotion stats (agents.md §5), budget settings, per-agent enable, global AI switch, auto-demotion job.
