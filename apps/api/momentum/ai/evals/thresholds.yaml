@@ -19,6 +19,7 @@ mock:
   agent_draft: 1.0
   agent_pulse: 1.0
   agent_sorter: 1.0
+  agent_herald: 1.0
 live:
   command: 0.9
   chat: 0.85
@@ -36,3 +37,4 @@ live:
   agent_draft: 0.85
   agent_pulse: 1.0
   agent_sorter: 0.8
+  agent_herald: 1.0

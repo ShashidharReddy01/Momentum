@@ -37,8 +37,8 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from momentum.agents import policy
+from momentum.agents.builtin import BUILTIN_HANDLERS
 from momentum.agents.extensions import Handler, HandlerRun, attach_file
-from momentum.agents.pulse import BUILTIN_HANDLERS
 from momentum.agents.triggers import agent_ctx, in_scope, on_behalf_ctx, task_project_ids
 from momentum.ai.actions import ProposedCall, apply_as_agent, propose
 from momentum.ai.context.builders import project_ctx, task_ctx

@@ -36,7 +36,7 @@ from momentum.core.settings import Settings
 from momentum.domain.access import get_visible_project, get_visible_task, task_ancestors
 from momentum.domain.agents.models import Agent
 from momentum.domain.agents.runs import enqueue_run
-from momentum.domain.projects.models import Project
+from momentum.domain.projects.models import Project, ProjectMember
 from momentum.domain.tasks.models import Task, TaskProject
 from momentum.domain.users.models import User
 from momentum.domain.workspace.models import Workspace
@@ -126,6 +126,50 @@ async def _enabled_agents(session: AsyncSession) -> list[tuple[Agent, User]]:
 # ---------------- schedules ----------------
 
 
+async def _per_project(
+    session: AsyncSession,
+    settings: Settings,
+    agent: Agent,
+    account: User,
+    index: int,
+    minute: datetime,
+    zone: str,
+) -> int:
+    """S5.3.3: a ``per: project`` schedule queues one run for each live project the agent's
+    account is a member of and may act on (its scope), for the project's owner (the person its
+    proposals go to; none when the owner is gone, so it only reports)."""
+    rows = (
+        await session.execute(
+            select(Project)
+            .join(ProjectMember, ProjectMember.project_id == Project.id)
+            .where(
+                ProjectMember.user_id == account.id,
+                Project.deleted_at.is_(None),
+                Project.archived_at.is_(None),
+                Project.is_template.is_(False),
+            )
+            .order_by(Project.name)
+        )
+    ).scalars()
+    ctx = agent_ctx(agent, account, settings)
+    queued = 0
+    for project in rows:
+        if not await in_scope(session, agent, ctx, [project.id]):
+            continue
+        trigger: dict[str, Any] = {
+            "type": "schedule",
+            "fire_time": minute.isoformat(),
+            "timezone": zone,
+            "project_id": str(project.id),
+        }
+        owner = await session.get(User, project.owner_id) if project.owner_id else None
+        if owner is not None and owner.status == "active" and not owner.is_agent:
+            trigger["requested_by"] = str(owner.id)
+        key = f"schedule:{index}:p{project.id}:{minute.isoformat()}"
+        queued += int(await enqueue_run(session, agent, trigger, key) is not None)
+    return queued
+
+
 def personal_cron(cron: str, person: User | None, at: str | None) -> str:
     """S5.3.1: a per-person schedule's cron with the person's own time of day (their
     notification ``digest_time``, "HH:MM") in place of its minute and hour, when they set one.
@@ -154,7 +198,7 @@ async def evaluate_schedules(
     if not settings.agents_enabled:
         return stats
     minutes = [_minute(now), _minute(now) - timedelta(minutes=1)]
-    for agent, _account in await _enabled_agents(session):
+    for agent, account in await _enabled_agents(session):
         for index, trig in enumerate(agent.triggers or []):
             if trig.get("type") != "schedule":
                 continue
@@ -179,6 +223,11 @@ async def evaluate_schedules(
                 own = personal_cron(cron, person, trig.get("at"))
                 for minute in minutes:
                     if not croniter.match(own, minute.astimezone(ZoneInfo(zone))):
+                        continue
+                    if trig.get("per") == "project":
+                        stats.queued += await _per_project(
+                            session, settings, agent, account, index, minute, zone
+                        )
                         continue
                     trigger: dict[str, Any] = {
                         "type": "schedule",

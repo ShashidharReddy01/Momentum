@@ -62,6 +62,8 @@ class ScheduleTrigger(_Strict):
     # S5.3.1: with ``timezone: user``, each person's own time of day replaces the cron's minute
     # and hour when they've set one (``digest_time`` = their notification digest time, "HH:MM")
     at: Literal["digest_time"] | None = None
+    # S5.3.3: one run per project the agent belongs to (and may act on), for its owner
+    per: Literal["project"] | None = None
 
     @field_validator("cron")
     @classmethod
@@ -75,14 +77,17 @@ class ScheduleTrigger(_Strict):
         # an unset ``at`` is left out, so schedules stored (and hashed) before it existed are
         # unchanged: installed agents don't turn "drifted" (S5.3.1)
         data: dict[str, Any] = handler(self)
-        if data.get("at") is None:
-            data.pop("at", None)
+        for key in ("at", "per"):
+            if data.get(key) is None:
+                data.pop(key, None)
         return data
 
     @model_validator(mode="after")
     def _at(self) -> ScheduleTrigger:
         if self.at is not None and self.timezone != "user":
             raise ValueError("`at` needs timezone: user (it is each person's own time)")
+        if self.per is not None and self.timezone == "user":
+            raise ValueError("A schedule runs per person (timezone: user) or per project, not both")
         return self
 
     @field_validator("timezone")

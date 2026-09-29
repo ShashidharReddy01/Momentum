@@ -66,6 +66,7 @@ FEATURES = (
     "agent_draft",
     "agent_pulse",
     "agent_sorter",
+    "agent_herald",
 )
 
 
@@ -327,6 +328,26 @@ async def _run(
         await _pulse(session, llm, registry, world, case, ctx, now, obs)
     elif feature == "agent_sorter":
         await _sorter(session, llm, registry, world, case, ctx, now, obs)
+    elif feature == "agent_herald":
+        project = case.get("project", "Launch Plan")
+        agent = await _install(session, registry, world, ctx, "status_reporter", project)
+        trigger = {
+            "type": "schedule",
+            "project_id": str(world.projects[project]),
+            "requested_by": str(ctx.actor.id),
+        }
+        await _execute(session, llm, registry, ctx, agent, trigger, now, obs)
+        texts: list[str] = []
+        for op in _op_args_of(obs.operations, "create_status_update"):
+            for k in ("title", "summary", "completed", "slipped", "blockers", "next"):
+                value = op.get(k)
+                if isinstance(value, list):
+                    texts.extend(str(x) for x in value)
+                elif value:
+                    texts.append(str(value))
+        obs.citations = [
+            c.to_json() for c in await citations.resolve(session, ctx, "\n".join(texts))
+        ]
     elif feature == "agent_teammate":
         await _teammate(session, llm, registry, world, case, ctx, now, obs)
     else:
@@ -400,6 +421,10 @@ async def _pulse(
         "digest": digest.text(),
     }
     obs.citations = [c.to_json() for c in await citations.resolve(session, ctx, obs.text)]
+
+
+def _op_args_of(operations: list[dict[str, Any]], tool: str) -> list[dict[str, Any]]:
+    return [op.get("args") or {} for op in operations if op.get("tool") == tool]
 
 
 async def _install(

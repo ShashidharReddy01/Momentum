@@ -194,10 +194,11 @@ async def test_each_person_gets_it_at_their_own_digest_time(
 
 def test_schedules_without_at_hash_as_before() -> None:
     """Adding ``at`` must not change stored schedules (installed agents would turn drifted)."""
+    from momentum.domain.agents.schemas import AgentConfig
     from momentum.domain.agents.service import canonical
 
-    herald = next(d for d, _s in load_definitions() if d.key == "status_reporter")
-    [schedule] = [t for t in canonical(herald)["triggers"] if t["type"] == "schedule"]
+    plain = AgentConfig(name="Plain", triggers=[{"type": "schedule", "cron": "0 9 * * MON"}])
+    [schedule] = canonical(plain)["triggers"]
     assert set(schedule) == {"type", "cron", "timezone"}
     [pulse] = canonical(PULSE)["triggers"]
     assert pulse["at"] == "digest_time"

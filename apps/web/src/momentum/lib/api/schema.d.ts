@@ -5764,6 +5764,8 @@ export interface components {
             at?: "digest_time" | null;
             /** Cron */
             cron: string;
+            /** Per */
+            per?: "project" | null;
             /**
              * Timezone
              * @default workspace

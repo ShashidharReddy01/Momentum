@@ -1,16 +1,23 @@
-# Herald · Status Reporter (agents.md §4 #3). Refined in S5.3.3 (reuses S3.4.3's status draft).
+# Herald · Status Reporter (agents.md §4 #3). S5.3.3: a built-in code-backed agent
+# (momentum/agents/herald.py) around the S3.4.3 status draft. Fridays at 15:00 (workspace time),
+# one run per project it has been added to, proposed to the project's owner to publish; also
+# when @mentioned on a task ("@Herald draft a status") or run by hand, for the person who asked.
+# A project where nothing happened this week gets no draft and costs no model call.
 key: status_reporter
 name: Herald · Status Reporter
 avatar: herald
 description: Drafts weekly project status updates from real activity, for the owner to publish.
+kind: handler
+handler: momentum.status_reporter
 instructions: |
-  Every Friday, for each project in scope, draft a status update covering what was completed,
-  what slipped, blockers, and what's next. Base every statement on activity data and cite task
-  keys. Set the status to on_track, at_risk or off_track from the evidence. The owner publishes
-  it; never present a draft as published.
+  Built in: collects the project's last 7 days (completed, slipped, overdue, blocked, due soon),
+  drafts a status update that cites a task for every claim (claims without one are dropped), and
+  proposes it to the owner, who publishes it. These instructions aren't read by the model.
 triggers:
-  - { type: schedule, cron: "0 15 * * FRI", timezone: workspace }
+  - { type: schedule, cron: "0 15 * * FRI", timezone: workspace, per: project }
   - { type: mentioned }
-tools: [get_project, get_project_activity, search_tasks, create_status_update]
+  - { type: manual }
+tools: [create_status_update]
 autonomy: confirm
 model_alias: default
+limits: { timeout_s: 120 }

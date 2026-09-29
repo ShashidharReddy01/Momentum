@@ -187,6 +187,12 @@ class HandlerRun:
 
         return (await get_visible_task(self.session, self.ctx, self.task_id))[0]
 
+    @property
+    def llm(self) -> LLM:
+        """The model handle for Momentum's own AI features (e.g. ``draft_status``) called from a
+        handler: every call is billed to this run and checked against the agent's budget."""
+        return _BilledLLM(self._llm, self.run_id)  # type: ignore[return-value]
+
     # --- recording ---
     def step(self, summary: str) -> None:
         """A line on the run's timeline (keep it short; no secrets)."""
@@ -237,3 +243,21 @@ class HandlerRun:
         )
         self.step(f"Attached {filename}")
         return attachment_id
+
+
+class _BilledLLM:
+    """An ``LLM`` whose calls all carry the run's ``agent_run_id`` (S5.3.3)."""
+
+    def __init__(self, llm: LLM, run_id: uuid.UUID) -> None:
+        self._llm, self._run_id = llm, run_id
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._llm, name)
+
+    async def complete(self, *args: Any, **kwargs: Any) -> Any:
+        kwargs["agent_run_id"] = self._run_id
+        return await self._llm.complete(*args, **kwargs)
+
+    def stream(self, *args: Any, **kwargs: Any) -> Any:
+        kwargs["agent_run_id"] = self._run_id
+        return self._llm.stream(*args, **kwargs)

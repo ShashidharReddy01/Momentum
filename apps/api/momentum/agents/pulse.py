@@ -227,6 +227,3 @@ async def daily_digest(hrun: HandlerRun) -> HandlerResult | None:
     )
     hrun.step("Sent the digest to the inbox")
     return HandlerResult(text=body)
-
-
-BUILTIN_HANDLERS = {HANDLER: daily_digest}

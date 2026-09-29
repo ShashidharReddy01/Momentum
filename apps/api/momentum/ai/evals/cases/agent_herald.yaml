@@ -1,0 +1,15 @@
+# Herald · Status Reporter (S5.3.3; agents.md §4: factuality, every claim cites real keys; status
+# rubric agreement ≥ 80%). Herald's Friday run on a project, through the real runtime: it must
+# propose (never post) one status update whose every claim cites a real task. The draft itself is
+# S3.4.3's (its own `status_draft` evals cover the rubric in depth); these check the agent around
+# it. Live threshold 100%: an uncited claim is a factuality failure.
+feature: agent_herald
+cases:
+  - id: launch_plan_weekly
+    mock: true
+    user: ravi
+    expect: {proposes: [create_status_update], risk: medium, min_citations: 1, citations_valid: true}
+  - id: launch_plan_weekly_live
+    user: ravi
+    expect: {proposes: [create_status_update], min_citations: 2, citations_valid: true}
+    judge: {rubric: "A status update draft for Launch Plan whose status (on track / at risk / off track) fits the facts: an overdue launch blocker (payment approval, vendor contract) means at risk or off track; every claim cites a task."}
