@@ -2,6 +2,76 @@
 
 > Moved out of `STATUS.md` (2026-09-27) to keep it small: every AI session reads STATUS in full. Newest first. Nothing here is current instruction; the code and the docs are.
 
+## Handoff notes (2026-09-29, S5.2.1 – S5.3.6: E5.2 and the starter agents)
+- **Shipped:** you can assign a task to an agent.
+  - The assignee picker offers enabled agents that act when assigned (amber ✦ ring, "✦ Agent"); agent assignees show with the ring everywhere; the toast says it will reply in the comments.
+  - Within a minute the agent answers in the thread, @mentioning you. A long answer (over 4,000 characters) is attached as a Markdown file, with its opening in the comment.
+  - Then it hands the task back: to a "Review"/"In review" section if the project has one, else back to the task's creator. Undoable; skipped if someone reassigned the task meanwhile.
+  - **Added (small, flagged):** when a run you asked for fails or is stopped, you get a notification that opens the run and says why. Before, an assigned task could sit waiting in silence.
+  - Teammate (S5.3.8): a real charter; `add_comment` removed from its tools (its answer is posted anyway), `get_attachment_text` added. Base agent prompt v2: on assigned work the answer is the work itself.
+  - Eval feature `agent_teammate`: 10 cases (3 mock, 7 live-only with rubric judging), live threshold 85%.
+  - Full account in `docs/ai/agents.md` §3 "As built" and `phase-5.md` S5.2.1.
+- **Verification:** `make check` green: backend **692** (685 + 7 in `tests/test_agent_assign.py`), web **323**, API types regenerated; mock evals `agent_teammate` 3/3 (all 10 run without errors under `--all`).
+- **Live check: checkpoint 2 is now possible** on your machine (J10 by hand):
+  1. `make migrate` (no new migration in this slice), `momentum agents install --only teammate --force` (the definition changed)
+  2. enable Teammate, give it editor access to a project
+  3. assign it a task with a request in the description; `make dev` runs the worker
+  4. within a minute: a reply that @mentions you, and the task goes back to you (or to a "Review" section)
+  5. optionally `EVALS_LIVE=1 make evals` with `--feature agent_teammate`
+- **S5.2.2 done (2026-09-29):** @mentioning an agent. The composer's @ list offers only people and the agents that answer mentions (✦ Agent); a mention added by editing a comment counts too (once per comment); the reply @mentions you. Verification: `make check` green, backend **695** (+3 in `tests/test_agent_mention.py`), web **323**.
+- **S5.2.3 done (2026-09-29):** an Agents page in the sidebar (gallery), "Create agent" with "✦ Describe what you want" (Mo drafts it; anything it got wrong is fixed and listed before you save), an Edit page, and a **Test run** on each agent's page that shows what it would say and change without changing anything (works while it's switched off). Verification: `make check` green, backend **697** (+2 in `tests/test_agent_gallery.py`), web **326** (+3); mock evals `agent_draft` 1/1.
+- **S5.0.2 done (2026-09-29):** public forms security review, 3 findings fixed (details in `phase-5.md` S5.0.2):
+  - Public forms no longer show assignee questions: they listed every project member's name to anyone with the link.
+  - Nobody can assign a form's task to someone the form doesn't offer (anonymous: never; signed in: the project's people).
+  - The per-IP rate limit could be dodged with a fake `X-Forwarded-For`. **Action for deployment:** set `MOMENTUM_TRUSTED_PROXY_HOPS=1` on Azure App Service (default 0 = no proxy).
+  - Verification: `make check` green, backend **701** (+4 in `tests/test_forms_security.py`), web **326**.
+- **S5.3.1 Pulse done (2026-09-29):** the weekday digest.
+  - Arrives in the inbox at each person's own digest time (08:30 by default), on their behalf.
+  - Lists what's due today, overdue, and unread assignments, mentions and updates since the last digest; the model only adds one "start here" line, which is dropped if it mentions anything not on the lists.
+  - No digest (and no AI cost) when there's nothing to report or someone turns "Daily digest (Pulse)" off in notification settings.
+  - Also fixed on the way: adding the per-person time to schedules would have marked every installed scheduled agent as "edited"; now it's invisible when unused.
+  - **Deploy note:** run `momentum agents install --only daily_digest` (Pulse is now a built-in code agent).
+  - Verification: `make check` green, backend **708** (+7 in `tests/test_agent_pulse.py`), web **326**; mock evals `agent_pulse` 3/3.
+- **S5.3.2 Sorter done (2026-09-29):** triage of new tasks.
+  - When a task is created in a project Sorter has been added to, it proposes a priority, a field such as Risk, and a "possible duplicate" comment, as one proposal to the person who created the task. Subtasks are skipped.
+  - New AI tool `set_field_value`; the AI now sees a task's custom fields.
+  - **Found and fixed:** custom-field changes (by people, rules, templates or AI) were never recorded in the activity log and couldn't be undone. They now are, and show in the task's feed as "changed Risk".
+  - Deploy: `momentum agents install --only triage`.
+  - Verification: `make check` green, backend **712** (+4 in `tests/test_agent_sorter.py`; the tool snapshot and catalog test updated for the new tool), web **328**; mock evals `agent_sorter` 3/3.
+- **S5.3.3 Herald done (2026-09-29):** weekly project status drafts.
+  - Fridays at 15:00 (workspace time), for each project Herald has been added to, it drafts a status update from the week's real activity and sends it to the project's owner to publish. A quiet week gets no draft and costs nothing.
+  - "@Herald" on a task drafts one on the spot, for whoever asked, with a reply in the thread.
+  - Deploy: `momentum agents install --only status_reporter`.
+  - Verification: `make check` green, backend **716** (+4 in `tests/test_agent_herald.py`), web **328**; mock evals `agent_herald` 1/1.
+- **S5.3.4 Nudge done (2026-09-29):** friendly reminders on overdue and stalled tasks.
+  - Weekdays at 10:00, in projects Nudge has been added to: one short comment to the assignee on tasks overdue by more than a day or untouched for 5 days, at most every 2 days; the 4th reminder also asks the project owner to check in, then it stops.
+  - Never nudges done tasks or tasks waiting on someone else's work. You can snooze it per task ("Snooze Nudge reminders" in the task menu) or turn it off in notification settings.
+  - Migration 0030. Deploy: `make migrate`, then `momentum agents install --only nudger`.
+  - Verification: `make check` green, backend **720** (+4 in `tests/test_agent_nudge.py`), web **329** (+1); mock evals `agent_nudge` 1/1.
+- **S5.3.7 Radar done (2026-09-29):** project risk notes.
+  - Each weekday morning, for projects Radar has been added to: overdue share, tasks waiting on overdue or blocked work, unassigned tasks due within 3 days, and fast scope growth.
+  - The result shows as an amber note on the project's Overview (with a link to how it decided), and as a "Project risks" line in the owner's Pulse digest. It changes nothing itself.
+  - Deploy: `momentum agents install --only risk_watcher`.
+  - Verification: `make check` green, backend **722** (+2 in `tests/test_agent_radar.py`), web **331** (+2); mock evals `agent_radar` 2/2.
+- **S5.3.5 Architect done (2026-09-29):** planning on request.
+  - Give Architect a brief ("Run now" on its page, paste or load a text file, pick a project) and it proposes a whole project plan to you; assign or @mention it on a task and it proposes subtasks. You review and apply.
+  - It notes when a suggested owner already has a lot due in the plan's window (full capacity planning is Phase 6).
+  - New "Run now" panel on agent pages (Architect, Scribe, and any agent you can run by hand).
+  - Deploy: `momentum agents install --only planner`.
+  - Verification: `make check` green, backend **724** (+2 in `tests/test_agent_architect.py`), web **333** (+2); mock evals `agent_architect` 2/2.
+- **S5.3.6 Scribe done (2026-09-29):** meeting notes to tasks.
+  - Paste or load notes (or a VTT transcript) in Scribe's "Run now", or run it on a task with the notes attached (Word, PDF and text files work): it lists the decisions and proposes one task per action item, with the owner and date when the notes give them, linked back to the notes.
+  - **All eight starter agents are built.**
+  - Deploy: `momentum agents install --only meeting_notes`.
+  - Verification: `make check` green, backend **726** (+2 in `tests/test_agent_scribe.py`), web **333**; mock evals `agent_scribe` 1/1.
+- **For the next session (read this first):**
+  - **Branch:** `claude/intelligent-meitner-9ne4e8`, everything pushed.
+  - **Fresh cloud container:** `apt-get install -y postgresql-16-pgvector`; `initdb` into `/home/user/.pgdata` as `postgres`; start with `pg_ctl -o '-p 5432 -k /tmp'`; create role `momentum`/`momentum` (createdb) and databases `momentum` + `momentum_test`; create the `vector`, `pg_trgm` and `citext` extensions in `template1`; then `make install`. Postgres **stops when the container sleeps**: `pg_isready -h 127.0.0.1` before trusting a wall of DB errors. `make check` takes about 10 minutes, so run it in the background.
+  - **Decisions already made, don't re-ask:** kickoff Q1–Q9 (`phase-5-kickoff.md` §5).
+  - **Mock mode throughout.**
+  - **Remaining:** the phase exit (J10 e2e in the browser, retro, INTEGRATION_GUIDE log).
+- **Next up:** Phase 5 exit (J10 e2e, retro, INTEGRATION_GUIDE log).
+
 ## Handoff notes (2026-09-28/29, S5.1.2 – S5.1.6)
 - **Shipped:** agents run.
   - Triggers: schedule (workspace, fixed or per-person timezone), event, assigned, mentioned, manual (`POST /agents/{id}/run`). Each trigger has a dedupe key, and each agent handles one task or project at a time.

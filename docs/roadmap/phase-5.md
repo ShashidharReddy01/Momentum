@@ -105,3 +105,16 @@ Tests: `tests/test_forms_security.py` (4); `test_forms.py` updated.
 | S5.3.8 | Teammate (generic) (S) | Base behavior for assigned/mentioned work. **Built 2026-09-29** with S5.2.1: charter, tools (no `add_comment`; + `get_attachment_text`), mock fixture `agent__teammate.yaml`, eval feature `agent_teammate` (agents.md §3 "As built") |
 
 Each starter-agent slice includes: YAML definition, prompt, tool allow-list, mock fixtures, eval cases with thresholds (agents.md §4), and docs update.
+
+## Phase 5 exit (2026-09-29)
+
+**Exit criteria (as agreed at kickoff §6):**
+- **J10 passes (mock):** `apps/web/e2e/j10-agent-teammate.e2e.ts`, against the real API, Postgres and embedded worker. An admin installs the starters and switches Teammate on; Ravi gives it access to Website Revamp from the agent's page, assigns it a task from the pane, and on the open pane sees its reply (@mentioning him) and the task moved to the project's Review section. About 2 minutes, most of it waiting for worker ticks.
+- **The budget cap stops a runaway agent:** `test_a_one_cent_budget_stops_the_agent_and_alerts_the_admin` (S5.1.2): a $0.01 budget on a priced mock model; the run stops with `budget_exceeded`, the next run is refused before any model call, admins get one alert, nothing is posted, and (since S5.2.1) the person who asked is told.
+- **The runs page explains every action:** every run records a trace step per tool call, proposal, application, suggestion, hand-off, skip, limit and error, plus tokens, cost and the answer (S5.1.3). Built-in agents add their own steps ("Gathered…", "Nothing to report", "Escalated T-12").
+- **Deferred to the product owner's machine:** `momentum llm-check` and `EVALS_LIVE=1 make evals` (the agent features added `agent_teammate`, `agent_draft`, `agent_pulse`, `agent_sorter`, `agent_herald`, `agent_nudge`, `agent_radar`, `agent_architect`, `agent_scribe`; their mock cases all pass).
+- **Deferred, post-ship:** the dogfood week (Pulse, Herald and Sorter on their triggers; ≥ 70% acceptance on the agents that propose, read from the S5.1.4 stats).
+
+**Found at exit:** there was no way in the UI to give an agent access to a project (API only), so nobody could have set up J10 by hand. Fixed: a "Works in" section on the agent's page for anyone who manages a project (add as editor, remove).
+
+**Shape of what shipped:** two of the eight starters are model-driven tool loops (Teammate, Sorter); six are built-in code-backed agents (Pulse, Herald, Nudge, Radar, Architect, Scribe) where code does the selecting, counting and limits, and the model only writes the prose or the plan. See the retro in STATUS.

@@ -179,3 +179,34 @@ export function useRunNow(id: string) {
     onSuccess: () => void qc.invalidateQueries({ queryKey: ['agents', id, 'runs'] }),
   });
 }
+
+/** Give an agent access to a project (its account becomes an editor there, visible in Share), or
+ * take it away. Needs admin on that project; undoable server-side. */
+export function useAgentProjects(id: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  const done = () => void qc.invalidateQueries({ queryKey: agentKeys.all });
+  return {
+    add: useMutation({
+      mutationFn: async (projectId: string) =>
+        (
+          await api.POST('/api/v1/agents/{agent_id}/projects', {
+            params: { path: { agent_id: id } },
+            body: { project_id: projectId, role: 'editor' },
+          })
+        ).data!,
+      onSuccess: done,
+      onError: (e) => toastError(e, "Couldn't give the agent access"),
+    }),
+    remove: useMutation({
+      mutationFn: async (projectId: string) =>
+        (
+          await api.DELETE('/api/v1/agents/{agent_id}/projects/{project_id}', {
+            params: { path: { agent_id: id, project_id: projectId } },
+          })
+        ).data!,
+      onSuccess: done,
+      onError: (e) => toastError(e, "Couldn't remove the agent's access"),
+    }),
+  };
+}

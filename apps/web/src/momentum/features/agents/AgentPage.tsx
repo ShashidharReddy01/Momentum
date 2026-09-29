@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/Button';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useMe } from '@/features/auth';
 import { StatusBadge } from './AgentRunPage';
+import { AgentProjects } from './AgentProjects';
 import { AgentSettings } from './AgentSettings';
 import { triggerSummary } from './AgentsGallery';
 import { useAgent, useAgentRuns, type AgentRun, type RunFilters } from './queries';
@@ -63,6 +64,7 @@ export function AgentPage() {
       </header>
 
       {isAdmin ? <AgentSettings agent={a} /> : null}
+      <AgentProjects agent={a} />
       {a.enabled && a.triggers.some((t) => t.type === 'manual') ? <RunNowPanel agent={a} /> : null}
       {isAdmin && a.kind === 'llm' ? <TestRunPanel agent={a} /> : null}
 

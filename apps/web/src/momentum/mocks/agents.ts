@@ -108,6 +108,7 @@ export function agentHandlers(
   const creates: unknown[] = [];
   const testRuns: unknown[] = [];
   const runsNow: unknown[] = [];
+  const added: unknown[] = [];
   const list = opts.list ?? [agent];
   const handlers = [
     // S5.2.3: gallery, tools, draft, create, test run
@@ -146,6 +147,21 @@ export function agentHandlers(
       const created = agentFixture({ ...body, id: 'agent-new', enabled: false, source: 'custom' });
       return HttpResponse.json(
         { data: created, meta: { activity_id: 'act-1', batch_id: null, version: 1 } },
+        { status: 201 },
+      );
+    }),
+    http.post('*/api/v1/agents/:agentId/projects', async ({ request }) => {
+      const body = (await request.json()) as { project_id: string; role: string };
+      added.push(body);
+      agent = {
+        ...agent,
+        projects: [
+          ...(agent.projects ?? []),
+          { id: body.project_id, name: 'Added project', role: body.role },
+        ],
+      };
+      return HttpResponse.json(
+        { data: { ok: true }, meta: { activity_id: 'act-5', batch_id: null, version: null } },
         { status: 201 },
       );
     }),
@@ -194,5 +210,5 @@ export function agentHandlers(
       });
     }),
   ];
-  return { handlers, queries, patches, creates, testRuns, runsNow };
+  return { handlers, queries, patches, creates, testRuns, runsNow, added };
 }

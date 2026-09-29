@@ -19,11 +19,12 @@ function boot(
   agents: ReturnType<typeof agentHandlers>,
   extra: Parameters<typeof server.use> = [],
   role = 'member',
+  projects: Parameters<typeof projectHandlers>[2] = [],
 ) {
   server.use(
     ...authHandlers({ loggedIn: true, me: { role } }).handlers,
     ...teamHandlers(),
-    ...projectHandlers(),
+    ...projectHandlers('', undefined, projects),
     ...agents.handlers,
     ...extra,
   );
@@ -235,5 +236,21 @@ describe('Run now (S5.3.5/S5.3.6)', () => {
     boot('/agents/agent-1', agentHandlers());
     await screen.findByRole('heading', { name: 'Teammate' });
     expect(screen.queryByRole('region', { name: 'Run now' })).toBeNull();
+  });
+});
+
+describe('Where an agent works (kickoff Q1)', () => {
+  it('lets an admin add the agent to a project they manage', async () => {
+    const agents = agentHandlers({ agent: agentFixture({ projects: [] }) });
+    const user = boot('/agents/agent-1', agents, [], 'admin', [{ name: 'Website Revamp', my_role: 'admin' }]);
+    const section = await screen.findByRole('region', { name: 'Works in' });
+    expect(within(section).getByText('No projects yet.')).toBeInTheDocument();
+    const select = within(section).getByRole('combobox', { name: 'Add to project' });
+    await waitFor(() => expect(within(select).getAllByRole('option').length).toBeGreaterThan(1));
+    const option = within(select).getAllByRole('option')[1]!;
+    await user.selectOptions(select, option);
+    await user.click(within(section).getByRole('button', { name: 'Add' }));
+    await waitFor(() => expect(agents.added).toHaveLength(1));
+    expect(agents.added[0]).toMatchObject({ role: 'editor' });
   });
 });

@@ -5,8 +5,8 @@
 > Older session handoff notes, the Phase 2 exit record and the Phase 0-1 retros live in `docs/progress/handoff-archive.md` (read them only when a slice touches that area). At the end of every slice, move the previous session's handoff there and keep only the latest one here.
 
 ## Current focus
-- **Phase:** 5: Agents v1 ("Teammates") — in progress: kickoff done (2026-09-28, `docs/roadmap/phase-5-kickoff.md`), E5.1 (S5.1.1–S5.1.6), S5.0.1, E5.2 (S5.2.1–S5.2.3) and S5.3.8 done. Phase 4 complete (exit criteria met 2026-09-28).
-- **Next up:** Phase 5 exit (J10 e2e, retro, INTEGRATION_GUIDE log).
+- **Phase:** 5: Agents v1 ("Teammates") — **complete** (exit criteria met 2026-09-29; deferred by agreement: live `llm-check`/evals on the product owner's machine, dogfood week post-ship). Next: Phase 6 kickoff.
+- **Next up:** the product owner's live run (handoff checklist), then the Phase 6 kickoff.
 - **Product-owner instruction (2026-09-26):** finish all remaining slices, then one big local test run against the real gateway (100+ questions/actions covering edge cases), then fix from that run.
 - **Scope note (product owner, 2026-09-26):** the customer-operations capabilities (SQQ, pricing, contracts, invoices, pushes to internal systems as tools and assignable agents) will be done later in the product owner's own codebase, **not in this repo**. Finish the roadmap as written.
 - **Branch:** Phases 3–4 are on `claude/clever-hopper-pbv7yr` (ahead of `main`). Phase 5 continues on `claude/intelligent-meitner-9ne4e8`, which starts from that branch's Phase 4 exit commit.
@@ -21,75 +21,24 @@
 - **Phase 5 AI mode:** mock mode throughout (no gateway in this environment). Deferred to the product owner's machine: `momentum llm-check`, `EVALS_LIVE=1 make evals` at phase exit. The dogfood exit criterion is a post-ship observation, not blocking.
 - **Carried past Phase 4 exit** (kickoff Q6: the inbox/bell gap → S5.0.1 and the forms security review → S5.0.2 (**done**) are now Phase 5 slices; J1 flake **fixed** 2026-09-28, see handoff; the other two stay deferred): a security review pass of S4.2.1's public form endpoint (member-name exposure on assignee questions, no `X-Forwarded-For` handling); wiring `conversational_intake` into the `momentum/ai/evals/` harness (its `EvalWorld` has no notion of a form and the harness models one-shot input → output, not a stateless multi-turn feature); a real per-turn spam counter for conversational intake (currently reuses the submission rate limiter as a coarse guard); the inbox/bell live-update gap (**fixed in S5.0.1**) and the J1 quick-entry flake (**fixed**) found at exit (both described in the Phase 4 exit handoff, now in `handoff-archive.md`).
 
-## Handoff notes (latest session: 2026-09-29, S5.2.1 + S5.3.8 Assign a task to an agent + Teammate)
-- **Shipped:** you can assign a task to an agent.
-  - The assignee picker offers enabled agents that act when assigned (amber ✦ ring, "✦ Agent"); agent assignees show with the ring everywhere; the toast says it will reply in the comments.
-  - Within a minute the agent answers in the thread, @mentioning you. A long answer (over 4,000 characters) is attached as a Markdown file, with its opening in the comment.
-  - Then it hands the task back: to a "Review"/"In review" section if the project has one, else back to the task's creator. Undoable; skipped if someone reassigned the task meanwhile.
-  - **Added (small, flagged):** when a run you asked for fails or is stopped, you get a notification that opens the run and says why. Before, an assigned task could sit waiting in silence.
-  - Teammate (S5.3.8): a real charter; `add_comment` removed from its tools (its answer is posted anyway), `get_attachment_text` added. Base agent prompt v2: on assigned work the answer is the work itself.
-  - Eval feature `agent_teammate`: 10 cases (3 mock, 7 live-only with rubric judging), live threshold 85%.
-  - Full account in `docs/ai/agents.md` §3 "As built" and `phase-5.md` S5.2.1.
-- **Verification:** `make check` green: backend **692** (685 + 7 in `tests/test_agent_assign.py`), web **323**, API types regenerated; mock evals `agent_teammate` 3/3 (all 10 run without errors under `--all`).
-- **Live check: checkpoint 2 is now possible** on your machine (J10 by hand):
-  1. `make migrate` (no new migration in this slice), `momentum agents install --only teammate --force` (the definition changed)
-  2. enable Teammate, give it editor access to a project
-  3. assign it a task with a request in the description; `make dev` runs the worker
-  4. within a minute: a reply that @mentions you, and the task goes back to you (or to a "Review" section)
-  5. optionally `EVALS_LIVE=1 make evals` with `--feature agent_teammate`
-- **S5.2.2 done (2026-09-29):** @mentioning an agent. The composer's @ list offers only people and the agents that answer mentions (✦ Agent); a mention added by editing a comment counts too (once per comment); the reply @mentions you. Verification: `make check` green, backend **695** (+3 in `tests/test_agent_mention.py`), web **323**.
-- **S5.2.3 done (2026-09-29):** an Agents page in the sidebar (gallery), "Create agent" with "✦ Describe what you want" (Mo drafts it; anything it got wrong is fixed and listed before you save), an Edit page, and a **Test run** on each agent's page that shows what it would say and change without changing anything (works while it's switched off). Verification: `make check` green, backend **697** (+2 in `tests/test_agent_gallery.py`), web **326** (+3); mock evals `agent_draft` 1/1.
-- **S5.0.2 done (2026-09-29):** public forms security review, 3 findings fixed (details in `phase-5.md` S5.0.2):
-  - Public forms no longer show assignee questions: they listed every project member's name to anyone with the link.
-  - Nobody can assign a form's task to someone the form doesn't offer (anonymous: never; signed in: the project's people).
-  - The per-IP rate limit could be dodged with a fake `X-Forwarded-For`. **Action for deployment:** set `MOMENTUM_TRUSTED_PROXY_HOPS=1` on Azure App Service (default 0 = no proxy).
-  - Verification: `make check` green, backend **701** (+4 in `tests/test_forms_security.py`), web **326**.
-- **S5.3.1 Pulse done (2026-09-29):** the weekday digest.
-  - Arrives in the inbox at each person's own digest time (08:30 by default), on their behalf.
-  - Lists what's due today, overdue, and unread assignments, mentions and updates since the last digest; the model only adds one "start here" line, which is dropped if it mentions anything not on the lists.
-  - No digest (and no AI cost) when there's nothing to report or someone turns "Daily digest (Pulse)" off in notification settings.
-  - Also fixed on the way: adding the per-person time to schedules would have marked every installed scheduled agent as "edited"; now it's invisible when unused.
-  - **Deploy note:** run `momentum agents install --only daily_digest` (Pulse is now a built-in code agent).
-  - Verification: `make check` green, backend **708** (+7 in `tests/test_agent_pulse.py`), web **326**; mock evals `agent_pulse` 3/3.
-- **S5.3.2 Sorter done (2026-09-29):** triage of new tasks.
-  - When a task is created in a project Sorter has been added to, it proposes a priority, a field such as Risk, and a "possible duplicate" comment, as one proposal to the person who created the task. Subtasks are skipped.
-  - New AI tool `set_field_value`; the AI now sees a task's custom fields.
-  - **Found and fixed:** custom-field changes (by people, rules, templates or AI) were never recorded in the activity log and couldn't be undone. They now are, and show in the task's feed as "changed Risk".
-  - Deploy: `momentum agents install --only triage`.
-  - Verification: `make check` green, backend **712** (+4 in `tests/test_agent_sorter.py`; the tool snapshot and catalog test updated for the new tool), web **328**; mock evals `agent_sorter` 3/3.
-- **S5.3.3 Herald done (2026-09-29):** weekly project status drafts.
-  - Fridays at 15:00 (workspace time), for each project Herald has been added to, it drafts a status update from the week's real activity and sends it to the project's owner to publish. A quiet week gets no draft and costs nothing.
-  - "@Herald" on a task drafts one on the spot, for whoever asked, with a reply in the thread.
-  - Deploy: `momentum agents install --only status_reporter`.
-  - Verification: `make check` green, backend **716** (+4 in `tests/test_agent_herald.py`), web **328**; mock evals `agent_herald` 1/1.
-- **S5.3.4 Nudge done (2026-09-29):** friendly reminders on overdue and stalled tasks.
-  - Weekdays at 10:00, in projects Nudge has been added to: one short comment to the assignee on tasks overdue by more than a day or untouched for 5 days, at most every 2 days; the 4th reminder also asks the project owner to check in, then it stops.
-  - Never nudges done tasks or tasks waiting on someone else's work. You can snooze it per task ("Snooze Nudge reminders" in the task menu) or turn it off in notification settings.
-  - Migration 0030. Deploy: `make migrate`, then `momentum agents install --only nudger`.
-  - Verification: `make check` green, backend **720** (+4 in `tests/test_agent_nudge.py`), web **329** (+1); mock evals `agent_nudge` 1/1.
-- **S5.3.7 Radar done (2026-09-29):** project risk notes.
-  - Each weekday morning, for projects Radar has been added to: overdue share, tasks waiting on overdue or blocked work, unassigned tasks due within 3 days, and fast scope growth.
-  - The result shows as an amber note on the project's Overview (with a link to how it decided), and as a "Project risks" line in the owner's Pulse digest. It changes nothing itself.
-  - Deploy: `momentum agents install --only risk_watcher`.
-  - Verification: `make check` green, backend **722** (+2 in `tests/test_agent_radar.py`), web **331** (+2); mock evals `agent_radar` 2/2.
-- **S5.3.5 Architect done (2026-09-29):** planning on request.
-  - Give Architect a brief ("Run now" on its page, paste or load a text file, pick a project) and it proposes a whole project plan to you; assign or @mention it on a task and it proposes subtasks. You review and apply.
-  - It notes when a suggested owner already has a lot due in the plan's window (full capacity planning is Phase 6).
-  - New "Run now" panel on agent pages (Architect, Scribe, and any agent you can run by hand).
-  - Deploy: `momentum agents install --only planner`.
-  - Verification: `make check` green, backend **724** (+2 in `tests/test_agent_architect.py`), web **333** (+2); mock evals `agent_architect` 2/2.
-- **S5.3.6 Scribe done (2026-09-29):** meeting notes to tasks.
-  - Paste or load notes (or a VTT transcript) in Scribe's "Run now", or run it on a task with the notes attached (Word, PDF and text files work): it lists the decisions and proposes one task per action item, with the owner and date when the notes give them, linked back to the notes.
-  - **All eight starter agents are built.**
-  - Deploy: `momentum agents install --only meeting_notes`.
-  - Verification: `make check` green, backend **726** (+2 in `tests/test_agent_scribe.py`), web **333**; mock evals `agent_scribe` 1/1.
+## Handoff notes (latest session: 2026-09-29, Phase 5 exit)
+- **Phase 5 is complete** (exit criteria met; see `phase-5.md` "Phase 5 exit"). This session shipped S5.2.1–S5.2.3, S5.0.2, and all eight starter agents; per-slice notes are in `handoff-archive.md`.
+- **What's there now, in short:**
+  - Assign or @mention an agent on a task: it answers in the thread (@mentioning you) and hands the task back for review.
+  - Agent gallery, create an agent from a description, edit, test run, Run now, and "Works in" (give an agent access to projects you manage) on each agent's page.
+  - Starters: Teammate and Sorter are model-driven tool loops; Pulse, Herald, Nudge, Radar, Architect and Scribe are built-in code-backed agents (code selects and limits, the model only writes prose or plans).
+  - Security review of public forms (S5.0.2), with a deploy action: `MOMENTUM_TRUSTED_PROXY_HOPS=1` on Azure App Service.
+- **Found and fixed along the way (worth knowing):** custom-field changes had no activity or undo since Phase 2; an agent planning a project couldn't see its asker's teams; the prefs loader mangled booleans; a new trigger option would have marked every installed agent as edited; the pickers and feed didn't know agent accounts.
+- **Your checklist on the real gateway (deferred by agreement):**
+  1. `make migrate` (0030 is new), then `momentum agents install --force` (or `--only <key>` for agents you haven't edited: the definitions of all eight changed this session).
+  2. Set `MOMENTUM_LLM_PRICE_TABLE` (agent budgets count dollars once the model is priced; until then the 2M-token cap).
+  3. `momentum llm-check`, then `EVALS_LIVE=1 make evals` (nine new agent eval features; live-only cases are the real test of their prompts).
+  4. J10 by hand (checkpoint 2): switch Teammate on, give it a project in "Works in", assign it a task.
+  5. Dogfood week: switch on Pulse, Herald and Sorter, add them to projects; acceptance is on each agent's page.
 - **For the next session (read this first):**
   - **Branch:** `claude/intelligent-meitner-9ne4e8`, everything pushed.
-  - **Fresh cloud container:** `apt-get install -y postgresql-16-pgvector`; `initdb` into `/home/user/.pgdata` as `postgres`; start with `pg_ctl -o '-p 5432 -k /tmp'`; create role `momentum`/`momentum` (createdb) and databases `momentum` + `momentum_test`; create the `vector`, `pg_trgm` and `citext` extensions in `template1`; then `make install`. Postgres **stops when the container sleeps**: `pg_isready -h 127.0.0.1` before trusting a wall of DB errors. `make check` takes about 10 minutes, so run it in the background.
-  - **Decisions already made, don't re-ask:** kickoff Q1–Q9 (`phase-5-kickoff.md` §5).
-  - **Mock mode throughout.**
-  - **Remaining:** the phase exit (J10 e2e in the browser, retro, INTEGRATION_GUIDE log).
-- **Next up:** Phase 5 exit (J10 e2e, retro, INTEGRATION_GUIDE log).
+  - **Fresh cloud container:** `apt-get install -y postgresql-16-pgvector`; `initdb` into `/home/user/.pgdata` as `postgres`; start with `pg_ctl -o '-p 5432 -k /tmp'`; create role `momentum`/`momentum` (createdb) and databases `momentum` + `momentum_test`; create the `vector`, `pg_trgm` and `citext` extensions in `template1`; then `make install`. Postgres **stops when the container sleeps**: `pg_isready -h 127.0.0.1` before trusting a wall of DB errors. `make check` takes about 11 minutes, so run it in the background; run `ruff format` and `prettier --write` first (a format miss costs a full rerun). E2E: `pnpm build`, then `MOMENTUM_E2E_CHROMIUM=/opt/pw-browsers/chromium pnpm exec playwright test` in `apps/web` (J10 takes ~2 minutes of worker ticks).
+  - **Next:** the Phase 6 kickoff (read `docs/roadmap/phase-6.md`; the model guide says which model), after the product owner's live run above. Radar's forecast signals and Architect's capacity hook are the Phase 6 extension points.
 
 ## Open questions
 | # | Question | Needed by | Status |
@@ -154,7 +103,7 @@
 - [x] S5.2.1 Assign a task to an agent (2026-09-29) · [x] S5.2.2 @mention an agent (2026-09-29) · [x] S5.2.3 Agent gallery + create from description (2026-09-29)
 - [x] S5.3.1 Pulse (2026-09-29) · [x] S5.3.2 Sorter (2026-09-29) · [x] S5.3.3 Herald (2026-09-29) · [x] S5.3.4 Nudge (2026-09-29) · [x] S5.3.5 Architect (2026-09-29) · [x] S5.3.6 Scribe (2026-09-29) · [x] S5.3.7 Radar (2026-09-29) · [x] S5.3.8 Teammate (2026-09-29)
 - Build order (kickoff Q3, Q8): S5.0.1 before S5.1.3 · E5.1 (incl. S5.1.5, S5.1.6) → S5.2.1 + S5.3.8 (J10) → S5.2.2 → S5.2.3 → Pulse, Sorter (after S5.0.2), Herald, Nudge, Radar → Architect, Scribe
-- [ ] Phase 5 exit: J10 (mock); budget-cap test; runs page explains every action · deferred: `llm-check` + `EVALS_LIVE=1 make evals` (product owner's machine), dogfood week (post-ship)
+- [x] Phase 5 exit (2026-09-29): J10 passes (e2e, mock); budget-cap test; runs page explains every action · deferred: `llm-check` + `EVALS_LIVE=1 make evals` (product owner's machine), dogfood week (post-ship)
 
 ### Phases 6–9
 Tracked in their phase files; copy the slice list here at each phase kickoff.
@@ -183,10 +132,27 @@ Tracked in their phase files; copy the slice list here at each phase kickoff.
 | 2026-09-26 | Phase 3 exit: `search_tasks.blocked`, `blocked_by` in task briefs, `from`/`to` for moved dates in project activity | Real gaps: Mo could not answer "which tasks are blocked" or "did anything slip" from list results |
 | 2026-09-28 | Phase 5 kickoff: new E5.0 (S5.0.1 inbox/bell live updates, S5.0.2 public forms security review) carried from Phase 4; kickoff refinements on S5.1.1/S5.1.2/S5.1.4 and the starter table (token-fallback budget, `agent_alert` kind, workspace timezone, explicit `croniter`, Sorter enabled via scope, Nudge snooze on `my_task_placements`); build order changed to put S5.3.8 with S5.2.1 (J10) | Product-owner answers to kickoff Q1–Q7; state check in `phase-5-kickoff.md` §2 |
 | 2026-09-28 | ADR-0009: agent extension points. Host tools and agent definitions, code-backed `handler` agents, `get_attachment_text` (new S5.1.5); API tokens moved from S7.1 to S5.1.6 | Product owner's customer-operations work (SQQ, discovery, invoices, contracts, data uploads) will live in their own codebase and plug into Momentum; kickoff Q8. Onboarding-specific workflow features (conditional template items, template versions applied to running projects, agent form pre-fill, document generation) are deliberately not on the roadmap; the product owner will do them later |
+| 2026-09-29 | Six of the eight starter agents are built-in code-backed agents (Pulse, Herald, Nudge, Radar, Architect, Scribe), not model tool loops; schedules gained `at: digest_time` and `per: project`, event filters `top_level`; a handler's proposals are previewed as the person they're for | Coverage, limits and "never invent" hold by construction when code selects and the model only writes; a plain schedule has no person to propose to, so per-project fan-out; previews as the applier match "applied with the applier's permissions" (S5.1.2) without widening agent access |
 | 2026-09-29 | Requested agent runs see only what both the agent and the requester can see (`ctx.acting_for` honoured in `domain/access.py`, lower role of the two) | Product-owner answer to a permissions question raised while building S5.1.3 (kickoff Q9) |
 | 2026-09-24 | Phase 2 started without a human sign-off gate on Phase 1, at explicit product-owner instruction ("finish off Phase 2 as you have all the context", "do not ask any permission... just finish this whole phase at ur own pace") given while unavailable | Phase 1 exit criteria were already met and the product owner asked to proceed rather than wait; noted here per that same instruction to record decisions/blockers instead of stopping |
 
 ## Phase retros
+### Phase 5 (2026-09-29)
+**Exit criteria: met** (J10 e2e against the real worker; the $0.01 budget test; a trace step for every action). Deferred by agreement: live evals and the dogfood week. Full account in `docs/roadmap/phase-5.md` "Phase 5 exit".
+
+- **Went well:**
+  - Code-backed agents turned out to be the right default for most starters. When code gathers, counts and applies limits and the model only writes the prose, the evals' hardest criteria (coverage, no invented tasks, rate limits, no nudges on blocked work) hold by construction, and a quiet day costs nothing. ADR-0009's handler mechanism, built for the product owner's scripts, carried six of the eight starters.
+  - Reusing the S3 features (status draft, project from brief, break down) inside agents with a `propose_action=False` switch kept one implementation per feature.
+  - Every new optional schema field (`at`, `per`, `top_level`) is omitted when unset, so installed agents' hashes didn't change; a test pins that.
+- **Went less well:**
+  - Two long-standing gaps surfaced only because an agent needed them: custom-field changes never recorded activity or undo (since Phase 2), and there was no UI to give an agent a project (found only when writing J10). **Rule:** when a slice depends on "undo works" or "an admin can set this up", check it through the UI or the activity table, not just the service.
+  - A snapshot of serialized config (hashes) is fragile: adding one optional field would have marked every installed agent as edited. **Rule:** new optional fields on stored config are excluded when unset, with a test.
+  - Formatting misses cost two full `make check` reruns (~11 minutes each). **Rule:** format before starting the gate.
+- **Watch in Phase 6:**
+  - The live-only agent eval cases have never met the real model; expect the first `EVALS_LIVE=1` run to find prompt issues (Phase 3's lesson), and fix them before tuning thresholds.
+  - Agent budgets are in tokens until the price table is set.
+  - Architect's capacity count and Radar's heuristics are placeholders for Phase 6's capacity and forecast models: replace them, don't stack on them.
+
 ### Phase 4 (2026-09-28)
 **Exit criteria: met.** J9 passes against the real embedded worker; rule loop protection proven (`test_rules.py`); live evals — nl_rule 20/20 (100%), every feature above threshold; a new integration test proves form → triage → assignment end to end through the real executor. Full account in `docs/roadmap/phase-4.md` "Phase 4 exit".
 
