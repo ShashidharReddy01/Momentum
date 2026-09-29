@@ -28,7 +28,7 @@ import { formatDue } from '@/lib/dates';
 import { FieldValueChip, type ProjectField as ProjectFieldT } from '@/features/fields';
 import type { Person } from '@/features/people';
 import { TagChip, type Tag } from '@/features/tags';
-import { AssigneePicker } from './AssigneePicker';
+import { AssigneePicker, assignedMessage } from './AssigneePicker';
 import { DatePicker } from './DatePicker';
 import { isTemp, type Task, type TaskPatch } from './queries';
 import type { DropPlacement, Modifiers } from './selection';
@@ -214,8 +214,8 @@ const RowBody = memo(function RowBody({
     }
   };
 
-  const assign = (id: string | null, name?: string) =>
-    onUpdate(task, { assignee_id: id }, id ? `Assigned to ${name ?? 'you'}` : 'Unassigned');
+  const assign = (id: string | null, message?: string) =>
+    onUpdate(task, { assignee_id: id }, message ?? (id ? 'Assigned to you' : 'Unassigned'));
   const closePicker = (open: boolean) => {
     if (!open) {
       setPicker(null);
@@ -245,7 +245,7 @@ const RowBody = memo(function RowBody({
     >
       {assignee ? (
         <>
-          <Avatar name={assignee.name} src={assignee.avatar_url} size={20} />
+          <Avatar name={assignee.name} src={assignee.avatar_url} size={20} isAgent={assignee.is_agent} />
           <span className="truncate text-[12.5px] text-ink-2 @max-3xl:hidden">
             {assignee.name.split(' ')[0]}
           </span>
@@ -405,7 +405,7 @@ const RowBody = memo(function RowBody({
           open
           onOpenChange={(o) => !o && closePicker(false)}
           assigneeId={task.assignee_id}
-          onChange={(u) => assign(u?.id ?? null, u?.id === meId ? 'you' : u?.name)}
+          onChange={(u) => assign(u?.id ?? null, assignedMessage(u, meId))}
         >
           {assigneeCell}
         </AssigneePicker>

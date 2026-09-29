@@ -37,7 +37,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from momentum.agents import policy
-from momentum.agents.extensions import Handler, HandlerRun
+from momentum.agents.extensions import Handler, HandlerRun, attach_file
 from momentum.agents.triggers import agent_ctx, in_scope, on_behalf_ctx, task_project_ids
 from momentum.ai.actions import ProposedCall, apply_as_agent, propose
 from momentum.ai.context.builders import project_ctx, task_ctx
@@ -51,8 +51,9 @@ from momentum.ai.prompts import load
 from momentum.ai.tools.registry import ToolRegistry
 from momentum.ai.tools.write_tools import text_doc
 from momentum.core.context import Actor, Ctx
-from momentum.core.errors import NotFound
+from momentum.core.errors import DomainError, NotFound
 from momentum.core.events import emit
+from momentum.core.ids import task_key
 from momentum.core.richtext import plain_text
 from momentum.core.settings import Settings
 from momentum.core.telemetry import get_logger
@@ -63,6 +64,9 @@ from momentum.domain.comments.models import Comment
 from momentum.domain.comments.service import create_comment
 from momentum.domain.notifications.models import Notification
 from momentum.domain.notifications.service import notify
+from momentum.domain.sections.models import Section
+from momentum.domain.tasks import service as tasks
+from momentum.domain.tasks.models import Task
 from momentum.domain.users.models import User
 from momentum.domain.workspace.models import Workspace
 from momentum.domain.workspace.service import get_ai_config
@@ -72,6 +76,9 @@ TRACE_TEXT = 300  # characters kept per trace summary
 FAILURES_BEFORE_ALERT = 3
 ALERT_EVERY = timedelta(hours=24)
 ANSWERING = ("assigned", "mentioned", "manual")  # a person asked: answer in the thread
+LONG_ANSWER = 4000  # characters; a longer answer goes in an attached file (S5.2.1)
+LONG_ANSWER_OPENING = 1200  # how much of it the comment keeps
+REVIEW_SECTIONS = ("review", "in review")  # where an assigned task goes back for review
 AUTONOMY_NOTE = {
     "suggest": "You can only suggest: your changes are shown to people as suggestions, and your"
     " comments are posted as your suggestions.",
@@ -431,6 +438,7 @@ async def execute_run(
     run.trace = trace.steps
     run.finished_at = datetime.now(UTC)
     await session.flush()
+    await _tell_requester(session, base_ctx, agent, run, status, error)
     if status == "failed":
         recent = await recent_statuses(session, agent.id, FAILURES_BEFORE_ALERT)
         if len(recent) == FAILURES_BEFORE_ALERT and all(s == "failed" for s in recent):
@@ -507,16 +515,39 @@ async def _check_access(
         ) from e
 
 
+def _answer_doc(text: str, mention: User | None) -> dict[str, Any]:
+    """The answer as a rich-text comment, @mentioning the person who asked (S5.2.1) so they're
+    notified that the work is ready."""
+    doc = text_doc(text)
+    if mention is not None:
+        node = {
+            "type": "mention",
+            "attrs": {"id": str(mention.id), "label": mention.name, "kind": "user"},
+        }
+        content = doc["content"]
+        if content:
+            content[0]["content"] = [node, {"type": "text", "text": " "}, *content[0]["content"]]
+        else:
+            content.append({"type": "paragraph", "content": [node]})
+    return doc
+
+
 async def _answer(
     session: AsyncSession,
     ctx: Ctx,
     run: AgentRun,
+    agent: Agent,
     text: str,
     output: dict[str, Any],
+    requester: User | None,
     trace: _Trace,
 ) -> None:
     """When a person asked (assigned, mentioned, run by hand on a task), reply in the task's
-    thread, with any suggestions listed under the answer. Otherwise the answer stays on the run."""
+    thread, with any suggestions listed under the answer. Otherwise the answer stays on the run.
+
+    For an assignment (S5.2.1) the reply @mentions the person who assigned it, and an answer
+    longer than ``LONG_ANSWER`` goes in an attached Markdown file, with its opening in the
+    comment."""
     trigger = run.trigger or {}
     task_id = trigger.get("task_id")
     suggestions: list[str] = output.get("suggestions") or []
@@ -524,13 +555,115 @@ async def _answer(
     if task_id is None or not ctx.actor.is_agent or not (asked or suggestions):
         return
     body = text if asked else ""
+    if asked and len(body) > LONG_ANSWER:
+        task = await session.get(Task, uuid.UUID(task_id))
+        name = f"{agent.key}-{task_key(task.number) if task else 'result'}.md"
+        attachment_id = await attach_file(
+            session,
+            ctx,
+            ctx.settings,
+            uuid.UUID(task_id),
+            name,
+            body.encode("utf-8"),
+            "text/markdown",
+        )
+        output["attachment_id"] = str(attachment_id)
+        trace.add("attachment", f"Attached the full answer as {name}")
+        opening = body[:LONG_ANSWER_OPENING].rsplit("\n", 1)[0].rstrip()
+        body = f"{opening}\n…\nThe full answer is in the attached file {name}."
     if suggestions:
         body = "\n".join([body, "Suggestions:", *(f"- {s}" for s in suggestions)]).strip()
     if not body.strip():
         return
-    m = await create_comment(session, ctx, uuid.UUID(task_id), text_doc(body))
+    mention = requester if trigger.get("type") == "assigned" else None
+    m = await create_comment(session, ctx, uuid.UUID(task_id), _answer_doc(body, mention))
     output["comment_id"] = str(m.entity.id)
     trace.add("comment", body.split("\n", 1)[0], comment_id=str(m.entity.id))
+
+
+async def _hand_off(
+    session: AsyncSession,
+    ctx: Ctx,
+    agent: Agent,
+    run: AgentRun,
+    requester: User | None,
+    output: dict[str, Any],
+    trace: _Trace,
+) -> None:
+    """S5.2.1: after working on a task it was assigned, the agent hands it back for review: to
+    the project's "Review" section if it has one (the agent stays the assignee), else to the
+    task's creator (or the person who assigned it, when the creator can't take it). Nothing
+    happens when someone already reassigned the task meanwhile. Each move is an ordinary,
+    undoable change by the agent; one that isn't allowed is noted on the run, not fatal."""
+    trigger = run.trigger or {}
+    if trigger.get("type") != "assigned" or not trigger.get("task_id") or not ctx.actor.is_agent:
+        return
+    task_id = uuid.UUID(trigger["task_id"])
+    task, placement, _role = await get_visible_task(session, ctx, task_id)
+    if task.assignee_id != ctx.actor.id or task.completed_at is not None:
+        trace.add("handoff", "Left as it is: the task was reassigned or completed meanwhile")
+        return
+    savepoint = await session.begin_nested()
+    try:
+        review = None
+        if placement is not None and task.parent_id is None:
+            review = await session.scalar(
+                select(Section)
+                .where(
+                    Section.project_id == placement.project_id,
+                    Section.deleted_at.is_(None),
+                    func.lower(func.trim(Section.name)).in_(REVIEW_SECTIONS),
+                )
+                .order_by(Section.position)
+                .limit(1)
+            )
+        if review is not None:
+            if placement is not None and placement.section_id != review.id:
+                await tasks.move_tasks(session, ctx, [task.id], section_id=review.id)
+            output["handoff"] = {"section_id": str(review.id)}
+            trace.add("handoff", f"Moved to {review.name} for review")
+        else:
+            creator = await _person(session, task.created_by)
+            back_to = creator or requester
+            if back_to is None:
+                trace.add("handoff", "Nobody to hand the task back to")
+                await savepoint.commit()
+                return
+            await tasks.update_task(session, ctx, task.id, {"assignee_id": back_to.id})
+            output["handoff"] = {"assignee_id": str(back_to.id)}
+            trace.add("handoff", f"Handed back to {back_to.name} for review")
+        await savepoint.commit()
+    except DomainError as e:
+        await savepoint.rollback()
+        trace.add("handoff", f"Couldn't hand the task back: {e.detail}")
+
+
+async def _tell_requester(
+    session: AsyncSession,
+    ctx: Ctx,
+    agent: Agent,
+    run: AgentRun,
+    status: str,
+    error: str | None,
+) -> None:
+    """A run a person asked for that didn't finish: tell them, so an assigned task doesn't sit
+    waiting in silence (S5.2.1). The notification opens the run, which explains why."""
+    trigger = run.trigger or {}
+    if status == "succeeded" or trigger.get("type") not in ANSWERING:
+        return
+    requester = await _person(session, trigger.get("requested_by"))
+    if requester is None:
+        return
+    await notify(
+        session,
+        ctx,
+        user_id=requester.id,
+        kind="agent_alert",
+        entity_type="agent_run",
+        entity_id=run.id,
+        title=f"{agent.name} couldn't finish what you asked"[:300],
+        snippet=(error or status)[:500],
+    )
 
 
 async def _run_handler(
@@ -578,7 +711,8 @@ async def _run_handler(
     text = result.text if result is not None else None
     output["text"] = text
     if text:
-        await _answer(session, ctx, run, text, output, trace)
+        await _answer(session, ctx, run, agent, text, output, requester, trace)
+    await _hand_off(session, ctx, agent, run, requester, output, trace)
     return output
 
 
@@ -610,6 +744,7 @@ async def _run_model(
                 emit=trace.on_loop_event,
                 max_steps=max_steps,
                 prompt_version=load("agent").version,
+                max_tokens=load("agent").max_tokens,
                 agent_run_id=run.id,
             )
     except TimeoutError as e:
@@ -621,5 +756,6 @@ async def _run_model(
         session, ctx, tools, agent, run, result.proposals, autonomy, requester, trace
     )
     output["text"] = result.text
-    await _answer(session, ctx, run, result.text, output, trace)
+    await _answer(session, ctx, run, agent, result.text, output, requester, trace)
+    await _hand_off(session, ctx, agent, run, requester, output, trace)
     return output

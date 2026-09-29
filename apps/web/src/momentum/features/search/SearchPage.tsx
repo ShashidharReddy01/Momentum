@@ -33,7 +33,7 @@ function SearchPageBody() {
   const [q, setQ] = useState(params.get('q') ?? '');
   const nav = useTaskNav()!;
   const projects = useProjects().data ?? [];
-  const people = usePeople().data ?? [];
+  const people = usePeople('', 'all').data ?? [];
 
   const activeTypes = params.get('type')?.split(',').filter(Boolean) ?? TYPES;
   const projectId = params.get('project_id') ?? '';

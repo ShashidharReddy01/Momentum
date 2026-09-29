@@ -43,7 +43,7 @@ import { cn } from '@/lib/cn';
 import { useMomentumConfig } from '@/lib/config';
 import { formatDay, formatDue } from '@/lib/dates';
 import { applyRealtimeEvent, useChannel } from '@/lib/realtime';
-import { AssigneePicker } from '../AssigneePicker';
+import { AssigneePicker, assignedMessage } from '../AssigneePicker';
 import { DatePicker } from '../DatePicker';
 import { useTaskDetail, useTaskDetailMutations, type TaskDetail } from '../detail';
 import { SubtaskList } from '../SubtaskList';
@@ -209,7 +209,7 @@ function PaneBody({
 }) {
   const m = useTaskDetailMutations(task.id);
   const config = useMomentumConfig();
-  const people = usePeople().data;
+  const people = usePeople('', 'all').data;
   const projectFields = useProjectFields(task.project?.id ?? '', !!task.project);
   const fieldValues = useTaskFieldValues(task.id);
   const setFieldValue = useSetFieldValue(task.id);
@@ -323,14 +323,20 @@ function PaneBody({
               onChange={(u) =>
                 m.update.mutate({
                   patch: { assignee_id: u?.id ?? null },
-                  message: u ? `Assigned to ${u.id === meId ? 'you' : u.name}` : 'Unassigned',
+                  message: assignedMessage(u, meId),
                 })
               }
             >
               <FieldButton disabled={!canEdit} label={assignee ? `Assignee: ${assignee.name}` : 'Assign'}>
                 {assignee ? (
                   <>
-                    <Avatar name={assignee.name} src={assignee.avatar_url} size={22} /> {assignee.name}
+                    <Avatar
+                      name={assignee.name}
+                      src={assignee.avatar_url}
+                      size={22}
+                      isAgent={assignee.is_agent}
+                    />{' '}
+                    {assignee.name}
                   </>
                 ) : (
                   <span className="flex items-center gap-2 text-muted">

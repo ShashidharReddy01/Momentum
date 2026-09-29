@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import uuid
-from typing import Any
+from typing import Any, Literal
 
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,10 +11,13 @@ from momentum.core.context import Ctx
 from momentum.core.errors import Conflict, NotFound
 from momentum.core.ids import new_id
 from momentum.core.permissions import Action, require
+from momentum.domain.agents.models import Agent
 from momentum.domain.integrations.models import ImportJob
 from momentum.domain.projects.models import Project
 from momentum.domain.users.models import User
 from momentum.domain.workspace.models import Workspace
+
+AgentFilter = Literal["assigned", "mentioned", "all"]
 
 
 async def get_me(session: AsyncSession, ctx: Ctx) -> tuple[User, Workspace]:
@@ -43,12 +46,22 @@ async def list_users(
     *,
     q: str | None = None,
     limit: int = 50,
-    include_agents: bool = False,
+    agents: AgentFilter | None = None,
 ) -> list[User]:
-    """Active workspace members for pickers, optionally filtered by name/email prefix."""
+    """Active workspace members for pickers, optionally filtered by name/email prefix.
+    ``agents`` (S5.2.1) adds agent accounts: ``assigned``/``mentioned`` the enabled agents that
+    act on that trigger (the assignee picker, @mentions), ``all`` every agent (to show the names
+    of agents already on a task)."""
     query = select(User).where(User.workspace_id == ctx.workspace_id, User.status != "disabled")
-    if not include_agents:
+    if agents is None:
         query = query.where(User.is_agent.is_(False))
+    elif agents != "all":
+        offered = select(Agent.user_id).where(
+            Agent.workspace_id == ctx.workspace_id,
+            Agent.enabled.is_(True),
+            Agent.triggers.contains([{"type": agents}]),
+        )
+        query = query.where(User.is_agent.is_(False) | User.id.in_(offered))
     if q:
         like = f"%{q.strip().lower()}%"
         query = query.where(

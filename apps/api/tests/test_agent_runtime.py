@@ -80,7 +80,7 @@ class Env:
         **settings: Any,
     ) -> None:
         self.uow, self.sf, self.tmp, self.world = uow, sf, tmp, world
-        self.settings = make_settings(llm_fixtures_dir=str(tmp), **settings)
+        self.settings = make_settings(**{"llm_fixtures_dir": str(tmp), **settings})
         self.llm = LLM(self.settings, MockTransport(self.settings), DbUsageLog(sf, 0))
         self.agent: Agent
         self.account: User
@@ -516,12 +516,15 @@ async def test_a_one_cent_budget_stops_the_agent_and_alerts_the_admin(
                 await s.execute(select(Notification).where(Notification.kind == "agent_alert"))
             ).scalars()
         )
+        told = [a for a in alerts if a.entity_type == "agent_run"]  # the person who asked
+        alerts = [a for a in alerts if a.entity_type == "agent"]
         admin = (
             await s.execute(select(User).where(User.email == "admin@acme-demo.test"))
         ).scalar_one()
     assert refused >= 2
     assert [a.user_id for a in alerts] == [admin.id]  # one alert, not one per run
     assert "budget" in alerts[0].title
+    assert {a.user_id for a in told} == {env.world.ravi.actor.id}  # S5.2.1: they hear why
     assert await _comments(env, env.world.copy.id) == []  # a stopped run posts nothing
 
 

@@ -14,6 +14,8 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from momentum.agents.loader import load_definitions
+from momentum.agents.runtime import execute_run
 from momentum.ai import citations, quick_add, summarize, write
 from momentum.ai.breakdown import break_down, project_people
 from momentum.ai.chat import run_chat, start_turn
@@ -29,11 +31,18 @@ from momentum.ai.plan_day import plan_day
 from momentum.ai.rule_steps import run_kind
 from momentum.ai.status_draft import draft_status
 from momentum.ai.tools.registry import ToolRegistry
+from momentum.ai.tools.write_tools import text_doc
 from momentum.core.context import Ctx
 from momentum.core.errors import DomainError
 from momentum.core.settings import Settings
+from momentum.domain.agents import service as agents
+from momentum.domain.agents.models import AgentRun
+from momentum.domain.agents.runs import enqueue_run
+from momentum.domain.agents.schemas import AgentPatchIn
+from momentum.domain.comments.service import create_comment
 from momentum.domain.notifications.models import Notification
 from momentum.domain.projects.models import Project
+from momentum.domain.tasks import service as tasks
 from momentum.domain.tasks.models import Task
 from momentum.domain.teams.models import Team
 
@@ -50,6 +59,7 @@ FEATURES = (
     "from_brief",
     "nl_rule",
     "ai_step",
+    "agent_teammate",
 )
 
 
@@ -302,8 +312,89 @@ async def _run(
             "source": step.source or None,
             **step.values,
         }
+    elif feature == "agent_teammate":
+        await _teammate(session, llm, registry, world, case, ctx, now, obs)
     else:
         raise ValueError(f"unknown eval feature {feature!r}")
+
+
+class _Unbilled:
+    """The eval's LLM without run attribution: usage rows are written in their own transaction,
+    and the case's run row (rolled back with the case) never exists for them to point at."""
+
+    def __init__(self, llm: LLM) -> None:
+        self._llm = llm
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._llm, name)
+
+    async def complete(self, *args: Any, **kwargs: Any) -> Any:
+        kwargs.pop("agent_run_id", None)
+        return await self._llm.complete(*args, **kwargs)
+
+    def stream(self, *args: Any, **kwargs: Any) -> Any:
+        kwargs.pop("agent_run_id", None)
+        return self._llm.stream(*args, **kwargs)
+
+
+async def _teammate(
+    session: AsyncSession,
+    llm: LLM,
+    registry: ToolRegistry,
+    world: EvalWorld,
+    case: dict[str, Any],
+    ctx: Ctx,
+    now: datetime,
+    obs: Observation,
+) -> None:
+    """S5.3.8: the Teammate starter on one task, through the real runtime (its packaged
+    definition, its own account with editor access to the project, the policy, the answer in
+    the thread, the hand-off). The case's person assigns the task (``input`` becomes its
+    description: the request) or mentions the agent (``input`` is the comment)."""
+    settings = ctx.settings
+    admin = world.ctx("admin", settings)
+    definition = next(d for d, _source in load_definitions() if d.key == "teammate")
+    [installed] = await agents.install_definitions(
+        session, admin, [(definition, "starter")], registry.names, force=True
+    )
+    agent = installed.agent
+    await agents.update_agent(session, admin, agent.id, AgentPatchIn(enabled=True), registry.names)
+    owner = world.ctx("ravi", settings)
+    await agents.add_to_project(
+        session, owner, agent.id, world.projects[case.get("project", "Launch Plan")], "editor"
+    )
+    task_id = world.task_ids[case["task"]]
+    trigger: dict[str, Any] = {"task_id": str(task_id), "requested_by": str(ctx.actor.id)}
+    person = ctx.with_(via="web")
+    if case.get("trigger", "assigned") == "assigned":
+        if case.get("input"):
+            await tasks.update_task(
+                session, person, task_id, {"description": text_doc(case["input"])}
+            )
+        trigger["type"] = "assigned"
+    else:
+        m = await create_comment(session, person, task_id, text_doc(case.get("input", "")))
+        trigger |= {"type": "mentioned", "comment_id": str(m.entity.id)}
+    run_id = await enqueue_run(session, agent, trigger, None)
+    assert run_id is not None
+    run = await session.get(AgentRun, run_id)
+    assert run is not None
+    run.status = "running"
+    await execute_run(session, _Unbilled(llm), registry, settings, run_id, now=now)  # type: ignore[arg-type]
+    await session.refresh(run)
+    output = run.output or {}
+    obs.text = str(output.get("text") or "")
+    for step in run.trace:
+        if step.get("kind") == "tool":
+            obs.tools.append(str(step.get("name")))
+            if not step.get("ok"):
+                obs.failed_tools.append(str(step.get("name")))
+    if output.get("proposed"):
+        obs.operations, obs.risk = await _operations(session, output["proposed"][0])
+    obs.citations = [c.to_json() for c in await citations.resolve(session, ctx, obs.text)]
+    obs.data = {"status": run.status, "handoff": output.get("handoff")}
+    if run.status != "succeeded":
+        obs.error = f"run_{run.status}: {run.error}"
 
 
 async def _ignore(kind: str, data: dict[str, Any]) -> None:

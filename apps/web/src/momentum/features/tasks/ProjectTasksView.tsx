@@ -113,7 +113,7 @@ export function ProjectTasksView({ projectId, canEdit }: { projectId: string; ca
   const meId = useMe().data?.user.id;
   const nav = useTaskNav();
   const openId = nav?.openId ?? null;
-  const people = usePeople().data;
+  const people = usePeople('', 'all').data;
   const peopleById = useMemo(() => new Map<string, Person>((people ?? []).map((p) => [p.id, p])), [people]);
   // Rows edited or created here stay visible even if they stop matching the filters,
   // until the view changes (so a row never vanishes under the cursor).

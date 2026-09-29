@@ -125,7 +125,7 @@ function FilterPopover({
   children: ReactNode;
 }) {
   const [q, setQ] = useState('');
-  const people = usePeople().data ?? [];
+  const people = usePeople('', 'all').data ?? [];
   const tags = useTagLibrary().data ?? [];
   const toggle = (token: string) =>
     onChange({

@@ -300,7 +300,7 @@ function Priorities({ tasks, open }: { tasks: HomeTask[]; open: number }) {
 
 function Waiting({ tasks, total }: { tasks: HomeTask[]; total: number }) {
   const nav = useTaskNav();
-  const people = usePeople().data;
+  const people = usePeople('', 'all').data;
   const nameOf = (id: string | null) => (id ? people?.find((p) => p.id === id)?.name : undefined);
   return (
     <Card title="Waiting on others">

@@ -82,7 +82,7 @@ export function CalendarView({
   useChannel(`project:${projectId}`, (event) => applyRealtimeEvent(qc, event, { projectId }));
   const open = useProjectTasks(projectId);
   const sections = useSections(projectId);
-  const people = usePeople().data;
+  const people = usePeople('', 'all').data;
   const m = useTaskMutations(projectId);
   const nav = useTaskNav();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -441,7 +441,9 @@ function Chip({
         onChange={onToggle}
       />
       <span className={cn('min-w-0 flex-1 truncate', done && 'text-muted line-through')}>{task.title}</span>
-      {assignee ? <Avatar name={assignee.name} src={assignee.avatar_url} size={14} /> : null}
+      {assignee ? (
+        <Avatar name={assignee.name} src={assignee.avatar_url} size={14} isAgent={assignee.is_agent} />
+      ) : null}
     </div>
   );
 }

@@ -1,0 +1,36 @@
+# Mock replies for the Teammate starter (S5.3.8), used by J10 and the Teammate eval in mock mode.
+# Keys and ids differ per database, so the replies look things up first and cite what they found.
+responses:
+  # the eval's breakdown case: read the task, then propose the steps
+  - match: {contains: "Book launch webinar", turn: 1}
+    tool_calls: [{name: get_task, arguments: {task: {title_query: "Book launch webinar"}}}]
+  - match: {contains: "Book launch webinar", turn: 2}
+    tool_calls:
+      - name: create_subtasks
+        arguments:
+          parent: {title_query: "Book launch webinar"}
+          subtasks:
+            - {title: "Pick a date and time"}
+            - {title: "Write the invitation"}
+            - {title: "Prepare the slides"}
+            - {title: "Rehearse the demo"}
+  - match: {contains: "Book launch webinar", turn: 3}
+    text: |
+      (mock) A plan for {{$keys}}, proposed as 4 subtasks for you to apply:
+      - Pick a date and time
+      - Write the invitation
+      - Prepare the slides
+      - Rehearse the demo
+  # assigned work in general (J10): read the task, then answer citing it
+  - match: {contains: "assigned you the task", turn: 1}
+    tool_calls: [{name: search_tasks, arguments: {limit: 5}}]
+  - match: {contains: "assigned you the task", turn: 2}
+    text: |
+      (mock) Draft ready for review. This is mock agent output, not real AI work, about {{$keys}}.
+      - What was asked: the task's title and description.
+      - What I found: {{$last.data.tasks[].key}}.
+      - Next step: review this draft and reply in the thread with changes.
+  - match: {contains: "mentioned you", turn: 1}
+    text: "(mock) Teammate here. This is mock agent output: I read the thread and the task."
+default:
+  text: "(mock response: Teammate has no fixture for this request)"

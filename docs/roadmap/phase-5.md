@@ -72,6 +72,7 @@
 ### S5.2.1: Assign a task to an agent
 **Scope:** agents appear in AssigneePicker (✦ ring); assignment triggers a run; the result is posted as a comment (long output → attachment); task moves to "Review" section if present, else reassigned to creator; @mention the requester.
 **Size:** M
+**Built (2026-09-29, with S5.3.8):** `GET /users?agents=assigned|mentioned|all`; `PeopleCommand agents=` + ✦ ring in the assignee picker, agent assignees shown with the ring in list/board/calendar/pane. Runtime (`agents/runtime.py`): the answer @mentions the assigner; an answer over `LONG_ANSWER` (4,000 chars) is attached as Markdown (`extensions.attach_file`, shared with handlers); `_hand_off` moves the task to a "Review"/"In review" section or reassigns it to its creator (else the assigner), skipped when the task was reassigned/completed meanwhile; `_tell_requester` sends an `agent_alert` on the run when a requested run doesn't finish (added: otherwise an assigned task sat waiting in silence). Base prompt `agent` v2. Tests: `tests/test_agent_assign.py` (7). J10 as a browser e2e is done at the phase exit.
 
 ### S5.2.2: @mention an agent
 **Scope:** mentions of agent users trigger a run with thread context; reply in the thread.
@@ -92,6 +93,6 @@
 | S5.3.5 | Architect · Planner | Wraps S3.4.6 with capacity awareness hooks (full in P6) |
 | S5.3.6 | Scribe · Meeting Notes | Paste/upload notes (txt, md, docx, vtt); decisions + action items; email-in hook (P7) |
 | S5.3.7 | Radar · Risk Watcher | Heuristic risk signals now; forecast integration in P6 |
-| S5.3.8 | Teammate (generic) (S) | Base behavior for assigned/mentioned work |
+| S5.3.8 | Teammate (generic) (S) | Base behavior for assigned/mentioned work. **Built 2026-09-29** with S5.2.1: charter, tools (no `add_comment`; + `get_attachment_text`), mock fixture `agent__teammate.yaml`, eval feature `agent_teammate` (agents.md §3 "As built") |
 
 Each starter-agent slice includes: YAML definition, prompt, tool allow-list, mock fixtures, eval cases with thresholds (agents.md §4), and docs update.

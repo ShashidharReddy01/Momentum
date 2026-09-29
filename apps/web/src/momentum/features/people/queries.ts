@@ -4,13 +4,21 @@ import { useApi } from '@/providers/api';
 
 export type Person = components['schemas']['UserOut'];
 
-export function usePeople(q = '') {
+/** Which agent accounts to include (S5.2.1): the enabled agents that act when assigned or
+ * mentioned (pickers), or every agent (to show who a task is assigned to). People only when
+ * omitted. */
+export type AgentFilter = 'assigned' | 'mentioned' | 'all';
+
+export function usePeople(q = '', agents?: AgentFilter) {
   const api = useApi();
   return useQuery({
-    queryKey: ['people', q],
+    queryKey: agents ? ['people', q, agents] : ['people', q],
     queryFn: async () =>
-      (await api.GET('/api/v1/users', { params: { query: q ? { q, limit: 50 } : { limit: 200 } } })).data!
-        .data,
+      (
+        await api.GET('/api/v1/users', {
+          params: { query: { ...(q ? { q, limit: 50 } : { limit: 200 }), ...(agents ? { agents } : {}) } },
+        })
+      ).data!.data,
     staleTime: 60_000,
   });
 }

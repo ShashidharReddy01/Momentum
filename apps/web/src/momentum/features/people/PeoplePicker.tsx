@@ -14,14 +14,17 @@ export function PeopleCommand({
   placeholder = 'Search people…',
   before,
   selectedId,
+  agents,
 }: {
   onSelect: (person: Person) => void;
   exclude?: string[];
   placeholder?: string;
   before?: ReactNode;
   selectedId?: string | null;
+  /** Also offer the agents that act on this trigger (S5.2.1). */
+  agents?: 'assigned' | 'mentioned';
 }) {
-  const people = usePeople();
+  const people = usePeople('', agents);
   const options = (people.data ?? []).filter((p) => !exclude.includes(p.id));
   return (
     <Command label="People" loop>
@@ -42,9 +45,13 @@ export function PeopleCommand({
             className={ITEM}
             aria-current={selectedId === p.id ? 'true' : undefined}
           >
-            <Avatar name={p.name} src={p.avatar_url} size={22} />
+            <Avatar name={p.name} src={p.avatar_url} size={22} isAgent={p.is_agent} />
             <span className="min-w-0 flex-1 truncate">{p.name}</span>
-            <span className="truncate text-xs text-muted">{p.email}</span>
+            {p.is_agent ? (
+              <span className="shrink-0 text-xs text-amber-ink">✦ Agent</span>
+            ) : (
+              <span className="truncate text-xs text-muted">{p.email}</span>
+            )}
           </Command.Item>
         ))}
       </Command.List>

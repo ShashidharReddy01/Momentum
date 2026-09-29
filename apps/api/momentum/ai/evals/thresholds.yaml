@@ -15,6 +15,7 @@ mock:
   from_brief: 1.0
   nl_rule: 1.0
   ai_step: 1.0
+  agent_teammate: 1.0
 live:
   command: 0.9
   chat: 0.85
@@ -28,3 +29,4 @@ live:
   from_brief: 0.9
   nl_rule: 0.9
   ai_step: 0.85
+  agent_teammate: 0.85

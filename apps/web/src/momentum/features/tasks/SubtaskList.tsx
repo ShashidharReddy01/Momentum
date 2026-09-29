@@ -18,7 +18,7 @@ import { useMe } from '@/features/auth';
 import { usePeople } from '@/features/people';
 import { cn } from '@/lib/cn';
 import { formatDue } from '@/lib/dates';
-import { AssigneePicker } from './AssigneePicker';
+import { AssigneePicker, assignedMessage } from './AssigneePicker';
 import { DatePicker } from './DatePicker';
 import type { Task } from './queries';
 import { useSubtaskMutations, useSubtasks } from './subtasks';
@@ -59,7 +59,7 @@ export function SubtaskList({
     if (startDraft) setDrafting(true);
   }, [startDraft]);
   const [draftKey, setDraftKey] = useState(0);
-  const people = usePeople().data;
+  const people = usePeople('', 'all').data;
   const meId = useMe().data?.user.id;
 
   if (subs.isPending) return <Skeleton className="h-8" />;
@@ -109,7 +109,7 @@ export function SubtaskList({
               m.update.mutate({
                 id: t.id,
                 patch: { assignee_id: u?.id ?? null },
-                message: u ? `Assigned to ${u.id === meId ? 'you' : u.name}` : 'Unassigned',
+                message: assignedMessage(u, meId),
               })
             }
             onDue={(v) =>

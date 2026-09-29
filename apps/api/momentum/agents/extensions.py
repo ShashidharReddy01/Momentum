@@ -46,6 +46,40 @@ if TYPE_CHECKING:
     from momentum.ai.types import Alias, Completion, Msg
 
 
+async def attach_file(
+    session: AsyncSession,
+    ctx: Ctx,
+    settings: Settings,
+    task_id: uuid.UUID,
+    filename: str,
+    data: bytes,
+    mime: str = "text/plain",
+) -> uuid.UUID:
+    """Store ``data`` and attach it to a task as ``ctx``'s actor, with its text extracted for
+    search and ``get_attachment_text``. Used by handlers and by long agent answers (S5.2.1)."""
+    key = f"{ctx.workspace_id}/{new_id()}"
+
+    async def chunks() -> Any:
+        yield data
+
+    await build_storage(settings).save_stream(key, chunks())
+    m = await attachments.create_attachment(
+        session,
+        ctx,
+        task_id=task_id,
+        comment_id=None,
+        storage_key=key,
+        filename=filename,
+        mime=mime,
+        size_bytes=len(data),
+        sha256=hashlib.sha256(data).hexdigest(),
+    )
+    await attachments.record_text_extract(
+        session, m.entity.id, attachments.extract_text_from_bytes(data, mime)
+    )
+    return m.entity.id
+
+
 @dataclass
 class HandlerResult:
     """What a handler hands back. ``text`` is its answer: posted in the task's thread when a
@@ -198,25 +232,8 @@ class HandlerRun:
         """Attach a file (a report, a generated document) to the run's task."""
         if self.task_id is None:
             raise ValidationFailed("This run isn't about a task")
-        key = f"{self.ctx.workspace_id}/{new_id()}"
-
-        async def chunks() -> Any:
-            yield data
-
-        await build_storage(self.settings).save_stream(key, chunks())
-        m = await attachments.create_attachment(
-            self.session,
-            self.ctx,
-            task_id=self.task_id,
-            comment_id=None,
-            storage_key=key,
-            filename=filename,
-            mime=mime,
-            size_bytes=len(data),
-            sha256=hashlib.sha256(data).hexdigest(),
-        )
-        await attachments.record_text_extract(
-            self.session, m.entity.id, attachments.extract_text_from_bytes(data, mime)
+        attachment_id = await attach_file(
+            self.session, self.ctx, self.settings, self.task_id, filename, data, mime
         )
         self.step(f"Attached {filename}")
-        return m.entity.id
+        return attachment_id

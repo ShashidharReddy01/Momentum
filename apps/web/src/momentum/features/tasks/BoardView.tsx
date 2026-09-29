@@ -72,7 +72,7 @@ export function BoardView({
   useChannel(`project:${projectId}`, (event) => applyRealtimeEvent(qc, event, { projectId }));
   const sections = useSections(projectId);
   const open = useProjectTasks(projectId);
-  const people = usePeople().data;
+  const people = usePeople('', 'all').data;
   const {
     move: moveSection,
     create: createSection,
@@ -522,7 +522,13 @@ function Card({
           </span>
         ) : null}
         {assignee ? (
-          <Avatar name={assignee.name} src={assignee.avatar_url} size={18} className="ml-auto" />
+          <Avatar
+            name={assignee.name}
+            src={assignee.avatar_url}
+            size={18}
+            isAgent={assignee.is_agent}
+            className="ml-auto"
+          />
         ) : null}
       </div>
     </div>

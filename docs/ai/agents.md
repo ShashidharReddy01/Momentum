@@ -76,13 +76,21 @@ trigger (schedule | outbox event | assigned | mentioned | manual)
 - **Acting for the person who asked** (2026-09-29, S5.1.3): assigned, mentioned and run-now runs set `ctx.acting_for` to the requester, so the agent sees only what both can see, with the lower role (see `architecture/auth-and-permissions.md` §8).
 - **Runs UI (S5.1.3):** `GET /agents/{id}/runs?status=&trigger=` (the runs the viewer may see, newest first, up to 50) and `GET /agents/runs/{run_id}` (steps, proposals with who they're for and whether the viewer can decide them, answer, cost, errors; `detail` = `full` or `summary`). Pages `/agents/runs/:runId` and `/agents/:agentId` (charter line + filterable run history); both refresh every 5 s while a run is queued or running. Inbox rows for `agent_run` and `agent` notifications open them.
 - **Extensions (S5.1.5, ADR-0009):** host tools, handler agents and definition dirs through `Extensions` (`momentum/agents/extensions.py`), loaded from `MOMENTUM_AGENT_EXTENSIONS` by the app, the worker and the CLI. A handler runs in `runtime._run_handler` with the same context, access, timeout and trace; its `propose()` calls go to the run's person (as `confirm`); its answer goes in the thread like a model agent's. See INTEGRATION_GUIDE §6.7.
-- **Not yet:** the Review-section move and the @mention of the requester on assignment are S5.2.1.
+- **Assignment (S5.2.1, 2026-09-29):** see §3 "As built".
 
 ## 3. Assignment and mention behavior
 
 - **Assigned a task:** the agent reads the task and its context, does the work (research/draft/summarize/plan), posts the result as a comment (and attachment if long), moves the task to a "Review" section if one exists or reassigns it to the task creator, and @mentions them.
 - **@mentioned in a comment:** replies in the thread. If the request implies changes, it follows autonomy rules.
 - Agents never complete tasks assigned to humans, never decide approvals, and never delete.
+
+**As built (S5.2.1 + S5.3.8, 2026-09-29):**
+- **Picker:** `GET /users?agents=assigned|mentioned|all`. The assignee picker offers people plus the *enabled* agents that have an `assigned` trigger (amber ✦ ring, "✦ Agent" instead of an email); task views load `all` so an agent assignee always shows its name and ring. The toast says the agent will reply in the comments.
+- **Answer:** the reply in the thread @mentions whoever assigned the task (they get the usual `mentioned` notification). An answer over 4,000 characters is attached to the task as `<agent key>-T-<n>.md` (text extracted, so it's searchable and readable by `get_attachment_text`), and the comment keeps its opening and names the file.
+- **Hand-off:** after an assigned run, the task goes to the project's first section named "Review" or "In review" (the agent stays assignee), else it is reassigned to its creator (the assigner when the creator is an agent or inactive). Both are ordinary undoable changes by the agent. Nothing moves when someone reassigned or completed the task during the run; a hand-off the permissions refuse is noted on the run, never fatal. The same applies to handler agents.
+- **A run a person asked for that didn't finish** (failed, cancelled, over budget) sends them an `agent_alert` notification on the run (`entity_type="agent_run"`), which opens the run page and its reason. The admins' alert (on the agent, throttled) is unchanged.
+- **Prompt:** `agent` v2: on assigned work the final message is the work product itself (not a short reply); it's posted for the agent, so it must never post it with `add_comment`. `max_tokens` 3000.
+- **Teammate (S5.3.8):** its charter (read the task, look things up, give the draft itself, propose subtasks for trackable steps, invent nothing, ask one question when unclear). Tools: `get_task`, `get_project`, `search_tasks`, `semantic_search`, `get_attachment_text`, `list_people`, `create_subtasks`. `add_comment` was dropped, since the answer is posted anyway and a `confirm` agent's comment would only be a proposal. Limits: 10 steps, 240 s. Eval feature `agent_teammate` (10 cases, 3 mock; live threshold 85%, rubric-judged helpfulness).
 
 ## 4. Starter agents
 
@@ -95,7 +103,7 @@ trigger (schedule | outbox event | assigned | mentioned | manual)
 | 5 | **Architect · Planner** | Manual ("Plan this" on a brief/task/project) | Brief text, templates, team members, capacity (P6) | create_project_from_plan, create_subtasks | Plan preview (sections, tasks, dates, suggested assignees) | confirm | Structure validity; dates within the requested window; no unknown assignees |
 | 6 | **Scribe · Meeting Notes** | Manual paste/upload of notes/transcript; email-in (P7) | Notes text, attendees → users, related projects | search_tasks, create_task, add_comment | Decisions list + action items as tasks with owner/due; link back | confirm | Action-item recall ≥ 85% on fixtures |
 | 7 | **Radar · Risk Watcher** | Daily 08:00 | Per project: overdue ratio, blocked chains, unassigned near-due, scope growth, forecast (P6) | read tools, add_comment | Risk note on the project overview + digest line for owners | suggest | Flags known-risky fixture projects; false-positive rate ≤ 20% |
-| 8 | **Teammate (generic)** | Assigned / mentioned | Task + context + retrieval | read tools + add_comment, create_subtasks | Work product in comments | confirm | Rubric-graded helpfulness on fixtures |
+| 8 | **Teammate (generic)** | Assigned / mentioned | Task + context + retrieval | read tools + create_subtasks (its answer is posted in the thread) | Work product in comments | confirm | Rubric-graded helpfulness on fixtures |
 
 ## 5. Autonomy promotion
 

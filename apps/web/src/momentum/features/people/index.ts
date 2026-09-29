@@ -1,2 +1,2 @@
 export { PeopleCommand, PeoplePicker, peopleItemClass } from './PeoplePicker';
-export { usePeople, type Person } from './queries';
+export { usePeople, type AgentFilter, type Person } from './queries';

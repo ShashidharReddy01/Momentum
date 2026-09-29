@@ -12506,6 +12506,8 @@ export interface operations {
             query?: {
                 q?: string | null;
                 limit?: number;
+                /** @description Also list agents: the enabled ones acting on `assigned`/`mentioned`, or `all` */
+                agents?: ("assigned" | "mentioned" | "all") | null;
             };
             header?: never;
             path?: never;

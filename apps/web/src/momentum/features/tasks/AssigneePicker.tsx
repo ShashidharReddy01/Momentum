@@ -6,7 +6,19 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/Popover
 import { useMe } from '@/features/auth';
 import { PeopleCommand, peopleItemClass } from '@/features/people';
 
-/** Assignee combobox: "Assign to me", search people, "Unassign". Controlled so `A` can open it. */
+/** The toast after assigning. An agent starts working within a minute and answers in the task's
+ * thread (S5.2.1), so say so. */
+export function assignedMessage(
+  user: { id: string; name: string; is_agent?: boolean } | null,
+  meId: string | undefined,
+): string {
+  if (!user) return 'Unassigned';
+  if (user.is_agent) return `Assigned to ${user.name}. It will reply in the comments shortly.`;
+  return `Assigned to ${user.id === meId ? 'you' : user.name}`;
+}
+
+/** Assignee combobox: "Assign to me", search people and assignable agents (✦, S5.2.1),
+ * "Unassign". Controlled so `A` can open it. */
 export function AssigneePicker({
   open,
   onOpenChange,
@@ -20,11 +32,11 @@ export function AssigneePicker({
   open: boolean;
   onOpenChange: (open: boolean) => void;
   assigneeId: string | null;
-  onChange: (user: { id: string; name: string } | null) => void;
+  onChange: (user: { id: string; name: string; is_agent?: boolean } | null) => void;
   children: ReactNode;
 }) {
   const me = useMe().data?.user;
-  const pick = (user: { id: string; name: string } | null) => {
+  const pick = (user: { id: string; name: string; is_agent?: boolean } | null) => {
     onOpenChange(false);
     if (allowClear || (user?.id ?? null) !== assigneeId) onChange(user);
   };
@@ -34,6 +46,7 @@ export function AssigneePicker({
       <PopoverContent className="w-72 p-0" align="start">
         <PeopleCommand
           placeholder="Assign to…"
+          agents="assigned"
           selectedId={assigneeId}
           onSelect={(p) => pick(p)}
           before={

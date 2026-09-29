@@ -131,7 +131,7 @@ function TagPageRow({
   isOpen: boolean;
   onOpen: () => void;
 }) {
-  const people = usePeople().data;
+  const people = usePeople('', 'all').data;
   const assignee = task.assignee_id ? people?.find((p) => p.id === task.assignee_id) : undefined;
   const m = useTaskDetailMutations(task.id);
   const done = !!task.completed_at;

@@ -43,9 +43,13 @@ async def list_users(
     uow: UowDep,
     q: str | None = Query(default=None, max_length=100),
     limit: int = Query(default=50, ge=1, le=200),
+    agents: service.AgentFilter | None = Query(
+        default=None,
+        description="Also list agents: the enabled ones acting on `assigned`/`mentioned`, or `all`",
+    ),
 ) -> ListOut[UserOut]:
     async with uow.transaction() as session:
-        users = await service.list_users(session, ctx, q=q, limit=limit)
+        users = await service.list_users(session, ctx, q=q, limit=limit, agents=agents)
         return ListOut(data=[UserOut.model_validate(u) for u in users])
 
 
