@@ -3,8 +3,13 @@
 # the triggers, schedule, tools and autonomy the description implies.
 feature: agent_draft
 cases:
+  # Mock only (live: false): the fixture scripts a bad draft (delete_task, `auto`, no mention
+  # trigger) to check the server's corrections and their notes. A live model drafts this one
+  # correctly, so there is nothing to correct and no notes (2026-09-29 live run); the live cases
+  # below score the model's own draft.
   - id: server_corrects_the_draft
     mock: true
+    live: false
     input: "A weekly bug sweeper that flags stale bugs"
     expect:
       agent_trigger_types: [schedule, mentioned]

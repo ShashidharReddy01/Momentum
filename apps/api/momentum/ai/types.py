@@ -20,6 +20,15 @@ Msg = dict[str, Any]  # {"role": "system"|"user"|"assistant"|"tool", "content": 
 ToolSchema = dict[str, Any]  # {"type": "function", "function": {"name", "description", ...}}
 ToolChoice = str | dict[str, Any]
 
+# The tool loop (``ai/loop.py``) adds this to the latest tool result on the last allowed step only,
+# so the model answers with what it has; it is never kept in the transcript. The mock transport
+# ignores it, so a fixture's turns and matches are the same with or without it.
+LAST_STEP_NOTE = (
+    "This is your last step: no more tool calls will run. Reply now with your final answer, "
+    "based on what you already have. The changes you already proposed are kept; say what is "
+    "left undone, if anything."
+)
+
 # Transport failure kinds. The first four are retried by the gateway; the rest fail at once.
 FailureKind = Literal[
     "timeout", "connection", "rate_limited", "server_error", "bad_request", "auth", "bad_response"

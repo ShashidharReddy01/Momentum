@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import json
 import uuid
+from dataclasses import replace
 from datetime import UTC, date, datetime
 from typing import Any
 
@@ -18,6 +19,7 @@ from momentum.ai.loop import OUT_OF_STEPS
 from momentum.ai.mock import _fill, _turn
 from momentum.ai.models import AiAction
 from momentum.ai.prefs import AiPrefs, set_prefs
+from momentum.ai.types import LAST_STEP_NOTE
 from momentum.core.db import UnitOfWork
 from momentum.core.settings import Settings
 from momentum.domain.tasks import service as tasks
@@ -133,6 +135,36 @@ async def test_loop_stops_after_max_steps(uow: UnitOfWork, world: World) -> None
     events = await run(uow, world.ravi, "keep searching forever")
     assert of(events, "token") == [{"text": OUT_OF_STEPS}]
     assert of(events, "done") == [{"steps": 6}]
+
+
+async def test_the_last_step_asks_for_an_answer_and_keeps_the_transcript(
+    uow: UnitOfWork, world: World
+) -> None:
+    """Phase 5 live run: agents that kept looking things up ended with OUT_OF_STEPS. The last
+    allowed step now tells the model to answer with what it has; the note isn't kept."""
+    inner = build_llm(make_settings())
+    seen: list[list[dict[str, Any]]] = []
+
+    class Answers:
+        async def complete(self, **kwargs: Any) -> Any:
+            messages = kwargs["messages"]
+            seen.append(list(messages))
+            done = await inner.complete(**kwargs)
+            if str(messages[-1].get("content")).endswith(LAST_STEP_NOTE):
+                return replace(done, text="Here is what I found so far.", tool_calls=[])
+            return done
+
+        def __getattr__(self, name: str) -> Any:
+            return getattr(inner, name)
+
+    events = await run(uow, world.ravi, "keep searching forever", llm=Answers())  # type: ignore[arg-type]
+    assert of(events, "done") == [{"steps": 6}]
+    assert "Here is what I found so far." in "".join(d["text"] for d in of(events, "token"))
+    assert OUT_OF_STEPS not in "".join(d["text"] for d in of(events, "token"))
+    noted = [LAST_STEP_NOTE in str(m.get("content")) for m in seen[-1]]
+    assert noted == [False] * (len(noted) - 1) + [True]  # only on the last tool result
+    assert seen[-1][-1]["role"] == "tool"  # no user message after tool results
+    assert not any(LAST_STEP_NOTE in str(m.get("content")) for s in seen[:-1] for m in s)
 
 
 def test_mock_turn_and_last_templating() -> None:

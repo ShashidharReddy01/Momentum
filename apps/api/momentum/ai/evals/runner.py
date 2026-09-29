@@ -233,6 +233,8 @@ async def run_evals(
                 continue
             if not live and not all_cases and not case.get("mock"):
                 continue  # mock mode runs only the cases with handwritten fixtures
+            if live and case.get("live") is False:
+                continue  # checks our own code against a fixture's scripted bad output
             user = world.users[case.get("user", "ravi")]
             today = datetime.now(UTC).astimezone(ZoneInfo(user.timezone)).date()
             filled = fill(case, world, today)

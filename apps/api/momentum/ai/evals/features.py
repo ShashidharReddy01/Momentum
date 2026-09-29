@@ -359,7 +359,8 @@ async def _run(
         trigger = {
             "type": "schedule",
             "project_id": str(world.projects[project]),
-            "timezone": "UTC",
+            # the workspace data's dates are days from the project owner's today
+            "timezone": world.users[case.get("owner", "ravi")].timezone,
             "requested_by": str(ctx.actor.id),
         }
         await _execute(session, llm, registry, ctx, agent, trigger, now, obs)
@@ -380,7 +381,7 @@ async def _run(
         trigger = {
             "type": "schedule",
             "project_id": str(world.projects[project]),
-            "timezone": "UTC",
+            "timezone": world.users[case.get("owner", "ravi")].timezone,
         }
         output = await _execute(session, llm, registry, ctx, agent, trigger, now, obs)
         risk = output.get("risk") or {}

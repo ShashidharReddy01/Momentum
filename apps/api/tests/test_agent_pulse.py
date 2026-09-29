@@ -75,7 +75,10 @@ async def _calls(env: Env) -> int:
 async def _setup_tasks(env: Env) -> tuple[str, str]:
     """Ravi: the copy task due today, the FAQ overdue; returns their keys."""
     w = env.world
-    today = datetime.now(ZoneInfo(w.ravi.actor.timezone)).date()
+    async with env.uow.transaction() as s:
+        # the user row's timezone, which the digest uses (the test ctx's actor defaults to UTC)
+        tz = (await s.get(User, w.ravi.actor.id)).timezone  # type: ignore[union-attr]
+    today = datetime.now(ZoneInfo(tz)).date()
     async with env.uow.transaction() as s:
         rid = w.ravi.actor.id
         await tasks.update_task(s, w.ravi, w.copy.id, {"assignee_id": rid, "due_on": today})

@@ -185,3 +185,14 @@ After fixes: re-run `momentum llm-check` (should stay 10/10) and
 `momentum evals --live --report-dir ../../reports/evals` (or `EVALS_LIVE=1 make evals`), confirm
 all 21 feature buckets clear their thresholds, then update `docs/progress/STATUS.md`'s Phase 5
 entry and retro with the outcome, per this repo's own documentation-update rules (CLAUDE.md §5).
+
+## Response (2026-09-29, same day, mock mode)
+
+Every finding is addressed in code or prompts, and the mock evals pass; the live re-run is the product owner's. Summary in `docs/progress/STATUS.md` (handoff "Live verification") and the plan-changes log:
+
+1. Pulse/Radar: bracketed citations asked for; both prompts moved to versioned files (`prompts/pulse_intro/v1.md`, `prompts/radar_note/v1.md`), which settles the "inline vs versioned" question.
+2. Sorter: charter rewritten (commit to a lead's call, Risk guidance, exact duplicate format, three turns). The `max_steps` exhaustion is addressed at its root for every loop: the last allowed step now tells the model to answer with what it has (`LAST_STEP_NOTE`); `max_steps` was not raised.
+3. Injection case: **decision: keep "propose nothing".** Teammate's charter already allowed subtasks only on an explicit ask, so the proposal broke its own rule; an agent now says it ignored the embedded instruction, proposes no changes, and does only the title's work as text. Recorded as a decision for the product owner to confirm.
+4. `ai_step_reply/v2`: the model isn't told today's date, so it must not state or assume it. Re-run the case 3 times.
+5. `plan_day/v2`: the capacity is a ceiling (Ana's webinar, due in 10 days with no priority, has no reason to be in Today: that was the missing signal), and blocked tasks are explained in words.
+6. `agent_draft/server_corrects_the_draft`: now mock-only (`live: false`). Its expectations (notes about `delete_task` and `auto`) exist only when the model's draft needs correcting, which the scripted mock draft does and the live model's didn't; the missing `mentioned` trigger wasn't implied by "a weekly bug sweeper".

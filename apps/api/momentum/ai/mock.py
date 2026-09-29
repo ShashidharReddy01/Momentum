@@ -41,6 +41,7 @@ import yaml
 
 from momentum.ai.transport import Transport
 from momentum.ai.types import (
+    LAST_STEP_NOTE,
     ChatRequest,
     EmbedRequest,
     Msg,
@@ -86,6 +87,20 @@ def request_key(messages: list[Msg], tools: list[dict[str, Any]] | None) -> str:
     names = sorted(t.get("function", {}).get("name", "") for t in tools or [])
     raw = json.dumps([convo, names], sort_keys=True, ensure_ascii=False)
     return hashlib.sha256(raw.encode()).hexdigest()[:16]
+
+
+def _without_last_step(messages: list[Msg]) -> list[Msg]:
+    """The tool loop's last-step note isn't part of the conversation a fixture describes."""
+    suffix = f"\n\n{LAST_STEP_NOTE}"
+    out: list[Msg] = []
+    for m in messages:
+        content = m.get("content")
+        if content == LAST_STEP_NOTE:
+            continue
+        if isinstance(content, str) and content.endswith(suffix):
+            m = {**m, "content": content[: -len(suffix)]}
+        out.append(m)
+    return out
 
 
 def _last_user_text(messages: list[Msg]) -> str:
@@ -273,10 +288,11 @@ class MockTransport:
         self._dim = settings.llm_embed_dim
 
     def resolve(self, req: ChatRequest) -> RawCompletion:
-        key = request_key(req.messages, req.tools)
-        last_user = _last_user_text(req.messages)
+        messages = _without_last_step(req.messages)
+        key = request_key(messages, req.tools)
+        last_user = _last_user_text(messages)
         data = _load(_feature_file(self._dir, req.feature))
-        turn = _turn(req.messages)
+        turn = _turn(messages)
         for entry in data.get("responses") or []:
             if isinstance(entry, dict) and _entry_matches(entry, key, last_user, turn):
                 return _entry_to_completion(entry, req)
@@ -333,7 +349,7 @@ class RecordingTransport:
         if path is None:
             return
         data = _load(path)
-        key = request_key(req.messages, req.tools)
+        key = request_key(_without_last_step(req.messages), req.tools)
         entry: dict[str, Any] = {"match": {"key": key}, "text": raw.text}
         if raw.tool_calls:
             entry["tool_calls"] = [

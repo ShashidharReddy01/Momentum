@@ -25,6 +25,7 @@ from momentum.ai.llm import LLM
 from momentum.ai.prefs import get_prefs
 from momentum.ai.tools.registry import ToolRegistry
 from momentum.ai.types import (
+    LAST_STEP_NOTE,
     Alias,
     Completion,
     DoneEvent,
@@ -38,6 +39,17 @@ from momentum.domain.workspace.service import get_ai_config
 
 Emit = Callable[[str, dict[str, Any]], Awaitable[None]]
 OUT_OF_STEPS = "I couldn't finish that in the steps I'm allowed. Try a narrower request."
+
+
+def _with_last_step_note(messages: list[Msg]) -> list[Msg]:
+    """The messages for the last allowed step: the note rides on the latest tool result (a copy),
+    since some providers refuse a user message straight after tool results. Tools stay attached
+    (some gateways refuse a tool history without them, and not all support tool_choice "none");
+    tool calls the model still makes on that step are not run."""
+    last = messages[-1]
+    if last.get("role") == "tool" and isinstance(last.get("content"), str):
+        return [*messages[:-1], {**last, "content": f"{last['content']}\n\n{LAST_STEP_NOTE}"}]
+    return [*messages, {"role": "user", "content": LAST_STEP_NOTE}]
 
 
 @dataclass
@@ -89,6 +101,8 @@ async def run_tool_loop(
     seen: set[tuple[str, str]] = set()
     for step in range(max_steps):
         result.steps = step + 1
+        last = step == max_steps - 1 and max_steps > 1
+        sent = _with_last_step_note(messages) if last else messages
         if stream:
             c = await _streamed_step(
                 llm,
@@ -96,7 +110,7 @@ async def run_tool_loop(
                 result,
                 emit,
                 alias,
-                messages,
+                sent,
                 schemas,
                 feature,
                 prompt_version,
@@ -106,7 +120,7 @@ async def run_tool_loop(
         else:
             c = await llm.complete(
                 alias=alias,
-                messages=messages,
+                messages=sent,
                 tools=schemas,
                 feature=feature,
                 ctx=ctx,
@@ -120,6 +134,8 @@ async def run_tool_loop(
         if not c.tool_calls:
             result.text = c.text.strip()
             return result
+        if last:
+            break
         messages.append(_assistant(c.text, c.tool_calls))
         for call in c.tool_calls:
             tool = registry.get(call.name)

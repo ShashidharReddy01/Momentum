@@ -208,14 +208,22 @@ class HandlerRun:
 
     # --- the model, billed to this run and its budget ---
     async def complete(
-        self, messages: list[Msg], *, alias: Alias | None = None, max_tokens: int = 1500
+        self,
+        messages: list[Msg],
+        *,
+        alias: Alias | None = None,
+        max_tokens: int = 1500,
+        prompt_version: str | None = None,
     ) -> Completion:
+        """A model call billed to this run, under the agent's own feature (``agent:<key>``);
+        ``prompt_version`` (e.g. ``prompts.load(...).version``) is recorded on ``llm_calls``."""
         return await self._llm.complete(
             alias=alias or self._alias,  # type: ignore[arg-type]
             messages=messages,
             feature=f"agent:{self.agent_key}",
             ctx=self.ctx,
             max_tokens=max_tokens,
+            prompt_version=prompt_version,
             agent_run_id=self.run_id,
         )
 
