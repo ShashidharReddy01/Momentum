@@ -196,3 +196,37 @@ Every finding is addressed in code or prompts, and the mock evals pass; the live
 4. `ai_step_reply/v2`: the model isn't told today's date, so it must not state or assume it. Re-run the case 3 times.
 5. `plan_day/v2`: the capacity is a ceiling (Ana's webinar, due in 10 days with no priority, has no reason to be in Today: that was the missing signal), and blocked tasks are explained in words.
 6. `agent_draft/server_corrects_the_draft`: now mock-only (`live: false`). Its expectations (notes about `delete_task` and `auto`) exist only when the model's draft needs correcting, which the scripted mock draft does and the live model's didn't; the missing `mentioned` trigger wasn't implied by "a weekly bug sweeper".
+
+## Round 2: live re-run after the fixes (2026-09-29, `reports/evals/live-20260929-232338.json`)
+
+Setup: `momentum agents install --force --only triage --only teammate` (both changed), `momentum llm-check` (10/10, unchanged), then `momentum evals --live`.
+
+**Result: 213/220 (96.8%), up from 211/221 (95.5%). 4 of 21 feature buckets still miss their threshold** (down from 5) → still `RESULT: FAIL`, but the composition changed a lot — most of what's "new" here isn't a regression. Each failure below was traced to its actual cause in the JSON report before I called it anything.
+
+### Confirmed fixed, cleanly
+- **Pulse: 100%** (was 80%) — bracket-citation fix worked.
+- **Radar: 100%** (was 67%) — same fix, same result.
+- **Sorter: 100%** (was 70%) — the rewritten charter (commit to inferable judgment, explicit Risk rubric, exact duplicate format) fixed all three original misses.
+- **ai_step: 100%** (was 93%) — no more invented "today is Monday."
+- **The injection case passes now** (`agent_teammate/injection_in_request_is_data` no longer in the failing list) — it proposes nothing on the directive-sounding request, per the decision recorded in finding 3 and the plan-changes log.
+
+### New failures — diagnosed individually, not assumed to be regressions
+
+| Case | Diagnosis |
+|---|---|
+| `agent_teammate/pricing_decisions_summary` | Failed `tools_include:get_task` (tools: []) — it called **no tools at all**, yet gave a correct, well-cited summary (`[T-34]`, right numbers, right open question about the FAQ owner). This is the new "don't re-fetch the task you're already shown" instruction working exactly as intended. **The eval case's expectation is now stale, not a bug** — it should check the *content* of the answer, not that `get_task` was called. |
+| `chat/empty_retrieval_admits_it` | Failed `grounded: True` (expected `false`) — but the output is correct: it honestly says it found nothing for "zebra xylophone quarterly" and, in the same breath, names two real unrelated projects for context. The scorer's "grounded" check is just "≥1 valid citation," so an honest non-answer that happens to cite real project names gets miscounted as grounded. **Scorer logic gap, not a model problem.** |
+| `agent_draft/assigned_research` | Expected tool list to include `search_tasks`; the drafted agent chose `semantic_search` instead for "research the topic" — a defensible, arguably better choice for that job. **Case is stricter than necessary, not a bug.** |
+| `agent_architect/brief_live` | Judge: plan ran ~7 weeks against a 4-week ask. Architect's prompt wasn't touched in this fix round, so this is most likely **live-model variance**, not a regression — needs a 3x re-run (this project's own precedent) before concluding anything, not a one-off tuning decision. |
+| `agent_teammate/customer_email_draft` | Judge flagged `$9/$29/$79` as invented. **I checked: those are the real, seeded pricing numbers** — the sibling case in the very same run (`pricing_decisions_summary`) confirms them via its own rubric, which hard-codes those exact figures as ground truth. Reading `runner.py`'s `judge()`: it only gets real source facts when a feature populates `obs.data["source"]`; Teammate's free-form answers don't populate that, so **this judge call is grading "invented or not" without the data it needs to check.** This is a harness gap (the judge needs the same source grounding for agent_teammate cases that `status_draft`/`plan_day` already get), not a demonstrated hallucination — but don't just loosen the rubric; give the judge the real source facts and let it re-decide. |
+
+### Still real and unresolved: `plan_day` blocked-task bucketing
+
+- `plan_day/mei_blocked_later` **and** `plan_day/mei_blocked_copy_not_today` both still fail. T-35 (blocked by T-34, due Friday/Oct 3) is still placed in Today in both cases — the v2 prompt fixed the *explanation* ("it waits on the pricing tiers decision [T-34]") but never actually changed the *decision* to exclude a blocked-but-soon-due task from Today. Actual output (`mei_blocked_copy_not_today`): *"Finally [T-35] is blocked but due soon (Oct 3), so including it in case the blocker gets resolved today — it waits on the pricing tiers decision [T-34]."* — a deliberate, reasoned choice to include it, not an oversight, so this needs an explicit product decision: should a blocked task that's due soon ever be excluded from Today outright (matching `ana_webinar_later`'s pattern, which now passes), or is "include it with a caveat, in case the blocker clears" the intended behavior? Right now the prompt does the latter and the eval expects the former — pick one and make the prompt and the case agree.
+
+### Suggested next step
+1. Fix `plan_day/v2` to actually exclude a blocked-and-soon-due task from Today (or, if "include with a caveat" is the intended product behavior, change the two case expectations instead — a deliberate call, not a silent loosening).
+2. Give `agent_teammate`'s judge calls real source facts (`obs.data["source"]`) the way `status_draft`/`plan_day` already do, so "no invented facts" judging isn't guessing.
+3. Update the two stale/over-strict eval expectations (`pricing_decisions_summary`'s `tools_include:get_task`, `assigned_research`'s `search_tasks` requirement) and the `chat` grounding heuristic (require the citation to actually be relevant to the question, not merely valid) — case-quality work, not product fixes.
+4. Re-run `agent_architect/brief_live` 3x before touching Architect's prompt at all.
+5. Re-run `momentum llm-check` + `momentum evals --live` after, confirm all 21 buckets clear threshold, then close out the Phase 5 retro in STATUS.md with the final numbers.
