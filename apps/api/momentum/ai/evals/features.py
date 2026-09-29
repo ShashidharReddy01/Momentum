@@ -71,6 +71,7 @@ FEATURES = (
     "agent_nudge",
     "agent_radar",
     "agent_architect",
+    "agent_scribe",
 )
 
 
@@ -400,6 +401,16 @@ async def _run(
         if inp:
             asked["input"] = inp
         await _execute(session, llm, registry, ctx, agent, asked, now, obs)
+    elif feature == "agent_scribe":
+        project = case.get("project", "Launch Plan")
+        agent = await _install(session, registry, world, ctx, "meeting_notes", project)
+        notes_run = {
+            "type": "manual",
+            "requested_by": str(ctx.actor.id),
+            "project_id": str(world.projects[project]),
+            "input": inp,
+        }
+        await _execute(session, llm, registry, ctx, agent, notes_run, now, obs)
     elif feature == "agent_teammate":
         await _teammate(session, llm, registry, world, case, ctx, now, obs)
     else:

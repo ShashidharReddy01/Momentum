@@ -25,6 +25,7 @@ KEY = re.compile(r"\bT-\d+\b")
 
 KNOWN = frozenset(
     {
+        "action_items_recall",
         "risk_level_in",
         "risk_signals_include",
         "nudged_include",
@@ -284,6 +285,16 @@ def score(obs: Observation, expect: dict[str, Any], *, today: date, asked: str =
                 "sorter_no_duplicate", "duplicate" not in comments, f"comments: {comments[:160]!r}"
             )
         )
+
+    # Scribe (S5.3.6): share of the expected action items among the proposed tasks' titles
+    if "action_items_recall" in expect:
+        spec = expect["action_items_recall"]
+        titles = " | ".join(str(a.get("title", "")).lower() for a in _op_args(obs, "create_task"))
+        wanted = [str(x).lower() for x in spec["items"]]
+        hit = [w for w in wanted if all(word in titles for word in w.split())]
+        recall = len(hit) / len(wanted) if wanted else 1.0
+        ok = recall >= float(spec.get("min", 0.85))
+        add(Check("action_items_recall", ok, f"{recall:.0%}: missing {set(wanted) - set(hit)}"))
 
     # Radar (S5.3.7): the note's level and signals
     if "risk_level_in" in expect:

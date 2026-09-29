@@ -1,0 +1,20 @@
+# Scribe (S5.3.6), mock mode. The "Launch sync" notes (tests and the mock eval) have three real
+# action items plus two the server must correct: an owner who isn't on the project and a date in
+# the past. Dates are far from today so the fixture never goes stale.
+responses:
+  - match: {contains: "Launch sync"}
+    tool_calls:
+      - name: submit_result
+        arguments:
+          title: "(mock) Launch sync"
+          decisions: ["Ship on Friday, October 9"]
+          action_items:
+            - {title: "Write the launch FAQ", owner: "Ana", due_on: "2030-10-06", quote: "Ana will write the FAQ by the 6th"}
+            - {title: "Book the venue", owner: "Ravi", quote: "Ravi to book the venue"}
+            - {title: "Update the pricing page", quote: "Someone should update the pricing page"}
+            - {title: "Call the lawyer", owner: "Zed Unknown", quote: "Zed calls the lawyer"}
+            - {title: "Send the recap", due_on: "2020-01-01", quote: "recap went out already"}
+default:
+  tool_calls:
+    - name: submit_result
+      arguments: {title: "(mock) Meeting", decisions: [], action_items: []}
