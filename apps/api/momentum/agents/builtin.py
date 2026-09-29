@@ -3,7 +3,7 @@ start with ``momentum.``; a host's handler can't replace them."""
 
 from __future__ import annotations
 
-from momentum.agents import herald, nudge, pulse, radar
+from momentum.agents import architect, herald, nudge, pulse, radar
 from momentum.agents.extensions import Handler
 
 BUILTIN_HANDLERS: dict[str, Handler] = {
@@ -11,4 +11,5 @@ BUILTIN_HANDLERS: dict[str, Handler] = {
     herald.HANDLER: herald.status_reporter,
     nudge.HANDLER: nudge.nudger,
     radar.HANDLER: radar.risk_watcher,
+    architect.HANDLER: architect.planner,
 }

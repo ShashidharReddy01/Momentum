@@ -191,6 +191,11 @@ class HandlerRun:
         return (await get_visible_task(self.session, self.ctx, self.task_id))[0]
 
     @property
+    def registry(self) -> ToolRegistry:
+        """The agent's own tools (for Momentum's AI features that take a registry)."""
+        return self._registry
+
+    @property
     def llm(self) -> LLM:
         """The model handle for Momentum's own AI features (e.g. ``draft_status``) called from a
         handler: every call is billed to this run and checked against the agent's budget."""

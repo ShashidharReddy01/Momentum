@@ -160,3 +160,22 @@ export function useTestRun(id: string) {
       ).data!,
   });
 }
+
+export type RunIn = components['schemas']['RunIn'];
+
+/** "Run now" (manual trigger): queued, starts within a minute; the result lands on the run page
+ * (and in the task's thread when it's run on a task). */
+export function useRunNow(id: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (body: RunIn) =>
+      (
+        await api.POST('/api/v1/agents/{agent_id}/run', {
+          params: { path: { agent_id: id } },
+          body,
+        })
+      ).data!,
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['agents', id, 'runs'] }),
+  });
+}

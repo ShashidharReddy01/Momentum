@@ -260,8 +260,11 @@ async def _apply_policy(
     autonomy: str,
     requester: User | None,
     trace: _Trace,
+    preview_ctx: Ctx | None = None,
 ) -> dict[str, Any]:
-    """Sort the previewed writes by the policy and act on them. Returns the run's output parts."""
+    """Sort the previewed writes by the policy and act on them. Returns the run's output parts.
+    ``preview_ctx``: previews and proposals made as the person they're for (a code-backed agent's
+    proposals, S5.3.5); that person applies them with their own permissions anyway."""
     acting_as_agent = ctx.actor.is_agent
     config = await get_ai_config(session, agent.workspace_id)
     allow_medium = config.allow_medium_auto is True
@@ -269,7 +272,9 @@ async def _apply_policy(
     to_propose: list[ProposedCall] = []
     suggestions: list[str] = []
     for call in proposals:
-        out = await registry.invoke(session, ctx, call.tool, call.args, mode="dry_run")
+        out = await registry.invoke(
+            session, preview_ctx or ctx, call.tool, call.args, mode="dry_run"
+        )
         if not out.ok:
             trace.add("skipped", f"{call.tool}: {out.result.summary}", name=call.tool)
             continue
@@ -313,7 +318,7 @@ async def _apply_policy(
         else:
             p = await propose(
                 session,
-                ctx,
+                preview_ctx or ctx,
                 registry,
                 to_propose,
                 source="agent",
@@ -708,8 +713,11 @@ async def _run_handler(
     except Exception as e:
         log.exception("agent_handler_failed", agent=agent.key, run_id=str(run.id))
         raise _Failed(f"The handler failed: {type(e).__name__}: {e}"[:300]) from e
+    # a handler's proposals are previewed as the person they're for (they apply them with their
+    # own permissions): e.g. Architect's project plan in a team the agent isn't part of
+    preview_ctx = on_behalf_ctx(requester, settings) if requester is not None else None
     output = await _apply_policy(
-        session, ctx, tools, agent, run, hrun.proposals, "confirm", requester, trace
+        session, ctx, tools, agent, run, hrun.proposals, "confirm", requester, trace, preview_ctx
     )
     output = {**hrun.output, **output}  # the runtime's own keys win
     text = result.text if result is not None else None

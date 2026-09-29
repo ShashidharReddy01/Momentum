@@ -22,6 +22,7 @@ mock:
   agent_herald: 1.0
   agent_nudge: 1.0
   agent_radar: 1.0
+  agent_architect: 1.0
 live:
   command: 0.9
   chat: 0.85
@@ -42,3 +43,4 @@ live:
   agent_herald: 1.0
   agent_nudge: 1.0
   agent_radar: 1.0
+  agent_architect: 0.9

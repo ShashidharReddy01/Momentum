@@ -71,7 +71,7 @@ class BriefPlan(BaseModel):
 
 @dataclass
 class BriefResult:
-    action_id: uuid.UUID
+    action_id: uuid.UUID | None
     name: str
     team: str
     start_on: date
@@ -79,10 +79,16 @@ class BriefResult:
     tasks: int
     notes: list[str] = field(default_factory=list)
     open_questions: list[str] = field(default_factory=list)
+    # the planned call; with ``propose_action=False`` it isn't stored (Architect proposes it to
+    # the person who asked, S5.3.5)
+    calls: list[ProposedCall] = field(default_factory=list)
 
 
 async def _team(session: AsyncSession, ctx: Ctx, team_id: uuid.UUID | None) -> Team:
-    mine = select(TeamMember.team_id).where(TeamMember.user_id == ctx.actor.id)
+    # an agent planning for someone (Architect, S5.3.5) plans in that person's teams: they apply
+    # the plan, with their own permissions; an agent account belongs to no team
+    person = ctx.acting_for.id if ctx.actor.is_agent and ctx.acting_for else ctx.actor.id
+    mine = select(TeamMember.team_id).where(TeamMember.user_id == person)
     q = select(Team).where(
         Team.workspace_id == ctx.workspace_id, Team.deleted_at.is_(None), Team.id.in_(mine)
     )
@@ -139,6 +145,7 @@ async def plan_from_brief(
     team_id: uuid.UUID | None = None,
     start_on: date | None = None,
     end_on: date | None = None,
+    propose_action: bool = True,
 ) -> BriefResult:
     brief = brief.strip()
     if not brief:
@@ -209,25 +216,29 @@ async def plan_from_brief(
         sections.append({"name": sec.name, "tasks": items})
     project_name = (name or "").strip() or plan.name.strip()
     count = sum(len(sec.tasks) for sec in plan.sections)
-    proposal = await propose(
-        session,
-        ctx,
-        registry,
-        [
-            ProposedCall(
-                "create_project_from_plan",
-                {"name": project_name, "team": str(team.id), "sections": sections},
-            )
-        ],
-        source="inline",
-        summary=f"Create project {project_name} ({len(sections)} sections, {count} tasks)",
-    )
-    if proposal.action is None:
-        detail = "; ".join(o.result.summary for _, o in proposal.failures)
-        raise ValidationFailed(detail[:300] or "The plan couldn't be previewed")
+    calls = [
+        ProposedCall(
+            "create_project_from_plan",
+            {"name": project_name, "team": str(team.id), "sections": sections},
+        )
+    ]
+    action_id = None
+    if propose_action:
+        proposal = await propose(
+            session,
+            ctx,
+            registry,
+            calls,
+            source="inline",
+            summary=f"Create project {project_name} ({len(sections)} sections, {count} tasks)",
+        )
+        if proposal.action is None:
+            detail = "; ".join(o.result.summary for _, o in proposal.failures)
+            raise ValidationFailed(detail[:300] or "The plan couldn't be previewed")
+        action_id = proposal.action.id
     last_due = max(d for _, d in dates.values())
     return BriefResult(
-        proposal.action.id,
+        action_id,
         project_name,
         team.name,
         start,
@@ -235,4 +246,5 @@ async def plan_from_brief(
         count,
         notes,
         [q.strip() for q in plan.open_questions if q.strip()],
+        calls,
     )

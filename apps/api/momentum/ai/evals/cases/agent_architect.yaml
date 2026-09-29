@@ -1,0 +1,26 @@
+# Architect · Planner (S5.3.5; agents.md §4: structure validity, dates within the window, no
+# unknown assignees). Architect run by hand through the real runtime: with a brief it proposes a
+# project plan (S3.4.6 underneath; its own `from_brief` evals check dates and staffing in depth),
+# on a task it proposes subtasks (S3.4.2). Here: the right kind of plan, proposed (never applied)
+# to the person who asked, and nothing else.
+feature: agent_architect
+cases:
+  - id: brief_becomes_project_plan
+    mock: true
+    user: ravi
+    input: >-
+      Relaunch the help center in six weeks: audit the current articles, rewrite the top twenty,
+      add search, and announce it to customers. Ana owns design; Mei writes the copy.
+    expect: {proposes: [create_project_from_plan], risk: medium}
+  - id: task_becomes_subtasks
+    mock: true
+    user: ravi
+    task: "Book launch webinar"
+    expect: {proposes: [create_subtasks], subtasks_between: [3, 10]}
+  - id: brief_live
+    user: ravi
+    input: >-
+      Run a customer beta for the new pricing page over the next four weeks: recruit ten
+      customers, collect feedback weekly, fix the top issues, and decide on launch.
+    expect: {proposes: [create_project_from_plan]}
+    judge: {rubric: "A sensible project plan for a four-week customer beta (recruit, run, collect feedback, fix, decide), in order, with dates inside four weeks and no invented people."}

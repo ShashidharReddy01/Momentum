@@ -107,6 +107,7 @@ export function agentHandlers(
   const queries: URLSearchParams[] = [];
   const creates: unknown[] = [];
   const testRuns: unknown[] = [];
+  const runsNow: unknown[] = [];
   const list = opts.list ?? [agent];
   const handlers = [
     // S5.2.3: gallery, tools, draft, create, test run
@@ -147,6 +148,10 @@ export function agentHandlers(
         { data: created, meta: { activity_id: 'act-1', batch_id: null, version: 1 } },
         { status: 201 },
       );
+    }),
+    http.post('*/api/v1/agents/:agentId/run', async ({ request }) => {
+      runsNow.push(await request.json());
+      return HttpResponse.json({ run_id: 'run-1', status: 'queued' }, { status: 202 });
     }),
     http.post('*/api/v1/agents/:agentId/test-run', async ({ request }) => {
       testRuns.push(await request.json());
@@ -189,5 +194,5 @@ export function agentHandlers(
       });
     }),
   ];
-  return { handlers, queries, patches, creates, testRuns };
+  return { handlers, queries, patches, creates, testRuns, runsNow };
 }

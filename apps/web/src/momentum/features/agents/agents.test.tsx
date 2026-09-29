@@ -213,3 +213,27 @@ describe('Agent gallery and creation (S5.2.3)', () => {
     expect(agents.testRuns).toEqual([{ task: 'T-12', text: null }]);
   });
 });
+
+describe('Run now (S5.3.5/S5.3.6)', () => {
+  it('runs an agent with pasted text on a task and opens the run', async () => {
+    const agents = agentHandlers({
+      agent: agentFixture({ name: 'Scribe · Meeting Notes', triggers: [{ type: 'manual' }] }),
+    });
+    const user = boot('/agents/agent-1', agents);
+    await user.type(
+      await screen.findByLabelText(/Text for Scribe/),
+      'Decided: ship Friday. Ana to write notes.',
+    );
+    await user.type(screen.getByLabelText('On a task (optional)'), 'T-12');
+    await user.click(screen.getByRole('button', { name: /Run Scribe/ }));
+    await waitFor(() => expect(agents.runsNow).toHaveLength(1));
+    expect(agents.runsNow[0]).toEqual({ task: 'T-12', text: 'Decided: ship Friday. Ana to write notes.' });
+    expect(await screen.findByRole('heading', { name: /Run ·/ })).toBeInTheDocument();
+  });
+
+  it('is not offered for agents without a manual trigger', async () => {
+    boot('/agents/agent-1', agentHandlers());
+    await screen.findByRole('heading', { name: 'Teammate' });
+    expect(screen.queryByRole('region', { name: 'Run now' })).toBeNull();
+  });
+});

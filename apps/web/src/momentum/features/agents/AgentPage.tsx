@@ -10,6 +10,7 @@ import { StatusBadge } from './AgentRunPage';
 import { AgentSettings } from './AgentSettings';
 import { triggerSummary } from './AgentsGallery';
 import { useAgent, useAgentRuns, type AgentRun, type RunFilters } from './queries';
+import { RunNowPanel } from './RunNowPanel';
 import { TestRunPanel } from './TestRunPanel';
 import { AUTONOMY_LABEL, RUN_STATUS, TRIGGER_LABEL, money, when } from './runMeta';
 
@@ -62,6 +63,7 @@ export function AgentPage() {
       </header>
 
       {isAdmin ? <AgentSettings agent={a} /> : null}
+      {a.enabled && a.triggers.some((t) => t.type === 'manual') ? <RunNowPanel agent={a} /> : null}
       {isAdmin && a.kind === 'llm' ? <TestRunPanel agent={a} /> : null}
 
       <section aria-label="Run history" className="flex flex-col gap-3">

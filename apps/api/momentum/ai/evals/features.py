@@ -70,6 +70,7 @@ FEATURES = (
     "agent_herald",
     "agent_nudge",
     "agent_radar",
+    "agent_architect",
 )
 
 
@@ -388,6 +389,17 @@ async def _run(
         }
         obs.text = str(risk.get("summary") or "")
         obs.citations = [c.to_json() for c in await citations.resolve(session, ctx, obs.text)]
+    elif feature == "agent_architect":
+        project = case.get("project", "Launch Plan")
+        agent = await _install(session, registry, world, ctx, "planner", project)
+        asked: dict[str, Any] = {"type": "manual", "requested_by": str(ctx.actor.id)}
+        if case.get("task"):
+            asked["task_id"] = str(world.task_ids[case["task"]])
+        else:
+            asked["project_id"] = str(world.projects[project])
+        if inp:
+            asked["input"] = inp
+        await _execute(session, llm, registry, ctx, agent, asked, now, obs)
     elif feature == "agent_teammate":
         await _teammate(session, llm, registry, world, case, ctx, now, obs)
     else:

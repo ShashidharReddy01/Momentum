@@ -62,6 +62,7 @@ class BreakdownResult:
     action_id: uuid.UUID | None
     notes: list[str] = field(default_factory=list)
     count: int = 0
+    calls: list[ProposedCall] = field(default_factory=list)  # see ``propose_action``
 
 
 async def project_people(session: AsyncSession, project: Project) -> list[User]:
@@ -112,6 +113,7 @@ async def break_down(
     *,
     hint: str | None,
     now: datetime,
+    propose_action: bool = True,
 ) -> BreakdownResult:
     task, placement, role = await get_visible_task(session, ctx, task_id)
     if ROLE_RANK[role] < ROLE_RANK["editor"]:
@@ -173,11 +175,14 @@ async def break_down(
         items.append(item)
     if not items:
         raise ValidationFailed("Mo didn't come up with any new subtasks. Try adding guidance.")
+    calls = [ProposedCall("create_subtasks", {"parent": task_key(task.number), "subtasks": items})]
+    if not propose_action:  # the caller proposes them (Architect, S5.3.5)
+        return BreakdownResult(None, notes, len(items), calls)
     p = await propose(
         session,
         ctx,
         registry,
-        [ProposedCall("create_subtasks", {"parent": task_key(task.number), "subtasks": items})],
+        calls,
         source="inline",
         source_id=task.id,
         summary=f"Break {task_key(task.number)} into {len(items)} subtasks",
@@ -185,4 +190,4 @@ async def break_down(
     if p.action is None:
         detail = "; ".join(out.result.summary for _, out in p.failures)
         raise ValidationFailed(detail[:300] or "The subtasks couldn't be previewed")
-    return BreakdownResult(p.action.id, notes, len(items))
+    return BreakdownResult(p.action.id, notes, len(items), calls)

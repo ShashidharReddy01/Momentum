@@ -65,6 +65,9 @@ class RunIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     task_id: uuid.UUID | None = None
+    task: str | None = Field(
+        default=None, max_length=60, description="Or a task key (T-12), as people type it"
+    )
     project_id: uuid.UUID | None = None
     text: str | None = Field(default=None, max_length=20_000)
 
@@ -83,8 +86,9 @@ class RunQueuedOut(BaseModel):
 async def run_agent(agent_id: uuid.UUID, body: RunIn, ctx: CtxDep, uow: UowDep) -> RunQueuedOut:
     async with uow.transaction() as s:
         agent = await service.get_agent(s, ctx, agent_id)
+        task_id = body.task_id or (await _task_id(s, ctx, body.task) if body.task else None)
         run_id = await request_run(
-            s, ctx, agent, task_id=body.task_id, project_id=body.project_id, text=body.text
+            s, ctx, agent, task_id=task_id, project_id=body.project_id, text=body.text
         )
         run = await s.get(AgentRun, run_id)
         return RunQueuedOut(run_id=run_id, status=run.status if run else "queued")

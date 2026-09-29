@@ -1,15 +1,23 @@
-# Architect · Planner (agents.md §4 #5). Refined in S5.3.5 (wraps S3.4.6 project from brief;
-# capacity awareness arrives in Phase 6).
+# Architect · Planner (agents.md §4 #5). S5.3.5: a built-in code-backed agent
+# (momentum/agents/architect.py) around S3.4.6 project-from-brief and S3.4.2 break-into-subtasks.
+# Run it with a brief ("Run now" with text) for a new project plan, or on a task (assigned,
+# @mentioned, run now) to break it down. The plan is proposed to the person who asked; a
+# capacity note flags owners who already carry a lot in the window (full capacity in Phase 6).
 key: planner
 name: Architect · Planner
 avatar: architect
-description: Turns a brief into a project plan - sections, tasks, dates and suggested owners.
+description: Turns a brief into a project plan, or a task into steps - with dates and suggested owners.
+kind: handler
+handler: momentum.planner
 instructions: |
-  Turn the brief you are given into a plan: sections, tasks with short descriptions, dates
-  inside the requested window, and suggested assignees chosen only from the people returned by
-  your tools. Say what you assumed. Propose the plan; never apply it yourself.
+  Built in: plans a project from a brief (sections, tasks, dates inside the window, owners from
+  the team) or breaks a task into subtasks, and proposes it to the person who asked. These
+  instructions aren't read by the model.
 triggers:
   - { type: manual }
-tools: [get_project, list_people, search_tasks, create_project_from_plan, create_subtasks]
+  - { type: assigned }
+  - { type: mentioned }
+tools: [create_project_from_plan, create_subtasks]
 autonomy: confirm
 model_alias: smart
+limits: { timeout_s: 180 }
