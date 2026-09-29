@@ -77,6 +77,7 @@
 ### S5.2.2: @mention an agent
 **Scope:** mentions of agent users trigger a run with thread context; reply in the thread.
 **Size:** S
+**Built (2026-09-29):** the `mentioned` trigger and thread reply existed since S5.1.2; this slice adds: mention search offers only people + agents that answer mentions (`MentionUser.is_agent`, ✦ in the composer's list); a mention added by editing a comment triggers too (once per agent per comment); the reply @mentions the commenter; agent names resolve in the task feed. Tests: `tests/test_agent_mention.py` (3).
 
 ### S5.2.3: Agent gallery + create from description
 **Scope:** `/agents` gallery; "Create agent" form; "✦ Describe what you want" → Mo drafts the definition (instructions, triggers, tools, autonomy) → review → save; test run on a chosen task/project (dry-run).

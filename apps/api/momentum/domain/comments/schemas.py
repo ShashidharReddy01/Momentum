@@ -40,6 +40,7 @@ class MentionUser(BaseModel):
     id: uuid.UUID
     name: str
     email: str
+    is_agent: bool = False
 
 
 class MentionTask(BaseModel):

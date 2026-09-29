@@ -290,8 +290,9 @@ async def _handle(
             key = f"assigned:{ev.entity_id}:{ev.id}"
             queued += int(await enqueue_run(session, agent, trigger, key) is not None)
 
-    # an agent @mentioned in a comment
-    if ev.type == "comment.created":
+    # an agent @mentioned in a comment, or newly mentioned in an edit of one (S5.2.2: an edit's
+    # event lists only the people it added); an agent answers a given comment once
+    if ev.type in ("comment.created", "comment.edited"):
         for uid in data.get("mentioned_user_ids") or []:
             if str(uid) not in by_user:
                 continue

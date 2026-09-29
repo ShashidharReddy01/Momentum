@@ -29,7 +29,7 @@ from momentum.domain.comments.schemas import (
 )
 from momentum.domain.projects.models import Project
 from momentum.domain.tasks.models import Task, TaskProject
-from momentum.domain.users.models import User
+from momentum.domain.users.service import list_users
 
 router = APIRouter(tags=["comments"])
 
@@ -129,18 +129,8 @@ async def mention_search(
     """Only what the caller can see; a few of each kind."""
     like = f"%{q.strip()}%"
     async with uow.transaction() as s:
-        users = (
-            await s.execute(
-                select(User)
-                .where(
-                    User.workspace_id == ctx.workspace_id,
-                    User.status != "disabled",
-                    (User.name.ilike(like)) | (User.email.ilike(like)),
-                )
-                .order_by(func.lower(User.name))
-                .limit(6)
-            )
-        ).scalars()
+        # people, plus the enabled agents that answer mentions (S5.2.2); never other agents
+        users = await list_users(s, ctx, q=q.strip() or None, limit=6, agents="mentioned")
         projects = (
             await s.execute(
                 select(Project)
@@ -164,7 +154,9 @@ async def mention_search(
             )
         ).scalars()
         return MentionSearchOut(
-            users=[MentionUser(id=u.id, name=u.name, email=u.email) for u in users],
+            users=[
+                MentionUser(id=u.id, name=u.name, email=u.email, is_agent=u.is_agent) for u in users
+            ],
             tasks=[MentionTask(id=t.id, title=t.title, key=task_key(t.number)) for t in tasks],
             projects=[MentionProject(id=p.id, name=p.name, color=p.color) for p in projects],
         )

@@ -33,7 +33,7 @@ export function Comments({ task }: { task: TaskDetail }) {
   const qc = useQueryClient();
   const feed = useTaskFeed(task.id);
   const meId = useMe().data?.user.id;
-  const people = usePeople().data ?? [];
+  const people = usePeople('', 'all').data ?? [];
   const sections = useSections(task.project?.id ?? '', !!task.project).data;
   const nameOf = (id: string | null | undefined) => people.find((p) => p.id === id)?.name;
   const m = useCommentMutations(task.id, meId);

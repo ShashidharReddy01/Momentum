@@ -545,9 +545,9 @@ async def _answer(
     """When a person asked (assigned, mentioned, run by hand on a task), reply in the task's
     thread, with any suggestions listed under the answer. Otherwise the answer stays on the run.
 
-    For an assignment (S5.2.1) the reply @mentions the person who assigned it, and an answer
-    longer than ``LONG_ANSWER`` goes in an attached Markdown file, with its opening in the
-    comment."""
+    For an assignment or a mention (S5.2.1, S5.2.2) the reply @mentions the person who asked,
+    so they're notified even if they don't follow the task. An answer longer than
+    ``LONG_ANSWER`` goes in an attached Markdown file, with its opening in the comment."""
     trigger = run.trigger or {}
     task_id = trigger.get("task_id")
     suggestions: list[str] = output.get("suggestions") or []
@@ -575,7 +575,7 @@ async def _answer(
         body = "\n".join([body, "Suggestions:", *(f"- {s}" for s in suggestions)]).strip()
     if not body.strip():
         return
-    mention = requester if trigger.get("type") == "assigned" else None
+    mention = requester if trigger.get("type") in ("assigned", "mentioned") else None
     m = await create_comment(session, ctx, uuid.UUID(task_id), _answer_doc(body, mention))
     output["comment_id"] = str(m.entity.id)
     trace.add("comment", body.split("\n", 1)[0], comment_id=str(m.entity.id))

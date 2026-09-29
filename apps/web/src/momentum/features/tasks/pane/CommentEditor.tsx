@@ -20,6 +20,7 @@ interface Item {
   id: string;
   label: string;
   sub?: string;
+  agent?: boolean;
   color?: string | null;
 }
 
@@ -81,7 +82,14 @@ export function CommentEditor({
     try {
       const res = (await api.GET('/api/v1/mentions/search', { params: { query: { q: query } } })).data!;
       return [
-        ...res.users.map((u) => ({ kind: 'user' as const, id: u.id, label: u.name, sub: u.email })),
+        ...res.users.map((u) => ({
+          kind: 'user' as const,
+          id: u.id,
+          label: u.name,
+          // agents that answer mentions (S5.2.2) are marked; they reply in the thread
+          sub: u.is_agent ? '✦ Agent' : u.email,
+          agent: u.is_agent,
+        })),
         ...res.tasks.map((t) => ({ kind: 'task' as const, id: t.id, label: t.title, sub: t.key })),
         ...res.projects.map((p) => ({ kind: 'project' as const, id: p.id, label: p.name, color: p.color })),
       ];
@@ -269,7 +277,11 @@ export function CommentEditor({
                       />
                     )}
                     <span className="min-w-0 flex-1 truncate">{it.label}</span>
-                    {it.sub ? <span className="truncate text-xs text-muted">{it.sub}</span> : null}
+                    {it.sub ? (
+                      <span className={cn('truncate text-xs', it.agent ? 'text-amber-ink' : 'text-muted')}>
+                        {it.sub}
+                      </span>
+                    ) : null}
                   </li>
                 ))
               )}

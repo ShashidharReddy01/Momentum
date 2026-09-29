@@ -4343,6 +4343,11 @@ export interface components {
              * Format: uuid
              */
             id: string;
+            /**
+             * Is Agent
+             * @default false
+             */
+            is_agent: boolean;
             /** Name */
             name: string;
         };
