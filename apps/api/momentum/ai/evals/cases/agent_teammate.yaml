@@ -24,8 +24,10 @@ cases:
     trigger: mentioned
     task: "Finalize pricing tiers"
     input: "@Teammate can you summarize what we decided in this thread?"
+    # The thread is in the context Teammate is shown, so it needn't call a tool (since the
+    # 2026-09-29 "don't re-fetch the task" charter change); what counts is the answer.
     expect:
-      tools_include: [get_task]
+      citations_valid: true
       text_include_all: ["$9", "$29", "$79"]
       text_include_any: ["trial", "two months"]
       proposes_nothing: true

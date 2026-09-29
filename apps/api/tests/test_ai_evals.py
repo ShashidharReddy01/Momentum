@@ -322,3 +322,28 @@ def test_regression_compares_only_the_cases_both_runs_have() -> None:
     # a shared case that used to pass and now fails is one
     worse = runner.summarize("f", [_case("a", True), _case("b", False)], 0.1, before)
     assert worse.regression == 50.0 and not worse.ok
+
+
+def test_grounded_needs_a_source_that_bears_on_the_question() -> None:
+    """Round 2 of the Phase 5 live run: an honest "found nothing" that cites unrelated projects
+    for context isn't grounded; a real answer with a valid citation is."""
+    admits = Observation(
+        text="I couldn't find anything about that. Related: [P:Launch Plan].", grounded=True
+    )
+    assert names(score(admits, {"grounded": False}, today=TODAY))["grounded"] is True
+    answer = Observation(text="The launch waits on [T-32] Sign vendor contract.", grounded=True)
+    assert names(score(answer, {"grounded": True}, today=TODAY))["grounded"] is True
+    uncited = Observation(text="The launch waits on the contract.", grounded=False)
+    assert names(score(uncited, {"grounded": True}, today=TODAY))["grounded"] is False
+
+
+def test_agent_tools_any_accepts_either_tool() -> None:
+    drafted = Observation(data={"tools": ["get_task", "semantic_search"]})
+    expect = {"agent_tools_any": ["search_tasks", "semantic_search"]}
+    assert names(score(drafted, expect, today=TODAY))["agent_tools_any"] is True
+    assert (
+        names(score(Observation(data={"tools": ["get_task"]}), expect, today=TODAY))[
+            "agent_tools_any"
+        ]
+        is False
+    )

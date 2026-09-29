@@ -144,6 +144,10 @@ class Verdict(BaseModel):
     reason: str = Field(max_length=500)
 
 
+# An agent's source (the task context plus every tool result) runs longer than a feature's facts
+SOURCE_CHARS = 16000
+
+
 async def judge(
     llm: LLM, settings: Settings, world: EvalWorld, case: dict[str, Any], obs: Observation
 ) -> Check:
@@ -172,7 +176,7 @@ async def judge(
     source_block = (
         [
             "Source material the output must be true to:\n"
-            + json.dumps(source, ensure_ascii=False, default=str)[:5000]
+            + json.dumps(source, ensure_ascii=False, default=str)[:SOURCE_CHARS]
         ]
         if source
         else []

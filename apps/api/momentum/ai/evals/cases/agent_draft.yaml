@@ -28,7 +28,9 @@ cases:
     expect: {agent_trigger_types: [event], agent_autonomy: suggest}
   - id: assigned_research
     input: "Someone assigns it a task and it researches the topic from what we have in Momentum and writes a summary."
-    expect: {agent_trigger_types: [assigned], agent_tools_include: [search_tasks]}
+    # Either search tool lets it research "from what we have in Momentum"; semantic_search is
+    # the better fit for a topic, so requiring search_tasks was stricter than the job (round 2).
+    expect: {agent_trigger_types: [assigned], agent_tools_any: [search_tasks, semantic_search]}
   - id: no_deleting
     input: "Clean up: delete tasks that were completed more than a year ago."
     expect: {agent_tools_exclude: [delete_task]}

@@ -35,6 +35,7 @@ from momentum.ai.rule_steps import run_kind
 from momentum.ai.status_draft import draft_status
 from momentum.ai.tools.registry import ToolRegistry
 from momentum.ai.tools.write_tools import text_doc
+from momentum.ai.types import LAST_STEP_NOTE, Msg
 from momentum.core.context import Ctx
 from momentum.core.errors import DomainError
 from momentum.core.settings import Settings
@@ -437,6 +438,28 @@ class _Unbilled:
         return self._llm.stream(*args, **kwargs)
 
 
+class _Seen(_Unbilled):
+    """``_Unbilled`` that also keeps what the model was last shown (the request, the task context
+    and every tool result), so the judge can check "no invented facts" against it."""
+
+    def __init__(self, llm: LLM) -> None:
+        super().__init__(llm)
+        self.messages: list[Msg] = []
+
+    async def complete(self, *args: Any, **kwargs: Any) -> Any:
+        self.messages = list(kwargs.get("messages") or [])
+        return await super().complete(*args, **kwargs)
+
+    def source(self) -> list[str]:
+        """The non-system messages' text: what the answer may draw on (the instructions and
+        the model's own earlier turns aside)."""
+        out = []
+        for m in self.messages:
+            if m.get("role") in ("user", "tool") and isinstance(m.get("content"), str):
+                out.append(str(m["content"]).replace(LAST_STEP_NOTE, "").strip())
+        return out
+
+
 async def _pulse(
     session: AsyncSession,
     llm: LLM,
@@ -626,7 +649,8 @@ async def _teammate(
     run = await session.get(AgentRun, run_id)
     assert run is not None
     run.status = "running"
-    await execute_run(session, _Unbilled(llm), registry, settings, run_id, now=now)  # type: ignore[arg-type]
+    seen = _Seen(llm)
+    await execute_run(session, seen, registry, settings, run_id, now=now)  # type: ignore[arg-type]
     await session.refresh(run)
     output = run.output or {}
     obs.text = str(output.get("text") or "")
@@ -638,7 +662,7 @@ async def _teammate(
     if output.get("proposed"):
         obs.operations, obs.risk = await _operations(session, output["proposed"][0])
     obs.citations = [c.to_json() for c in await citations.resolve(session, ctx, obs.text)]
-    obs.data = {"status": run.status, "handoff": output.get("handoff")}
+    obs.data = {"status": run.status, "handoff": output.get("handoff"), "source": seen.source()}
     if run.status != "succeeded":
         obs.error = f"run_{run.status}: {run.error}"
 

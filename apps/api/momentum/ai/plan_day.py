@@ -3,8 +3,9 @@ of Today, as a previewed change to their My Tasks (``plan_my_day`` tool → ``mo
 one write path for personal placements). Nothing moves until the user applies it.
 
 The model sees the user's open tasks (key, section, due date, priority, blocked or not) and
-submits keys. The server keeps only keys of those tasks, drops duplicates, caps Today at
-``CAPACITY``, and only moves to Later what is currently in Today; each correction is a note.
+submits keys. The server keeps only keys of those tasks, drops duplicates, keeps blocked tasks
+out of Today (they can't be started; Phase 5 live evals), caps Today at ``CAPACITY``, and only
+moves to Later what is currently in Today; each correction is a note.
 Estimates and calendar time come later (no estimates field yet; calendar is Phase 7).
 """
 
@@ -139,10 +140,16 @@ async def plan_day(
     )
 
     notes: list[str] = []
+    held_back = False  # a blocked task the model put in today
     plan_today: list[str] = []
     for key in _keys(out.today):
         if key not in by_key:
             notes.append(f"Left out {key}: it isn't one of your open tasks.")
+        elif by_key[key][0].id in blocked:
+            notes.append(f"Left {key} out of today: it's blocked until what it waits on is done.")
+            held_back = True
+            if by_key[key][1] == "today" and key not in _keys(out.later):
+                out.later.append(key)
         elif key not in plan_today:
             plan_today.append(key)
     if len(plan_today) > CAPACITY:
@@ -164,6 +171,8 @@ async def plan_day(
     if not plan_later and plan_today == current_today:
         return PlanResult(None, out.rationale.strip(), plan_today, [], notes)
     if not plan_today and not plan_later:
+        if held_back:  # everything it picked was blocked: nothing to move, the notes say why
+            return PlanResult(None, out.rationale.strip(), [], [], notes)
         raise ValidationFailed("Mo couldn't make a plan from your tasks. Try again.")
     proposal = await propose(
         session,

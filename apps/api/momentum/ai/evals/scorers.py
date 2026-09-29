@@ -14,6 +14,14 @@ from typing import Any
 
 from momentum.ai.evals.features import Observation
 
+# Narrower than UNCERTAIN: saying the search came up empty (not hedging inside a real answer).
+NOT_FOUND = re.compile(
+    r"(couldn['\u2019]?t|could not|can['\u2019]?t|cannot|unable to|didn['\u2019]?t|did not) find|"
+    r"nothing (about|matching|found|on that|related)|no (matching|relevant) (results?|tasks?|"
+    r"information|content)|(found|returned|there(['\u2019]s| is| are)) (nothing|no (results?|"
+    r"matches|tasks?))",
+    re.I,
+)
 UNCERTAIN = re.compile(
     r"couldn['\u2019]?t find|could not find|can['\u2019]?t find|cannot find|unable to find|"
     r"no (matching|relevant|results?|tasks?|information|record)|nothing (about|matching|found|in)|"
@@ -40,6 +48,7 @@ KNOWN = frozenset(
         "agent_trigger_types",
         "agent_cron_any",
         "agent_tools_include",
+        "agent_tools_any",
         "agent_tools_exclude",
         "agent_autonomy",
         "error",
@@ -181,8 +190,18 @@ def score(obs: Observation, expect: dict[str, Any], *, today: date, asked: str =
         in_text = _low(t) in lt and not echoed
         add(Check(f"mentions_exclude:{t}", not in_text and not in_cites, "leaked"))
     if "grounded" in expect:
+        # Grounded = the answer rests on workspace sources: a valid citation, and not an answer
+        # that says it found nothing (whatever it then cites "for context" doesn't bear on the
+        # question: Phase 5 live round 2, chat/empty_retrieval_admits_it).
+        found_nothing = bool(NOT_FOUND.search(text))
+        grounded = bool(obs.grounded) and not found_nothing
         add(
-            Check("grounded", obs.grounded == bool(expect["grounded"]), f"grounded: {obs.grounded}")
+            Check(
+                "grounded",
+                grounded == bool(expect["grounded"]),
+                f"grounded: {grounded} (cites a source: {obs.grounded}, says it found nothing: "
+                f"{found_nothing})",
+            )
         )
     if "uncertain" in expect:
         found = bool(UNCERTAIN.search(text))
@@ -331,6 +350,10 @@ def score(obs: Observation, expect: dict[str, Any], *, today: date, asked: str =
         add(Check("agent_cron_any", ok, f"crons: {crons}"))
     for t in expect.get("agent_tools_include", []):
         add(Check(f"agent_tools_include:{t}", t in obs.data.get("tools", []), ""))
+    if "agent_tools_any" in expect:  # one of these is enough (e.g. either way of searching)
+        got_tools = obs.data.get("tools", [])
+        ok = any(t in got_tools for t in expect["agent_tools_any"])
+        add(Check("agent_tools_any", ok, f"tools: {got_tools}"))
     for t in expect.get("agent_tools_exclude", []):
         add(Check(f"agent_tools_exclude:{t}", t not in obs.data.get("tools", []), ""))
     if "agent_autonomy" in expect:

@@ -10,17 +10,20 @@ cases:
   - id: ana_overdue_first
     user: ana
     expect: {today_include: ["{{key:Sign vendor contract}}"], today_exclude: ["{{key:Payment provider approval}}"]}
+  # Decided in round 2 (2026-09-29): a blocked task never goes in Today, even when it's urgent
+  # or due soon (it can't be started); the rationale says what it waits on. plan_day/v3 says so
+  # and the server enforces it.
   - id: mei_blocked_later
     user: mei
-    expect: {citations_valid: true}
-    judge: {rubric: "Doesn't put the blocked pricing copy first; explains it waits on the pricing decision."}
+    expect: {citations_valid: true, today_exclude: ["{{key:Update pricing page copy}}"]}
+    judge: {rubric: "Leaves the blocked pricing copy out of today and explains it waits on the pricing decision."}
   - id: no_private_leak
     user: ravi
     expect: {mentions_exclude: ["Zenith"], today_exclude: ["{{key:Secret launch partner: Zenith Corp}}"]}
   - id: priya_blocked_urgent
     user: priya
-    expect: {citations_valid: true}
-    judge: {rubric: "Doesn't present the blocked payment provider approval as ready to start; it says it waits on the vendor contract or leaves it out of today."}
+    expect: {citations_valid: true, today_exclude: ["{{key:Payment provider approval}}"]}
+    judge: {rubric: "Leaves the blocked payment provider approval out of today and says it waits on the vendor contract."}
   - id: ana_webinar_later
     user: ana
     expect: {today_exclude: ["{{key:Book launch webinar}}"], citations_valid: true}

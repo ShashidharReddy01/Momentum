@@ -192,3 +192,30 @@ async def test_blocked_tasks_name_their_visible_blockers_only(
     copy_line = next(x for x in seen[-1].splitlines() if x.startswith(f"[{key(world.copy)}]"))
     assert "blocked" in copy_line and "Draft pricing secret" not in copy_line
     assert key(world.hidden) not in copy_line
+
+
+async def test_a_blocked_task_is_kept_out_of_today(
+    uow: UnitOfWork, world: World, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Phase 5 live evals: the model put a blocked, soon-due task in Today "in case the blocker
+    clears". It can't be started, so the server keeps it out and says why (plan_day v3)."""
+    from momentum.ai import plan_day as module
+
+    picks: list[str] = []
+
+    async def fake_extract(*args: object, schema: type, **kwargs: object) -> object:  # type: ignore[type-arg]
+        return schema(today=picks, later=[], rationale="x")
+
+    monkeypatch.setattr(module, "extract", fake_extract)
+    await assign_to_ravi(uow, world, world.copy.id, world.faq.id)
+    async with uow.transaction() as s:
+        await tasks.add_dependency(s, world.ravi, world.copy.id, world.faq.id)
+    picks[:] = [key(world.copy), key(world.faq)]
+    r = await plan(uow, world.ravi)
+    assert r.today == [key(world.faq)]
+    assert f"Left {key(world.copy)} out of today: it's blocked" in "\n".join(r.notes)
+
+    picks[:] = [key(world.copy)]  # only the blocked one: no plan to apply, and no error
+    r = await plan(uow, world.ravi)
+    assert r.action_id is None and r.today == []
+    assert any("blocked" in n for n in r.notes)
