@@ -22,6 +22,7 @@ from sqlalchemy.orm import aliased
 from momentum.ai import retrieval
 from momentum.ai.embeddings import INDEXED
 from momentum.ai.tools.base import ToolContext, ToolError, ToolResult, tool
+from momentum.ai.tools.fields import fields_view
 from momentum.ai.tools.refs import (
     TaskRef,
     resolve_person,
@@ -180,6 +181,9 @@ async def get_task(tc: ToolContext, args: GetTaskArgs) -> ToolResult:
         detail["attachments"] = [a.filename for a in files]
     if task.description_text:
         detail["description"] = clip(task.description_text)
+    custom = await fields_view(tc, task)
+    if custom:  # S5.3.2: names, choices and values as labels (set with set_field_value)
+        detail["custom_fields"] = custom
     subtasks = list(
         (
             await s.execute(

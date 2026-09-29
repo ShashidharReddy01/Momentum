@@ -56,6 +56,13 @@ export function describeActivity(a: ActivityItem, n: FeedNames): { lines: string
         };
       return { lines: [], minor: true };
     }
+    case 'task.field_set': {
+      // S5.3.2: custom field changes ({"field:<name>": [old, new]}); values are ids, so name the field
+      const lines = Object.entries(c)
+        .filter(([k]) => k.startsWith('field:'))
+        .map(([k, [, now]]) => (now == null ? `cleared ${k.slice(6)}` : `changed ${k.slice(6)}`));
+      return { lines, minor: true };
+    }
     case 'task.updated': {
       const lines: string[] = [];
       for (const [field, [, now]] of Object.entries(c)) {

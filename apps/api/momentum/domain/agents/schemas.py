@@ -99,6 +99,16 @@ class ScheduleTrigger(_Strict):
 
 class EventFilter(_Strict):
     project_ids: list[uuid.UUID] | None = None
+    # S5.3.2: only top-level tasks (a ``task.*`` event about a subtask is skipped, before any
+    # run or model call); left out when unset, so stored filters hash as before
+    top_level: bool | None = None
+
+    @model_serializer(mode="wrap")
+    def _omit_unset(self, handler: SerializerFunctionWrapHandler) -> dict[str, Any]:
+        data: dict[str, Any] = handler(self)
+        if data.get("top_level") is None:
+            data.pop("top_level", None)
+        return data
 
 
 class EventTrigger(_Strict):

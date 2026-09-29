@@ -799,6 +799,112 @@
   },
   {
     "function": {
+      "description": "Set one custom field on a task (e.g. Risk = High, Type = Bug). Use names and labels exactly as get_task lists them; priority, dates and the assignee are update_task's.",
+      "name": "set_field_value",
+      "parameters": {
+        "additionalProperties": false,
+        "properties": {
+          "field": {
+            "description": "The custom field's name, as get_task lists it",
+            "maxLength": 200,
+            "type": "string"
+          },
+          "task": {
+            "additionalProperties": false,
+            "description": "Exactly one of ``id``, ``key`` or ``title_query``. A bare string is accepted too:\n``\"T-12\"`` is read as a key, a UUID as an id, anything else as a title query.",
+            "properties": {
+              "id": {
+                "anyOf": [
+                  {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "Task id, when known exactly"
+              },
+              "key": {
+                "anyOf": [
+                  {
+                    "pattern": "^[Tt]-\\d{1,9}$",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "Task key such as \"T-123\""
+              },
+              "project": {
+                "anyOf": [
+                  {
+                    "maxLength": 200,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "Project name or id to narrow a title_query"
+              },
+              "title_query": {
+                "anyOf": [
+                  {
+                    "maxLength": 200,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "Words from the task title, when neither the id nor the key is known"
+              }
+            },
+            "type": "object"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A choice's label (a list for multi-select), a person's name or email (a list for people fields), text, a number, true/false, or a YYYY-MM-DD date; null clears it"
+          }
+        },
+        "required": [
+          "task",
+          "field",
+          "value"
+        ],
+        "type": "object"
+      }
+    },
+    "type": "function"
+  },
+  {
+    "function": {
       "description": "Mark a task complete (or reopen it).",
       "name": "complete_task",
       "parameters": {

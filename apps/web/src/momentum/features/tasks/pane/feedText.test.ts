@@ -44,6 +44,8 @@ const act = (
 describe('activity sentences', () => {
   it.each([
     [act('task.created', { title: [null, 'X'] }), ['created this task']],
+    [act('task.field_set', { 'field:Risk': [null, 'opt-high'] }), ['changed Risk']],
+    [act('task.field_set', { 'field:Risk': ['opt-high', null] }), ['cleared Risk']],
     [
       act('task.created', { title: [null, 'Step'] }, { subject: { id: 's', title: 'Step' } }),
       ['added subtask “Step”'],

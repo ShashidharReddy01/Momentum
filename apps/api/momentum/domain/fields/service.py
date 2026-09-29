@@ -24,6 +24,7 @@ from momentum.core.errors import Conflict, NotFound, ValidationFailed
 from momentum.core.events import emit
 from momentum.core.mutation import Mutation
 from momentum.core.ordering import key_between
+from momentum.core.undo import UndoConflict, undo_handler, undo_op
 from momentum.domain.access import get_visible_project, get_visible_task, require_project_role
 from momentum.domain.fields.models import FieldDef, FieldValue, ProjectField
 from momentum.domain.fields.schemas import (
@@ -449,8 +450,18 @@ async def list_project_field_values(
 
 
 async def set_task_field_value(
-    session: AsyncSession, ctx: Ctx, task_id: uuid.UUID, field_id: uuid.UUID, value: Any
+    session: AsyncSession,
+    ctx: Ctx,
+    task_id: uuid.UUID,
+    field_id: uuid.UUID,
+    value: Any,
+    *,
+    record_undo: bool = True,
+    batch_id: uuid.UUID | None = None,
 ) -> FieldValue | None:
+    """Set (or clear, with ``None``) a task's value for a field. S5.3.2: records a
+    ``task.field_set`` activity with an undo (an agent's or a rule's field change can be taken
+    back like any other change); setting the value it already has records nothing."""
     _, placement, role = await get_visible_task(session, ctx, task_id)
     require_project_role(role, "editor", "set field values")
     field = await session.get(FieldDef, field_id)
@@ -458,6 +469,23 @@ async def set_task_field_value(
         raise NotFound("Field not found")
     clean = validate_value(field, value)
     row = await session.get(FieldValue, (task_id, field_id))
+    old = row.value if row is not None else None
+    if old == clean:
+        return row
+    await record_activity(
+        session,
+        ctx,
+        entity_type="task",
+        entity_id=task_id,
+        verb="task.field_set",
+        changes={f"field:{field.name}": (old, clean)},
+        undo=undo_op(
+            "fields.set_value", task_id=task_id, field_id=field_id, value=old, expect=clean
+        )
+        if record_undo
+        else None,
+        batch_id=batch_id,
+    )
     if clean is None:
         if row is not None:
             await session.delete(row)
@@ -485,3 +513,14 @@ async def set_task_field_value(
         channels=channels,
     )
     return result
+
+
+@undo_handler("fields.set_value")
+async def _undo_set_value(session: AsyncSession, ctx: Ctx, args: dict[str, Any]) -> None:
+    task_id, field_id = uuid.UUID(str(args["task_id"])), uuid.UUID(str(args["field_id"]))
+    row = await session.get(FieldValue, (task_id, field_id))
+    if (row.value if row is not None else None) != args.get("expect"):
+        raise UndoConflict("This field was changed again since")
+    await set_task_field_value(
+        session, ctx, task_id, field_id, args.get("value"), record_undo=False
+    )

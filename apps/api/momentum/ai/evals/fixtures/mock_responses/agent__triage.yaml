@@ -1,0 +1,21 @@
+# Sorter · Triage (S5.3.2), mock mode. Keys differ per database, so the duplicate comment cites
+# what the search found. Marked as mock output.
+responses:
+  - match: {contains: "still hasn't approved us", turn: 1}
+    tool_calls: [{name: search_tasks, arguments: {text: "payment provider", limit: 5}}]
+  - match: {contains: "still hasn't approved us", turn: 2}
+    tool_calls:
+      - name: update_task
+        arguments: {task: {title_query: "still hasn't approved us"}, priority: urgent}
+      - name: set_field_value
+        arguments: {task: {title_query: "still hasn't approved us"}, field: Risk, value: High}
+      - name: add_comment
+        arguments:
+          task: {title_query: "still hasn't approved us"}
+          text: "(mock) Possible duplicate of {{$last.data.tasks[].key}} (Payment provider approval): the same approval."
+  - match: {contains: "still hasn't approved us", turn: 3}
+    text: "(mock) Urgent: checkout is blocked. Risk high. Likely a duplicate of the approval task."
+  - match: {contains: "office plants", turn: 1}
+    text: "(mock) Nothing clear to triage: no deadline, owner or duplicate."
+default:
+  text: "(mock response: Sorter has no fixture for this task)"

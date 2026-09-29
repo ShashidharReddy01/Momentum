@@ -92,7 +92,7 @@ Registered in S3.1.2 unless noted. `semantic_search` arrives with S3.1.4 (embedd
 | `bulk_update_tasks` | medium (>25: high) | 3 | Same assignee/dates/completed change on up to 100 tasks, all or nothing |
 | `delete_task` | high | 3 | Soft delete, always confirm |
 | `create_rule` | medium | 4 | From NL rule compile. **Not registered** (found at the Phase 5 kickoff): S4.1.4's NL → rule compiles through `POST /ai/rules/compile` instead of a tool |
-| `set_field_value` | low | 4 | **Not registered yet** (found in S5.1.1): Sorter needs it, so S5.3.2 registers it |
+| `set_field_value` | low | 4 | Registered in S5.3.2 (Sorter): field by name, choices by label, people by name; stored as ids through `set_task_field_value` (now recorded with an undo). `get_task` lists the task's `custom_fields` (names, choices, values as labels) |
 | `request_approval` / `decide_approval` | medium / high | 4 | Agents never decide approvals. **Not registered** (found in S5.1.1): approvals are only the S4.4.1 endpoints. `decide_approval` is on the list no agent may ever be given (`FORBIDDEN_AGENT_TOOLS`, with `delete_task`) |
 | `post_slack_message` | high | 7 | External side effect |
 | `query_metrics` | read | 6 | Safe reporting query spec (no raw SQL) |

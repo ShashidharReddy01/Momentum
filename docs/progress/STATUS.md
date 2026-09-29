@@ -6,7 +6,7 @@
 
 ## Current focus
 - **Phase:** 5: Agents v1 ("Teammates") — in progress: kickoff done (2026-09-28, `docs/roadmap/phase-5-kickoff.md`), E5.1 (S5.1.1–S5.1.6), S5.0.1, E5.2 (S5.2.1–S5.2.3) and S5.3.8 done. Phase 4 complete (exit criteria met 2026-09-28).
-- **Next up:** S5.3.2 Sorter · Triage (register `set_field_value`).
+- **Next up:** S5.3.3 Herald · Status Reporter.
 - **Product-owner instruction (2026-09-26):** finish all remaining slices, then one big local test run against the real gateway (100+ questions/actions covering edge cases), then fix from that run.
 - **Scope note (product owner, 2026-09-26):** the customer-operations capabilities (SQQ, pricing, contracts, invoices, pushes to internal systems as tools and assignable agents) will be done later in the product owner's own codebase, **not in this repo**. Finish the roadmap as written.
 - **Branch:** Phases 3–4 are on `claude/clever-hopper-pbv7yr` (ahead of `main`). Phase 5 continues on `claude/intelligent-meitner-9ne4e8`, which starts from that branch's Phase 4 exit commit.
@@ -51,13 +51,19 @@
   - Also fixed on the way: adding the per-person time to schedules would have marked every installed scheduled agent as "edited"; now it's invisible when unused.
   - **Deploy note:** run `momentum agents install --only daily_digest` (Pulse is now a built-in code agent).
   - Verification: `make check` green, backend **708** (+7 in `tests/test_agent_pulse.py`), web **326**; mock evals `agent_pulse` 3/3.
+- **S5.3.2 Sorter done (2026-09-29):** triage of new tasks.
+  - When a task is created in a project Sorter has been added to, it proposes a priority, a field such as Risk, and a "possible duplicate" comment, as one proposal to the person who created the task. Subtasks are skipped.
+  - New AI tool `set_field_value`; the AI now sees a task's custom fields.
+  - **Found and fixed:** custom-field changes (by people, rules, templates or AI) were never recorded in the activity log and couldn't be undone. They now are, and show in the task's feed as "changed Risk".
+  - Deploy: `momentum agents install --only triage`.
+  - Verification: `make check` green, backend **712** (+4 in `tests/test_agent_sorter.py`; the tool snapshot and catalog test updated for the new tool), web **328**; mock evals `agent_sorter` 3/3.
 - **For the next session (read this first):**
   - **Branch:** `claude/intelligent-meitner-9ne4e8`, everything pushed.
   - **Fresh cloud container:** `apt-get install -y postgresql-16-pgvector`; `initdb` into `/home/user/.pgdata` as `postgres`; start with `pg_ctl -o '-p 5432 -k /tmp'`; create role `momentum`/`momentum` (createdb) and databases `momentum` + `momentum_test`; create the `vector`, `pg_trgm` and `citext` extensions in `template1`; then `make install`. Postgres **stops when the container sleeps**: `pg_isready -h 127.0.0.1` before trusting a wall of DB errors. `make check` takes about 10 minutes, so run it in the background.
   - **Decisions already made, don't re-ask:** kickoff Q1–Q9 (`phase-5-kickoff.md` §5).
   - **Mock mode throughout.**
-  - **Remaining, in the agreed order:** S5.3.2 Sorter (register `set_field_value`), S5.3.3 Herald, S5.3.4 Nudge (snooze on `my_task_placements`, migration), S5.3.7 Radar, S5.3.5 Architect, S5.3.6 Scribe, then the phase exit (J10 e2e in the browser, retro, INTEGRATION_GUIDE log).
-- **Next up:** S5.3.2 Sorter · Triage (register `set_field_value`).
+  - **Remaining, in the agreed order:** S5.3.3 Herald, S5.3.4 Nudge (snooze on `my_task_placements`, migration), S5.3.7 Radar, S5.3.5 Architect, S5.3.6 Scribe, then the phase exit (J10 e2e in the browser, retro, INTEGRATION_GUIDE log).
+- **Next up:** S5.3.3 Herald · Status Reporter.
 
 ## Open questions
 | # | Question | Needed by | Status |
@@ -120,7 +126,7 @@
 - [x] S5.0.1 Inbox and bell live updates (2026-09-28) · [x] S5.0.2 Public forms security review (2026-09-29)
 - [x] S5.1.1 Agent model and accounts (2026-09-28) · [x] S5.1.2 Runtime loop and triggers (2026-09-28) · [x] S5.1.3 Runs UI (2026-09-29) · [x] S5.1.4 Autonomy, budgets, kill switches (2026-09-29) · [x] S5.1.5 Extension points and code-backed agents (2026-09-29) · [x] S5.1.6 API tokens (2026-09-29)
 - [x] S5.2.1 Assign a task to an agent (2026-09-29) · [x] S5.2.2 @mention an agent (2026-09-29) · [x] S5.2.3 Agent gallery + create from description (2026-09-29)
-- [x] S5.3.1 Pulse (2026-09-29) · [ ] S5.3.2 Sorter · [ ] S5.3.3 Herald · [ ] S5.3.4 Nudge · [ ] S5.3.5 Architect · [ ] S5.3.6 Scribe · [ ] S5.3.7 Radar · [x] S5.3.8 Teammate (2026-09-29)
+- [x] S5.3.1 Pulse (2026-09-29) · [x] S5.3.2 Sorter (2026-09-29) · [ ] S5.3.3 Herald · [ ] S5.3.4 Nudge · [ ] S5.3.5 Architect · [ ] S5.3.6 Scribe · [ ] S5.3.7 Radar · [x] S5.3.8 Teammate (2026-09-29)
 - Build order (kickoff Q3, Q8): S5.0.1 before S5.1.3 · E5.1 (incl. S5.1.5, S5.1.6) → S5.2.1 + S5.3.8 (J10) → S5.2.2 → S5.2.3 → Pulse, Sorter (after S5.0.2), Herald, Nudge, Radar → Architect, Scribe
 - [ ] Phase 5 exit: J10 (mock); budget-cap test; runs page explains every action · deferred: `llm-check` + `EVALS_LIVE=1 make evals` (product owner's machine), dogfood week (post-ship)
 

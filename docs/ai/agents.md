@@ -112,6 +112,8 @@ trigger (schedule | outbox event | assigned | mentioned | manual)
 - **Delivery:** an inbox item of kind `digest` from Pulse's account, opening the run, whose answer is the full digest. Nothing to report, or the person set the new `digest` notification kind to off → no digest and no model call. Email/Slack delivery arrives with P7 through the same kind and its channel preference.
 - Evals: `agent_pulse` (coverage against the database, citations; 5 cases, 3 mock; live threshold 100%).
 
+**As built: Sorter (S5.3.2, 2026-09-29).** Wakes on `task.created` with the new event filter `top_level: true` (subtasks are skipped before any run or model call); enabled per project by adding its account to the project. Reads the task (now with its project's `custom_fields`), searches for duplicates, and proposes: priority (`update_task`), a choice field such as Risk (the new `set_field_value` tool), an owner only when unambiguous, and one "Possible duplicate of T-n" comment. `confirm` by default, so it all arrives as one proposal for the person who created the task; form-created tasks are capped at `confirm` anyway. Applying runs with that person's permissions, and one undo takes the whole proposal back (field changes now record `task.field_set` activity with an undo). Evals: `agent_sorter` (10 cases, 3 mock; live threshold 80%).
+
 ## 5. Autonomy promotion
 
 An admin can promote `confirm → auto` for an agent when its **acceptance rate ≥ 85% over the last 30 proposals** and there were no undo events for 14 days. The UI shows these stats next to the toggle. Demotion is automatic if the undo rate goes above 10% in a week.

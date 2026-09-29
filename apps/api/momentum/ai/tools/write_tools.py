@@ -19,6 +19,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from sqlalchemy import select
 
 from momentum.ai.tools.base import ToolContext, ToolError, ToolResult, tool
+from momentum.ai.tools.fields import find_field, project_fields, to_stored
 from momentum.ai.tools.refs import (
     TaskRef,
     resolve_person,
@@ -30,6 +31,8 @@ from momentum.ai.tools.refs import (
 from momentum.ai.tools.views import target, task_brief
 from momentum.core.ids import task_key
 from momentum.domain.comments.service import create_comment
+from momentum.domain.fields.models import FieldValue
+from momentum.domain.fields.service import set_task_field_value
 from momentum.domain.mytasks import service as my_tasks
 from momentum.domain.projects.schemas import ProjectCreateIn
 from momentum.domain.projects.service import create_project
@@ -181,6 +184,47 @@ async def update_task(tc: ToolContext, args: UpdateTaskArgs) -> ToolResult:
     return ToolResult.success(
         f"{tc.verb('Updated', 'Would update')} {key} {task.title}",
         {"task": await task_brief(tc, m.entity)},
+        targets=[target(task)],
+    )
+
+
+# ---------------- set_field_value (S5.3.2) ----------------
+
+
+class SetFieldValueArgs(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    task: TaskRef
+    field: str = Field(max_length=200, description="The custom field's name, as get_task lists it")
+    value: str | float | bool | list[str] | None = Field(
+        description=(
+            "A choice's label (a list for multi-select), a person's name or email (a list for "
+            "people fields), text, a number, true/false, or a YYYY-MM-DD date; null clears it"
+        )
+    )
+
+
+@tool(
+    name="set_field_value",
+    description=(
+        "Set one custom field on a task (e.g. Risk = High, Type = Bug). Use names and labels "
+        "exactly as get_task lists them; priority, dates and the assignee are update_task's."
+    ),
+    risk="low",
+    scopes=WRITE,
+)
+async def set_field_value(tc: ToolContext, args: SetFieldValueArgs) -> ToolResult:
+    task, _, _ = await resolve_task(tc, args.task)
+    field = find_field(await project_fields(tc, task), args.field)
+    stored = await to_stored(tc, field, args.value)
+    before = await tc.session.get(FieldValue, (task.id, field.id))
+    key = task_key(task.number)
+    if (before.value if before is not None else None) == stored:
+        return ToolResult.success(f"{key} already has that {field.name}", {"task": key})
+    await set_task_field_value(tc.session, tc.ctx, task.id, field.id, stored, batch_id=tc.batch_id)
+    shown = "cleared" if args.value is None else f"= {args.value}"
+    return ToolResult.success(
+        f"{tc.verb('Set', 'Would set')} {field.name} {shown} on {key} {task.title}",
+        {"task": key, "field": field.name, "value": args.value},
         targets=[target(task)],
     )
 
@@ -680,6 +724,7 @@ async def delete_task(tc: ToolContext, args: DeleteTaskArgs) -> ToolResult:
 TOOLS = [
     create_task,
     update_task,
+    set_field_value,
     complete_task,
     move_task,
     add_comment,

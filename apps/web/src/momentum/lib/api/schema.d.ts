@@ -2770,7 +2770,7 @@ export interface components {
             /** Tools */
             tools?: string[];
             /** Triggers */
-            triggers?: (components["schemas"]["ScheduleTrigger-Input"] | components["schemas"]["EventTrigger"] | components["schemas"]["SimpleTrigger"])[];
+            triggers?: (components["schemas"]["ScheduleTrigger-Input"] | components["schemas"]["EventTrigger-Input"] | components["schemas"]["SimpleTrigger"])[];
         };
         /**
          * AgentIn
@@ -2831,7 +2831,7 @@ export interface components {
             /** Tools */
             tools?: string[];
             /** Triggers */
-            triggers?: (components["schemas"]["ScheduleTrigger-Output"] | components["schemas"]["EventTrigger"] | components["schemas"]["SimpleTrigger"])[];
+            triggers?: (components["schemas"]["ScheduleTrigger-Output"] | components["schemas"]["EventTrigger-Output"] | components["schemas"]["SimpleTrigger"])[];
         };
         /**
          * AgentLimits
@@ -2956,7 +2956,7 @@ export interface components {
             /** Tools */
             tools?: string[] | null;
             /** Triggers */
-            triggers?: (components["schemas"]["ScheduleTrigger-Input"] | components["schemas"]["EventTrigger"] | components["schemas"]["SimpleTrigger"])[] | null;
+            triggers?: (components["schemas"]["ScheduleTrigger-Input"] | components["schemas"]["EventTrigger-Input"] | components["schemas"]["SimpleTrigger"])[] | null;
         };
         /**
          * AgentProjectIn
@@ -3726,15 +3726,31 @@ export interface components {
             monthly_budget_usd: number;
         };
         /** EventFilter */
-        EventFilter: {
+        "EventFilter-Input": {
             /** Project Ids */
             project_ids?: string[] | null;
+            /** Top Level */
+            top_level?: boolean | null;
+        };
+        "EventFilter-Output": {
+            [key: string]: unknown;
         };
         /** EventTrigger */
-        EventTrigger: {
+        "EventTrigger-Input": {
             /** Event */
             event: string;
-            filter?: components["schemas"]["EventFilter"];
+            filter?: components["schemas"]["EventFilter-Input"];
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "event";
+        };
+        /** EventTrigger */
+        "EventTrigger-Output": {
+            /** Event */
+            event: string;
+            filter?: components["schemas"]["EventFilter-Output"];
             /**
              * @description discriminator enum property added by openapi-typescript
              * @enum {string}

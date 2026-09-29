@@ -65,6 +65,7 @@ FEATURES = (
     "agent_teammate",
     "agent_draft",
     "agent_pulse",
+    "agent_sorter",
 )
 
 
@@ -324,6 +325,8 @@ async def _run(
         obs.data = drafted.agent.model_dump(mode="json")
     elif feature == "agent_pulse":
         await _pulse(session, llm, registry, world, case, ctx, now, obs)
+    elif feature == "agent_sorter":
+        await _sorter(session, llm, registry, world, case, ctx, now, obs)
     elif feature == "agent_teammate":
         await _teammate(session, llm, registry, world, case, ctx, now, obs)
     else:
@@ -397,6 +400,95 @@ async def _pulse(
         "digest": digest.text(),
     }
     obs.citations = [c.to_json() for c in await citations.resolve(session, ctx, obs.text)]
+
+
+async def _install(
+    session: AsyncSession,
+    registry: ToolRegistry,
+    world: EvalWorld,
+    ctx: Ctx,
+    key: str,
+    project: str,
+) -> Any:
+    """Install a starter (switched on) with editor access to a project, inside the case."""
+    admin = world.ctx("admin", ctx.settings)
+    definition = next(d for d, _source in load_definitions() if d.key == key)
+    [installed] = await agents.install_definitions(
+        session, admin, [(definition, "starter")], registry.names, force=True
+    )
+    agent = installed.agent
+    await agents.update_agent(session, admin, agent.id, AgentPatchIn(enabled=True), registry.names)
+    owner = world.ctx("ravi", ctx.settings)
+    await agents.add_to_project(session, owner, agent.id, world.projects[project], "editor")
+    return agent
+
+
+async def _execute(
+    session: AsyncSession,
+    llm: LLM,
+    registry: ToolRegistry,
+    ctx: Ctx,
+    agent: Any,
+    trigger: dict[str, Any],
+    now: datetime,
+    obs: Observation,
+) -> dict[str, Any]:
+    """Run one agent run through the real runtime and record what it did on ``obs``."""
+    run_id = await enqueue_run(session, agent, trigger, None)
+    assert run_id is not None
+    run = await session.get(AgentRun, run_id)
+    assert run is not None
+    run.status = "running"
+    await execute_run(session, _Unbilled(llm), registry, ctx.settings, run_id, now=now)  # type: ignore[arg-type]
+    await session.refresh(run)
+    output = run.output or {}
+    obs.text = str(output.get("text") or "")
+    for step in run.trace:
+        if step.get("kind") == "tool":
+            obs.tools.append(str(step.get("name")))
+            if not step.get("ok"):
+                obs.failed_tools.append(str(step.get("name")))
+    for action_id in [*output.get("proposed", []), *output.get("applied", [])]:
+        ops, risk = await _operations(session, action_id)
+        obs.operations.extend(ops)
+        obs.risk = obs.risk or risk
+    if run.status != "succeeded":
+        obs.error = f"run_{run.status}: {run.error}"
+    return output
+
+
+async def _sorter(
+    session: AsyncSession,
+    llm: LLM,
+    registry: ToolRegistry,
+    world: EvalWorld,
+    case: dict[str, Any],
+    ctx: Ctx,
+    now: datetime,
+    obs: Observation,
+) -> None:
+    """S5.3.2: a new task arrives in Launch Plan (created by the case's person, or by a form);
+    Sorter triages it through the real runtime. Scored on what it proposes."""
+    project = case.get("project", "Launch Plan")
+    agent = await _install(session, registry, world, ctx, "triage", project)
+    person = ctx.with_(via=case.get("via", "web"))
+    created = (
+        await tasks.create_task(session, person, world.projects[project], case["title"])
+    ).entity[0]
+    if case.get("input"):
+        await tasks.update_task(
+            session, person, created.id, {"description": text_doc(case["input"])}
+        )
+    trigger = {
+        "type": "event",
+        "event_type": "task.created",
+        "task_id": str(created.id),
+        "project_id": str(world.projects[project]),
+        "requested_by": str(ctx.actor.id),
+        "external": case.get("via") == "form",
+    }
+    await _execute(session, llm, registry, ctx, agent, trigger, now, obs)
+    obs.data = {"task_key": f"T-{created.number}"}
 
 
 async def _teammate(

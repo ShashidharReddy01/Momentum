@@ -95,6 +95,7 @@ def test_catalog_covers_phase_1_2_tools_with_their_risks() -> None:
         "get_attachment_text": "read",  # S5.1.5
         "create_task": "low",
         "update_task": "low",
+        "set_field_value": "low",  # S5.3.2 (Sorter)
         "complete_task": "low",
         "move_task": "low",
         "add_comment": "low",

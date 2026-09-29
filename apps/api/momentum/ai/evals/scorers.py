@@ -25,6 +25,11 @@ KEY = re.compile(r"\bT-\d+\b")
 
 KNOWN = frozenset(
     {
+        "sorter_priority_in",
+        "sorter_priority_none",
+        "sorter_field_in",
+        "sorter_duplicate_of",
+        "sorter_no_duplicate",
         "digest_empty",
         "digest_covers",
         "agent_trigger_types",
@@ -246,6 +251,33 @@ def score(obs: Observation, expect: dict[str, Any], *, today: date, asked: str =
                 f"today_exclude:{k}",
                 k not in obs.data.get("today", []),
                 f"today: {obs.data.get('today')}",
+            )
+        )
+
+    # Sorter triage (S5.3.2): what it proposed for the new task
+    priorities = [a.get("priority") for a in _op_args(obs, "update_task") if "priority" in a]
+    if "sorter_priority_in" in expect:
+        ok = bool(priorities) and priorities[-1] in expect["sorter_priority_in"]
+        add(Check("sorter_priority_in", ok, f"priority: {priorities}"))
+    if expect.get("sorter_priority_none"):
+        add(Check("sorter_priority_none", not priorities, f"priority: {priorities}"))
+    for name, allowed in (expect.get("sorter_field_in") or {}).items():
+        got_values = [
+            a.get("value")
+            for a in _op_args(obs, "set_field_value")
+            if str(a.get("field", "")).lower() == name.lower()
+        ]
+        ok = bool(got_values) and str(got_values[-1]).lower() in {str(x).lower() for x in allowed}
+        add(Check(f"sorter_field_in:{name}", ok, f"{name}: {got_values}"))
+    comments = " ".join(str(a.get("text", "")) for a in _op_args(obs, "add_comment")).lower()
+    if "sorter_duplicate_of" in expect:
+        want = [str(x).lower() for x in expect["sorter_duplicate_of"]]
+        ok = "duplicate" in comments and any(w in comments for w in want)
+        add(Check("sorter_duplicate_of", ok, f"comments: {comments[:160]!r}"))
+    if expect.get("sorter_no_duplicate"):
+        add(
+            Check(
+                "sorter_no_duplicate", "duplicate" not in comments, f"comments: {comments[:160]!r}"
             )
         )
 

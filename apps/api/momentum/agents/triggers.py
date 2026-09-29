@@ -341,8 +341,11 @@ async def _handle(
         wanted = [
             t
             for t in matching
-            if not (t.get("filter") or {}).get("project_ids")
-            or {str(p) for p in projects} & {str(p) for p in t["filter"]["project_ids"]}
+            if (
+                not (t.get("filter") or {}).get("project_ids")
+                or {str(p) for p in projects} & {str(p) for p in t["filter"]["project_ids"]}
+            )
+            and not ((t.get("filter") or {}).get("top_level") and data.get("parent_id"))
         ]
         if not wanted or not await in_scope(
             session, agent, agent_ctx(agent, user, settings), projects
