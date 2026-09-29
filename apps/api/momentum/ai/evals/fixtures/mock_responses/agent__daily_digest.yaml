@@ -1,0 +1,4 @@
+# Pulse's one summary line (S5.3.1), mock mode: cites the digest's own keys, so it passes the
+# "nothing outside the digest" check. Marked as mock output.
+default:
+  text: "(mock) Start with {{$keys}}."

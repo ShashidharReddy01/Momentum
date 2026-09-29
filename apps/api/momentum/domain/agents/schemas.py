@@ -11,7 +11,15 @@ from typing import Annotated, Any, Literal
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from croniter import croniter
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    SerializerFunctionWrapHandler,
+    field_validator,
+    model_serializer,
+    model_validator,
+)
 
 Autonomy = Literal["suggest", "confirm", "auto"]
 AgentKind = Literal["llm", "handler"]
@@ -51,6 +59,9 @@ class ScheduleTrigger(_Strict):
     type: Literal["schedule"]
     cron: str = Field(max_length=100)
     timezone: str = Field(default="workspace", max_length=64)
+    # S5.3.1: with ``timezone: user``, each person's own time of day replaces the cron's minute
+    # and hour when they've set one (``digest_time`` = their notification digest time, "HH:MM")
+    at: Literal["digest_time"] | None = None
 
     @field_validator("cron")
     @classmethod
@@ -58,6 +69,21 @@ class ScheduleTrigger(_Strict):
         if not croniter.is_valid(value) or len(value.split()) != 5:
             raise ValueError('cron must be a 5-field cron expression, e.g. "0 15 * * FRI"')
         return value
+
+    @model_serializer(mode="wrap")
+    def _omit_unset_at(self, handler: SerializerFunctionWrapHandler) -> dict[str, Any]:
+        # an unset ``at`` is left out, so schedules stored (and hashed) before it existed are
+        # unchanged: installed agents don't turn "drifted" (S5.3.1)
+        data: dict[str, Any] = handler(self)
+        if data.get("at") is None:
+            data.pop("at", None)
+        return data
+
+    @model_validator(mode="after")
+    def _at(self) -> ScheduleTrigger:
+        if self.at is not None and self.timezone != "user":
+            raise ValueError("`at` needs timezone: user (it is each person's own time)")
+        return self
 
     @field_validator("timezone")
     @classmethod

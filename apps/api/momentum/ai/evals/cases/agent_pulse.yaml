@@ -1,0 +1,26 @@
+# Pulse · Daily Digest (S5.3.1; agents.md §4: coverage, no hallucinated tasks). Each case builds
+# the digest the case's person would get today and checks it against the database: every open
+# task of theirs due today or overdue is listed, the summary line cites only listed tasks, and a
+# person with nothing to report gets no digest (and no model call). Live threshold 100%: the
+# lists are code, so only the model line can fail, and it's dropped rather than sent when wrong.
+feature: agent_pulse
+cases:
+  - id: ravi_overdue_pricing
+    mock: true
+    user: ravi
+    expect: {digest_empty: false, digest_covers: true, citations_valid: true}
+  - id: ana_overdue_contract
+    mock: true
+    user: ana
+    expect: {digest_empty: false, digest_covers: true, citations_valid: true}
+  - id: lena_nothing_to_report
+    mock: true
+    user: lena
+    expect: {digest_empty: true, digest_covers: true}
+  - id: ravi_live_line
+    user: ravi
+    expect: {digest_covers: true, citations_valid: true, min_citations: 1, max_chars: 300}
+    judge: {rubric: "One short sentence saying where to start today, pointing at the most pressing overdue or due-today task by key; nothing invented."}
+  - id: ana_live_line
+    user: ana
+    expect: {digest_covers: true, citations_valid: true, max_chars: 300}

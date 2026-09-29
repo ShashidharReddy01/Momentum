@@ -25,6 +25,8 @@ KEY = re.compile(r"\bT-\d+\b")
 
 KNOWN = frozenset(
     {
+        "digest_empty",
+        "digest_covers",
         "agent_trigger_types",
         "agent_cron_any",
         "agent_tools_include",
@@ -246,6 +248,14 @@ def score(obs: Observation, expect: dict[str, Any], *, today: date, asked: str =
                 f"today: {obs.data.get('today')}",
             )
         )
+
+    # Pulse digests (S5.3.1)
+    if "digest_empty" in expect:
+        got_empty = bool(obs.data.get("empty"))
+        add(Check("digest_empty", got_empty == bool(expect["digest_empty"]), f"empty: {got_empty}"))
+    if expect.get("digest_covers"):
+        missing = obs.data.get("missing") or []
+        add(Check("digest_covers", not missing, f"missing: {missing}"))
 
     # agent drafts (S5.2.3)
     if "agent_trigger_types" in expect:

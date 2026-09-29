@@ -95,7 +95,7 @@ Tests: `tests/test_forms_security.py` (4); `test_forms.py` updated.
 
 | Slice | Agent | Notes |
 |---|---|---|
-| S5.3.1 | Pulse · Daily Digest | Per-user schedule at `prefs.digest_time` (default 08:30 weekdays in the user's timezone); no digest when there's nothing to report; runs on behalf of the recipient; inbox digest item; email/Slack delivery hooks for P7 |
+| S5.3.1 | Pulse · Daily Digest | Per-user schedule at `prefs.digest_time` (default 08:30 weekdays in the user's timezone); no digest when there's nothing to report; runs on behalf of the recipient; inbox digest item; email/Slack delivery hooks for P7. **Built 2026-09-29:** a built-in handler agent (`agents/pulse.py`): lists built in code (due today, overdue, unread assignments/mentions/updates since the last digest), one `fast` model line that may cite only those tasks; schedule `at: digest_time` (new `ScheduleTrigger.at`, omitted when unset so existing installs don't turn drifted); new `digest` notification kind preference (off = no digest, no model call); settings page row and digest-time text. Tests `tests/test_agent_pulse.py` (7); eval `agent_pulse` |
 | S5.3.2 | Sorter · Triage | Registers the `set_field_value` tool (in the Phase 4 catalog, never built; found in S5.1.1) and adds it to Sorter. Enabled per project (= its `scope.projects`); uses semantic duplicates; `confirm` default; capped at `confirm` on `form.submitted`. After S5.0.2 |
 | S5.3.3 | Herald · Status Reporter | Reuses S3.4.3 prompt; weekly schedule; owner publishes |
 | S5.3.4 | Nudge · Nudger (S) | Rate limits per task; escalation to owner; respects snooze: per-task "Snooze nudges until…" (`my_task_placements.nudge_snoozed_until`) and a user-level "don't nudge me" pref; skips tasks blocked by others' open work |

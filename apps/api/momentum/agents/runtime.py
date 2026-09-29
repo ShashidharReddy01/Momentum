@@ -38,6 +38,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from momentum.agents import policy
 from momentum.agents.extensions import Handler, HandlerRun, attach_file
+from momentum.agents.pulse import BUILTIN_HANDLERS
 from momentum.agents.triggers import agent_ctx, in_scope, on_behalf_ctx, task_project_ids
 from momentum.ai.actions import ProposedCall, apply_as_agent, propose
 from momentum.ai.context.builders import project_ctx, task_ctx
@@ -377,7 +378,9 @@ async def execute_run(
     try:
         if not settings.agents_enabled or not agent.enabled:
             raise _Cancelled(f"{agent.name} is turned off")
-        handler = (handlers or {}).get(agent.handler or "") if agent.kind == "handler" else None
+        # Momentum's own code-backed agents (Pulse, S5.3.1) can't be replaced by a host's
+        available = {**(handlers or {}), **BUILTIN_HANDLERS}
+        handler = available.get(agent.handler or "") if agent.kind == "handler" else None
         if agent.kind == "handler" and handler is None:
             raise _Failed(f"No handler is registered for {agent.handler}")
         requester = await _person(session, trigger.get("requested_by"))

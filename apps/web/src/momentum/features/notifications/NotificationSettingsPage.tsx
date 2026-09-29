@@ -5,7 +5,15 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { useNotificationPrefs, useSetNotificationPrefs, type NotificationPrefs } from './queries';
 
 type Channel = NotificationPrefs['assigned'];
-const CHANNEL_KINDS = ['assigned', 'mentioned', 'commented', 'completed', 'due_soon', 'overdue'] as const;
+const CHANNEL_KINDS = [
+  'assigned',
+  'mentioned',
+  'commented',
+  'completed',
+  'due_soon',
+  'overdue',
+  'digest',
+] as const;
 
 const KIND_LABEL: Record<(typeof CHANNEL_KINDS)[number], string> = {
   assigned: 'Assigned to me',
@@ -14,6 +22,7 @@ const KIND_LABEL: Record<(typeof CHANNEL_KINDS)[number], string> = {
   completed: 'A task I created is completed',
   due_soon: 'Due today',
   overdue: 'Overdue',
+  digest: 'Daily digest (Pulse)',
 };
 
 const CHANNEL_LABEL: Record<Channel, string> = {
@@ -27,8 +36,8 @@ const CHANNEL_OPTIONS = Object.keys(CHANNEL_LABEL) as Channel[];
 /** S2.5.3: per-kind channel choice plus a digest-time preference. Only "in_app" delivers
  * anything today — the backend records "email"/"slack" as chosen-but-not-yet-active, so
  * picking one behaves like "off" until those senders exist (see `NotificationChannel`'s
- * docstring in `domain/notifications/schemas.py`). The digest time is likewise stored only,
- * for the Pulse agent's daily digest in a future phase — nothing reads it yet. */
+ * docstring in `domain/notifications/schemas.py`). The digest time is when the Pulse agent's
+ * weekday digest arrives (S5.3.1; 08:30 in your timezone when unset). */
 export function NotificationSettingsPage() {
   const prefs = useNotificationPrefs();
   const setPrefs = useSetNotificationPrefs();
@@ -100,7 +109,8 @@ export function NotificationSettingsPage() {
               Daily digest time
             </label>
             <p className="mb-2 text-xs text-muted">
-              Saved for later — the daily digest itself isn't built yet.
+              Weekdays, in your own timezone (08:30 if you leave it empty). Pulse skips days with nothing to
+              report, and only switched-on agents send it.
             </p>
             <input
               id="digest-time"

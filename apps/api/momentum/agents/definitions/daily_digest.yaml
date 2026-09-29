@@ -1,18 +1,22 @@
-# Pulse · Daily Digest (agents.md §4 #1). Refined in S5.3.1.
-# Runs once per user at their notification digest time (default 08:30 weekdays in their own
-# timezone), on behalf of that user: it can only report what the recipient can already see.
+# Pulse · Daily Digest (agents.md §4 #1). S5.3.1: a built-in code-backed agent
+# (momentum/agents/pulse.py). Runs once per person on weekdays at their own digest time (08:30
+# in their timezone unless they set another), on their behalf: it only reports what they can
+# already see. The lists come from code; the model writes one summary line. No digest (and no
+# model call) when there's nothing to report or the person turned digests off.
 key: daily_digest
 name: Pulse · Daily Digest
 avatar: pulse
 description: A short morning digest of what's due, overdue, newly assigned and mentioned.
+kind: handler
+handler: momentum.daily_digest
 instructions: |
-  Write the recipient's daily digest. Cover, in this order: tasks due today, overdue tasks, new
-  assignments, mentions, and notable changes on tasks they follow since the last digest.
-  List only tasks returned by your tools, each with its task key. Never invent a task, a date or
-  a person. If there is nothing to report, say so in one line and stop.
+  Built in: gathers the person's tasks due today and overdue, and the unread assignments,
+  mentions and updates on followed tasks since their last digest, then writes one line on where
+  to start. These instructions aren't read by the model.
 triggers:
-  - { type: schedule, cron: "30 8 * * 1-5", timezone: user }
-tools: [list_my_tasks, search_tasks, get_task]
+  - { type: schedule, cron: "30 8 * * 1-5", timezone: user, at: digest_time }
+tools: []
 autonomy: auto
-model_alias: default
+model_alias: fast
 budget_monthly_usd: 10
+limits: { timeout_s: 60 }

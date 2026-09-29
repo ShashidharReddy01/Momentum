@@ -2770,7 +2770,7 @@ export interface components {
             /** Tools */
             tools?: string[];
             /** Triggers */
-            triggers?: (components["schemas"]["ScheduleTrigger"] | components["schemas"]["EventTrigger"] | components["schemas"]["SimpleTrigger"])[];
+            triggers?: (components["schemas"]["ScheduleTrigger-Input"] | components["schemas"]["EventTrigger"] | components["schemas"]["SimpleTrigger"])[];
         };
         /**
          * AgentIn
@@ -2831,7 +2831,7 @@ export interface components {
             /** Tools */
             tools?: string[];
             /** Triggers */
-            triggers?: (components["schemas"]["ScheduleTrigger"] | components["schemas"]["EventTrigger"] | components["schemas"]["SimpleTrigger"])[];
+            triggers?: (components["schemas"]["ScheduleTrigger-Output"] | components["schemas"]["EventTrigger"] | components["schemas"]["SimpleTrigger"])[];
         };
         /**
          * AgentLimits
@@ -2956,7 +2956,7 @@ export interface components {
             /** Tools */
             tools?: string[] | null;
             /** Triggers */
-            triggers?: (components["schemas"]["ScheduleTrigger"] | components["schemas"]["EventTrigger"] | components["schemas"]["SimpleTrigger"])[] | null;
+            triggers?: (components["schemas"]["ScheduleTrigger-Input"] | components["schemas"]["EventTrigger"] | components["schemas"]["SimpleTrigger"])[] | null;
         };
         /**
          * AgentProjectIn
@@ -4832,6 +4832,12 @@ export interface components {
              * @enum {string}
              */
             completed: "in_app" | "email" | "slack" | "off";
+            /**
+             * Digest
+             * @default in_app
+             * @enum {string}
+             */
+            digest: "in_app" | "email" | "slack" | "off";
             /** Digest Time */
             digest_time?: string | null;
             /**
@@ -4857,9 +4863,9 @@ export interface components {
          * NotificationPrefsOut
          * @description Per-kind channel choice (default in_app) plus a digest-time preference.
          *
-         *     The digest time is stored only — nothing reads it yet. It's for the Pulse agent's
-         *     daily digest in Phase 5 (P5); persisting it now means users can set it once and have
-         *     it already in place when that consumer exists.
+         *     S5.3.1: ``digest`` is the Pulse daily digest ("off" = no digest, and no model call spent on
+         *     it); ``digest_time`` ("HH:MM", the person's own timezone) is when it arrives on weekdays
+         *     (08:30 when unset).
          */
         NotificationPrefsOut: {
             /**
@@ -4880,6 +4886,12 @@ export interface components {
              * @enum {string}
              */
             completed: "in_app" | "email" | "slack" | "off";
+            /**
+             * Digest
+             * @default in_app
+             * @enum {string}
+             */
+            digest: "in_app" | "email" | "slack" | "off";
             /** Digest Time */
             digest_time?: string | null;
             /**
@@ -5731,7 +5743,9 @@ export interface components {
          * @description ``timezone``: ``workspace`` (workspaces.settings['timezone'], default UTC), ``user`` (each
          *     user's own timezone, for per-user agents such as Pulse) or an IANA name.
          */
-        ScheduleTrigger: {
+        "ScheduleTrigger-Input": {
+            /** At */
+            at?: "digest_time" | null;
             /** Cron */
             cron: string;
             /**
@@ -5744,6 +5758,15 @@ export interface components {
              * @enum {string}
              */
             type: "schedule";
+        };
+        "ScheduleTrigger-Output": {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "schedule";
+        } & {
+            [key: string]: unknown;
         };
         /** ScreenIn */
         ScreenIn: {

@@ -60,9 +60,9 @@ DIGEST_TIME_PATTERN = r"^([01]\d|2[0-3]):[0-5]\d$"  # "HH:MM", 24h, local to the
 class NotificationPrefsOut(BaseModel):
     """Per-kind channel choice (default in_app) plus a digest-time preference.
 
-    The digest time is stored only — nothing reads it yet. It's for the Pulse agent's
-    daily digest in Phase 5 (P5); persisting it now means users can set it once and have
-    it already in place when that consumer exists.
+    S5.3.1: ``digest`` is the Pulse daily digest ("off" = no digest, and no model call spent on
+    it); ``digest_time`` ("HH:MM", the person's own timezone) is when it arrives on weekdays
+    (08:30 when unset).
     """
 
     assigned: NotificationChannel = "in_app"
@@ -71,6 +71,7 @@ class NotificationPrefsOut(BaseModel):
     completed: NotificationChannel = "in_app"
     due_soon: NotificationChannel = "in_app"
     overdue: NotificationChannel = "in_app"
+    digest: NotificationChannel = "in_app"
     digest_time: str | None = None
 
     @field_validator("digest_time")

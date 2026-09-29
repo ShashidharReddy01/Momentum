@@ -126,6 +126,21 @@ async def _enabled_agents(session: AsyncSession) -> list[tuple[Agent, User]]:
 # ---------------- schedules ----------------
 
 
+def personal_cron(cron: str, person: User | None, at: str | None) -> str:
+    """S5.3.1: a per-person schedule's cron with the person's own time of day (their
+    notification ``digest_time``, "HH:MM") in place of its minute and hour, when they set one.
+    Days and months stay the definition's (Pulse: weekdays)."""
+    if person is None or at != "digest_time":
+        return cron
+    value = ((person.prefs or {}).get("notifications") or {}).get("digest_time")
+    if not isinstance(value, str) or len(value) != 5 or value[2] != ":":
+        return cron
+    hour, minute = value.split(":")
+    if not (hour.isdigit() and minute.isdigit() and int(hour) < 24 and int(minute) < 60):
+        return cron
+    return " ".join([str(int(minute)), str(int(hour)), *cron.split()[2:]])
+
+
 def _minute(dt: datetime) -> datetime:
     return dt.replace(second=0, microsecond=0)
 
@@ -161,8 +176,9 @@ async def evaluate_schedules(
                     tz = workspace_timezone(ws) if ws is not None else "UTC"
                 targets = [(None, tz)]
             for person, zone in targets:
+                own = personal_cron(cron, person, trig.get("at"))
                 for minute in minutes:
-                    if not croniter.match(cron, minute.astimezone(ZoneInfo(zone))):
+                    if not croniter.match(own, minute.astimezone(ZoneInfo(zone))):
                         continue
                     trigger: dict[str, Any] = {
                         "type": "schedule",

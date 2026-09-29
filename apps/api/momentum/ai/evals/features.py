@@ -14,6 +14,8 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from momentum.agents import pulse
+from momentum.agents.extensions import HandlerRun
 from momentum.agents.loader import load_definitions
 from momentum.agents.runtime import execute_run
 from momentum.ai import citations, quick_add, summarize, write
@@ -62,6 +64,7 @@ FEATURES = (
     "ai_step",
     "agent_teammate",
     "agent_draft",
+    "agent_pulse",
 )
 
 
@@ -319,6 +322,8 @@ async def _run(
         obs.text = drafted.agent.instructions
         obs.notes = drafted.notes
         obs.data = drafted.agent.model_dump(mode="json")
+    elif feature == "agent_pulse":
+        await _pulse(session, llm, registry, world, case, ctx, now, obs)
     elif feature == "agent_teammate":
         await _teammate(session, llm, registry, world, case, ctx, now, obs)
     else:
@@ -342,6 +347,56 @@ class _Unbilled:
     def stream(self, *args: Any, **kwargs: Any) -> Any:
         kwargs.pop("agent_run_id", None)
         return self._llm.stream(*args, **kwargs)
+
+
+async def _pulse(
+    session: AsyncSession,
+    llm: LLM,
+    registry: ToolRegistry,
+    world: EvalWorld,
+    case: dict[str, Any],
+    ctx: Ctx,
+    now: datetime,
+    obs: Observation,
+) -> None:
+    """S5.3.1: Pulse's digest for the case's person (what it would send), checked against the
+    database: every open task of theirs due today or overdue must be listed, and the summary
+    line may cite only listed tasks."""
+    person = ctx.with_(via="agent")
+    hrun = HandlerRun(
+        session=session,
+        ctx=person,
+        settings=ctx.settings,
+        llm=_Unbilled(llm),  # type: ignore[arg-type]
+        registry=registry,
+        run_id=uuid.uuid4(),
+        agent_key="daily_digest",
+        agent_name="Pulse",
+        model_alias="fast",
+        trigger={"type": "schedule", "for_user_id": str(ctx.actor.id)},
+        step=obs.notes.append,
+    )
+    digest = await pulse.gather(hrun, now)
+    intro = None if digest.empty() else await pulse._intro(hrun, digest)
+    obs.text = intro or ""
+    today = pulse._local_today(ctx.actor.timezone, now)
+    due = (
+        await session.execute(
+            select(Task.number).where(
+                Task.assignee_id == ctx.actor.id,
+                Task.completed_at.is_(None),
+                Task.deleted_at.is_(None),
+                Task.due_on <= today,
+            )
+        )
+    ).scalars()
+    listed = " ".join(digest.due_today + digest.overdue)
+    obs.data = {
+        "empty": digest.empty(),
+        "missing": [n for n in due if f"T-{n} " not in listed + " "],
+        "digest": digest.text(),
+    }
+    obs.citations = [c.to_json() for c in await citations.resolve(session, ctx, obs.text)]
 
 
 async def _teammate(

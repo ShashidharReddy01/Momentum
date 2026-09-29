@@ -19,6 +19,13 @@ import {
 
 type Simple = 'assigned' | 'mentioned' | 'manual';
 type Alias = 'fast' | 'default' | 'smart';
+/** A schedule keeps its timezone and per-person time (`at`) through an edit (Pulse's is
+ * "each person's own time"); new ones run in workspace time. */
+interface Schedule {
+  cron: string;
+  timezone: string;
+  at?: string | null;
+}
 
 /** What the form edits: the parts of a definition a person writes. Autonomy beyond the first
  * choice, budgets and on/off live in the admin panel on the agent's page (S5.1.4). */
@@ -27,7 +34,7 @@ export interface AgentFormValues {
   description: string;
   instructions: string;
   simple: Simple[];
-  schedules: string[];
+  schedules: Schedule[];
   events: string[];
   tools: string[];
   autonomy: 'suggest' | 'confirm';
@@ -71,11 +78,16 @@ type Triggers = Agent['triggers'];
 
 export function fromTriggers(triggers: Triggers) {
   const simple: Simple[] = [];
-  const schedules: string[] = [];
+  const schedules: Schedule[] = [];
   const events: string[] = [];
   for (const t of triggers) {
     const type = String(t.type);
-    if (type === 'schedule') schedules.push(String(t.cron ?? ''));
+    if (type === 'schedule')
+      schedules.push({
+        cron: String(t.cron ?? ''),
+        timezone: String(t.timezone ?? 'workspace'),
+        at: t.at ? String(t.at) : null,
+      });
     else if (type === 'event') events.push(String(t.event ?? ''));
     else if (type === 'assigned' || type === 'mentioned' || type === 'manual') simple.push(type);
   }
@@ -86,8 +98,13 @@ export function toTriggers(v: AgentFormValues) {
   return [
     ...v.simple.map((type) => ({ type })),
     ...v.schedules
-      .filter((c) => c.trim())
-      .map((cron) => ({ type: 'schedule' as const, cron: cron.trim(), timezone: 'workspace' })),
+      .filter((sc) => sc.cron.trim())
+      .map((sc) => ({
+        type: 'schedule' as const,
+        cron: sc.cron.trim(),
+        timezone: sc.timezone,
+        ...(sc.at ? { at: sc.at as 'digest_time' } : {}),
+      })),
     ...v.events.filter(Boolean).map((event) => ({ type: 'event' as const, event })),
   ];
 }
@@ -226,7 +243,7 @@ export function AgentForm({
   const toggle = <T,>(list: T[], item: T) =>
     list.includes(item) ? list.filter((x) => x !== item) : [...list, item];
   const hasTrigger =
-    v.simple.length + v.schedules.filter((c) => c.trim()).length + v.events.filter(Boolean).length > 0;
+    v.simple.length + v.schedules.filter((sc) => sc.cron.trim()).length + v.events.filter(Boolean).length > 0;
 
   return (
     <form
@@ -304,22 +321,30 @@ export function AgentForm({
             {s.label}
           </label>
         ))}
-        {v.schedules.map((cron, i) => (
+        {v.schedules.map((sc, i) => (
           <span key={`s${i}`} className="flex items-center gap-2 text-sm">
             On a schedule
             <input
               aria-label="Schedule (cron)"
               className={`${field} w-40 font-mono`}
-              value={cron}
+              value={sc.cron}
               placeholder="0 9 * * 1-5"
               onChange={(e) =>
                 set(
                   'schedules',
-                  v.schedules.map((c, j) => (j === i ? e.target.value : c)),
+                  v.schedules.map((c, j) => (j === i ? { ...c, cron: e.target.value } : c)),
                 )
               }
             />
-            <span className="text-xs text-muted">workspace time</span>
+            <span className="text-xs text-muted">
+              {sc.timezone === 'user'
+                ? sc.at
+                  ? 'each person’s own digest time'
+                  : 'each person’s own timezone'
+                : sc.timezone === 'workspace'
+                  ? 'workspace time'
+                  : sc.timezone}
+            </span>
             <button
               type="button"
               aria-label="Remove schedule"
@@ -373,7 +398,7 @@ export function AgentForm({
             type="button"
             size="sm"
             variant="text"
-            onClick={() => set('schedules', [...v.schedules, '0 9 * * 1-5'])}
+            onClick={() => set('schedules', [...v.schedules, { cron: '0 9 * * 1-5', timezone: 'workspace' }])}
           >
             <Plus size={13} aria-hidden /> Schedule
           </Button>
