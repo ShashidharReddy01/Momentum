@@ -101,7 +101,7 @@ Tests: `tests/test_forms_security.py` (4); `test_forms.py` updated.
 | S5.3.4 | Nudge · Nudger (S) | Rate limits per task; escalation to owner; respects snooze: per-task "Snooze nudges until…" (`my_task_placements.nudge_snoozed_until`) and a user-level "don't nudge me" pref; skips tasks blocked by others' open work. **Built 2026-09-29:** built-in handler (`agents/nudge.py`), migration 0030, `PUT /me/tasks/{id}/nudge-snooze`, `nudge_me` pref (and a fix: the prefs loader turned any boolean into a channel string), pane menu + settings checkbox, prompt `nudge`. Tests `tests/test_agent_nudge.py` (4), 1 web; eval `agent_nudge` |
 | S5.3.5 | Architect · Planner | Wraps S3.4.6 with capacity awareness hooks (full in P6) |
 | S5.3.6 | Scribe · Meeting Notes | Paste/upload notes (txt, md, docx, vtt); decisions + action items; email-in hook (P7) |
-| S5.3.7 | Radar · Risk Watcher | Heuristic risk signals now; forecast integration in P6 |
+| S5.3.7 | Radar · Risk Watcher | Heuristic risk signals now; forecast integration in P6. **Built 2026-09-29:** built-in handler (`agents/radar.py`), `HandlerRun.output`, `GET /projects/{id}/risk`, `RiskNote` on the Overview, a risks section in Pulse. Tests `tests/test_agent_radar.py` (2), 2 web; eval `agent_radar` |
 | S5.3.8 | Teammate (generic) (S) | Base behavior for assigned/mentioned work. **Built 2026-09-29** with S5.2.1: charter, tools (no `add_comment`; + `get_attachment_text`), mock fixture `agent__teammate.yaml`, eval feature `agent_teammate` (agents.md §3 "As built") |
 
 Each starter-agent slice includes: YAML definition, prompt, tool allow-list, mock fixtures, eval cases with thresholds (agents.md §4), and docs update.

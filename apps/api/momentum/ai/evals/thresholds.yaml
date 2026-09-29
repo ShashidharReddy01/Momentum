@@ -21,6 +21,7 @@ mock:
   agent_sorter: 1.0
   agent_herald: 1.0
   agent_nudge: 1.0
+  agent_radar: 1.0
 live:
   command: 0.9
   chat: 0.85
@@ -40,3 +41,4 @@ live:
   agent_sorter: 0.8
   agent_herald: 1.0
   agent_nudge: 1.0
+  agent_radar: 1.0

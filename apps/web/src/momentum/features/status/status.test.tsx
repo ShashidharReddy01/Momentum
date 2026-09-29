@@ -48,7 +48,9 @@ const DRAFT = {
   citations: [T12],
 };
 
-function boot(opts: { role?: string; aiEnabled?: boolean; path?: string; history?: unknown[] } = {}) {
+function boot(
+  opts: { role?: string; aiEnabled?: boolean; path?: string; history?: unknown[]; risk?: unknown } = {},
+) {
   const posted: unknown[] = [];
   let drafts = 0;
   server.use(
@@ -57,6 +59,7 @@ function boot(opts: { role?: string; aiEnabled?: boolean; path?: string; history
     ...projectHandlers('', undefined, [{ name: 'Website Revamp', my_role: opts.role ?? 'admin' }]),
     ...sectionHandlers('', { 'seed-1': ['Backlog'] }),
     ...taskHandlers('', { 'seed-1': { 'sec-1': ['First'] } }),
+    http.get('*/api/v1/projects/:id/risk', () => HttpResponse.json(opts.risk ?? null)),
     http.get('*/api/v1/projects/:id/status-updates', () =>
       HttpResponse.json({ data: opts.history ?? HISTORY, meta: { next_cursor: null } }),
     ),
@@ -163,5 +166,41 @@ describe('Status updates (S3.4.3)', () => {
     await screen.findByRole('article', { name: 'Status: Pricing slips' });
     expect(screen.getByRole('button', { name: 'Post update' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Draft with Mo|Draft status/ })).toBeNull();
+  });
+});
+
+describe('Radar risk note (S5.3.7)', () => {
+  it('shows the latest note above the status updates, marked as AI, with the evidence', async () => {
+    boot({
+      risk: {
+        level: 'high',
+        summary: 'Start with T-12: it holds the rest up.',
+        signals: [
+          { kind: 'overdue', text: '3 of 5 dated open tasks are overdue', tasks: ['T-12 Pricing copy'] },
+          {
+            kind: 'unassigned',
+            text: '1 task(s) due within 3 days have no one assigned',
+            tasks: ['T-14 Venue'],
+          },
+        ],
+        at: new Date().toISOString(),
+        run_id: 'run-9',
+        agent_id: 'agent-7',
+        agent_name: 'Radar · Risk Watcher',
+      },
+    });
+    const note = await screen.findByRole('region', { name: 'Radar · Risk Watcher · High risk (AI)' });
+    expect(within(note).getByText('Start with T-12: it holds the rest up.')).toBeInTheDocument();
+    expect(within(note).getByText(/3 of 5 dated open tasks are overdue/)).toBeInTheDocument();
+    expect(within(note).getByRole('link', { name: /How Radar decided/ })).toHaveAttribute(
+      'href',
+      '/agents/runs/run-9',
+    );
+  });
+
+  it('shows nothing when Radar is not watching the project', async () => {
+    boot();
+    await screen.findByRole('article', { name: 'Status: Pricing slips' });
+    expect(screen.queryByRole('region', { name: /Radar/ })).toBeNull();
   });
 });

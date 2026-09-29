@@ -10,6 +10,7 @@ import { cn } from '@/lib/cn';
 import { useMomentumConfig } from '@/lib/config';
 import { formatRelative } from '@/lib/dates';
 import { useUndoToast } from '@/lib/undo';
+import { RiskNote } from './RiskNote';
 import {
   usePostStatus,
   useStatusDraft,
@@ -86,6 +87,7 @@ export function StatusOverview({
 
   return (
     <div className="mx-auto max-w-3xl space-y-5">
+      <RiskNote projectId={projectId} />
       <div className="flex flex-wrap items-center gap-2">
         <h2 className="flex-1 text-[15px] font-semibold">Status updates</h2>
         {canEdit && !editing ? (

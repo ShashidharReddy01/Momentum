@@ -59,3 +59,18 @@ export function useStatusDraft(projectId: string) {
       ).data!,
   });
 }
+
+/** S5.3.7: Radar's latest risk note on the project (null when Radar hasn't looked at it). */
+export function useProjectRisk(projectId: string) {
+  const api = useApi();
+  return useQuery({
+    queryKey: ['projects', projectId, 'risk'],
+    queryFn: async () =>
+      (
+        await api.GET('/api/v1/projects/{project_id}/risk', {
+          params: { path: { project_id: projectId } },
+        })
+      ).data ?? null,
+    staleTime: 5 * 60_000,
+  });
+}

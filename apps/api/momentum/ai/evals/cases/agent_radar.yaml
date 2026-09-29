@@ -1,0 +1,24 @@
+# Radar · Risk Watcher (S5.3.7; agents.md §4: flags known-risky fixture projects; false-positive
+# rate ≤ 20%). Radar's morning run through the real runtime. "Launch Plan" is risky by design
+# (an overdue contract blocking payment approval, overdue pricing blocking the page copy);
+# "Secret Roadmap" is calm (one task, not due yet) and must not be flagged. Signals are code, so
+# live the only variable is the note's wording (it may cite only the signals' tasks).
+feature: agent_radar
+cases:
+  - id: launch_plan_is_at_risk
+    mock: true
+    user: ravi
+    expect:
+      risk_level_in: [medium, high]
+      risk_signals_include: [overdue, blocked]
+      citations_valid: true
+  - id: calm_project_not_flagged
+    mock: true
+    user: priya
+    project: "Secret Roadmap"
+    owner: priya
+    expect: {risk_level_in: [none]}
+  - id: launch_plan_note_live
+    user: ravi
+    expect: {risk_level_in: [medium, high], min_citations: 1, citations_valid: true, max_chars: 400}
+    judge: {rubric: "A calm one- or two-sentence risk note naming the overdue vendor contract and the tasks waiting on overdue work, with a sensible next step; nothing invented."}

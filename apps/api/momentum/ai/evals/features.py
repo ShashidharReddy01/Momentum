@@ -69,6 +69,7 @@ FEATURES = (
     "agent_sorter",
     "agent_herald",
     "agent_nudge",
+    "agent_radar",
 )
 
 
@@ -369,6 +370,24 @@ async def _run(
         ).all()
         obs.data = {"nudged": [t for t, _ in rows]}
         obs.text = "\n".join(b for _, b in rows)
+    elif feature == "agent_radar":
+        project = case.get("project", "Launch Plan")
+        agent = await _install(
+            session, registry, world, ctx, "risk_watcher", project, owner=case.get("owner", "ravi")
+        )
+        trigger = {
+            "type": "schedule",
+            "project_id": str(world.projects[project]),
+            "timezone": "UTC",
+        }
+        output = await _execute(session, llm, registry, ctx, agent, trigger, now, obs)
+        risk = output.get("risk") or {}
+        obs.data = {
+            "level": risk.get("level"),
+            "kinds": [x["kind"] for x in risk.get("signals", [])],
+        }
+        obs.text = str(risk.get("summary") or "")
+        obs.citations = [c.to_json() for c in await citations.resolve(session, ctx, obs.text)]
     elif feature == "agent_teammate":
         await _teammate(session, llm, registry, world, case, ctx, now, obs)
     else:
@@ -455,8 +474,11 @@ async def _install(
     ctx: Ctx,
     key: str,
     project: str,
+    *,
+    owner: str = "ravi",
 ) -> Any:
-    """Install a starter (switched on) with editor access to a project, inside the case."""
+    """Install a starter (switched on) with editor access to a project, inside the case (given
+    by ``owner``, an admin of that project)."""
     admin = world.ctx("admin", ctx.settings)
     definition = next(d for d, _source in load_definitions() if d.key == key)
     [installed] = await agents.install_definitions(
@@ -464,8 +486,8 @@ async def _install(
     )
     agent = installed.agent
     await agents.update_agent(session, admin, agent.id, AgentPatchIn(enabled=True), registry.names)
-    owner = world.ctx("ravi", ctx.settings)
-    await agents.add_to_project(session, owner, agent.id, world.projects[project], "editor")
+    sharer = world.ctx(owner, ctx.settings)
+    await agents.add_to_project(session, sharer, agent.id, world.projects[project], "editor")
     return agent
 
 

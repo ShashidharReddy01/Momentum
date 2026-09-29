@@ -26,6 +26,7 @@ from zoneinfo import ZoneInfo
 
 from sqlalchemy import select
 
+from momentum.agents.radar import latest_note
 from momentum.ai.context.tokens import safe
 from momentum.ai.errors import AIUnavailable
 from momentum.core.ids import task_key
@@ -33,6 +34,7 @@ from momentum.domain.agents.models import Agent
 from momentum.domain.mytasks.service import list_my_tasks
 from momentum.domain.notifications.models import Notification
 from momentum.domain.notifications.service import get_prefs, notify
+from momentum.domain.projects.models import Project
 from momentum.domain.tasks.models import Task
 from momentum.domain.users.models import User
 
@@ -44,12 +46,14 @@ PER_SECTION = 10  # items listed per section; the rest are counted
 FIRST_DIGEST_WINDOW = timedelta(hours=24)
 MAX_WINDOW = timedelta(days=7)
 INTRO_CHARS = 300
+RISK_FRESH = timedelta(hours=26)  # Radar runs each weekday morning
 UPDATE_KINDS = ("commented", "completed", "approval_requested", "approval_decided")
 _KEY = re.compile(r"\bT-\d+\b")
 
 
 @dataclass
 class Digest:
+    risks: list[str] = field(default_factory=list)
     due_today: list[str] = field(default_factory=list)
     overdue: list[str] = field(default_factory=list)
     assigned: list[str] = field(default_factory=list)
@@ -58,6 +62,7 @@ class Digest:
     keys: set[str] = field(default_factory=set)
 
     SECTIONS = (
+        ("risks", "Project risks (Radar)"),
         ("due_today", "Due today"),
         ("overdue", "Overdue"),
         ("assigned", "Newly assigned"),
@@ -69,11 +74,14 @@ class Digest:
         return not any(getattr(self, name) for name, _ in self.SECTIONS)
 
     def counts(self) -> str:
+        labels = dict(self.SECTIONS)
         parts = [
-            f"{len(getattr(self, name))} {label.lower()}"
-            for name, label in self.SECTIONS[:3]
+            f"{len(getattr(self, name))} {labels[name].lower()}"
+            for name in ("due_today", "overdue", "assigned")
             if getattr(self, name)
         ]
+        if self.risks:
+            parts.append(f"{len(self.risks)} project risk{'s' if len(self.risks) != 1 else ''}")
         extra = len(self.mentions) + len(self.updates)
         if extra:
             parts.append(f"{extra} update{'s' if extra != 1 else ''}")
@@ -116,6 +124,25 @@ async def gather(hrun: HandlerRun, now: datetime) -> Digest:
         elif task.due_on < today:
             digest.overdue.append(f"{key} {task.title} (due {task.due_on:%b} {task.due_on.day})")
             digest.keys.add(key)
+
+    # S5.3.7: Radar's latest note on projects they own, when it's recent and medium or high
+    owned = (
+        await session.execute(
+            select(Project).where(
+                Project.owner_id == me,
+                Project.deleted_at.is_(None),
+                Project.archived_at.is_(None),
+            )
+        )
+    ).scalars()
+    for project in owned:
+        note = await latest_note(session, ctx.workspace_id, project.id)
+        if note is None or (note[0].finished_at or now) < now - RISK_FRESH:
+            continue
+        risk = (note[0].output or {}).get("risk") or {}
+        if risk.get("level") in ("medium", "high"):
+            digest.risks.append(f"{project.name}: {risk['level']} risk. {risk.get('summary', '')}")
+            digest.keys.update(_KEY.findall(str(risk.get("summary", ""))))
 
     last = await session.scalar(
         select(Notification.created_at)

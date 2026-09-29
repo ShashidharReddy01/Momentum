@@ -5,13 +5,14 @@ from __future__ import annotations
 
 import re
 import uuid
+from datetime import datetime
 
 from fastapi import APIRouter, status
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from momentum.agents import runs_view
+from momentum.agents import radar, runs_view
 from momentum.agents.loader import DefinitionError, load_definitions
 from momentum.agents.runtime import dry_run
 from momentum.agents.triggers import request_run
@@ -22,6 +23,7 @@ from momentum.api.schemas import ListOut
 from momentum.core.context import Ctx
 from momentum.core.errors import Forbidden, NotFound, ValidationFailed
 from momentum.core.permissions import Action, can
+from momentum.domain.access import get_visible_project
 from momentum.domain.agents import service
 from momentum.domain.agents.models import AgentRun
 from momentum.domain.agents.schemas import (
@@ -237,4 +239,50 @@ async def list_agent_tools(ctx: CtxDep, runtime: RuntimeDep) -> ListOut[AgentToo
             for n in runtime.tools.names
             if (t := runtime.tools.get(n)) is not None and n not in FORBIDDEN_AGENT_TOOLS
         ]
+    )
+
+
+class RiskSignalOut(BaseModel):
+    kind: str
+    text: str
+    tasks: list[str]
+
+
+class RiskNoteOut(BaseModel):
+    level: str
+    summary: str
+    signals: list[RiskSignalOut]
+    at: datetime
+    run_id: uuid.UUID
+    agent_id: uuid.UUID
+    agent_name: str
+
+
+@router.get(
+    "/projects/{project_id}/risk",
+    response_model=RiskNoteOut | None,
+    summary="Radar's latest risk note on a project (S5.3.7); null when there is none",
+)
+async def project_risk(project_id: uuid.UUID, ctx: CtxDep, uow: UowDep) -> RiskNoteOut | None:
+    async with uow.transaction() as s:
+        await get_visible_project(s, ctx, project_id)
+        return await latest_risk(s, ctx.workspace_id, project_id)
+
+
+async def latest_risk(
+    s: AsyncSession, workspace_id: uuid.UUID, project_id: uuid.UUID
+) -> RiskNoteOut | None:
+    found = await radar.latest_note(s, workspace_id, project_id)
+    if found is None:
+        return None
+    run, agent = found
+    risk = (run.output or {}).get("risk") or {}
+    return RiskNoteOut(
+        level=str(risk.get("level", "none")),
+        summary=str(risk.get("summary", "")),
+        signals=[RiskSignalOut.model_validate(x) for x in risk.get("signals", [])],
+        at=run.finished_at or run.created_at,
+        run_id=run.id,
+        agent_id=agent.id,
+        agent_name=agent.name,
     )

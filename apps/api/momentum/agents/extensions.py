@@ -161,6 +161,9 @@ class HandlerRun:
         self._registry = registry
         self._alias = model_alias
         self._step = step
+        # structured results kept on the run (``agent_runs.output``), next to the answer and the
+        # proposals; e.g. Radar's risk note (S5.3.7)
+        self.output: dict[str, Any] = {}
         self.proposals: list[ProposedCall] = []
 
     # --- what the run is about ---

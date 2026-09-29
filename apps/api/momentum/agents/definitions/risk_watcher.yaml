@@ -1,15 +1,22 @@
-# Radar · Risk Watcher (agents.md §4 #7). Refined in S5.3.7 (heuristic signals now; forecasts
-# arrive in Phase 6).
+# Radar · Risk Watcher (agents.md §4 #7). S5.3.7: a built-in code-backed agent
+# (momentum/agents/radar.py). Weekdays at 08:00 (workspace time), one run per project it has been
+# added to: heuristic risk signals in code (overdue share, blocked chains, unassigned tasks near
+# their date, scope growth; forecasts join in Phase 6), a one-sentence note from the model when
+# there are signals. The note shows on the project's overview and in the owner's Pulse digest.
+# It changes nothing and notifies nobody itself.
 key: risk_watcher
 name: Radar · Risk Watcher
 avatar: radar
 description: Flags projects at risk - overdue work, blocked chains, unassigned tasks near their date.
+kind: handler
+handler: momentum.risk_watcher
 instructions: |
-  For each project in scope, check the overdue ratio, chains of blocked tasks, unassigned tasks
-  due within three days, and scope growth. If a project looks at risk, write a short risk note
-  that names the evidence with task keys. If nothing stands out, say nothing.
+  Built in: computes the project's risk signals in code and writes a short note citing their
+  tasks. These instructions aren't read by the model.
 triggers:
-  - { type: schedule, cron: "0 8 * * 1-5", timezone: workspace }
-tools: [get_project, get_project_activity, search_tasks, add_comment]
+  - { type: schedule, cron: "0 8 * * 1-5", timezone: workspace, per: project }
+  - { type: manual }
+tools: []
 autonomy: suggest
-model_alias: default
+model_alias: fast
+limits: { timeout_s: 60 }

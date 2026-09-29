@@ -25,6 +25,8 @@ KEY = re.compile(r"\bT-\d+\b")
 
 KNOWN = frozenset(
     {
+        "risk_level_in",
+        "risk_signals_include",
         "nudged_include",
         "nudged_exclude",
         "sorter_priority_in",
@@ -282,6 +284,15 @@ def score(obs: Observation, expect: dict[str, Any], *, today: date, asked: str =
                 "sorter_no_duplicate", "duplicate" not in comments, f"comments: {comments[:160]!r}"
             )
         )
+
+    # Radar (S5.3.7): the note's level and signals
+    if "risk_level_in" in expect:
+        got_level = obs.data.get("level")
+        ok = got_level in expect["risk_level_in"]
+        add(Check("risk_level_in", ok, f"level: {got_level}"))
+    for kind in expect.get("risk_signals_include", []):
+        kinds = obs.data.get("kinds") or []
+        add(Check(f"risk_signals_include:{kind}", kind in kinds, f"signals: {kinds}"))
 
     # Nudge (S5.3.4): which tasks got a reminder
     nudged = [str(t).lower() for t in obs.data.get("nudged", [])]

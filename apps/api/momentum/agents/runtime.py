@@ -711,6 +711,7 @@ async def _run_handler(
     output = await _apply_policy(
         session, ctx, tools, agent, run, hrun.proposals, "confirm", requester, trace
     )
+    output = {**hrun.output, **output}  # the runtime's own keys win
     text = result.text if result is not None else None
     output["text"] = text
     if text:

@@ -1526,6 +1526,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/{project_id}/risk": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Radar's latest risk note on a project (S5.3.7); null when there is none */
+        get: operations["project_risk_api_v1_projects__project_id__risk_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/{project_id}/sections": {
         parameters: {
             query?: never;
@@ -5435,6 +5452,41 @@ export interface components {
              * @default false
              */
             workdays_only: boolean;
+        };
+        /** RiskNoteOut */
+        RiskNoteOut: {
+            /**
+             * Agent Id
+             * Format: uuid
+             */
+            agent_id: string;
+            /** Agent Name */
+            agent_name: string;
+            /**
+             * At
+             * Format: date-time
+             */
+            at: string;
+            /** Level */
+            level: string;
+            /**
+             * Run Id
+             * Format: uuid
+             */
+            run_id: string;
+            /** Signals */
+            signals: components["schemas"]["RiskSignalOut"][];
+            /** Summary */
+            summary: string;
+        };
+        /** RiskSignalOut */
+        RiskSignalOut: {
+            /** Kind */
+            kind: string;
+            /** Tasks */
+            tasks: string[];
+            /** Text */
+            text: string;
         };
         /** RoleMapping */
         RoleMapping: {
@@ -10353,6 +10405,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ListOut_OtherPlacementOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    project_risk_api_v1_projects__project_id__risk_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RiskNoteOut"] | null;
                 };
             };
             /** @description Validation Error */
