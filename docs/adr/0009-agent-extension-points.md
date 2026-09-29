@@ -1,6 +1,6 @@
 # ADR-0009: Agent extension points (host tools, host agents, code-backed agents, API tokens)
 
-- **Status:** Accepted
+- **Status:** Accepted (items 1–3 and 5 built in S5.1.5; item 4 in S5.1.6)
 - **Date:** 2026-09-28
 - **Deciders:** product owner, AI (drafted)
 
@@ -14,7 +14,7 @@ The product owner will build customer-operations work (SQQ questionnaires, disco
 As planned before this ADR, Phase 5 agents were LLM loops defined only by Momentum's packaged YAML. The tool registry already accepts extra tools (`catalog.build_registry(*extra)`, S3.1.2). API tokens were parked in Phase 7 (S7.1) as open question #5. The `api_tokens` table exists since migration 0001, but nothing authenticates with it.
 
 ## Decision
-1. **Host tools.** The app factory accepts extra tools, which are passed to `build_registry`. They follow the same rules as built-in tools: a `risk` level, a dry-run path, services-only writes.
+1. **Host tools.** The app factory accepts extra tools, which are passed to `build_registry`. **As built:** one `Extensions` object carries tools, handlers and definition dirs. It is given to the app factory or named by `MOMENTUM_AGENT_EXTENSIONS`, which is how a separate worker process gets it too. They follow the same rules as built-in tools: a `risk` level, a dry-run path, services-only writes.
 2. **Host agent definitions.** The agent definitions loader reads the packaged `momentum/agents/definitions/` plus any directories the host passes to the app factory. `momentum agents install` installs from all of them. A definition's `tools` may name host tools.
 3. **Agent kinds.** `agents.kind` is `llm` (default: the agents.md §2 loop) or `handler`. A `handler` agent names a Python callable that the host registered with the app factory (`handlers={"erp_upload": fn}`). Its triggers, runs, trace, dedupe, timeout, kill switches, permissions (its own account, explicit project membership) and runs page are the same as an `llm` agent's.
    - Writes go through services as the agent account (`via="agent"`), so they record activity, can be undone and show the ✦ marker.

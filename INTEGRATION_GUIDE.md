@@ -167,8 +167,43 @@ Design tokens in `apps/web/src/momentum/styles/tokens.css` (scoped). To match a 
 `GET /ws` (docs/architecture/realtime-jobs-events.md §3) is a plain FastAPI websocket route, mounted at the app root alongside the API and SPA — under `settings.base_path` the same way they are, no separate config. Any reverse proxy or gateway in front of Momentum (Mode A/B) must forward websocket upgrades (`Connection: Upgrade`) for that path, not just HTTP; Azure App Service and most modern proxies do this by default, but confirm with the host's ops docs. Set `MOMENTUM_REALTIME_ENABLED=false` to turn the whole feature off (the route then closes every connection with code 4503) if the host can't proxy websockets yet — the UI falls back to its Phase 1 behavior (refetch on window focus).
 
 
-### 6.7 Agents (Phase 5+)
-A host adds its own agents without forking Momentum (ADR-0009). **Agent definitions:** put one YAML file per agent (`<key>.yaml`, same schema as `momentum/agents/definitions/*.yaml`, see `docs/ai/agents.md` §1) in a directory of the host's own and pass it to `create_app(agent_definition_dirs=[…])` or `mount_momentum(…, agent_definition_dirs=[…])`; the CLI takes `momentum agents install --definitions-dir DIR`. Host agents install next to the starters with `source="host"`, disabled until an admin enables them; keys must not collide with a starter's. Every agent acts as its own user account (`<key>@agents.momentum.invalid`, never signs in) and sees only projects it was explicitly added to. Coming in S5.1.5: host tools and `handler` agents (Python functions); in S5.1.6: API tokens for scripts outside the process.
+### 6.7 Agents (Phase 5+): extending them from the host (ADR-0009)
+Every agent acts as its own user account (`<key>@agents.momentum.invalid`, never signs in) and works only in projects it was explicitly added to. When a person asks it for something, it sees only what both can see. A host adds its own agents without forking Momentum, through one `Extensions` object (`momentum.agents.extensions`):
+
+```python
+# acme/momentum_ext.py
+from momentum.agents.extensions import Extensions, HandlerResult, HandlerRun
+from momentum.ai.tools.base import ToolContext, ToolResult, tool
+
+@tool(name="lookup_customer", description="Look up a customer in our CRM.", risk="read", scopes=("tasks:read",))
+async def lookup_customer(tc: ToolContext, args: LookupArgs) -> ToolResult: ...
+
+async def upload_to_erp(run: HandlerRun) -> HandlerResult:
+    task = await run.task()                      # what it was assigned (visible to it)
+    text = await run.read("get_attachment_text", {"task": str(task.id)})
+    run.step("Pushed 42 rows")                  # a line on the run's timeline
+    await run.attach("report.txt", b"...", "text/plain")
+    run.propose("update_task", {"task": str(task.id), "priority": "low"})  # for the requester to apply
+    return HandlerResult(text="Uploaded 42 rows.")  # answered in the task's thread
+
+extensions = Extensions(
+    tools=[lookup_customer],
+    handlers={"acme.erp:upload": upload_to_erp},
+    definition_dirs=["acme/agents"],             # acme/agents/erp_uploader.yaml: kind: handler, handler: acme.erp:upload
+)
+```
+
+- **Wire it in** with `MOMENTUM_AGENT_EXTENSIONS=acme.momentum_ext:extensions`. The web app **and every worker** load it, so set it wherever agents run. `create_app(extensions=…)` / `mount_momentum(extensions=…)` also work in-process. `momentum agents install` then installs the host's definitions (disabled, `source: host`) next to the starters. Keys must not collide.
+- **Host tools** follow the built-in rules: a `risk`, arguments as a Pydantic model, writes only through Momentum's services (so they're previewable and undoable). A definition's `tools` may name them.
+- **Handler agents** (`kind: handler`) run your function with the same triggers, access, scope, timeout, kill switches, runs page and trace as a model-driven agent. `HandlerRun` gives:
+  - `ctx` (for calling services), `task()`, `input`, `trigger`;
+  - `read(tool, args)`;
+  - `complete(messages)` (billed to the agent's budget);
+  - `step()`, `comment()`, `attach()`;
+  - `propose()`: sent to the person the run is for.
+
+  Autonomy doesn't apply to your code, but the service guards do: no deletes, no completing others' tasks, no approval decisions. An exception fails the run with its message (on the runs page, for admins and the requester).
+- **Outside the process:** API tokens for scripts that call Momentum arrive in S5.1.6.
 ---
 
 ## 7. Verification suite (run after integrating)
@@ -199,6 +234,7 @@ A host adds its own agents without forking Momentum (ADR-0009). **Agent definiti
 | 2026-09-26 | 3 | S3.1.1 LLM gateway: migration 0015 (`llm_calls`, usage only, no prompt bodies); `momentum llm-check`; new settings `MOMENTUM_LLM_API_KEY_HEADER`, `MOMENTUM_LLM_EXTRA_HEADERS`, `MOMENTUM_LLM_FIXTURES_DIR` (plus the already-documented `LLM_EMBED_BATCH`/`TIMEOUT_S`/`MAX_RETRIES`/`SUPPORTS_STREAMING_TOOLS`/`PRICE_TABLE`, `AI_MONTHLY_BUDGET_USD`, now read). **Startup now fails in `MOMENTUM_ENV=production` unless `MOMENTUM_LLM_MODE=gateway` or `MOMENTUM_AI_ENABLED=false`.** New runtime dependencies: `openai` (ADR-0004; brings `httpx2`), `pyyaml` (was already transitive). See §6 (LLM gateway). |
 | 2026-09-26 | 3 | S3.1.2–S3.1.4: migrations 0016 (`ai_actions`) and 0017 (`embeddings` vector(1024) + HNSW, `ai_summaries`): the `vector` extension (installed by 0001) is now actually used. New API `/api/v1/ai/actions/*`; new periodic jobs `expire_ai_actions` and `index_embeddings` (queue `momentum_ai`, needs a worker); CLI `momentum reindex`; settings `MOMENTUM_LLM_RERANK_MODEL`, `MOMENTUM_AI_RERANK` (off). A host moving data in or out can drop and rebuild `embeddings` with `momentum reindex` (derived data). |
 | 2026-09-26 | 3 | **Phase 3 exit** (no migration, endpoint or new setting). Host-relevant: (1) `MOMENTUM_AI_MONTHLY_BUDGET_USD` is dollars, so it only enforces if `MOMENTUM_LLM_PRICE_TABLE` prices the resolved model ids; with no price table spend counts as $0 and the budget never trips (tokens are always recorded). (2) `momentum evals` (`EVALS_LIVE=1` for the real gateway) needs a Postgres role that may create/drop its own `*_evals` database (`MOMENTUM_EVALS_DATABASE_URL`); it never touches the app database. (3) AI read-tool output gained `blocked_by` on task briefs (a blocker the reader cannot see is counted, never named; `get_task` now follows the same rule), `search_tasks.blocked`, and `from`/`to` on moved dates; hosts that register extra tools or replay tool fixtures should expect these keys. (4) `GET /ai/admin/usage` gained `unpriced_models`; `llm-check` gained a `pricing` row. (5) The e2e server (`tools/e2e/serve.sh`) now pins `MOMENTUM_LLM_MODE=mock` and Playwright starts it via `bash`, so it also runs on Windows. |
+| 2026-09-29 | 5 | S5.1.5 (ADR-0009): `Extensions` (host tools, handler agents, definition dirs) via `MOMENTUM_AGENT_EXTENSIONS` or `create_app`/`mount_momentum(extensions=…)`; new read tool `get_attachment_text`; `get_task` lists attachment names. See §6.7. |
 | 2026-09-29 | 5 | S5.1.4: new daily job `demote_agents` (maintenance queue); `GET /agents/{id}/stats`; workspace AI setting `allow_medium_auto` (in `workspaces.settings['ai']`, off unless set). No migration. |
 | 2026-09-29 | 5 | S5.0.1 + S5.1.3: the app shell always subscribes to `user:<me>` (inbox and bell live). New endpoints `GET /agents/{id}/runs`, `GET /agents/runs/{run_id}`; new routes `/agents/:agentId`, `/agents/runs/:runId`. **Permission semantics:** `Ctx.acting_for` is now honoured by `domain/access.py` (intersection of both actors, lower role), used for runs a person asked an agent to do. A host setting `acting_for` gets the same behaviour. |
 | 2026-09-28 | 5 | S5.1.2 agent runtime: migration 0029 (`agents.enabled_at`); jobs `agent_triggers` (default queue) and `run_agent_runs` (`momentum_ai` queue), both every minute, **so agents need the worker**; setting `MOMENTUM_AGENTS_ENABLED`; endpoints `POST /agents/{id}/run`, `GET/PUT /workspace/settings` (timezone for agent schedules, stored in `workspaces.settings`). **Every outbox event payload gains `via`** (a host consuming events sees one more key). New consumer cursor `agents` in `consumer_offsets`. |

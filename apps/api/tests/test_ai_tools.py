@@ -92,6 +92,7 @@ def test_catalog_covers_phase_1_2_tools_with_their_risks() -> None:
         "list_user_tasks": "read",
         "get_project_activity": "read",
         "list_people": "read",
+        "get_attachment_text": "read",  # S5.1.5
         "create_task": "low",
         "update_task": "low",
         "complete_task": "low",

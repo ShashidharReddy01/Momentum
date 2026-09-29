@@ -79,6 +79,7 @@ Registered in S3.1.2 unless noted. `semantic_search` arrives with S3.1.4 (embedd
 | `list_my_tasks` / `list_user_tasks` | read | 3 | |
 | `get_project_activity` | read | 3 | Changes in a time window (for status reports); moved due/start dates and priority carry `from`/`to` |
 | `list_people` | read | 3 | Resolve names → users |
+| `get_attachment_text` | read | 5 (S5.1.5) | Text of a file on a task or its comments (by name; `ambiguous` with candidates), capped at 20,000 characters; `not_ready` while extraction is pending. `get_task` lists attachment names |
 | `create_task` | low | 3 | |
 | `update_task` | low | 3 | Title, assignee, start/due dates, description (priority: no service writes it yet) |
 | `complete_task` | low | 3 | |

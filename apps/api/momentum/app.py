@@ -10,6 +10,7 @@ import contextlib
 from collections.abc import AsyncIterator, Sequence
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from fastapi import APIRouter, FastAPI
 from starlette.middleware.gzip import GZipMiddleware
@@ -26,6 +27,9 @@ from momentum.core.http import (
 )
 from momentum.core.settings import Settings
 from momentum.core.telemetry import configure_logging, get_logger
+
+if TYPE_CHECKING:
+    from momentum.agents.extensions import Extensions
 
 API_PREFIX = "/api/v1"
 CSRF_EXEMPT = ("/api/v1/public/", "/webhooks/")
@@ -104,12 +108,22 @@ def create_app(
     *,
     resolve_principal: HostPrincipalResolver | None = None,
     agent_definition_dirs: Sequence[str | Path] = (),
+    extensions: Extensions | None = None,
 ) -> FastAPI:
     """Build the Momentum ASGI app. Nothing is connected until the lifespan starts.
 
-    ``agent_definition_dirs``: a host application's own agent definition files, installed next
-    to Momentum's starter agents (ADR-0009, INTEGRATION_GUIDE "Extending agents")."""
+    ``agent_definition_dirs`` / ``extensions``: a host application's own agent definitions,
+    tools and handler agents (ADR-0009, INTEGRATION_GUIDE §6.7). ``MOMENTUM_AGENT_EXTENSIONS``
+    is loaded as well; that setting is how a separate worker process gets them too."""
+    from momentum.agents.extensions import Extensions, load_extensions, merge
+    from momentum.ai.tools.catalog import build_registry
+
     settings = settings or Settings()
+    ext = merge(
+        load_extensions(settings),
+        extensions,
+        Extensions(definition_dirs=list(agent_definition_dirs)),
+    )
     configure_logging(settings)
     log = get_logger("app")
 
@@ -121,7 +135,9 @@ def create_app(
             engine=engine,
             session_factory=create_session_factory(engine),
             auth=build_auth_provider(settings, resolve_principal),
-            agent_definition_dirs=tuple(Path(d) for d in agent_definition_dirs),
+            agent_definition_dirs=tuple(Path(d) for d in ext.definition_dirs),
+            tools=build_registry(*ext.tools),
+            agent_handlers=dict(ext.handlers),
         )
         app.state.momentum = runtime
         from momentum.ai.llm import build_llm
@@ -218,6 +234,7 @@ def mount_momentum(
     settings: Settings,
     resolve_principal: HostPrincipalResolver | None = None,
     agent_definition_dirs: Sequence[str | Path] = (),
+    extensions: Extensions | None = None,
 ) -> FastAPI:
     """Mount Momentum under ``settings.base_path`` in a host FastAPI app.
 
@@ -232,6 +249,7 @@ def mount_momentum(
         settings.model_copy(update={"serve_spa": False}),
         resolve_principal=resolve_principal,
         agent_definition_dirs=agent_definition_dirs,
+        extensions=extensions,
     )
     host_app.mount(settings.base_path, sub)
     host_app.state.momentum_subapp = sub

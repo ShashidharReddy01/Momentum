@@ -34,6 +34,7 @@ from momentum.ai.visibility import visible_task_ids
 from momentum.core.activity import Activity
 from momentum.core.ids import task_key
 from momentum.domain.access import visible_projects_clause
+from momentum.domain.attachments.models import Attachment
 from momentum.domain.comments.models import Comment
 from momentum.domain.mytasks.service import list_my_tasks as svc_list_my_tasks
 from momentum.domain.projects.models import Project
@@ -174,6 +175,9 @@ async def get_task(tc: ToolContext, args: GetTaskArgs) -> ToolResult:
     task, _, role = await resolve_task(tc, args.task)
     detail = await task_brief(tc, task)
     detail["my_role"] = role
+    files = await _task_attachments(tc, task)
+    if files:  # S5.1.5: names only; get_attachment_text reads one
+        detail["attachments"] = [a.filename for a in files]
     if task.description_text:
         detail["description"] = clip(task.description_text)
     subtasks = list(
@@ -630,6 +634,83 @@ async def semantic_search(tc: ToolContext, args: SemanticSearchArgs) -> ToolResu
     )
 
 
+# ---------------- get_attachment_text (S5.1.5) ----------------
+
+ATTACHMENT_TEXT_LIMIT = 20_000  # characters
+
+
+async def _task_attachments(tc: ToolContext, task: Task) -> list[Attachment]:
+    """Files on the task itself and on its comments (the caller already sees the task)."""
+    rows = await tc.session.execute(
+        select(Attachment)
+        .outerjoin(Comment, Comment.id == Attachment.comment_id)
+        .where(
+            Attachment.deleted_at.is_(None),
+            or_(
+                Attachment.task_id == task.id,
+                and_(Comment.task_id == task.id, Comment.deleted_at.is_(None)),
+            ),
+        )
+        .order_by(Attachment.created_at, Attachment.id)
+    )
+    return list(rows.scalars())
+
+
+class GetAttachmentTextArgs(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    task: TaskRef
+    name: str | None = Field(
+        default=None, max_length=300, description="File name, or part of it; omit if only one"
+    )
+
+
+@tool(
+    name="get_attachment_text",
+    description=(
+        "The text of a file attached to a task (PDF, Word or text), for reading or extracting "
+        "details from it. Long files are cut at 20,000 characters."
+    ),
+    risk="read",
+    scopes=READ,
+)
+async def get_attachment_text(tc: ToolContext, args: GetAttachmentTextArgs) -> ToolResult:
+    task, _, _ = await resolve_task(tc, args.task)
+    files = await _task_attachments(tc, task)
+    if args.name:
+        wanted = args.name.strip().lower()
+        exact = [a for a in files if a.filename.lower() == wanted]
+        files = exact or [a for a in files if wanted in a.filename.lower()]
+    key = task_key(task.number)
+    if not files:
+        return ToolResult.failure("not_found", f"No matching file on {key}")
+    if len(files) > 1:
+        return ToolResult.failure(
+            "ambiguous",
+            f"{len(files)} files on {key} match; say which one",
+            candidates=[{"name": a.filename} for a in files[:8]],
+        )
+    att = files[0]
+    if att.extract_status == "pending":
+        return ToolResult.failure(
+            "not_ready", f"{att.filename} is still being read; try again shortly"
+        )
+    if not att.text_extract:
+        return ToolResult.failure(
+            "no_text", f"No text could be read from {att.filename} ({att.mime})"
+        )
+    text = att.text_extract
+    cut = len(text) > ATTACHMENT_TEXT_LIMIT
+    return ToolResult.success(
+        f"Read {att.filename} on {key}" + (" (first 20,000 characters)" if cut else ""),
+        {
+            "file": att.filename,
+            "mime": att.mime,
+            "text": text[:ATTACHMENT_TEXT_LIMIT],
+            "truncated": cut,
+        },
+    )
+
+
 TOOLS = [
     search_tasks,
     semantic_search,
@@ -640,4 +721,5 @@ TOOLS = [
     list_user_tasks,
     get_project_activity,
     list_people,
+    get_attachment_text,
 ]

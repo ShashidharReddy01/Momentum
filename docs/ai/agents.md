@@ -75,7 +75,8 @@ trigger (schedule | outbox event | assigned | mentioned | manual)
 - **Service guards (agents.md §3):** agents can't delete anything (tasks, comments, attachments, sections, projects, teams, tags, forms, rules, templates: `access.forbid_agent`), can't complete a task assigned to someone else, and can't decide approvals (S4.4.1).
 - **Acting for the person who asked** (2026-09-29, S5.1.3): assigned, mentioned and run-now runs set `ctx.acting_for` to the requester, so the agent sees only what both can see, with the lower role (see `architecture/auth-and-permissions.md` §8).
 - **Runs UI (S5.1.3):** `GET /agents/{id}/runs?status=&trigger=` (the runs the viewer may see, newest first, up to 50) and `GET /agents/runs/{run_id}` (steps, proposals with who they're for and whether the viewer can decide them, answer, cost, errors; `detail` = `full` or `summary`). Pages `/agents/runs/:runId` and `/agents/:agentId` (charter line + filterable run history); both refresh every 5 s while a run is queued or running. Inbox rows for `agent_run` and `agent` notifications open them.
-- **Not yet:** handler agents fail with "No handler is registered" until S5.1.5. The runs UI is S5.1.3; the Review-section move and the @mention of the requester on assignment are S5.2.1.
+- **Extensions (S5.1.5, ADR-0009):** host tools, handler agents and definition dirs through `Extensions` (`momentum/agents/extensions.py`), loaded from `MOMENTUM_AGENT_EXTENSIONS` by the app, the worker and the CLI. A handler runs in `runtime._run_handler` with the same context, access, timeout and trace; its `propose()` calls go to the run's person (as `confirm`); its answer goes in the thread like a model agent's. See INTEGRATION_GUIDE §6.7.
+- **Not yet:** the Review-section move and the @mention of the requester on assignment are S5.2.1.
 
 ## 3. Assignment and mention behavior
 

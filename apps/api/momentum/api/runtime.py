@@ -41,4 +41,6 @@ class MomentumRuntime:
     tools: ToolRegistry = field(default_factory=_default_tools)  # S3.1.2 catalog
     # S5.1.1: host agent-definition directories, added to Momentum's starters (ADR-0009)
     agent_definition_dirs: tuple[Path, ...] = ()
+    # S5.1.5: host handler agents by name (code-backed agents, ADR-0009)
+    agent_handlers: dict[str, Any] = field(default_factory=dict)
     extras: dict[str, Any] = field(default_factory=dict)

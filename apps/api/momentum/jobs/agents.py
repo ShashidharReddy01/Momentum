@@ -35,6 +35,7 @@ async def agent_triggers(timestamp: int) -> None:
 async def run_agent_runs(timestamp: int) -> None:
     """Run queued agent runs. Claiming and running are separate transactions, and each run gets
     its own, so one slow agent never holds another's writes."""
+    from momentum.agents.extensions import load_extensions
     from momentum.agents.runtime import execute_run
     from momentum.ai.tools.catalog import build_registry
     from momentum.core.settings import Settings
@@ -46,11 +47,14 @@ async def run_agent_runs(timestamp: int) -> None:
         return
     async with job_session() as session:
         claimed = await claim_runs(session, timeout_s=settings.agent_timeout_s)
-    registry = build_registry()
+    ext = load_extensions(settings)  # a host's tools and handler agents (S5.1.5)
+    registry = build_registry(*ext.tools)
     counts: dict[str, int] = {}
     for run_id in claimed.run_ids:
         async with job_session() as session:
-            status = await execute_run(session, job_llm(), registry, settings, run_id)
+            status = await execute_run(
+                session, job_llm(), registry, settings, run_id, handlers=ext.handlers
+            )
         counts[status] = counts.get(status, 0) + 1
     if claimed.run_ids or claimed.timed_out:
         log.info("agent_runs_ran", timed_out=claimed.timed_out, timestamp=timestamp, **counts)

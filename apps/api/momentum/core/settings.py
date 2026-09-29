@@ -132,6 +132,9 @@ class Settings(BaseSettings):
     # S5.1.2: kill switch for the agent scheduler, event consumer and runner (agents stay
     # editable; nothing runs). The global AI switch and each agent's `enabled` apply as well.
     agents_enabled: bool = True
+    # S5.1.5 (ADR-0009): a host's agent extensions, "package.module:attribute" (an Extensions
+    # object or a function returning one): extra tools, handler agents, definition directories.
+    agent_extensions: str = ""
     agent_max_steps: int = Field(default=15, ge=1, le=50)
     agent_timeout_s: int = Field(default=300, ge=10, le=3600)
 

@@ -90,11 +90,18 @@ class Env:
             yaml.safe_dump({"responses": responses}), encoding="utf-8"
         )
 
-    async def install(self, definition: AgentDefinition, *, access: bool = True) -> Agent:
+    async def install(
+        self,
+        definition: AgentDefinition,
+        *,
+        access: bool = True,
+        tool_names: list[str] | None = None,
+    ) -> Agent:
         admin = await ctx_for(self.uow, self.settings, "admin")
+        names = tool_names or TOOLS
         async with self.uow.transaction() as s:
-            [r] = await service.install_definitions(s, admin, [(definition, "host")], TOOLS)
-            await service.update_agent(s, admin, r.agent.id, AgentPatchIn(enabled=True), TOOLS)
+            [r] = await service.install_definitions(s, admin, [(definition, "host")], names)
+            await service.update_agent(s, admin, r.agent.id, AgentPatchIn(enabled=True), names)
             if access:  # ravi owns the world's project
                 await service.add_to_project(
                     s, self.world.ravi, r.agent.id, self.world.project.id, "editor"

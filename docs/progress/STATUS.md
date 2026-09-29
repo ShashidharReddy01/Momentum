@@ -5,8 +5,8 @@
 > Older session handoff notes, the Phase 2 exit record and the Phase 0-1 retros live in `docs/progress/handoff-archive.md` (read them only when a slice touches that area). At the end of every slice, move the previous session's handoff there and keep only the latest one here.
 
 ## Current focus
-- **Phase:** 5: Agents v1 ("Teammates") — in progress: kickoff done (2026-09-28, `docs/roadmap/phase-5-kickoff.md`), S5.1.1–S5.1.4 and S5.0.1 done. Phase 4 complete (exit criteria met 2026-09-28).
-- **Next up:** S5.1.5 Extension points and code-backed agents.
+- **Phase:** 5: Agents v1 ("Teammates") — in progress: kickoff done (2026-09-28, `docs/roadmap/phase-5-kickoff.md`), S5.1.1–S5.1.5 and S5.0.1 done. Phase 4 complete (exit criteria met 2026-09-28).
+- **Next up:** S5.1.6 API tokens.
 - **Product-owner instruction (2026-09-26):** finish all remaining slices, then one big local test run against the real gateway (100+ questions/actions covering edge cases), then fix from that run.
 - **Scope note (product owner, 2026-09-26):** the customer-operations capabilities (SQQ, pricing, contracts, invoices, pushes to internal systems as tools and assignable agents) will be done later in the product owner's own codebase, **not in this repo**. Finish the roadmap as written.
 - **Branch:** Phases 3–4 are on `claude/clever-hopper-pbv7yr` (ahead of `main`). Phase 5 continues on `claude/intelligent-meitner-9ne4e8`, which starts from that branch's Phase 4 exit commit.
@@ -58,7 +58,13 @@
   - Workspace setting "agents may apply medium-risk changes" (off by default).
   - Admin panel on the agent page: on/off, autonomy with its stats, budget next to this month's spend.
   - Verification: backend **674**, web **320**, types current.
-- **Next up:** S5.1.5 Extension points and code-backed agents.
+- **S5.1.5 done (2026-09-29):**
+  - Your codebase can add AI tools, agent definitions and code-backed agents (Python handlers) through one `Extensions` object, named by `MOMENTUM_AGENT_EXTENSIONS` so the worker gets them too.
+  - Handlers run with the same triggers, access, timeout, trace and runs page as model agents; they can read, attach files, comment, propose and call the model (billed to their budget).
+  - New tool `get_attachment_text`.
+  - A worked example is in INTEGRATION_GUIDE §6.7.
+  - Verification: backend **680**, web **320**.
+- **Next up:** S5.1.6 API tokens.
 
 ## Open questions
 | # | Question | Needed by | Status |
@@ -119,7 +125,7 @@
 ### Phase 5: Agents v1 ("Teammates")
 - [x] Kickoff (`docs/roadmap/phase-5-kickoff.md`, 2026-09-28)
 - [x] S5.0.1 Inbox and bell live updates (2026-09-28) · [ ] S5.0.2 Public forms security review
-- [x] S5.1.1 Agent model and accounts (2026-09-28) · [x] S5.1.2 Runtime loop and triggers (2026-09-28) · [ ] S5.1.3 Runs UI · [ ] S5.1.4 Autonomy, budgets, kill switches · [ ] S5.1.5 Extension points and code-backed agents · [ ] S5.1.6 API tokens
+- [x] S5.1.1 Agent model and accounts (2026-09-28) · [x] S5.1.2 Runtime loop and triggers (2026-09-28) · [ ] S5.1.3 Runs UI · [ ] S5.1.4 Autonomy, budgets, kill switches · [x] S5.1.5 Extension points and code-backed agents (2026-09-29) · [ ] S5.1.6 API tokens
 - [ ] S5.2.1 Assign a task to an agent · [ ] S5.2.2 @mention an agent · [ ] S5.2.3 Agent gallery + create from description
 - [ ] S5.3.1 Pulse · [ ] S5.3.2 Sorter · [ ] S5.3.3 Herald · [ ] S5.3.4 Nudge · [ ] S5.3.5 Architect · [ ] S5.3.6 Scribe · [ ] S5.3.7 Radar · [ ] S5.3.8 Teammate
 - Build order (kickoff Q3, Q8): S5.0.1 before S5.1.3 · E5.1 (incl. S5.1.5, S5.1.6) → S5.2.1 + S5.3.8 (J10) → S5.2.2 → S5.2.3 → Pulse, Sorter (after S5.0.2), Herald, Nudge, Radar → Architect, Scribe

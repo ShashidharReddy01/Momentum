@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import asyncio
 import uuid
+from collections.abc import Mapping
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Any
@@ -36,6 +37,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from momentum.agents import policy
+from momentum.agents.extensions import Handler, HandlerRun
 from momentum.agents.triggers import agent_ctx, in_scope, on_behalf_ctx, task_project_ids
 from momentum.ai.actions import ProposedCall, apply_as_agent, propose
 from momentum.ai.context.builders import project_ctx, task_ctx
@@ -341,9 +343,11 @@ async def execute_run(
     run_id: uuid.UUID,
     *,
     now: datetime | None = None,
+    handlers: Mapping[str, Handler] | None = None,
 ) -> str:
     """Run one claimed run to completion and record the outcome; returns the final status.
-    Never raises: the run row keeps the error, and writes made before a failure roll back."""
+    Never raises: the run row keeps the error, and writes made before a failure roll back.
+    ``handlers``: the host's code-backed agents (S5.1.5), by the name ``agent.handler`` gives."""
     run = await session.get(AgentRun, run_id)
     if run is None or run.status != "running":
         return "skipped"
@@ -366,8 +370,9 @@ async def execute_run(
     try:
         if not settings.agents_enabled or not agent.enabled:
             raise _Cancelled(f"{agent.name} is turned off")
-        if agent.kind == "handler":
-            raise _Failed(f"No handler is registered for {agent.handler} yet")
+        handler = (handlers or {}).get(agent.handler or "") if agent.kind == "handler" else None
+        if agent.kind == "handler" and handler is None:
+            raise _Failed(f"No handler is registered for {agent.handler}")
         requester = await _person(session, trigger.get("requested_by"))
         for_user = await _person(session, trigger.get("for_user_id"))
         if trigger.get("for_user_id") and for_user is None:
@@ -390,33 +395,15 @@ async def execute_run(
         if autonomy != agent.autonomy:
             trace.add("policy", f"External content: autonomy capped at {autonomy}")
         tools = ToolRegistry(t for n in agent.tools if (t := registry.get(n)) is not None)
-        messages = await _messages(session, ctx, agent, run, requester, autonomy, now)
-        max_steps, timeout_s = _limits(agent, settings)
-        try:
-            async with asyncio.timeout(timeout_s):
-                result = await run_tool_loop(
-                    session,
-                    llm,
-                    ctx,
-                    tools,
-                    messages=messages,
-                    feature=f"agent:{agent.key}",
-                    alias=agent.model_alias,  # type: ignore[arg-type]
-                    emit=trace.on_loop_event,
-                    max_steps=max_steps,
-                    prompt_version=load("agent").version,
-                    agent_run_id=run.id,
-                )
-        except TimeoutError as e:
-            raise _Failed(f"The run hit its time limit ({timeout_s} s)") from e
-        run.steps = result.steps
-        if result.text == OUT_OF_STEPS:
-            trace.add("limit", f"Stopped at the step limit ({max_steps})")
-        output = await _apply_policy(
-            session, ctx, tools, agent, run, result.proposals, autonomy, requester, trace
-        )
-        output["text"] = result.text
-        await _answer(session, ctx, run, result.text, output, trace)
+        timeout_s = _limits(agent, settings)[1]
+        if handler is not None:
+            output = await _run_handler(
+                session, llm, tools, settings, ctx, agent, run, handler, timeout_s, requester, trace
+            )
+        else:
+            output = await _run_model(
+                session, llm, tools, ctx, agent, run, autonomy, requester, now, trace
+            )
         await savepoint.commit()
     except _Cancelled as e:
         await savepoint.rollback()
@@ -544,3 +531,95 @@ async def _answer(
     m = await create_comment(session, ctx, uuid.UUID(task_id), text_doc(body))
     output["comment_id"] = str(m.entity.id)
     trace.add("comment", body.split("\n", 1)[0], comment_id=str(m.entity.id))
+
+
+async def _run_handler(
+    session: AsyncSession,
+    llm: LLM,
+    tools: ToolRegistry,
+    settings: Settings,
+    ctx: Ctx,
+    agent: Agent,
+    run: AgentRun,
+    handler: Handler,
+    timeout_s: int,
+    requester: User | None,
+    trace: _Trace,
+) -> dict[str, Any]:
+    """S5.1.5 (ADR-0009): a code-backed agent. It gets the same context, access, timeout and
+    trace as a model-driven one; autonomy doesn't apply to host code, but anything it chose to
+    ``propose`` goes to the run's person for a decision."""
+    hrun = HandlerRun(
+        session=session,
+        ctx=ctx,
+        settings=settings,
+        llm=llm,
+        registry=tools,
+        run_id=run.id,
+        agent_key=agent.key,
+        agent_name=agent.name,
+        model_alias=agent.model_alias,
+        trigger=run.trigger or {},
+        step=lambda summary: trace.add("step", summary),
+    )
+    try:
+        async with asyncio.timeout(timeout_s):
+            result = await handler(hrun)
+    except TimeoutError as e:
+        raise _Failed(f"The run hit its time limit ({timeout_s} s)") from e
+    except (BudgetExceeded, AIDisabled, AIUnavailable):
+        raise
+    except Exception as e:
+        log.exception("agent_handler_failed", agent=agent.key, run_id=str(run.id))
+        raise _Failed(f"The handler failed: {type(e).__name__}: {e}"[:300]) from e
+    output = await _apply_policy(
+        session, ctx, tools, agent, run, hrun.proposals, "confirm", requester, trace
+    )
+    text = result.text if result is not None else None
+    output["text"] = text
+    if text:
+        await _answer(session, ctx, run, text, output, trace)
+    return output
+
+
+async def _run_model(
+    session: AsyncSession,
+    llm: LLM,
+    tools: ToolRegistry,
+    ctx: Ctx,
+    agent: Agent,
+    run: AgentRun,
+    autonomy: str,
+    requester: User | None,
+    now: datetime,
+    trace: _Trace,
+) -> dict[str, Any]:
+    """A model-driven agent: the shared tool loop, then the policy, then the answer."""
+    messages = await _messages(session, ctx, agent, run, requester, autonomy, now)
+    max_steps, timeout_s = _limits(agent, ctx.settings)
+    try:
+        async with asyncio.timeout(timeout_s):
+            result = await run_tool_loop(
+                session,
+                llm,
+                ctx,
+                tools,
+                messages=messages,
+                feature=f"agent:{agent.key}",
+                alias=agent.model_alias,  # type: ignore[arg-type]
+                emit=trace.on_loop_event,
+                max_steps=max_steps,
+                prompt_version=load("agent").version,
+                agent_run_id=run.id,
+            )
+    except TimeoutError as e:
+        raise _Failed(f"The run hit its time limit ({timeout_s} s)") from e
+    run.steps = result.steps
+    if result.text == OUT_OF_STEPS:
+        trace.add("limit", f"Stopped at the step limit ({max_steps})")
+    output = await _apply_policy(
+        session, ctx, tools, agent, run, result.proposals, autonomy, requester, trace
+    )
+    output["text"] = result.text
+    await _answer(session, ctx, run, result.text, output, trace)
+    return output

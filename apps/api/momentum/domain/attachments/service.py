@@ -208,6 +208,18 @@ def extract_text_from_bytes(data: bytes, mime: str) -> str | None:
 # ---------- undo ----------
 
 
+async def record_text_extract(
+    session: AsyncSession, attachment_id: uuid.UUID, text: str | None
+) -> None:
+    """Store extracted text for an attachment whose bytes are already at hand (S5.1.5: a file an
+    agent attached), instead of waiting for the extraction job."""
+    att = await session.get(Attachment, attachment_id)
+    if att is None:
+        return
+    att.text_extract = text
+    att.extract_status = "done" if text is not None else "skipped"
+
+
 def _aid(args: dict[str, object]) -> uuid.UUID:
     return uuid.UUID(str(args["attachment_id"]))
 

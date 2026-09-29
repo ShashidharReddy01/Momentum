@@ -226,6 +226,7 @@ def agents_install(
     """Install or refresh agents from their definitions. New agents start disabled; an admin
     enables each one. Safe to re-run: unchanged agents are left alone, edited ones are reported
     as drifted and kept (unless --force)."""
+    from momentum.agents.extensions import load_extensions
     from momentum.agents.loader import DefinitionError, load_definitions
     from momentum.ai.tools.catalog import build_registry
     from momentum.core.context import Actor, Ctx
@@ -234,8 +235,9 @@ def agents_install(
     from momentum.domain.workspace.service import ensure_default_workspace
 
     settings = Settings()
+    ext = load_extensions(settings)  # MOMENTUM_AGENT_EXTENSIONS (S5.1.5)
     try:
-        definitions = load_definitions(definitions_dir)
+        definitions = load_definitions([*definitions_dir, *ext.definition_dirs])
     except DefinitionError as e:
         raise typer.BadParameter(str(e)) from e
 
@@ -255,7 +257,7 @@ def agents_install(
                     session,
                     ctx,
                     definitions,
-                    build_registry().names,
+                    build_registry(*ext.tools).names,
                     keys=only or None,
                     force=force,
                 )
