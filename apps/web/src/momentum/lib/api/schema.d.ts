@@ -159,6 +159,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/agents/{agent_id}/tokens": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** API tokens that act as this agent (admins) */
+        get: operations["list_agent_tokens_api_v1_agents__agent_id__tokens_get"];
+        put?: never;
+        /** Issue a token so an external script acts as this agent (admins; secret shown once) */
+        post: operations["create_agent_token_api_v1_agents__agent_id__tokens_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/ai/actions/{action_id}": {
         parameters: {
             query?: never;
@@ -1000,6 +1018,41 @@ export interface paths {
         /** Move a task within My Tasks (pins it to that bucket) */
         post: operations["move_my_task_api_v1_me_tasks__task_id__move_post"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/tokens": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** My API tokens */
+        get: operations["list_my_tokens_api_v1_me_tokens_get"];
+        put?: never;
+        /** Create an API token for scripts; the secret is shown only in this response */
+        post: operations["create_my_token_api_v1_me_tokens_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/tokens/{token_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Revoke one of my tokens (or, for admins, an agent's) */
+        delete: operations["revoke_token_api_v1_me_tokens__token_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -3037,6 +3090,52 @@ export interface components {
              */
             auto_apply_low_risk: boolean;
         };
+        /**
+         * ApiTokenCreatedOut
+         * @description The only response that ever carries the secret.
+         */
+        ApiTokenCreatedOut: {
+            data: components["schemas"]["ApiTokenOut"];
+            /** Secret */
+            secret: string;
+        };
+        /**
+         * ApiTokenIn
+         * @description S5.1.6: a new API token. ``expires_in_days`` defaults to 90 (at most 365).
+         */
+        ApiTokenIn: {
+            /** Expires In Days */
+            expires_in_days?: number | null;
+            /** Name */
+            name: string;
+            /** Scopes */
+            scopes: string[];
+        };
+        /** ApiTokenOut */
+        ApiTokenOut: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Expires At */
+            expires_at: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Last Used At */
+            last_used_at: string | null;
+            /** Name */
+            name: string;
+            /** Prefix */
+            prefix: string;
+            /** Revoked At */
+            revoked_at: string | null;
+            /** Scopes */
+            scopes: string[];
+        };
         /** ApplyIn */
         ApplyIn: {
             /**
@@ -3955,6 +4054,13 @@ export interface components {
         ListOut_AgentRunOut_: {
             /** Data */
             data: components["schemas"]["AgentRunOut"][];
+            /** @default {} */
+            meta: components["schemas"]["ListMeta"];
+        };
+        /** ListOut[ApiTokenOut] */
+        ListOut_ApiTokenOut_: {
+            /** Data */
+            data: components["schemas"]["ApiTokenOut"][];
             /** @default {} */
             meta: components["schemas"]["ListMeta"];
         };
@@ -6905,6 +7011,72 @@ export interface operations {
             };
         };
     };
+    list_agent_tokens_api_v1_agents__agent_id__tokens_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                agent_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListOut_ApiTokenOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_agent_token_api_v1_agents__agent_id__tokens_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                agent_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApiTokenIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiTokenCreatedOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_ai_action_api_v1_ai_actions__action_id__get: {
         parameters: {
             query?: never;
@@ -8754,6 +8926,90 @@ export interface operations {
                 "application/json": components["schemas"]["MyTaskMoveIn"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationOut_OkOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_my_tokens_api_v1_me_tokens_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListOut_ApiTokenOut_"];
+                };
+            };
+        };
+    };
+    create_my_token_api_v1_me_tokens_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApiTokenIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiTokenCreatedOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revoke_token_api_v1_me_tokens__token_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {

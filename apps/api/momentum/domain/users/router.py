@@ -7,12 +7,16 @@ from pydantic import BaseModel
 from starlette.responses import JSONResponse
 
 from momentum.api.deps import CtxDep, RuntimeDep, UowDep
-from momentum.api.schemas import ListOut
+from momentum.api.schemas import ListOut, MutationMeta, MutationOut, OkOut
 from momentum.core.errors import NotFound
 from momentum.domain.access import get_visible_project
 from momentum.domain.users import service
+from momentum.domain.users import tokens as token_service
 from momentum.domain.users.models import User
 from momentum.domain.users.schemas import (
+    ApiTokenCreatedOut,
+    ApiTokenIn,
+    ApiTokenOut,
     MeOut,
     OnboardingPatchIn,
     OnboardingStatusOut,
@@ -150,6 +154,42 @@ async def logout(request: Request, rt: RuntimeDep) -> JSONResponse:
 
 
 # ---- Dev-only login (registered only when AUTH_MODE is dev or easyauth-sim) ----
+
+# ---------- API tokens (S5.1.6) ----------
+
+
+@router.get("/me/tokens", response_model=ListOut[ApiTokenOut], summary="My API tokens")
+async def list_my_tokens(ctx: CtxDep, uow: UowDep) -> ListOut[ApiTokenOut]:
+    assert ctx.actor.id is not None
+    async with uow.transaction() as s:
+        rows = await token_service.list_tokens(s, ctx, ctx.actor.id)
+        return ListOut(data=[ApiTokenOut.model_validate(t) for t in rows])
+
+
+@router.post(
+    "/me/tokens",
+    response_model=ApiTokenCreatedOut,
+    status_code=201,
+    summary="Create an API token for scripts; the secret is shown only in this response",
+)
+async def create_my_token(body: ApiTokenIn, ctx: CtxDep, uow: UowDep) -> ApiTokenCreatedOut:
+    async with uow.transaction() as s:
+        m, secret = await token_service.create_token(
+            s, ctx, name=body.name, scopes=body.scopes, expires_in_days=body.expires_in_days
+        )
+        return ApiTokenCreatedOut(data=ApiTokenOut.model_validate(m.entity), secret=secret)
+
+
+@router.delete(
+    "/me/tokens/{token_id}",
+    response_model=MutationOut[OkOut],
+    summary="Revoke one of my tokens (or, for admins, an agent's)",
+)
+async def revoke_token(token_id: uuid.UUID, ctx: CtxDep, uow: UowDep) -> MutationOut[OkOut]:
+    async with uow.transaction() as s:
+        m = await token_service.revoke_token(s, ctx, token_id)
+    return MutationOut(data=OkOut(), meta=MutationMeta(activity_id=m.activity_id))
+
 
 dev_router = APIRouter(prefix="/dev", tags=["dev"])
 

@@ -1,6 +1,6 @@
 # ADR-0009: Agent extension points (host tools, host agents, code-backed agents, API tokens)
 
-- **Status:** Accepted (items 1–3 and 5 built in S5.1.5; item 4 in S5.1.6)
+- **Status:** Accepted (items 1–3 and 5 built in S5.1.5; item 4 built in S5.1.6)
 - **Date:** 2026-09-28
 - **Deciders:** product owner, AI (drafted)
 

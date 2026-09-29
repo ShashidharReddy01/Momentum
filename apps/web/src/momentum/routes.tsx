@@ -14,6 +14,7 @@ import { SearchPage } from '@/features/search';
 import { TaskPage } from '@/features/tasks';
 import { TagPage } from '@/features/tags';
 import { TeamPage } from '@/features/teams';
+import { TokensPage } from '@/features/tokens';
 import type { RuntimeConfig } from '@/lib/config';
 import { Layout } from '@/shell/Layout';
 
@@ -73,6 +74,7 @@ export function buildRoutes(config: RuntimeConfig): RouteObject[] {
           handle: { crumb: 'Members' },
         },
         { path: 'settings/ai', element: <AiSettingsPage />, handle: { crumb: 'AI settings' } },
+        { path: 'settings/tokens', element: <TokensPage />, handle: { crumb: 'API tokens' } },
         { path: 'ask', element: <AskPage />, handle: { crumb: 'Ask Mo' } },
         { path: 'ask/:conversationId', element: <AskPage />, handle: { crumb: 'Ask Mo' } },
         ...galleryRoute.map((r) => ({ ...r, path: 'dev/ui', handle: { crumb: 'Component gallery' } })),

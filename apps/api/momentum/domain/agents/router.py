@@ -22,6 +22,9 @@ from momentum.domain.agents.schemas import (
     AgentStatsOut,
 )
 from momentum.domain.agents.stats import agent_stats
+from momentum.domain.users import tokens as token_service
+from momentum.domain.users.models import User
+from momentum.domain.users.schemas import ApiTokenCreatedOut, ApiTokenIn, ApiTokenOut
 
 router = APIRouter(tags=["agents"])
 
@@ -136,3 +139,39 @@ async def get_agent_stats(
         month_tokens=stats.month_tokens,
         priced=priced,
     )
+
+
+@router.get(
+    "/agents/{agent_id}/tokens",
+    response_model=ListOut[ApiTokenOut],
+    summary="API tokens that act as this agent (admins)",
+)
+async def list_agent_tokens(agent_id: uuid.UUID, ctx: CtxDep, uow: UowDep) -> ListOut[ApiTokenOut]:
+    async with uow.transaction() as s:
+        agent = await service.get_agent_for_admin(s, ctx, agent_id)
+        rows = await token_service.list_tokens(s, ctx, agent.user_id)
+        return ListOut(data=[ApiTokenOut.model_validate(t) for t in rows])
+
+
+@router.post(
+    "/agents/{agent_id}/tokens",
+    response_model=ApiTokenCreatedOut,
+    status_code=status.HTTP_201_CREATED,
+    summary="Issue a token so an external script acts as this agent (admins; secret shown once)",
+)
+async def create_agent_token(
+    agent_id: uuid.UUID, body: ApiTokenIn, ctx: CtxDep, uow: UowDep
+) -> ApiTokenCreatedOut:
+    async with uow.transaction() as s:
+        agent = await service.get_agent_for_admin(s, ctx, agent_id)
+        account = await s.get(User, agent.user_id)
+        assert account is not None
+        m, secret = await token_service.create_token(
+            s,
+            ctx,
+            name=body.name,
+            scopes=body.scopes,
+            expires_in_days=body.expires_in_days,
+            for_user=account,
+        )
+        return ApiTokenCreatedOut(data=ApiTokenOut.model_validate(m.entity), secret=secret)

@@ -65,6 +65,7 @@
 **Scope (ADR-0009):** token auth as an `AuthProvider` alongside Easy Auth/dev (`Authorization: Bearer mtm_…`), using the existing `api_tokens` table (hashed, prefix shown, scopes, expiry, revoke, `last_used_at`); personal tokens in profile settings (shown once); admins can issue a token for an agent account so an external script acts as that agent; scopes (`tasks:read`, `tasks:write`, `attachments:write`, …) narrow normal permissions; writes carry `via="api"`. Docs: "Calling Momentum from a script".
 **AC:** a token without `tasks:write` can't create tasks; a revoked or expired token gets 401; tokens never appear in logs; a script using an agent's token creates a task that shows the agent as its author.
 **Size:** M
+**Built (2026-09-29):** `domain/users/tokens.py` (create, list, revoke, authenticate; sha256 at rest; expiry ≤ 365 days, default 90; made only by a signed-in person; admin-issued agent tokens), `auth/tokens.py` (`ApiTokenProvider` wrapping the configured provider, `resolve` shared by the API and the websocket, `required_scope`/`check_scope`), `Ctx.via="api"`. Endpoints `/me/tokens`, `/agents/{id}/tokens`; web `/settings/tokens` (Account menu). All ACs have tests (`tests/test_api_tokens.py`, 5, including no cookie fall-back and no secrets in logs) plus 1 web test. Docs: INTEGRATION_GUIDE §6.8 "Calling Momentum from a script".
 
 ## E5.2 Agents as teammates
 

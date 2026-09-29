@@ -130,11 +130,17 @@ def create_app(
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         engine = create_engine(settings)
+        from momentum.auth.tokens import with_api_tokens
+
+        session_factory = create_session_factory(engine)
         runtime = MomentumRuntime(
             settings=settings,
             engine=engine,
-            session_factory=create_session_factory(engine),
-            auth=build_auth_provider(settings, resolve_principal),
+            session_factory=session_factory,
+            # S5.1.6: API tokens first, then the deployment's own provider
+            auth=with_api_tokens(
+                build_auth_provider(settings, resolve_principal), settings, session_factory
+            ),
             agent_definition_dirs=tuple(Path(d) for d in ext.definition_dirs),
             tools=build_registry(*ext.tools),
             agent_handlers=dict(ext.handlers),

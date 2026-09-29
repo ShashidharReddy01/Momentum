@@ -87,7 +87,7 @@ async def replay(
 
 
 async def _build_ctx(rt: MomentumRuntime, websocket: WebSocket) -> Ctx | None:
-    from momentum.auth.identity import resolve_user
+    from momentum.auth.tokens import resolve
 
     # AuthProvider.authenticate only reads headers/cookies (see auth/*.py), which a
     # WebSocket carries the same way a Request does — the type hint is the one HTTP-shaped
@@ -96,7 +96,8 @@ async def _build_ctx(rt: MomentumRuntime, websocket: WebSocket) -> Ctx | None:
     if principal is None:
         return None
     async with rt.session_factory() as session, session.begin():
-        user, workspace = await resolve_user(session, rt.settings, principal)
+        resolved = await resolve(session, rt.settings, principal)
+    user, workspace = resolved.user, resolved.workspace
     actor = Actor(
         id=user.id,
         workspace_id=workspace.id,

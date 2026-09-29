@@ -203,7 +203,18 @@ extensions = Extensions(
   - `propose()`: sent to the person the run is for.
 
   Autonomy doesn't apply to your code, but the service guards do: no deletes, no completing others' tasks, no approval decisions. An exception fails the run with its message (on the runs page, for admins and the requester).
-- **Outside the process:** API tokens for scripts that call Momentum arrive in S5.1.6.
+- **Outside the process:** see §6.8.
+
+### 6.8 Calling Momentum from a script (API tokens, S5.1.6)
+Create a token under **Account menu → API tokens** (`/settings/tokens`), pick its scopes (`read`, `tasks:write`, `attachments:write`, `ai`) and an expiry (≤ 1 year). Copy the secret: it's shown once. For a script that should show up **as an agent**, an admin issues the token on that agent (`POST /api/v1/agents/{id}/tokens`), and the agent must have been given the projects it works in.
+
+```bash
+curl -H "Authorization: Bearer $MOMENTUM_TOKEN" https://momentum.example/api/v1/projects
+curl -X POST -H "Authorization: Bearer $MOMENTUM_TOKEN" -H "Content-Type: application/json" \
+     -d '{"title": "Customer 42: upload complete"}' https://momentum.example/api/v1/projects/$PROJECT/tasks
+```
+
+A token acts as its owner, only within its scopes (403 `token_scope` otherwise). Changes are recorded with `created_via="api"` and are undoable in the app. Revoke it on the same page (agent tokens: `DELETE /api/v1/me/tokens/{id}` as an admin). `MOMENTUM_API_TOKENS_ENABLED=false` turns tokens off entirely. The OpenAPI schema at `/api/v1/docs` lists every endpoint.
 ---
 
 ## 7. Verification suite (run after integrating)
@@ -234,6 +245,7 @@ extensions = Extensions(
 | 2026-09-26 | 3 | S3.1.1 LLM gateway: migration 0015 (`llm_calls`, usage only, no prompt bodies); `momentum llm-check`; new settings `MOMENTUM_LLM_API_KEY_HEADER`, `MOMENTUM_LLM_EXTRA_HEADERS`, `MOMENTUM_LLM_FIXTURES_DIR` (plus the already-documented `LLM_EMBED_BATCH`/`TIMEOUT_S`/`MAX_RETRIES`/`SUPPORTS_STREAMING_TOOLS`/`PRICE_TABLE`, `AI_MONTHLY_BUDGET_USD`, now read). **Startup now fails in `MOMENTUM_ENV=production` unless `MOMENTUM_LLM_MODE=gateway` or `MOMENTUM_AI_ENABLED=false`.** New runtime dependencies: `openai` (ADR-0004; brings `httpx2`), `pyyaml` (was already transitive). See §6 (LLM gateway). |
 | 2026-09-26 | 3 | S3.1.2–S3.1.4: migrations 0016 (`ai_actions`) and 0017 (`embeddings` vector(1024) + HNSW, `ai_summaries`): the `vector` extension (installed by 0001) is now actually used. New API `/api/v1/ai/actions/*`; new periodic jobs `expire_ai_actions` and `index_embeddings` (queue `momentum_ai`, needs a worker); CLI `momentum reindex`; settings `MOMENTUM_LLM_RERANK_MODEL`, `MOMENTUM_AI_RERANK` (off). A host moving data in or out can drop and rebuild `embeddings` with `momentum reindex` (derived data). |
 | 2026-09-26 | 3 | **Phase 3 exit** (no migration, endpoint or new setting). Host-relevant: (1) `MOMENTUM_AI_MONTHLY_BUDGET_USD` is dollars, so it only enforces if `MOMENTUM_LLM_PRICE_TABLE` prices the resolved model ids; with no price table spend counts as $0 and the budget never trips (tokens are always recorded). (2) `momentum evals` (`EVALS_LIVE=1` for the real gateway) needs a Postgres role that may create/drop its own `*_evals` database (`MOMENTUM_EVALS_DATABASE_URL`); it never touches the app database. (3) AI read-tool output gained `blocked_by` on task briefs (a blocker the reader cannot see is counted, never named; `get_task` now follows the same rule), `search_tasks.blocked`, and `from`/`to` on moved dates; hosts that register extra tools or replay tool fixtures should expect these keys. (4) `GET /ai/admin/usage` gained `unpriced_models`; `llm-check` gained a `pricing` row. (5) The e2e server (`tools/e2e/serve.sh`) now pins `MOMENTUM_LLM_MODE=mock` and Playwright starts it via `bash`, so it also runs on Windows. |
+| 2026-09-29 | 5 | S5.1.6: API tokens (`Authorization: Bearer mtm_…`) accepted in every auth mode via `ApiTokenProvider` wrapping the configured provider; `/me/tokens`, `/agents/{id}/tokens`; `/settings/tokens`. No migration (`api_tokens` existed). A host proxy must pass the `Authorization` header through to Momentum. See §6.8. |
 | 2026-09-29 | 5 | S5.1.5 (ADR-0009): `Extensions` (host tools, handler agents, definition dirs) via `MOMENTUM_AGENT_EXTENSIONS` or `create_app`/`mount_momentum(extensions=…)`; new read tool `get_attachment_text`; `get_task` lists attachment names. See §6.7. |
 | 2026-09-29 | 5 | S5.1.4: new daily job `demote_agents` (maintenance queue); `GET /agents/{id}/stats`; workspace AI setting `allow_medium_auto` (in `workspaces.settings['ai']`, off unless set). No migration. |
 | 2026-09-29 | 5 | S5.0.1 + S5.1.3: the app shell always subscribes to `user:<me>` (inbox and bell live). New endpoints `GET /agents/{id}/runs`, `GET /agents/runs/{run_id}`; new routes `/agents/:agentId`, `/agents/runs/:runId`. **Permission semantics:** `Ctx.acting_for` is now honoured by `domain/access.py` (intersection of both actors, lower role), used for runs a person asked an agent to do. A host setting `acting_for` gets the same behaviour. |

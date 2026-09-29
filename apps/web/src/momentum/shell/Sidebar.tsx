@@ -5,16 +5,17 @@ import {
   ChevronRight,
   ChevronsUpDown,
   Download,
-  Lock,
-  Star,
   FolderPlus,
   Home,
   Inbox,
+  KeyRound,
   ListChecks,
+  Lock,
   LogOut,
   Moon,
   Plus,
   Sparkles,
+  Star,
   Sun,
   Users,
 } from 'lucide-react';
@@ -290,6 +291,9 @@ function UserMenu() {
         </DropdownMenuItem>
         <DropdownMenuItem onSelect={() => navigate('/settings/ai')}>
           <Icon icon={Sparkles} /> AI settings
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => navigate('/settings/tokens')}>
+          <Icon icon={KeyRound} /> API tokens
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem onSelect={() => logout.mutate()}>

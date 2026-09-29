@@ -27,6 +27,13 @@ class Ctx:
 
 ## 2. Auth providers (`MOMENTUM_AUTH_MODE`)
 
+**API tokens (S5.1.6, ADR-0009):** `auth/tokens.ApiTokenProvider` wraps whichever provider the mode selects (when `MOMENTUM_API_TOKENS_ENABLED`, default on).
+- **Bearer only:** a request with `Authorization: Bearer mtm_…` is authenticated by its token alone; a bad, revoked or expired token is a 401, never a fall-back to the session cookie. Bearer requests skip the CSRF header check (no cookie is involved).
+- **No identity linking:** a token principal resolves straight to its user (`auth/tokens.resolve`, used by the API and the websocket), with no provisioning.
+- **Acts as its user,** with `via="api"`. Its **scopes** narrow the user's own permissions (`required_scope`): `read` for any GET (every scope includes reading); `tasks:write` for tasks, projects, sections, comments, fields, tags, forms, rules, templates, status updates, undo and personal prefs; `attachments:write` for uploads; `ai` for Mo and running agents; `admin` for everything else, still within the user's role. A missing scope is 403 `token_scope`.
+- **Created only in the app:** tokens are made by a signed-in person, never with another token. Admins issue tokens for **agent accounts** (`POST /agents/{id}/tokens`), so an external script acts as that agent, bound by its explicit project access and the agent service guards (no deletes, and so on).
+- **Secrets never stored or logged:** only the hash is kept; activity records the name, prefix and scopes.
+
 ```python
 class AuthProvider(Protocol):
     async def authenticate(self, request: Request) -> Principal | None: ...

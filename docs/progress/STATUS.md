@@ -5,8 +5,8 @@
 > Older session handoff notes, the Phase 2 exit record and the Phase 0-1 retros live in `docs/progress/handoff-archive.md` (read them only when a slice touches that area). At the end of every slice, move the previous session's handoff there and keep only the latest one here.
 
 ## Current focus
-- **Phase:** 5: Agents v1 ("Teammates") — in progress: kickoff done (2026-09-28, `docs/roadmap/phase-5-kickoff.md`), S5.1.1–S5.1.5 and S5.0.1 done. Phase 4 complete (exit criteria met 2026-09-28).
-- **Next up:** S5.1.6 API tokens.
+- **Phase:** 5: Agents v1 ("Teammates") — in progress: kickoff done (2026-09-28, `docs/roadmap/phase-5-kickoff.md`), E5.1 (S5.1.1–S5.1.6) and S5.0.1 done. Phase 4 complete (exit criteria met 2026-09-28).
+- **Next up:** S5.2.1 Assign a task to an agent + S5.3.8 Teammate (J10).
 - **Product-owner instruction (2026-09-26):** finish all remaining slices, then one big local test run against the real gateway (100+ questions/actions covering edge cases), then fix from that run.
 - **Scope note (product owner, 2026-09-26):** the customer-operations capabilities (SQQ, pricing, contracts, invoices, pushes to internal systems as tools and assignable agents) will be done later in the product owner's own codebase, **not in this repo**. Finish the roadmap as written.
 - **Branch:** Phases 3–4 are on `claude/clever-hopper-pbv7yr` (ahead of `main`). Phase 5 continues on `claude/intelligent-meitner-9ne4e8`, which starts from that branch's Phase 4 exit commit.
@@ -64,7 +64,32 @@
   - New tool `get_attachment_text`.
   - A worked example is in INTEGRATION_GUIDE §6.7.
   - Verification: backend **680**, web **320**.
-- **Next up:** S5.1.6 API tokens.
+- **S5.1.6 done (2026-09-29):**
+  - API tokens for scripts: created on `/settings/tokens`, secret shown once and stored hashed, scoped, expiring (≤1 year), revocable, never logged.
+  - Admins can issue a token on an agent, so an external script acts as that agent.
+  - Works in every auth mode (it wraps the configured `AuthProvider`); a bad token never falls back to the cookie.
+  - Guide: INTEGRATION_GUIDE §6.8.
+  - **E5.1 (runtime) is complete.**
+  - Verification: `make check` green, backend **685**, web **321**; e2e 10/10 (last full run at S5.0.1).
+- **For the next session (read this first):**
+  - **Branch:** `claude/intelligent-meitner-9ne4e8`, everything pushed.
+  - **Fresh cloud container:** `apt-get install -y postgresql-16-pgvector`; `initdb` into `/home/user/.pgdata` as `postgres`; start with `pg_ctl -o '-p 5432 -k /tmp'`; create role `momentum`/`momentum` (createdb) and databases `momentum` + `momentum_test`; create the `vector`, `pg_trgm` and `citext` extensions in `template1`; then `make install`. Postgres **stops when the container sleeps**: `pg_isready -h 127.0.0.1` before trusting a wall of DB errors. `make check` takes about 10 minutes, so run it in the background.
+  - **Decisions already made, don't re-ask:** kickoff Q1–Q9 (`phase-5-kickoff.md` §5), including 2026-09-29's "a requested run sees only what both the agent and the requester can see".
+  - **Mock mode throughout;** checkpoint 1 is possible on the product owner's machine (above).
+  - **Remaining, in the agreed order:**
+    1. S5.2.1 + S5.3.8 (J10)
+    2. S5.2.2
+    3. S5.2.3
+    4. S5.0.2 (before Sorter)
+    5. S5.3.1 Pulse
+    6. S5.3.2 Sorter (register `set_field_value`)
+    7. S5.3.3 Herald
+    8. S5.3.4 Nudge (snooze on `my_task_placements`, migration)
+    9. S5.3.7 Radar
+    10. S5.3.5 Architect
+    11. S5.3.6 Scribe
+    12. the phase exit (J10 e2e, retro, INTEGRATION_GUIDE log)
+- **Next up:** S5.2.1 Assign a task to an agent + S5.3.8 Teammate (J10), then S5.0.2 before Sorter.
 
 ## Open questions
 | # | Question | Needed by | Status |
@@ -125,7 +150,7 @@
 ### Phase 5: Agents v1 ("Teammates")
 - [x] Kickoff (`docs/roadmap/phase-5-kickoff.md`, 2026-09-28)
 - [x] S5.0.1 Inbox and bell live updates (2026-09-28) · [ ] S5.0.2 Public forms security review
-- [x] S5.1.1 Agent model and accounts (2026-09-28) · [x] S5.1.2 Runtime loop and triggers (2026-09-28) · [ ] S5.1.3 Runs UI · [ ] S5.1.4 Autonomy, budgets, kill switches · [x] S5.1.5 Extension points and code-backed agents (2026-09-29) · [ ] S5.1.6 API tokens
+- [x] S5.1.1 Agent model and accounts (2026-09-28) · [x] S5.1.2 Runtime loop and triggers (2026-09-28) · [ ] S5.1.3 Runs UI · [ ] S5.1.4 Autonomy, budgets, kill switches · [x] S5.1.5 Extension points and code-backed agents (2026-09-29) · [x] S5.1.6 API tokens (2026-09-29)
 - [ ] S5.2.1 Assign a task to an agent · [ ] S5.2.2 @mention an agent · [ ] S5.2.3 Agent gallery + create from description
 - [ ] S5.3.1 Pulse · [ ] S5.3.2 Sorter · [ ] S5.3.3 Herald · [ ] S5.3.4 Nudge · [ ] S5.3.5 Architect · [ ] S5.3.6 Scribe · [ ] S5.3.7 Radar · [ ] S5.3.8 Teammate
 - Build order (kickoff Q3, Q8): S5.0.1 before S5.1.3 · E5.1 (incl. S5.1.5, S5.1.6) → S5.2.1 + S5.3.8 (J10) → S5.2.2 → S5.2.3 → Pulse, Sorter (after S5.0.2), Herald, Nudge, Radar → Architect, Scribe

@@ -74,6 +74,7 @@ Event payloads share an envelope:
 | `approval.decided` | 4 | `state` (`approved`/`changes_requested`/`rejected`); a new rules trigger with an optional `decision` filter (S4.4.1; frontend handler in `lib/realtime/handlers.ts` refetches the task detail and any open task list) |
 | `form.submitted` | 4 | `entity_type="task"`, `form_id`, `project_id` (S4.2.1; emitted alongside the ordinary `task.created`/`task.assigned` events after a submission's task is created, so it reaches the rules executor's task-only event filter; channel `project:<id>`) |
 | `form.created` / `form.updated` / `form.deleted` | 4 | `project_id` (created, deleted); `changes`, `version` (updated); channel `project:<id>` (S4.2.1) |
+| `api_token.created` / `api_token.revoked` | 5 | `user_id` (the token's owner: a person or an agent account); channel `user:<owner>` (S5.1.6). Never the secret |
 | `agent_run.finished` | 5 | `agent_id`, `status` (`succeeded`,`failed`,`cancelled`,`budget_exceeded`), `task_id`; channels `workspace:<id>` and `user:<requested_by>` (S5.1.2). Actor is the agent, so it never triggers agents |
 | `workspace.settings_changed` | 5 | `timezone`; channel `workspace:<id>` (S5.1.2) |
 | `agent.created` / `agent.updated` | 5 | `key`, `source` (created); `changes` (field names), `version` (updated); channel `workspace:<id>` (S5.1.1). No frontend handler yet (the agents pages arrive in S5.1.3/S5.2.3) |

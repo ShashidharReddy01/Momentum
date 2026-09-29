@@ -60,6 +60,7 @@ All tables live in the Postgres schema configured by `MOMENTUM_DB_SCHEMA` (defau
 
 ### `api_tokens`
 id, workspace_id, user_id, name, `token_hash` (sha256), `prefix` (first 8 chars for display), scopes text[], last_used_at, expires_at, revoked_at.
+**As built (S5.1.6, no migration; the table existed since 0001):** secrets are `mtm_` + 43 url-safe characters, stored only as a sha256 hash; `prefix` is the first 10 characters (`mtm_` + 6). `user_id` is a person, or an agent's account (issued by an admin). Scopes: `read`, `tasks:write`, `attachments:write`, `ai`, `admin`. Expiry is required (1–365 days, default 90). `last_used_at` is refreshed at most once a minute.
 
 ## 2. Organization
 

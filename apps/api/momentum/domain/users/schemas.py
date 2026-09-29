@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
 from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
@@ -73,3 +74,33 @@ class ProjectViewPrefs(BaseModel):
     # to *which* view is showing). None = never chosen here yet: fall back to the project's
     # default_view, distinct from explicitly picking "list".
     view: Literal["list", "board", "calendar", "timeline", "overview", "dashboard"] | None = None
+
+
+class ApiTokenIn(BaseModel):
+    """S5.1.6: a new API token. ``expires_in_days`` defaults to 90 (at most 365)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str = Field(min_length=1, max_length=100)
+    scopes: list[str] = Field(min_length=1, max_length=5)
+    expires_in_days: int | None = Field(default=None, ge=1, le=365)
+
+
+class ApiTokenOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    name: str
+    prefix: str
+    scopes: list[str]
+    created_at: datetime
+    last_used_at: datetime | None
+    expires_at: datetime | None
+    revoked_at: datetime | None
+
+
+class ApiTokenCreatedOut(BaseModel):
+    """The only response that ever carries the secret."""
+
+    data: ApiTokenOut
+    secret: str

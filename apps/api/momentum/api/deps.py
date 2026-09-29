@@ -28,7 +28,7 @@ async def get_uow(request: Request) -> AsyncIterator[UnitOfWork]:
 
 
 async def get_ctx(request: Request, uow: Annotated[UnitOfWork, Depends(get_uow)]) -> Ctx:
-    from momentum.auth.identity import resolve_user
+    from momentum.auth.tokens import check_scope, resolve
 
     rt = get_runtime(request)
     principal = await rt.auth.authenticate(request)
@@ -36,7 +36,10 @@ async def get_ctx(request: Request, uow: Annotated[UnitOfWork, Depends(get_uow)]
     if principal is None:
         raise Unauthenticated(login_url=rt.auth.login_url(return_to))
     async with uow.transaction() as session:
-        user, workspace = await resolve_user(session, rt.settings, principal)
+        resolved = await resolve(session, rt.settings, principal)
+    user, workspace = resolved.user, resolved.workspace
+    if resolved.scopes is not None:  # an API token (S5.1.6): its scopes narrow what it may do
+        check_scope(resolved.scopes, request.method, request.url.path)
     actor = Actor(
         id=user.id,
         workspace_id=workspace.id,
@@ -47,7 +50,12 @@ async def get_ctx(request: Request, uow: Annotated[UnitOfWork, Depends(get_uow)]
         timezone=user.timezone,
     )
     structlog.contextvars.bind_contextvars(user_id=str(user.id))
-    return Ctx(actor=actor, settings=rt.settings, request_id=request.state.request_id)
+    return Ctx(
+        actor=actor,
+        settings=rt.settings,
+        request_id=request.state.request_id,
+        via="api" if resolved.scopes is not None else "ui",
+    )
 
 
 CtxDep = Annotated[Ctx, Depends(get_ctx)]
