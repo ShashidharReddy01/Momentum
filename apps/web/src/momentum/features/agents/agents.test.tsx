@@ -171,3 +171,45 @@ describe('Agent runs (S5.1.3)', () => {
     await waitFor(() => expect(agents.patches).toEqual([{ autonomy: 'auto', expected_version: 1 }]));
   });
 });
+
+describe('Agent gallery and creation (S5.2.3)', () => {
+  it('lists agents with what wakes them', async () => {
+    boot('/agents', agentHandlers());
+    const list = await screen.findByRole('list', { name: 'Agents' });
+    expect(within(list).getByRole('link', { name: /Teammate/ })).toHaveAttribute('href', '/agents/agent-1');
+    expect(within(list).getByText(/Assigned a task · Asks before changing/)).toBeInTheDocument();
+    // members can't create agents
+    expect(screen.queryByRole('link', { name: /Create agent/ })).not.toBeInTheDocument();
+  });
+
+  it('drafts an agent from a description, marks it as Mo’s, and saves it', async () => {
+    const agents = agentHandlers();
+    const user = boot('/agents/new', agents, [], 'admin');
+    await user.type(await screen.findByLabelText(/Describe what you want/), 'A weekly bug sweeper');
+    await user.click(screen.getByRole('button', { name: /Draft it/ }));
+    expect(await screen.findByText(/Mo drafted this/)).toBeInTheDocument();
+    expect(screen.getByText(/Left out delete_task/)).toBeInTheDocument();
+    expect(screen.getByLabelText('Name')).toHaveValue('(mock) Bug Sweeper');
+    expect(screen.getByLabelText('Schedule (cron)')).toHaveValue('0 9 * * MON');
+    await user.click(screen.getByRole('button', { name: 'Create agent' }));
+    await waitFor(() => expect(agents.creates).toHaveLength(1));
+    expect(agents.creates[0]).toMatchObject({
+      name: '(mock) Bug Sweeper',
+      triggers: [{ type: 'mentioned' }, { type: 'schedule', cron: '0 9 * * MON', timezone: 'workspace' }],
+      tools: ['search_tasks', 'add_comment'],
+      autonomy: 'confirm',
+      model_alias: 'fast',
+    });
+  });
+
+  it('test-runs an agent and says nothing was changed', async () => {
+    const agents = agentHandlers();
+    const user = boot('/agents/agent-1', agents, [], 'admin');
+    await user.type(await screen.findByLabelText('Task key'), 'T-12');
+    await user.click(screen.getByRole('button', { name: /Test run/ }));
+    expect(await screen.findByText(/nothing was changed/)).toBeInTheDocument();
+    expect(screen.getByText('(mock) I would raise the priority.')).toBeInTheDocument();
+    expect(screen.getByText('Set priority to high on T-12')).toBeInTheDocument();
+    expect(agents.testRuns).toEqual([{ task: 'T-12', text: null }]);
+  });
+});

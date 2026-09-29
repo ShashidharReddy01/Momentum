@@ -92,14 +92,80 @@ export function statsFixture(over: Partial<AgentStats> = {}): AgentStats {
 }
 
 export function agentHandlers(
-  opts: { agent?: Agent; runs?: AgentRun[]; run?: AgentRunDetail; stats?: AgentStats } = {},
+  opts: {
+    agent?: Agent;
+    runs?: AgentRun[];
+    run?: AgentRunDetail;
+    stats?: AgentStats;
+    list?: Agent[];
+  } = {},
 ) {
   let agent = opts.agent ?? agentFixture();
   const patches: unknown[] = [];
   const run = opts.run ?? runFixture();
   const runs = opts.runs ?? [run];
   const queries: URLSearchParams[] = [];
+  const creates: unknown[] = [];
+  const testRuns: unknown[] = [];
+  const list = opts.list ?? [agent];
   const handlers = [
+    // S5.2.3: gallery, tools, draft, create, test run
+    http.get('*/api/v1/agents', () => HttpResponse.json({ data: list, meta: { next_cursor: null } })),
+    http.get('*/api/v1/agents/tools', () =>
+      HttpResponse.json({
+        data: [
+          { name: 'get_task', description: 'Read a task', risk: 'read' },
+          { name: 'search_tasks', description: 'Find tasks', risk: 'read' },
+          { name: 'add_comment', description: 'Comment on a task', risk: 'low' },
+        ],
+        meta: { next_cursor: null },
+      }),
+    ),
+    http.post('*/api/v1/agents/draft', () =>
+      HttpResponse.json({
+        agent: {
+          name: '(mock) Bug Sweeper',
+          description: '(mock) Flags stale bugs every Monday.',
+          instructions: '(mock) You review open bugs each Monday.',
+          triggers: [{ type: 'schedule', cron: '0 9 * * MON', timezone: 'workspace' }, { type: 'mentioned' }],
+          tools: ['search_tasks', 'add_comment'],
+          autonomy: 'confirm',
+          model_alias: 'fast',
+          avatar: 'teammate',
+          kind: 'llm',
+          budget_monthly_usd: '5',
+          budget_monthly_tokens: 2000000,
+        },
+        notes: ['Left out delete_task: agents never delete or decide approvals.'],
+      }),
+    ),
+    http.post('*/api/v1/agents', async ({ request }) => {
+      const body = (await request.json()) as Partial<Agent>;
+      creates.push(body);
+      const created = agentFixture({ ...body, id: 'agent-new', enabled: false, source: 'custom' });
+      return HttpResponse.json(
+        { data: created, meta: { activity_id: 'act-1', batch_id: null, version: 1 } },
+        { status: 201 },
+      );
+    }),
+    http.post('*/api/v1/agents/:agentId/test-run', async ({ request }) => {
+      testRuns.push(await request.json());
+      return HttpResponse.json({
+        text: '(mock) I would raise the priority.',
+        steps: 2,
+        trace: [{ kind: 'tool', summary: 'Previewed a change', name: 'update_task', ok: true }],
+        changes: [
+          {
+            tool: 'update_task',
+            summary: 'Set priority to high on T-12',
+            risk: 'low',
+            decision: 'would propose to the person who asked',
+          },
+        ],
+        tokens_in: 900,
+        tokens_out: 60,
+      });
+    }),
     http.get('*/api/v1/agents/runs/:runId', () => HttpResponse.json(run)),
     http.get('*/api/v1/agents/:agentId/runs', ({ request }) => {
       const q = new URL(request.url).searchParams;
@@ -123,5 +189,5 @@ export function agentHandlers(
       });
     }),
   ];
-  return { handlers, queries, patches };
+  return { handlers, queries, patches, creates, testRuns };
 }

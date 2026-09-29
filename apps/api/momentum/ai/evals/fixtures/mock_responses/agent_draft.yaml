@@ -1,0 +1,28 @@
+# S5.2.3 "✦ Describe what you want" (mock). The draft deliberately includes things the server
+# must correct (an unknown tool, a forbidden one, a bad schedule, `auto`), so the notes show.
+responses:
+  - match: {contains: "weekly bug"}
+    tool_calls:
+      - name: submit_result
+        arguments:
+          name: "(mock) Bug Sweeper"
+          description: "(mock) Reviews open bugs every Monday and flags stale ones."
+          instructions: "(mock) You review open bugs each Monday. Cite task keys. Never invent facts."
+          triggers:
+            - {type: schedule, cron: "0 9 * * MON"}
+            - {type: schedule, cron: "every monday"}
+            - {type: mentioned}
+          tools: [search_tasks, get_task, add_comment, delete_task, browse_web]
+          autonomy: auto
+          model_alias: fast
+default:
+  tool_calls:
+    - name: submit_result
+      arguments:
+        name: "(mock) Helper"
+        description: "(mock) A drafted agent: mock output, not real AI work."
+        instructions: "(mock) You help with the task you're given. Cite task keys; never invent facts."
+        triggers: [{type: assigned}, {type: mentioned}]
+        tools: [get_task, search_tasks]
+        autonomy: confirm
+        model_alias: default

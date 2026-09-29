@@ -82,6 +82,7 @@
 ### S5.2.3: Agent gallery + create from description
 **Scope:** `/agents` gallery; "Create agent" form; "✦ Describe what you want" → Mo drafts the definition (instructions, triggers, tools, autonomy) → review → save; test run on a chosen task/project (dry-run).
 **Size:** M
+**Built (2026-09-29):** `ai/agent_draft.py` + prompt `agent_draft` v1 (`POST /agents/draft`, admins; the draft is checked against the agent rules, fixes listed as notes); `runtime.dry_run` (`POST /agents/{id}/test-run`, admins, model agents; task by id or key, or a project; savepoint rolled back); `GET /agents/tools`. Web: `AgentsGallery` (`/agents`, sidebar), `AgentForm` (`/agents/new` with "✦ Describe what you want", `/agents/:id/edit`), `TestRunPanel` on the agent page. Fixed on the way: `Button asChild` rendered two children (a Link styled as a button crashed). Eval feature `agent_draft`. Tests: `tests/test_agent_gallery.py` (2), 3 web.
 
 ## E5.3 Starter agents (one slice each, size M unless noted)
 

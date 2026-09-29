@@ -213,6 +213,8 @@ Workspace memory:
 | Conversational intake | `POST /forms/{id}/converse` + `.../submit` (also `/public/forms/{token}/converse[/submit]`) | fast | 4 |
 | Template from description | `POST /ai/templates/from-brief` + `.../from-brief/save` | smart | 4 |
 | Agents | worker | per agent | 5 |
+| Agent from description (S5.2.3) | `POST /agents/draft` (checked draft, nothing saved) | smart | 5 |
+| Agent test run (S5.2.3) | `POST /agents/{id}/test-run` (dry run, nothing changed) | per agent | 5 |
 | Ask for a chart | `POST /ai/dashboards/query` | default | 6 |
 | Risk explanation / rebalancing | worker + endpoints | default | 6 |
 

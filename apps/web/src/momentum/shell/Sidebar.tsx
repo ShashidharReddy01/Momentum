@@ -5,6 +5,7 @@ import {
   ChevronRight,
   ChevronsUpDown,
   Download,
+  Bot,
   FolderPlus,
   Home,
   Inbox,
@@ -51,6 +52,7 @@ const NAV = [
   { to: '/', label: 'Home', icon: Home, end: true },
   { to: '/my-tasks', label: 'My Tasks', icon: ListChecks },
   { to: '/inbox', label: 'Inbox', icon: Inbox },
+  { to: '/agents', label: 'Agents', icon: Bot },
 ] as const;
 
 export function Sidebar() {

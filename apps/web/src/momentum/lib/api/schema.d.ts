@@ -22,6 +22,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/agents/draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** ✦ Draft an agent from a description (admins); nothing is saved */
+        post: operations["draft_agent_from_description_api_v1_agents_draft_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/agents/install": {
         parameters: {
             query?: never;
@@ -48,6 +65,23 @@ export interface paths {
         };
         /** One run: its steps, proposals, answer, cost and errors */
         get: operations["get_agent_run_api_v1_agents_runs__run_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/agents/tools": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The tools an agent can be given (for the agent form) */
+        get: operations["list_agent_tools_api_v1_agents_tools_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -153,6 +187,23 @@ export interface paths {
         get: operations["get_agent_stats_api_v1_agents__agent_id__stats_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/agents/{agent_id}/test-run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Test an agent on a task or project (admins): a dry run, nothing is changed */
+        post: operations["test_run_agent_api_v1_agents__agent_id__test_run_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2654,11 +2705,17 @@ export interface components {
             /** Version */
             version: number;
         };
+        /** AgentDraftOut */
+        AgentDraftOut: {
+            agent: components["schemas"]["AgentIn-Output"];
+            /** Notes */
+            notes?: string[];
+        };
         /**
          * AgentIn
          * @description Create a custom agent. ``key`` defaults to one derived from the name.
          */
-        AgentIn: {
+        "AgentIn-Input": {
             /**
              * Autonomy
              * @default confirm
@@ -2680,6 +2737,67 @@ export interface components {
              * @default 5
              */
             budget_monthly_usd: number | string;
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+            /** Handler */
+            handler?: string | null;
+            /**
+             * Instructions
+             * @default
+             */
+            instructions: string;
+            /** Key */
+            key?: string | null;
+            /**
+             * Kind
+             * @default llm
+             * @enum {string}
+             */
+            kind: "llm" | "handler";
+            limits?: components["schemas"]["AgentLimits"];
+            /**
+             * Model Alias
+             * @default default
+             * @enum {string}
+             */
+            model_alias: "fast" | "default" | "smart";
+            /** Name */
+            name: string;
+            scope?: components["schemas"]["AgentScope"];
+            /** Tools */
+            tools?: string[];
+            /** Triggers */
+            triggers?: (components["schemas"]["ScheduleTrigger"] | components["schemas"]["EventTrigger"] | components["schemas"]["SimpleTrigger"])[];
+        };
+        /**
+         * AgentIn
+         * @description Create a custom agent. ``key`` defaults to one derived from the name.
+         */
+        "AgentIn-Output": {
+            /**
+             * Autonomy
+             * @default confirm
+             * @enum {string}
+             */
+            autonomy: "suggest" | "confirm" | "auto";
+            /**
+             * Avatar
+             * @default teammate
+             */
+            avatar: string;
+            /**
+             * Budget Monthly Tokens
+             * @default 2000000
+             */
+            budget_monthly_tokens: number;
+            /**
+             * Budget Monthly Usd
+             * @default 5
+             */
+            budget_monthly_usd: string;
             /**
              * Description
              * @default
@@ -3001,6 +3119,15 @@ export interface components {
             reasons: string[];
             /** Undos 14D */
             undos_14d: number;
+        };
+        /** AgentToolOut */
+        AgentToolOut: {
+            /** Description */
+            description: string;
+            /** Name */
+            name: string;
+            /** Risk */
+            risk: string;
         };
         /** AiActionEnvelope */
         AiActionEnvelope: {
@@ -3557,6 +3684,11 @@ export interface components {
             /** Verb */
             verb: string;
         };
+        /** DraftIn */
+        DraftIn: {
+            /** Description */
+            description: string;
+        };
         /** DraftSection */
         DraftSection: {
             /** Name */
@@ -4054,6 +4186,13 @@ export interface components {
         ListOut_AgentRunOut_: {
             /** Data */
             data: components["schemas"]["AgentRunOut"][];
+            /** @default {} */
+            meta: components["schemas"]["ListMeta"];
+        };
+        /** ListOut[AgentToolOut] */
+        ListOut_AgentToolOut_: {
+            /** Data */
+            data: components["schemas"]["AgentToolOut"][];
             /** @default {} */
             meta: components["schemas"]["ListMeta"];
         };
@@ -6464,6 +6603,55 @@ export interface components {
              */
             updated_at: string;
         };
+        /** TestChangeOut */
+        TestChangeOut: {
+            /** Decision */
+            decision: string;
+            /** Risk */
+            risk: string;
+            /** Summary */
+            summary: string;
+            /** Tool */
+            tool: string;
+        };
+        /** TestRunIn */
+        TestRunIn: {
+            /** Project Id */
+            project_id?: string | null;
+            /**
+             * Task
+             * @description A task id or key (T-12) to run on
+             */
+            task?: string | null;
+            /** Text */
+            text?: string | null;
+        };
+        /** TestRunOut */
+        TestRunOut: {
+            /** Changes */
+            changes: components["schemas"]["TestChangeOut"][];
+            /** Steps */
+            steps: number;
+            /** Text */
+            text: string;
+            /** Tokens In */
+            tokens_in: number;
+            /** Tokens Out */
+            tokens_out: number;
+            /** Trace */
+            trace: components["schemas"]["TestStepOut"][];
+        };
+        /** TestStepOut */
+        TestStepOut: {
+            /** Kind */
+            kind: string;
+            /** Name */
+            name?: string | null;
+            /** Ok */
+            ok?: boolean | null;
+            /** Summary */
+            summary: string;
+        };
         /** Trigger */
         Trigger: {
             /** Decision */
@@ -6695,7 +6883,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["AgentIn"];
+                "application/json": components["schemas"]["AgentIn-Input"];
             };
         };
         responses: {
@@ -6706,6 +6894,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MutationOut_AgentOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    draft_agent_from_description_api_v1_agents_draft_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DraftIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentDraftOut"];
                 };
             };
             /** @description Validation Error */
@@ -6779,6 +7000,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_agent_tools_api_v1_agents_tools_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListOut_AgentToolOut_"];
                 };
             };
         };
@@ -7003,6 +7244,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AgentStatsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    test_run_agent_api_v1_agents__agent_id__test_run_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                agent_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TestRunIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TestRunOut"];
                 };
             };
             /** @description Validation Error */

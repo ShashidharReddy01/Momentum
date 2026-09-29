@@ -118,4 +118,11 @@ An admin can promote `confirm → auto` for an agent when its **acceptance rate 
 
 ## 6. Agent UI surfaces
 
+**As built (S5.2.3, 2026-09-29):**
+- **`/agents` gallery** (sidebar "Agents"): a card per agent with its description, what wakes it, its autonomy and whether it's on; admins get "Create agent", and "Install starter agents" when there are none.
+- **`/agents/new`**: the agent form (name, description, instructions, triggers: assigned / mentioned / run now / schedules in workspace time / events, tools from `GET /agents/tools`, autonomy `confirm` or `suggest`, model). "✦ Describe what you want" calls `POST /agents/draft`: Mo (`agent_draft` prompt, `smart`) drafts a definition and `ai/agent_draft.py` checks it with the same rules as a hand-made agent: unknown or forbidden tools dropped, invalid schedules and unknown events dropped, never `auto` (a manual trigger is added if none survive); each fix is listed in amber under "Mo drafted this — check it before saving". Saving is the normal `POST /agents` (disabled, $5).
+- **`/agents/:id/edit`**: the same form for name, description, instructions, triggers, tools and model (a handler agent: name, description and triggers only). On/off, autonomy and budget stay in the admin panel.
+- **Test run** (admins, model agents, on the agent's page): `POST /agents/{id}/test-run {task (id or key) | project_id, text?}` runs the agent as a "Run now" by the admin, with its own access, scope, tools, instructions and limits, even while it's switched off. Reads are real; every change it wants is previewed and labelled with what the policy would do ("would apply", "would propose…", "would suggest"); nothing is applied, proposed or posted, and the transaction is rolled back. It creates no run; its model calls are logged as `agent_test:<key>` against the workspace, not the agent's budget.
+- Evals: `agent_draft` (6 cases, 1 mock; live threshold 85%).
+
 See `frontend/ux-specs.md` §9. Every agent action in the product shows: agent avatar (amber ring), "✦ via Herald", a "Why?" tooltip (trigger + summary), and Undo when applicable.

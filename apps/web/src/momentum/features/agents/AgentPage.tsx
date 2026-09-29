@@ -1,17 +1,20 @@
-import { Bot } from 'lucide-react';
+import { Bot, Pencil } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { MoMark } from '@/components/common/MoMark';
 import { EmptyState, ErrorState } from '@/components/common/States';
+import { Button } from '@/components/ui/Button';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useMe } from '@/features/auth';
 import { StatusBadge } from './AgentRunPage';
 import { AgentSettings } from './AgentSettings';
+import { triggerSummary } from './AgentsGallery';
 import { useAgent, useAgentRuns, type AgentRun, type RunFilters } from './queries';
+import { TestRunPanel } from './TestRunPanel';
 import { AUTONOMY_LABEL, RUN_STATUS, TRIGGER_LABEL, money, when } from './runMeta';
 
 /** S5.1.3 `/agents/:agentId`: an agent's charter at a glance and its run history (filterable by
- * status and trigger). The full gallery, editing and "create from description" are S5.2.3. */
+ * status and trigger). Admins also get its settings, an Edit link and a test run (S5.2.3). */
 export function AgentPage() {
   const { agentId } = useParams();
   const agent = useAgent(agentId!);
@@ -40,8 +43,16 @@ export function AgentPage() {
           <span className={a.enabled ? 'text-sm text-ok' : 'text-sm text-muted'}>
             {a.enabled ? 'On' : 'Off'}
           </span>
+          {isAdmin ? (
+            <Button asChild size="sm" variant="ghost" className="ml-auto">
+              <Link to={`/agents/${a.id}/edit`}>
+                <Pencil size={13} aria-hidden /> Edit
+              </Link>
+            </Button>
+          ) : null}
         </div>
         {a.description ? <p className="text-sm text-ink-2">{a.description}</p> : null}
+        <p className="text-xs text-muted">{triggerSummary(a.triggers)}</p>
         <p className="text-xs text-muted">
           {AUTONOMY_LABEL[a.autonomy] ?? a.autonomy} · budget {money(a.budget_monthly_usd)}/month
           {projects.length
@@ -51,6 +62,7 @@ export function AgentPage() {
       </header>
 
       {isAdmin ? <AgentSettings agent={a} /> : null}
+      {isAdmin && a.kind === 'llm' ? <TestRunPanel agent={a} /> : null}
 
       <section aria-label="Run history" className="flex flex-col gap-3">
         <div className="flex flex-wrap items-center gap-2">

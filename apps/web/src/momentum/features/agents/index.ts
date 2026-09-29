@@ -1,3 +1,5 @@
+export { EditAgentPage, NewAgentPage } from './AgentForm';
+export { AgentsGallery } from './AgentsGallery';
 export { AgentPage } from './AgentPage';
 export { AgentRunPage } from './AgentRunPage';
 export {

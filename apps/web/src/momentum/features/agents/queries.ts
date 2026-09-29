@@ -86,9 +86,77 @@ export function useUpdateAgent(id: string) {
         })
       ).data!,
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: agentKeys.detail(id) });
+      void qc.invalidateQueries({ queryKey: agentKeys.all });
       void qc.invalidateQueries({ queryKey: agentKeys.stats(id) });
     },
     onError: (e) => toastError(e, "Couldn't save the agent"),
+  });
+}
+
+// ---------- S5.2.3: gallery, create/edit, draft from a description, test run ----------
+
+export type AgentIn = components['schemas']['AgentIn-Input'];
+export type AgentDraft = components['schemas']['AgentDraftOut'];
+export type AgentTool = components['schemas']['AgentToolOut'];
+export type TestRun = components['schemas']['TestRunOut'];
+export type TestRunIn = components['schemas']['TestRunIn'];
+
+export function useAgents() {
+  const api = useApi();
+  return useQuery({
+    queryKey: agentKeys.all,
+    queryFn: async () => (await api.GET('/api/v1/agents')).data!.data,
+  });
+}
+
+export function useAgentTools() {
+  const api = useApi();
+  return useQuery({
+    queryKey: ['agents', 'tools'],
+    queryFn: async () => (await api.GET('/api/v1/agents/tools')).data!.data,
+    staleTime: 5 * 60_000,
+  });
+}
+
+export function useInstallAgents() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async () => (await api.POST('/api/v1/agents/install', { body: { force: false } })).data!,
+    onSuccess: () => void qc.invalidateQueries({ queryKey: agentKeys.all }),
+    onError: (e) => toastError(e, "Couldn't install the starter agents"),
+  });
+}
+
+export function useCreateAgent() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (body: AgentIn) => (await api.POST('/api/v1/agents', { body })).data!,
+    onSuccess: () => void qc.invalidateQueries({ queryKey: agentKeys.all }),
+    onError: (e) => toastError(e, "Couldn't create the agent"),
+  });
+}
+
+/** "✦ Describe what you want": Mo drafts a definition; nothing is saved. */
+export function useDraftAgent() {
+  const api = useApi();
+  return useMutation({
+    mutationFn: async (description: string) =>
+      (await api.POST('/api/v1/agents/draft', { body: { description } })).data!,
+  });
+}
+
+/** A dry run on a task or project: what the agent would say and change; nothing is changed. */
+export function useTestRun(id: string) {
+  const api = useApi();
+  return useMutation({
+    mutationFn: async (body: TestRunIn) =>
+      (
+        await api.POST('/api/v1/agents/{agent_id}/test-run', {
+          params: { path: { agent_id: id } },
+          body,
+        })
+      ).data!,
   });
 }

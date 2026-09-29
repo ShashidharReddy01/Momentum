@@ -50,8 +50,14 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
       aria-busy={loading || undefined}
       {...props}
     >
-      {loading ? <Icon icon={Loader2} className="animate-spin" /> : null}
-      {children}
+      {asChild ? (
+        children // Slot needs exactly one child element (e.g. a Link styled as a button)
+      ) : (
+        <>
+          {loading ? <Icon icon={Loader2} className="animate-spin" /> : null}
+          {children}
+        </>
+      )}
     </Comp>
   );
 });

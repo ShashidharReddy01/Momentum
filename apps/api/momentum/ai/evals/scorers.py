@@ -25,6 +25,11 @@ KEY = re.compile(r"\bT-\d+\b")
 
 KNOWN = frozenset(
     {
+        "agent_trigger_types",
+        "agent_cron_any",
+        "agent_tools_include",
+        "agent_tools_exclude",
+        "agent_autonomy",
         "error",
         "tools_include",
         "tools_any",
@@ -241,6 +246,24 @@ def score(obs: Observation, expect: dict[str, Any], *, today: date, asked: str =
                 f"today: {obs.data.get('today')}",
             )
         )
+
+    # agent drafts (S5.2.3)
+    if "agent_trigger_types" in expect:
+        kinds = sorted({t["type"] for t in obs.data.get("triggers", [])})
+        ok = set(expect["agent_trigger_types"]) <= set(kinds)
+        add(Check("agent_trigger_types", ok, f"triggers: {kinds}"))
+    if "agent_cron_any" in expect:
+        crons = [t.get("cron") for t in obs.data.get("triggers", []) if t.get("cron")]
+        ok = any(c in expect["agent_cron_any"] for c in crons)
+        add(Check("agent_cron_any", ok, f"crons: {crons}"))
+    for t in expect.get("agent_tools_include", []):
+        add(Check(f"agent_tools_include:{t}", t in obs.data.get("tools", []), ""))
+    for t in expect.get("agent_tools_exclude", []):
+        add(Check(f"agent_tools_exclude:{t}", t not in obs.data.get("tools", []), ""))
+    if "agent_autonomy" in expect:
+        got_autonomy = obs.data.get("autonomy")
+        ok = got_autonomy == expect["agent_autonomy"]
+        add(Check("agent_autonomy", ok, f"autonomy: {got_autonomy}"))
 
     # break into subtasks
     if "subtasks_between" in expect:

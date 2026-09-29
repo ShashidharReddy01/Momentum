@@ -51,7 +51,7 @@ from momentum.ai.prompts import load
 from momentum.ai.tools.registry import ToolRegistry
 from momentum.ai.tools.write_tools import text_doc
 from momentum.core.context import Actor, Ctx
-from momentum.core.errors import DomainError, NotFound
+from momentum.core.errors import DomainError, NotFound, ValidationFailed
 from momentum.core.events import emit
 from momentum.core.ids import task_key
 from momentum.core.richtext import plain_text
@@ -759,3 +759,122 @@ async def _run_model(
     await _answer(session, ctx, run, agent, result.text, output, requester, trace)
     await _hand_off(session, ctx, agent, run, requester, output, trace)
     return output
+
+
+DECISION_TEXT = {
+    "apply": "would apply",
+    "propose": "would propose to the person who asked",
+    "suggest": "would suggest",
+}
+
+
+async def dry_run(
+    session: AsyncSession,
+    llm: LLM,
+    registry: ToolRegistry,
+    settings: Settings,
+    agent: Agent,
+    requester: User,
+    *,
+    task_id: uuid.UUID | None = None,
+    project_id: uuid.UUID | None = None,
+    text: str | None = None,
+    now: datetime | None = None,
+) -> dict[str, Any]:
+    """S5.2.3: a test run. The agent runs as a "Run now" by ``requester`` on a task or project
+    (the same access, scope, tools, instructions and limits), but nothing is applied, proposed
+    or posted: every change it wants is previewed and labelled with what the policy would do,
+    and everything is rolled back. The agent may be switched off (that's what testing is for);
+    the deployment's agent switch and the AI switches still apply. Model calls count toward the
+    workspace's AI usage, not the agent's run history (there is no run)."""
+    if agent.kind == "handler":
+        raise ValidationFailed(
+            "Test runs are for model-driven agents; a code-backed agent is the host's own code"
+        )
+    if not settings.agents_enabled:
+        raise ValidationFailed("Agents are turned off in this deployment")
+    account = await session.get(User, agent.user_id)
+    if account is None:
+        raise NotFound()
+    now = now or datetime.now(UTC)
+    trigger: dict[str, Any] = {"type": "manual", "requested_by": str(requester.id)}
+    if task_id:
+        trigger["task_id"] = str(task_id)
+    elif project_id:
+        trigger["project_id"] = str(project_id)
+    if text:
+        trigger["input"] = text
+    ctx = agent_ctx(agent, account, settings).with_(
+        acting_for=Actor(
+            id=requester.id,
+            workspace_id=requester.workspace_id,
+            role=requester.role,
+            email=requester.email,
+            name=requester.name,
+            timezone=requester.timezone,
+        )
+    )
+    trace = _Trace()
+    savepoint = await session.begin_nested()
+    try:
+        try:
+            await _check_access(session, agent, ctx, trigger)
+        except _NoAccess as e:
+            raise ValidationFailed(str(e), code="no_access") from e
+        autonomy = agent.autonomy
+        tools = ToolRegistry(t for n in agent.tools if (t := registry.get(n)) is not None)
+        probe = AgentRun(agent_id=agent.id, workspace_id=agent.workspace_id, trigger=trigger)
+        messages = await _messages(session, ctx, agent, probe, requester, autonomy, now)
+        max_steps, timeout_s = _limits(agent, settings)
+        try:
+            async with asyncio.timeout(timeout_s):
+                result = await run_tool_loop(
+                    session,
+                    llm,
+                    ctx,
+                    tools,
+                    messages=messages,
+                    feature=f"agent_test:{agent.key}",
+                    alias=agent.model_alias,  # type: ignore[arg-type]
+                    emit=trace.on_loop_event,
+                    max_steps=max_steps,
+                    prompt_version=load("agent").version,
+                    max_tokens=load("agent").max_tokens,
+                )
+        except TimeoutError as e:
+            raise ValidationFailed(f"The test run hit its time limit ({timeout_s} s)") from e
+        config = await get_ai_config(session, agent.workspace_id)
+        changes: list[dict[str, Any]] = []
+        for call in result.proposals:
+            out = await tools.invoke(session, ctx, call.tool, call.args, mode="dry_run")
+            if not out.ok:
+                changes.append(
+                    {
+                        "tool": call.tool,
+                        "summary": out.result.summary,
+                        "risk": out.risk,
+                        "decision": "skipped",
+                    }
+                )
+                continue
+            decision = policy.decide(
+                autonomy, out.risk, call.tool, allow_medium_auto=config.allow_medium_auto is True
+            )
+            changes.append(
+                {
+                    "tool": call.tool,
+                    "summary": out.result.summary,
+                    "risk": out.risk,
+                    "decision": DECISION_TEXT.get(decision, decision),
+                }
+            )
+    finally:
+        await savepoint.rollback()
+    return {
+        "text": result.text,
+        "steps": result.steps,
+        "trace": trace.steps,
+        "changes": changes,
+        "tokens_in": result.tokens_in,
+        "tokens_out": result.tokens_out,
+    }

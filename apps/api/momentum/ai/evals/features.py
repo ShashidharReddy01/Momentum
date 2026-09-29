@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from momentum.agents.loader import load_definitions
 from momentum.agents.runtime import execute_run
 from momentum.ai import citations, quick_add, summarize, write
+from momentum.ai.agent_draft import draft_agent
 from momentum.ai.breakdown import break_down, project_people
 from momentum.ai.chat import run_chat, start_turn
 from momentum.ai.command import run_command
@@ -60,6 +61,7 @@ FEATURES = (
     "nl_rule",
     "ai_step",
     "agent_teammate",
+    "agent_draft",
 )
 
 
@@ -312,6 +314,11 @@ async def _run(
             "source": step.source or None,
             **step.values,
         }
+    elif feature == "agent_draft":
+        drafted = await draft_agent(llm, ctx, registry, inp)
+        obs.text = drafted.agent.instructions
+        obs.notes = drafted.notes
+        obs.data = drafted.agent.model_dump(mode="json")
     elif feature == "agent_teammate":
         await _teammate(session, llm, registry, world, case, ctx, now, obs)
     else:

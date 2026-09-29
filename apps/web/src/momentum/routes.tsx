@@ -1,5 +1,5 @@
 import type { RouteObject } from 'react-router';
-import { AgentPage, AgentRunPage } from '@/features/agents';
+import { AgentPage, AgentRunPage, AgentsGallery, EditAgentPage, NewAgentPage } from '@/features/agents';
 import { AiActionPage, AiSettingsPage, AskPage } from '@/features/ai';
 import { AuthGate, DevLoginPage } from '@/features/auth';
 import { FormFillPage, PublicFormPage } from '@/features/forms';
@@ -55,7 +55,10 @@ export function buildRoutes(config: RuntimeConfig): RouteObject[] {
         { path: 'tags/:tagId', element: <TagPage />, handle: { crumb: 'Tag' } },
         { path: 'inbox', element: <InboxPage />, handle: { crumb: 'Inbox' } },
         { path: 'ai/actions/:actionId', element: <AiActionPage />, handle: { crumb: 'Suggestion' } },
+        { path: 'agents', element: <AgentsGallery />, handle: { crumb: 'Agents' } },
+        { path: 'agents/new', element: <NewAgentPage />, handle: { crumb: 'New agent' } },
         { path: 'agents/runs/:runId', element: <AgentRunPage />, handle: { crumb: 'Agent run' } },
+        { path: 'agents/:agentId/edit', element: <EditAgentPage />, handle: { crumb: 'Edit agent' } },
         { path: 'agents/:agentId', element: <AgentPage />, handle: { crumb: 'Agent' } },
         { path: 'search', element: <SearchPage />, handle: { crumb: 'Search' } },
         {

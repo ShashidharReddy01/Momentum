@@ -3,20 +3,35 @@ passed to ``create_app``). Same service as ``momentum agents install``."""
 
 from __future__ import annotations
 
+import re
 import uuid
 
 from fastapi import APIRouter, status
 from pydantic import BaseModel, ConfigDict, Field
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from momentum.agents import runs_view
 from momentum.agents.loader import DefinitionError, load_definitions
+from momentum.agents.runtime import dry_run
 from momentum.agents.triggers import request_run
+from momentum.ai.agent_draft import MAX_DESCRIPTION, AgentDraftOut, draft_agent
+from momentum.ai.router import require_llm
 from momentum.api.deps import CtxDep, RuntimeDep, UowDep
 from momentum.api.schemas import ListOut
-from momentum.core.errors import ValidationFailed
+from momentum.core.context import Ctx
+from momentum.core.errors import Forbidden, NotFound, ValidationFailed
+from momentum.core.permissions import Action, can
 from momentum.domain.agents import service
 from momentum.domain.agents.models import AgentRun
-from momentum.domain.agents.schemas import InstallIn, InstallOut, InstallRowOut
+from momentum.domain.agents.schemas import (
+    FORBIDDEN_AGENT_TOOLS,
+    InstallIn,
+    InstallOut,
+    InstallRowOut,
+)
+from momentum.domain.tasks.models import Task
+from momentum.domain.users.models import User
 
 router = APIRouter(tags=["agents"])
 
@@ -99,3 +114,127 @@ async def list_agent_runs(
 async def get_agent_run(run_id: uuid.UUID, ctx: CtxDep, uow: UowDep) -> runs_view.AgentRunDetailOut:
     async with uow.transaction() as s:
         return await runs_view.get_run(s, ctx, run_id)
+
+
+class DraftIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    description: str = Field(min_length=1, max_length=MAX_DESCRIPTION)
+
+
+@router.post(
+    "/agents/draft",
+    response_model=AgentDraftOut,
+    summary="✦ Draft an agent from a description (admins); nothing is saved",
+)
+async def draft_agent_from_description(
+    body: DraftIn, ctx: CtxDep, runtime: RuntimeDep
+) -> AgentDraftOut:
+    if not can(ctx, Action.WORKSPACE_ADMIN):
+        raise Forbidden("Only workspace admins can create agents")
+    llm = require_llm(runtime)
+    return await draft_agent(llm, ctx.with_(via="ai"), runtime.tools, body.description)
+
+
+class TestRunIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    task: str | None = Field(
+        default=None, max_length=60, description="A task id or key (T-12) to run on"
+    )
+    project_id: uuid.UUID | None = None
+    text: str | None = Field(default=None, max_length=20_000)
+
+
+class TestChangeOut(BaseModel):
+    tool: str
+    summary: str
+    risk: str
+    decision: str
+
+
+class TestStepOut(BaseModel):
+    kind: str
+    summary: str
+    name: str | None = None
+    ok: bool | None = None
+
+
+class TestRunOut(BaseModel):
+    text: str
+    steps: int
+    trace: list[TestStepOut]
+    changes: list[TestChangeOut]
+    tokens_in: int
+    tokens_out: int
+
+
+async def _task_id(s: AsyncSession, ctx: Ctx, ref: str) -> uuid.UUID:
+    ref = ref.strip()
+    m = re.fullmatch(r"[Tt]-?(\d{1,9})", ref)
+    if m is None:
+        try:
+            return uuid.UUID(ref)
+        except ValueError as e:
+            raise ValidationFailed("Give a task key like T-12") from e
+    found = await s.scalar(
+        select(Task.id).where(Task.workspace_id == ctx.workspace_id, Task.number == int(m[1]))
+    )
+    if found is None:
+        raise NotFound("No task with that key")
+    return found
+
+
+@router.post(
+    "/agents/{agent_id}/test-run",
+    response_model=TestRunOut,
+    summary="Test an agent on a task or project (admins): a dry run, nothing is changed",
+)
+async def test_run_agent(
+    agent_id: uuid.UUID, body: TestRunIn, ctx: CtxDep, uow: UowDep, runtime: RuntimeDep
+) -> TestRunOut:
+    if not can(ctx, Action.WORKSPACE_ADMIN):
+        raise Forbidden("Only workspace admins can test agents")
+    llm = require_llm(runtime)
+    async with uow.transaction() as s:
+        agent = await service.get_agent(s, ctx, agent_id)
+        me = await s.get(User, ctx.actor.id)
+        if me is None:
+            raise NotFound()
+        task_id = await _task_id(s, ctx, body.task) if body.task else None
+        if task_id is None and body.project_id is None:
+            raise ValidationFailed("Pick a task or a project to test on")
+        out = await dry_run(
+            s,
+            llm,
+            runtime.tools,
+            runtime.settings,
+            agent,
+            me,
+            task_id=task_id,
+            project_id=body.project_id,
+            text=body.text,
+        )
+        return TestRunOut.model_validate(out)
+
+
+class AgentToolOut(BaseModel):
+    name: str
+    description: str
+    risk: str
+
+
+@router.get(
+    "/agents/tools",
+    response_model=ListOut[AgentToolOut],
+    summary="The tools an agent can be given (for the agent form)",
+)
+async def list_agent_tools(ctx: CtxDep, runtime: RuntimeDep) -> ListOut[AgentToolOut]:
+    _ = ctx  # members only (the dependency authenticates)
+    return ListOut(
+        data=[
+            AgentToolOut(name=t.spec.name, description=t.spec.description, risk=t.spec.risk)
+            for n in runtime.tools.names
+            if (t := runtime.tools.get(n)) is not None and n not in FORBIDDEN_AGENT_TOOLS
+        ]
+    )
