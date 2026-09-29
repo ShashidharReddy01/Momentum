@@ -92,6 +92,10 @@ class Settings(BaseSettings):
     forms_rate_limit_per_ip: int = Field(default=5, ge=1)
     forms_rate_limit_per_form: int = Field(default=60, ge=1)
     forms_rate_limit_window_minutes: int = Field(default=10, ge=1)
+    # S5.0.2: reverse proxies in front of the app that append to X-Forwarded-For (Azure App
+    # Service: 1). 0 = none: the connection's own address is the client. The client address is
+    # taken that many entries from the right of the header, so a visitor can't forge it.
+    trusted_proxy_hops: int = Field(default=0, ge=0, le=5)
 
     # AI (used from Phase 3)
     ai_enabled: bool = True

@@ -26,6 +26,13 @@
 ### S5.0.2: Public forms security review
 **Scope:** review S4.2.1's public form endpoints: member-name exposure on assignee questions; `X-Forwarded-For` handling for the per-IP rate limit (trusted-proxy setting). Fix what the review finds. Before S5.3.2, because Sorter acts on form submissions.
 **Size:** S
+**Built (2026-09-29), findings and fixes:**
+1. **Member exposure:** an assignee question on a public form listed every project member's name and user id to anyone with the link (and, since S5.1, agent accounts too). → Anonymous visitors never see an assignee question (`_anonymous_questions`, also in the public conversational intake); the task is left unassigned.
+2. **Assign-anyone:** an anonymous submission could put any workspace member's id (or an agent's, starting its run) in the assignee answer; the server only checked "in this workspace". → Ignored for anonymous submissions; a signed-in submitter may pick only the project's active people (`_assignable`), which is also what the internal fill page now offers (was: every workspace member).
+3. **Forgeable rate-limit address:** `momentum serve` ran uvicorn with `proxy_headers` and `forwarded_allow_ips="*"`, so `request.client` came from a visitor-supplied `X-Forwarded-For`: anyone could dodge the per-IP limit. Behind a real proxy without that, every visitor would share the proxy's address. → `MOMENTUM_TRUSTED_PROXY_HOPS` (default 0): `api.deps.client_ip` takes the address that many entries from the right; uvicorn trusts forwarded headers only when it's above 0.
+- Reviewed and fine: one `NotFound` for every reason a link fails; honeypot; per-form limit; size caps on answers; form content marked external (`via="form"`) so agents cap at `confirm`.
+- Still deferred (kickoff Q6): conversational-intake eval coverage; a real per-turn spam counter.
+Tests: `tests/test_forms_security.py` (4); `test_forms.py` updated.
 
 ---
 

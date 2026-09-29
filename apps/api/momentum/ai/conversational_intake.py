@@ -64,7 +64,7 @@ def _history_block(history: list[ConversationMessage]) -> str:
 async def converse(
     session: AsyncSession, llm: LLM, ctx: Ctx, form: Form, history: list[ConversationMessage]
 ) -> ConverseTurnOut:
-    view = await service.public_form_view(session, form)
+    view = await service.public_form_view(session, form, anonymous=ctx.actor.id is None)
     prompt = prompts.load("conversational_intake")
     user = (
         f'<data source="form">\n'

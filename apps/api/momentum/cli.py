@@ -32,14 +32,17 @@ def serve(
     """Run the web app (API + SPA + embedded worker)."""
     import uvicorn
 
+    # S5.0.2: trust X-Forwarded-* only when the deployment says a proxy is in front; otherwise
+    # any visitor could set their own address (rate limits use ``api.deps.client_ip``)
+    behind_proxy = Settings().trusted_proxy_hops > 0
     uvicorn.run(
         "momentum.asgi:app",
         host=host,
         port=port,
         reload=reload,
         workers=None if reload else workers,
-        proxy_headers=True,
-        forwarded_allow_ips="*",
+        proxy_headers=behind_proxy,
+        forwarded_allow_ips="*" if behind_proxy else None,
         loop="asyncio:SelectorEventLoop" if WINDOWS else "auto",
     )
 

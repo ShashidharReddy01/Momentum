@@ -59,6 +59,7 @@ Frontend build-time variables use the `VITE_MOMENTUM_` prefix, but the SPA prefe
 | `MOMENTUM_FORMS_RATE_LIMIT_PER_IP` | `5` | Submissions one (form, hashed IP) pair may make inside the rolling window |
 | `MOMENTUM_FORMS_RATE_LIMIT_PER_FORM` | `60` | Submissions one form may receive in total inside the rolling window, regardless of IP (bounds a spoofed-IP flood) |
 | `MOMENTUM_FORMS_RATE_LIMIT_WINDOW_MINUTES` | `10` | The rolling window both limits above are counted over |
+| `MOMENTUM_TRUSTED_PROXY_HOPS` | `0` | S5.0.2: how many reverse proxies in front of the app append to `X-Forwarded-For` (Azure App Service: `1`). Rate limits take the client address that many entries from the right, so a visitor can't forge it; `momentum serve` trusts forwarded headers only when this is above 0. `0` = the connection's own address |
 
 ## Storage
 

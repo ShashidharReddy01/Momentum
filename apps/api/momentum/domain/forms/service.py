@@ -328,8 +328,9 @@ async def _question_view(
         ]
         return PublicQuestionOut(kind="select", options=priority_options, **base)
     if maps_to == "assignee":
-        members = await project_members(session, project_id)
-        people = [PublicOption(id=str(u.id), label=u.name) for u, _role in members]
+        people = [
+            PublicOption(id=str(u.id), label=u.name) for u in await _assignable(session, project_id)
+        ]
         return PublicQuestionOut(kind="person", people=people, **base)
     field = fields[uuid.UUID(maps_to)]
     if field.type in ("text", "url"):
@@ -350,9 +351,26 @@ async def _question_view(
     return PublicQuestionOut(kind="select", options=field_options, **base)
 
 
-async def public_form_view(session: AsyncSession, form: Form) -> PublicFormOut:
+async def _assignable(session: AsyncSession, project_id: uuid.UUID) -> list[User]:
+    """Who a signed-in person may assign a form's task to: the project's active people (never
+    agent accounts; S5.0.2)."""
+    members = await project_members(session, project_id)
+    return [u for u, _role in members if not u.is_agent and u.status == "active"]
+
+
+def _anonymous_questions(questions: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """S5.0.2: an anonymous (public-link) visitor never sees or answers an assignee question:
+    offering one would list the project's members (names and ids) to anyone with the link, and
+    let a stranger assign work to them. The form's task is left unassigned instead."""
+    return [q for q in questions if q["maps_to"] != "assignee"]
+
+
+async def public_form_view(
+    session: AsyncSession, form: Form, *, anonymous: bool = True
+) -> PublicFormOut:
     fields = await _project_fields(session, form.project_id)
-    questions = [await _question_view(session, form.project_id, q, fields) for q in form.questions]
+    asked = _anonymous_questions(form.questions) if anonymous else form.questions
+    questions = [await _question_view(session, form.project_id, q, fields) for q in asked]
     return PublicFormOut(
         name=form.name,
         description=form.description,
@@ -449,7 +467,9 @@ async def submit_form(
         raise NotFound("This form isn't accepting submissions")
     if rate_limited:
         await _rate_limit(session, settings, form.id, ip_hash)
-    visible = _visible_questions(form.questions, body.answers)
+    anonymous = submitted_by is None
+    asked = _anonymous_questions(form.questions) if anonymous else form.questions
+    visible = _visible_questions(asked, body.answers)
     for q in visible:
         if q["required"] and _is_blank(body.answers.get(q["id"])):
             raise ValidationFailed(f"“{q['label']}” is required")
@@ -496,6 +516,9 @@ async def submit_form(
             assignee_id = uuid.UUID(str(assignee_raw))
         except ValueError:
             raise ValidationFailed("Invalid assignee") from None
+        # only someone the form offered (S5.0.2): not any workspace member, never an agent
+        if assignee_id not in {u.id for u in await _assignable(session, form.project_id)}:
+            raise ValidationFailed("Invalid assignee")
 
     m = await create_task(
         session,

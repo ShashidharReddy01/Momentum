@@ -288,7 +288,7 @@ async def test_public_form_view_and_submit(as_user: Clients, uow: UnitOfWork) ->
         by_id = {q["id"]: q for q in body["questions"]}
         assert by_id["q_kind"]["kind"] == "select"
         assert {o["label"] for o in by_id["q_kind"]["options"]} == {"Bug", "Feature"}
-        assert by_id["q_who"]["kind"] == "person" and by_id["q_who"]["people"]
+        assert "q_who" not in by_id  # S5.0.2: no member list for anonymous visitors
         kind_option = by_id["q_kind"]["options"][0]["id"]
         submitted = await pub.post(
             f"/api/v1/public/forms/{token}/submit",

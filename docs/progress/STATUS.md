@@ -6,7 +6,7 @@
 
 ## Current focus
 - **Phase:** 5: Agents v1 ("Teammates") — in progress: kickoff done (2026-09-28, `docs/roadmap/phase-5-kickoff.md`), E5.1 (S5.1.1–S5.1.6), S5.0.1, E5.2 (S5.2.1–S5.2.3) and S5.3.8 done. Phase 4 complete (exit criteria met 2026-09-28).
-- **Next up:** S5.0.2 Public forms security review (before Sorter).
+- **Next up:** S5.3.1 Pulse · Daily Digest.
 - **Product-owner instruction (2026-09-26):** finish all remaining slices, then one big local test run against the real gateway (100+ questions/actions covering edge cases), then fix from that run.
 - **Scope note (product owner, 2026-09-26):** the customer-operations capabilities (SQQ, pricing, contracts, invoices, pushes to internal systems as tools and assignable agents) will be done later in the product owner's own codebase, **not in this repo**. Finish the roadmap as written.
 - **Branch:** Phases 3–4 are on `claude/clever-hopper-pbv7yr` (ahead of `main`). Phase 5 continues on `claude/intelligent-meitner-9ne4e8`, which starts from that branch's Phase 4 exit commit.
@@ -19,7 +19,7 @@
 - **Standing instruction (product owner, 2026-09-28):** finish all remaining Phase 5 slices one by one, committing and pushing each with a short report, without waiting for the live checkpoints; stop only for decisions that are the product owner's (CLAUDE.md §6) or if a live finding would change the design.
 - **Phase 5 live checkpoints (agreed 2026-09-28):** the product owner pulls and runs the real gateway at 3 checkpoints, not every slice: **(1) after S5.1.2** (set `MOMENTUM_LLM_PRICE_TABLE`, `llm-check`, one manual agent run), **(2) after S5.2.1 + S5.3.8** (J10 by hand against the real model), **(3) phase exit** (`EVALS_LIVE=1 make evals`). Each slice report says whether a live check is needed; findings get fixed in the next slice.
 - **Phase 5 AI mode:** mock mode throughout (no gateway in this environment). Deferred to the product owner's machine: `momentum llm-check`, `EVALS_LIVE=1 make evals` at phase exit. The dogfood exit criterion is a post-ship observation, not blocking.
-- **Carried past Phase 4 exit** (kickoff Q6: the inbox/bell gap → S5.0.1 and the forms security review → S5.0.2 are now Phase 5 slices; J1 flake **fixed** 2026-09-28, see handoff; the other two stay deferred): a security review pass of S4.2.1's public form endpoint (member-name exposure on assignee questions, no `X-Forwarded-For` handling); wiring `conversational_intake` into the `momentum/ai/evals/` harness (its `EvalWorld` has no notion of a form and the harness models one-shot input → output, not a stateless multi-turn feature); a real per-turn spam counter for conversational intake (currently reuses the submission rate limiter as a coarse guard); the inbox/bell live-update gap (**fixed in S5.0.1**) and the J1 quick-entry flake (**fixed**) found at exit (both described in the Phase 4 exit handoff, now in `handoff-archive.md`).
+- **Carried past Phase 4 exit** (kickoff Q6: the inbox/bell gap → S5.0.1 and the forms security review → S5.0.2 (**done**) are now Phase 5 slices; J1 flake **fixed** 2026-09-28, see handoff; the other two stay deferred): a security review pass of S4.2.1's public form endpoint (member-name exposure on assignee questions, no `X-Forwarded-For` handling); wiring `conversational_intake` into the `momentum/ai/evals/` harness (its `EvalWorld` has no notion of a form and the harness models one-shot input → output, not a stateless multi-turn feature); a real per-turn spam counter for conversational intake (currently reuses the submission rate limiter as a coarse guard); the inbox/bell live-update gap (**fixed in S5.0.1**) and the J1 quick-entry flake (**fixed**) found at exit (both described in the Phase 4 exit handoff, now in `handoff-archive.md`).
 
 ## Handoff notes (latest session: 2026-09-29, S5.2.1 + S5.3.8 Assign a task to an agent + Teammate)
 - **Shipped:** you can assign a task to an agent.
@@ -39,13 +39,18 @@
   5. optionally `EVALS_LIVE=1 make evals` with `--feature agent_teammate`
 - **S5.2.2 done (2026-09-29):** @mentioning an agent. The composer's @ list offers only people and the agents that answer mentions (✦ Agent); a mention added by editing a comment counts too (once per comment); the reply @mentions you. Verification: `make check` green, backend **695** (+3 in `tests/test_agent_mention.py`), web **323**.
 - **S5.2.3 done (2026-09-29):** an Agents page in the sidebar (gallery), "Create agent" with "✦ Describe what you want" (Mo drafts it; anything it got wrong is fixed and listed before you save), an Edit page, and a **Test run** on each agent's page that shows what it would say and change without changing anything (works while it's switched off). Verification: `make check` green, backend **697** (+2 in `tests/test_agent_gallery.py`), web **326** (+3); mock evals `agent_draft` 1/1.
+- **S5.0.2 done (2026-09-29):** public forms security review, 3 findings fixed (details in `phase-5.md` S5.0.2):
+  - Public forms no longer show assignee questions: they listed every project member's name to anyone with the link.
+  - Nobody can assign a form's task to someone the form doesn't offer (anonymous: never; signed in: the project's people).
+  - The per-IP rate limit could be dodged with a fake `X-Forwarded-For`. **Action for deployment:** set `MOMENTUM_TRUSTED_PROXY_HOPS=1` on Azure App Service (default 0 = no proxy).
+  - Verification: `make check` green, backend **701** (+4 in `tests/test_forms_security.py`), web **326**.
 - **For the next session (read this first):**
   - **Branch:** `claude/intelligent-meitner-9ne4e8`, everything pushed.
   - **Fresh cloud container:** `apt-get install -y postgresql-16-pgvector`; `initdb` into `/home/user/.pgdata` as `postgres`; start with `pg_ctl -o '-p 5432 -k /tmp'`; create role `momentum`/`momentum` (createdb) and databases `momentum` + `momentum_test`; create the `vector`, `pg_trgm` and `citext` extensions in `template1`; then `make install`. Postgres **stops when the container sleeps**: `pg_isready -h 127.0.0.1` before trusting a wall of DB errors. `make check` takes about 10 minutes, so run it in the background.
   - **Decisions already made, don't re-ask:** kickoff Q1–Q9 (`phase-5-kickoff.md` §5).
   - **Mock mode throughout.**
-  - **Remaining, in the agreed order:** S5.0.2 (before Sorter), S5.3.1 Pulse, S5.3.2 Sorter (register `set_field_value`), S5.3.3 Herald, S5.3.4 Nudge (snooze on `my_task_placements`, migration), S5.3.7 Radar, S5.3.5 Architect, S5.3.6 Scribe, then the phase exit (J10 e2e in the browser, retro, INTEGRATION_GUIDE log).
-- **Next up:** S5.0.2 Public forms security review (before Sorter).
+  - **Remaining, in the agreed order:** S5.3.1 Pulse, S5.3.2 Sorter (register `set_field_value`), S5.3.3 Herald, S5.3.4 Nudge (snooze on `my_task_placements`, migration), S5.3.7 Radar, S5.3.5 Architect, S5.3.6 Scribe, then the phase exit (J10 e2e in the browser, retro, INTEGRATION_GUIDE log).
+- **Next up:** S5.3.1 Pulse · Daily Digest.
 
 ## Open questions
 | # | Question | Needed by | Status |
@@ -105,7 +110,7 @@
 
 ### Phase 5: Agents v1 ("Teammates")
 - [x] Kickoff (`docs/roadmap/phase-5-kickoff.md`, 2026-09-28)
-- [x] S5.0.1 Inbox and bell live updates (2026-09-28) · [ ] S5.0.2 Public forms security review
+- [x] S5.0.1 Inbox and bell live updates (2026-09-28) · [x] S5.0.2 Public forms security review (2026-09-29)
 - [x] S5.1.1 Agent model and accounts (2026-09-28) · [x] S5.1.2 Runtime loop and triggers (2026-09-28) · [x] S5.1.3 Runs UI (2026-09-29) · [x] S5.1.4 Autonomy, budgets, kill switches (2026-09-29) · [x] S5.1.5 Extension points and code-backed agents (2026-09-29) · [x] S5.1.6 API tokens (2026-09-29)
 - [x] S5.2.1 Assign a task to an agent (2026-09-29) · [x] S5.2.2 @mention an agent (2026-09-29) · [x] S5.2.3 Agent gallery + create from description (2026-09-29)
 - [ ] S5.3.1 Pulse · [ ] S5.3.2 Sorter · [ ] S5.3.3 Herald · [ ] S5.3.4 Nudge · [ ] S5.3.5 Architect · [ ] S5.3.6 Scribe · [ ] S5.3.7 Radar · [x] S5.3.8 Teammate (2026-09-29)

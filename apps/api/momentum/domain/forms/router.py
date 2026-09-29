@@ -10,7 +10,7 @@ import uuid
 
 from fastapi import APIRouter, Request, status
 
-from momentum.api.deps import CtxDep, RuntimeDep, UowDep
+from momentum.api.deps import CtxDep, RuntimeDep, UowDep, client_ip
 from momentum.api.schemas import ListOut, MutationOut, OkOut
 from momentum.domain.forms import service
 from momentum.domain.forms.schemas import (
@@ -92,10 +92,6 @@ async def submit_form_internal(
     return OkOut()
 
 
-def _client_ip(request: Request) -> str | None:
-    return request.client.host if request.client else None
-
-
 @public_router.get(
     "/{token}", response_model=PublicFormOut, summary="A public form's questions (no login)"
 )
@@ -116,7 +112,7 @@ async def submit_public_form(
 ) -> OkOut:
     async with uow.transaction() as s:
         form = await service.get_public_form(s, token)
-        ip_hash = service.hash_ip(rt.settings, _client_ip(request))
+        ip_hash = service.hash_ip(rt.settings, client_ip(request, rt.settings.trusted_proxy_hops))
         await service.submit_form(
             s,
             rt.settings,

@@ -12,7 +12,7 @@ from fastapi import APIRouter, Request
 
 from momentum.ai.conversational_intake import converse
 from momentum.ai.router import require_llm
-from momentum.api.deps import CtxDep, RuntimeDep, UowDep
+from momentum.api.deps import CtxDep, RuntimeDep, UowDep, client_ip
 from momentum.api.schemas import OkOut
 from momentum.core.context import Actor, Ctx
 from momentum.core.errors import NotFound
@@ -22,10 +22,6 @@ from momentum.domain.forms.schemas import ConverseIn, ConverseSubmitIn, Converse
 
 router = APIRouter(tags=["forms-intake"])
 public_router = APIRouter(prefix="/public/forms", tags=["forms-intake-public"])
-
-
-def _client_ip(request: Request) -> str | None:
-    return request.client.host if request.client else None
 
 
 def _require_conversational(form: Form) -> None:
@@ -85,7 +81,7 @@ async def converse_public(
     async with uow.transaction() as s:
         form = await service.get_public_form(s, token)
         _require_conversational(form)
-        ip_hash = service.hash_ip(rt.settings, _client_ip(request))
+        ip_hash = service.hash_ip(rt.settings, client_ip(request, rt.settings.trusted_proxy_hops))
         await service.rate_limit_turn(s, rt.settings, form.id, ip_hash)
         ai_ctx = Ctx(
             actor=Actor(id=None, workspace_id=form.workspace_id), settings=rt.settings, via="ai"
@@ -104,7 +100,7 @@ async def converse_submit_public(
     async with uow.transaction() as s:
         form = await service.get_public_form(s, token)
         _require_conversational(form)
-        ip_hash = service.hash_ip(rt.settings, _client_ip(request))
+        ip_hash = service.hash_ip(rt.settings, client_ip(request, rt.settings.trusted_proxy_hops))
         await service.submit_conversational(
             s,
             rt.settings,

@@ -61,3 +61,16 @@ async def get_ctx(request: Request, uow: Annotated[UnitOfWork, Depends(get_uow)]
 CtxDep = Annotated[Ctx, Depends(get_ctx)]
 UowDep = Annotated[UnitOfWork, Depends(get_uow)]
 RuntimeDep = Annotated[MomentumRuntime, Depends(get_runtime)]
+
+
+def client_ip(request: Request, hops: int) -> str | None:
+    """The visitor's address for rate limits (S5.0.2). Behind ``hops`` trusted proxies, each
+    appends the address it received from, so the entry ``hops`` from the right is the one the
+    outermost proxy saw; anything to its left came from the visitor and is ignored. Without a
+    proxy (``hops`` 0) it is the connection's address."""
+    if hops > 0:
+        header = request.headers.get("x-forwarded-for", "")
+        parts = [p.strip() for p in header.split(",") if p.strip()]
+        if parts:
+            return parts[-hops] if len(parts) >= hops else parts[0]
+    return request.client.host if request.client else None
