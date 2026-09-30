@@ -10,6 +10,7 @@ from momentum.domain.attachments.models import Attachment
 from momentum.domain.comments.models import Comment, Mention, Reaction
 from momentum.domain.fields.models import FieldDef, FieldValue, ProjectField
 from momentum.domain.forms.models import Form, FormSubmission
+from momentum.domain.goals.models import Goal, GoalLink
 from momentum.domain.integrations.models import ExternalLink, ImportJob
 from momentum.domain.mytasks.models import MyTaskPlacement
 from momentum.domain.notifications.models import Notification
@@ -45,6 +46,8 @@ __all__ = [
     "Follower",
     "Form",
     "FormSubmission",
+    "Goal",
+    "GoalLink",
     "IdempotencyKey",
     "ImportJob",
     "LlmCall",

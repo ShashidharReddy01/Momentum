@@ -37,6 +37,7 @@ from momentum.core.ids import task_key
 from momentum.domain.access import visible_projects_clause
 from momentum.domain.attachments.models import Attachment
 from momentum.domain.comments.models import Comment
+from momentum.domain.goals import service as goals
 from momentum.domain.mytasks.service import list_my_tasks as svc_list_my_tasks
 from momentum.domain.portfolios import service as portfolios
 from momentum.domain.projects.models import Project
@@ -789,12 +790,89 @@ async def get_portfolio(tc: ToolContext, args: GetPortfolioArgs) -> ToolResult:
     return ToolResult.success(p.name, {"portfolio": data})
 
 
+# ---------------- get_goals (S6.3.1) ----------------
+
+
+class GetGoalsArgs(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    goal: str | None = Field(
+        default=None, max_length=200, description="Goal name or id; omit to list every goal"
+    )
+
+
+def _pct(v: float | None) -> int | None:
+    return None if v is None else round(v * 100)
+
+
+@tool(
+    name="get_goals",
+    description=(
+        "Goals: omit `goal` to list them (period, owner, status, progress %); name one to get its "
+        "metric, how progress is measured, linked projects/portfolios and sub-goals."
+    ),
+    risk="read",
+    scopes=READ,
+)
+async def get_goals(tc: ToolContext, args: GetGoalsArgs) -> ToolResult:
+    s = tc.session
+    all_goals, progress = await goals.list_goals(s, tc.ctx)
+    names = await user_names(tc, {g.owner_id for g in all_goals})
+
+    def brief(g: Any) -> dict[str, Any]:
+        return {
+            "id": str(g.id),
+            "name": g.name,
+            "period": g.period_label or f"{iso(g.period_start)}..{iso(g.period_end)}",
+            "owner": names.get(g.owner_id),
+            "status": g.status,
+            "progress_pct": _pct(progress.by_goal.get(g.id)),
+        }
+
+    if args.goal is None:
+        return ToolResult.success(
+            f"{len(all_goals)} goals", {"goals": [brief(g) for g in all_goals]}
+        )
+    want = args.goal.strip().lower()
+    exact = [g for g in all_goals if str(g.id) == want or g.name.lower() == want]
+    found = exact or [g for g in all_goals if want in g.name.lower()]
+    if not found:
+        raise ToolError("not_found", f"No goal called {args.goal!r}")
+    if len(found) > 1:
+        raise ToolError(
+            "ambiguous",
+            "More than one goal matches",
+            candidates=[{"id": str(g.id), "name": g.name} for g in found[:8]],
+        )
+    g = found[0]
+    links, hidden = await goals.link_views(s, tc.ctx, g, progress)
+    data = {
+        **brief(g),
+        "description": clip(g.description, 1000),
+        "progress_source": g.progress_source,
+        "metric": g.metric,
+        "links": [
+            {
+                "type": x["entity_type"],
+                "name": x["name"],
+                "status": x["status"],
+                "progress_pct": _pct(x["progress"]),
+            }
+            for x in links
+        ],
+        "sub_goals": [brief(c) for c in all_goals if c.parent_id == g.id],
+    }
+    if hidden:
+        data["linked_projects_you_cannot_see"] = hidden
+    return ToolResult.success(g.name, {"goal": data})
+
+
 TOOLS = [
     search_tasks,
     semantic_search,
     get_task,
     get_project,
     get_portfolio,
+    get_goals,
     get_section_tasks,
     list_my_tasks,
     list_user_tasks,

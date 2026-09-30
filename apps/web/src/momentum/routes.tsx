@@ -2,6 +2,7 @@ import type { RouteObject } from 'react-router';
 import { AgentPage, AgentRunPage, AgentsGallery, EditAgentPage, NewAgentPage } from '@/features/agents';
 import { AiActionPage, AiSettingsPage, AskPage } from '@/features/ai';
 import { AuthGate, DevLoginPage } from '@/features/auth';
+import { GoalPage, GoalsPage } from '@/features/goals';
 import { FormFillPage, PublicFormPage } from '@/features/forms';
 import { HomePage } from '@/features/home';
 import { AsanaImportPage } from '@/features/imports';
@@ -56,6 +57,8 @@ export function buildRoutes(config: RuntimeConfig): RouteObject[] {
         { path: 'tags/:tagId', element: <TagPage />, handle: { crumb: 'Tag' } },
         { path: 'inbox', element: <InboxPage />, handle: { crumb: 'Inbox' } },
         { path: 'portfolios', element: <PortfoliosPage />, handle: { crumb: 'Portfolios' } },
+        { path: 'goals', element: <GoalsPage />, handle: { crumb: 'Goals' } },
+        { path: 'goals/:goalId', element: <GoalPage />, handle: { crumb: 'Goal' } },
         { path: 'portfolios/:portfolioId', element: <PortfolioPage />, handle: { crumb: 'Portfolio' } },
         { path: 'ai/actions/:actionId', element: <AiActionPage />, handle: { crumb: 'Suggestion' } },
         { path: 'agents', element: <AgentsGallery />, handle: { crumb: 'Agents' } },

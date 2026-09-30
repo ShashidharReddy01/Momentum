@@ -73,6 +73,7 @@
 ### S6.3.1: Goals
 **Scope:** migrations `goals`, `goal_links` (with `workspace_id`); goals list (by period, owner) and detail (metric, progress source: manual / linked projects completion / sub-goals average), check-ins as `status_updates(entity_type='goal')`. Visible to all members; owner and admins edit (kickoff Q5).
 **Size:** M
+**As built (2026-09-30):** migration 0033; `domain/goals` (create/edit/delete, link/unlink project or portfolio, check-ins that can move the metric; all undoable; deleting a goal with sub-goals is refused; linking a project needs to see it). `GET /goals`, `GET /goals/{id}` (links with their own progress, `hidden_links` counted, children), `POST /goals/{id}/check-ins`. Progress computed per request for the viewer (never stored). Mo's `get_goals` read tool. Realtime channel `goal:<id>`. Sidebar entry **Goals**.
 
 ### S6.3.2: AI for goals
 **Scope:** ✦ goal check-in narrative from linked work; ✦ "suggest projects that support this goal" (semantic match) → link proposals.

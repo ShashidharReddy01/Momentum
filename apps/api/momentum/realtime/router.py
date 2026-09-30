@@ -62,6 +62,11 @@ async def authorize_channel(session: AsyncSession, ctx: Ctx, channel: str) -> No
         from momentum.domain.portfolios.service import get_portfolio
 
         await get_portfolio(session, ctx, entity_id)
+    elif kind == "goal":
+        # S6.3.1: every member can see a goal; events carry only ids and versions
+        from momentum.domain.goals.service import get_goal
+
+        await get_goal(session, ctx, entity_id)
     else:
         raise DomainError("Unknown channel", code="invalid_channel")
 

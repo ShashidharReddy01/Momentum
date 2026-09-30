@@ -277,6 +277,32 @@
   },
   {
     "function": {
+      "description": "Goals: omit `goal` to list them (period, owner, status, progress %); name one to get its metric, how progress is measured, linked projects/portfolios and sub-goals.",
+      "name": "get_goals",
+      "parameters": {
+        "additionalProperties": false,
+        "properties": {
+          "goal": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Goal name or id; omit to list every goal"
+          }
+        },
+        "type": "object"
+      }
+    },
+    "type": "function"
+  },
+  {
+    "function": {
       "description": "Tasks in one section of a project, in their board/list order.",
       "name": "get_section_tasks",
       "parameters": {

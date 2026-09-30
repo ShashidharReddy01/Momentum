@@ -76,6 +76,7 @@ Registered in S3.1.2 unless noted. `semantic_search` arrives with S3.1.4 (embedd
 | `search_tasks` | read | 3 | Structured filters (assignee incl. "none", project, due range, overdue, blocked, status, text). Every task brief lists its open blockers (`blocked_by`) |
 | `semantic_search` | read | 3 (S3.1.4) | Hybrid search across tasks/comments/attachments with snippets |
 | `get_task` / `get_project` / `get_section_tasks` | read | 3 | Details incl. recent activity (`get_project` also has the project's start/due dates and brief since S6.2.1) |
+| `get_goals` | read | 6 (S6.3.1) | List goals (period, owner, status, progress %), or one goal's metric, progress source, links and sub-goals, computed as the viewer |
 | `get_portfolio` | read | 6 (S6.2.2) | List portfolios, or one portfolio's projects (status, tasks done/total, overdue, due, latest update) as the viewer sees them; projects they can't see only counted |
 | `list_my_tasks` / `list_user_tasks` | read | 3 | |
 | `get_project_activity` | read | 3 | Changes in a time window (for status reports); moved due/start dates and priority carry `from`/`to` |

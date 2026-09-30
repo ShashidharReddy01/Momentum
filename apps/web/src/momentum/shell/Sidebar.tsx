@@ -19,6 +19,7 @@ import {
   Sparkles,
   Star,
   Sun,
+  Target,
   Users,
 } from 'lucide-react';
 import { NavLink, useLocation, useNavigate } from 'react-router';
@@ -54,6 +55,7 @@ const NAV = [
   { to: '/my-tasks', label: 'My Tasks', icon: ListChecks },
   { to: '/inbox', label: 'Inbox', icon: Inbox },
   { to: '/portfolios', label: 'Portfolios', icon: Briefcase },
+  { to: '/goals', label: 'Goals', icon: Target },
   { to: '/agents', label: 'Agents', icon: Bot },
 ] as const;
 
