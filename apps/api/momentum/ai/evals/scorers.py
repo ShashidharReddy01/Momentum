@@ -89,6 +89,11 @@ KNOWN = frozenset(
         "tasks_between",
         "fields",
         "rule_exact",
+        "chart_exact",
+        "chart_window_between",
+        "chart_value",
+        "chart_groups",
+        "chart_tasks",
         "values_in",
         "values_absent",
     }
@@ -402,6 +407,36 @@ def score(obs: Observation, expect: dict[str, Any], *, today: date, asked: str =
     if "rule_exact" in expect:
         got = obs.data.get("rule")
         add(Check("rule_exact", got == expect["rule_exact"], json.dumps(got, default=str)[:300]))
+
+    # ask for a chart (S6.5.2): the chart as names; the window only within a range (the model
+    # may read "last 3 months" as 84 or 90 days); the numbers the server counted
+    if "chart_exact" in expect:
+        chart_got: dict[str, Any] = obs.data.get("chart") or {}
+        want_chart: dict[str, Any] = expect["chart_exact"]
+        seen = {k: v for k, v in chart_got.items() if k != "window_days"}
+        want_full = {"group_by": None, "measure": "count", **want_chart}
+        want_full["filters"] = {"status": "open", **want_chart.get("filters", {})}
+        add(Check("chart_exact", seen == want_full, json.dumps(chart_got, default=str)[:300]))
+    if "chart_window_between" in expect:
+        w_lo, w_hi = expect["chart_window_between"]
+        window = (obs.data.get("chart") or {}).get("window_days")
+        ok_window = window is not None and w_lo <= window <= w_hi
+        add(Check("chart_window_between", ok_window, f"window: {window}"))
+    if "chart_value" in expect:
+        add(
+            Check(
+                "chart_value",
+                obs.data.get("value") == expect["chart_value"],
+                f"value: {obs.data.get('value')}",
+            )
+        )
+    if "chart_groups" in expect:
+        groups = obs.data.get("groups")
+        add(Check("chart_groups", groups == expect["chart_groups"], f"groups: {groups}"))
+    if "chart_tasks" in expect:
+        got_titles = sorted(obs.data.get("task_titles") or [])
+        ok_titles = got_titles == sorted(expect["chart_tasks"])
+        add(Check("chart_tasks", ok_titles, f"tasks: {got_titles}"))
 
     # AI step (S4.1.5): the value it wrote must be one of the acceptable ones, and a field the
     # task says nothing about must be left alone rather than guessed at.

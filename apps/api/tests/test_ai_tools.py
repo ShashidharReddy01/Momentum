@@ -90,6 +90,7 @@ def test_catalog_covers_phase_1_2_tools_with_their_risks() -> None:
         "get_portfolio": "read",  # S6.2.2
         "get_goals": "read",  # S6.3.1
         "suggest_rebalance": "read",  # S6.4.2
+        "query_metrics": "read",  # S6.5.2
         "get_section_tasks": "read",
         "list_my_tasks": "read",
         "list_user_tasks": "read",

@@ -178,6 +178,9 @@ class WidgetIn(BaseModel):
     title: str = Field(min_length=1, max_length=200)
     query_spec: QuerySpec
     viz: VizIn = Field(default_factory=VizIn)
+    created_from_prompt: str | None = Field(
+        default=None, max_length=300, description="The question, when Mo drafted this chart"
+    )
 
     @model_validator(mode="after")
     def _kind(self) -> WidgetIn:
@@ -224,6 +227,7 @@ class WidgetOut(BaseModel):
     query_spec: QuerySpec
     viz: VizIn
     version: int
+    created_from_prompt: str | None = None
 
 
 class StarterWidgetOut(BaseModel):

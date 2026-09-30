@@ -336,6 +336,217 @@
   },
   {
     "function": {
+      "description": "Count tasks the user can see, the way a dashboard chart does: filters (status, overdue, blocked, people, projects, sections, tags, priorities, due or completed within N days), optionally split by one dimension (group_by: assignee, section, project, status, priority, tag, or a single-select field) or over time (time_bucket day/week/month by completed, created or due date). measure sum_estimate gives estimated hours. The server computes every number: quote them as given. kind list returns the tasks themselves.",
+      "name": "query_metrics",
+      "parameters": {
+        "additionalProperties": false,
+        "description": "Which tasks to count (by name), at most one way to split them, and what to measure.",
+        "properties": {
+          "blocked": {
+            "default": false,
+            "type": "boolean"
+          },
+          "completed_within_days": {
+            "anyOf": [
+              {
+                "maximum": 366,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "due_within_days": {
+            "anyOf": [
+              {
+                "maximum": 366,
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "field": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The single-select field when group_by=field"
+          },
+          "group_by": {
+            "anyOf": [
+              {
+                "enum": [
+                  "assignee",
+                  "section",
+                  "project",
+                  "status",
+                  "priority",
+                  "tag",
+                  "field"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "kind": {
+            "anyOf": [
+              {
+                "enum": [
+                  "count",
+                  "bar",
+                  "line",
+                  "donut",
+                  "list"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "count, bar, donut, line (over time) or list (the tasks)"
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "maximum": 50,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "measure": {
+            "default": "count",
+            "enum": [
+              "count",
+              "sum_estimate"
+            ],
+            "type": "string"
+          },
+          "overdue": {
+            "default": false,
+            "type": "boolean"
+          },
+          "people": {
+            "description": "Names, \"me\" or \"unassigned\"",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 10,
+            "type": "array"
+          },
+          "priorities": {
+            "items": {
+              "enum": [
+                "urgent",
+                "high",
+                "medium",
+                "low",
+                "none"
+              ],
+              "type": "string"
+            },
+            "maxItems": 5,
+            "type": "array"
+          },
+          "projects": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 10,
+            "type": "array"
+          },
+          "sections": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 10,
+            "type": "array"
+          },
+          "status": {
+            "default": "open",
+            "enum": [
+              "open",
+              "completed",
+              "all"
+            ],
+            "type": "string"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 10,
+            "type": "array"
+          },
+          "time_bucket": {
+            "anyOf": [
+              {
+                "enum": [
+                  "day",
+                  "week",
+                  "month"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "time_field": {
+            "default": "completed",
+            "enum": [
+              "completed",
+              "created",
+              "due"
+            ],
+            "type": "string"
+          },
+          "window_days": {
+            "anyOf": [
+              {
+                "maximum": 366,
+                "minimum": 7,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          }
+        },
+        "type": "object"
+      }
+    },
+    "type": "function"
+  },
+  {
+    "function": {
       "description": "Tasks in one section of a project, in their board/list order.",
       "name": "get_section_tasks",
       "parameters": {

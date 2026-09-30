@@ -392,6 +392,7 @@ async def add_widget(
     if position is None:
         position = key_between(live[-1].position if live else None, None)
     w = _widget_row(ctx, d, data.kind, data.title, data.query_spec, data.viz, position)
+    w.created_from_prompt = (data.created_from_prompt or "").strip() or None
     session.add(w)
     d.version += 1
     await session.flush()

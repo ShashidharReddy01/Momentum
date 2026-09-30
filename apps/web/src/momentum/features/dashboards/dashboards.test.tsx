@@ -38,7 +38,10 @@ const DETAIL = {
   updated_at: now,
   widgets: [
     widget('w-count', 'count', 'Overdue', { filters: { overdue: true } }, 'sm'),
-    widget('w-bar', 'bar', 'Open tasks by assignee', { group_by: 'assignee' }),
+    {
+      ...widget('w-bar', 'bar', 'Open tasks by assignee', { group_by: 'assignee' }),
+      created_from_prompt: 'who has what?',
+    },
     widget('w-list', 'list', 'Overdue work', { filters: { overdue: true }, limit: 10 }, 'lg'),
   ],
 };
@@ -112,6 +115,18 @@ function boot(detail: object = DETAIL) {
       const body = (await request.json()) as Record<string, unknown>;
       queries.push(body);
       return HttpResponse.json({ ...DATA['w-bar'], kind: body.kind });
+    }),
+    http.post('*/api/v1/ai/dashboards/query', async ({ request }) => {
+      const body = (await request.json()) as { text: string };
+      if (body.text.includes('revenue'))
+        return HttpResponse.json({ question: 'I can chart tasks, not revenue. Open tasks by project?' });
+      return HttpResponse.json({
+        kind: 'bar',
+        title: 'Open tasks by assignee',
+        query_spec: { group_by: 'assignee', filters: { status: 'open', overdue: false, blocked: false } },
+        named: { people: [] },
+        result: DATA['w-bar'],
+      });
     }),
     http.post('*/api/v1/dashboards/:id/widgets', async ({ request }) => {
       const body = (await request.json()) as Record<string, unknown>;
@@ -232,5 +247,44 @@ describe('Project Dashboard tab (S6.5.1)', () => {
     await waitFor(() => expect(queries.length).toBeGreaterThanOrEqual(2));
     expect(queries.every((q) => q.project_id === 'seed-1')).toBe(true);
     expect(screen.getByRole('link', { name: 'Dashboard' })).toHaveAttribute('aria-current', 'page');
+  });
+});
+
+describe('Ask for a chart (S6.5.2)', () => {
+  it('turns a question into a live chart and adds it with the question remembered', async () => {
+    const { added, user } = boot();
+    await user.click(await screen.findByRole('button', { name: 'Ask for a chart' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Ask for a chart' });
+    await user.click(within(dialog).getByRole('button', { name: 'Open tasks by assignee' }));
+    const made = await within(dialog).findByRole('region', { name: 'Mo made this chart (AI)' });
+    expect(made).toHaveTextContent('Open tasks · by assignee');
+    expect(within(dialog).getByRole('region', { name: 'Open tasks by assignee' })).toBeInTheDocument();
+    await user.click(within(dialog).getByRole('button', { name: 'Add to dashboard' }));
+    await waitFor(() => expect(added).toHaveLength(1));
+    expect(added[0]).toMatchObject({
+      kind: 'bar',
+      title: 'Open tasks by assignee',
+      created_from_prompt: 'Open tasks by assignee',
+      query_spec: { group_by: 'assignee' },
+    });
+  });
+
+  it('asks back instead of guessing', async () => {
+    const { added, user } = boot();
+    await user.click(await screen.findByRole('button', { name: 'Ask for a chart' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Ask for a chart' });
+    await user.type(within(dialog).getByLabelText('What do you want to see?'), 'revenue by quarter');
+    await user.click(within(dialog).getByRole('button', { name: /Ask$/ }));
+    expect(await within(dialog).findByText(/not revenue/)).toBeInTheDocument();
+    expect(within(dialog).queryByRole('button', { name: 'Add to dashboard' })).toBeNull();
+    expect(added).toHaveLength(0);
+  });
+
+  it('marks a chart Mo drafted with the amber sparkle and its question', async () => {
+    boot();
+    const card = await screen.findByRole('region', { name: 'Open tasks by assignee' });
+    expect(within(card).getByRole('img', { name: 'Drafted by Mo from: who has what?' })).toHaveClass(
+      'text-amber-ink',
+    );
   });
 });

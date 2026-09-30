@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from momentum.ai import (
     actions,
     breakdown,
+    chart,
     chat,
     citations,
     from_brief,
@@ -42,6 +43,7 @@ from momentum.ai.prefs import AiPrefs
 from momentum.api.deps import CtxDep, RuntimeDep, UowDep
 from momentum.api.schemas import ListOut, MutationOut
 from momentum.core.errors import ValidationFailed
+from momentum.domain.dashboards.schemas import QueryResultOut, QuerySpec, WidgetKind
 from momentum.domain.portfolios import service as portfolios
 from momentum.domain.status_updates.schemas import StatusUpdateIn
 from momentum.domain.status_updates.service import body_text as status_body_text
@@ -762,6 +764,50 @@ async def ai_compile_rule(
             created_from_prompt=r.rule.created_from_prompt,
         )
     return RuleCompileOut(rule=draft, sentence=r.sentence, question=r.question)
+
+
+# ---------------- ask for a chart (S6.5.2) ----------------
+
+
+class ChartAskIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    text: str = Field(min_length=1, max_length=chart.MAX_TEXT)
+    project_id: uuid.UUID | None = Field(
+        default=None, description="Ask inside this project (its Dashboard tab)"
+    )
+
+
+class ChartAskOut(BaseModel):
+    """Either a chart (``kind``, ``title``, ``query_spec`` ready for ``POST
+    /dashboards/{id}/widgets``, the filters as names, and its numbers as the asker), or
+    ``question`` when Mo needs to ask rather than guess."""
+
+    question: str | None = None
+    kind: WidgetKind | None = None
+    title: str | None = None
+    query_spec: QuerySpec | None = None
+    named: dict[str, Any] = Field(default_factory=dict)
+    result: QueryResultOut | None = None
+
+
+@router.post(
+    "/dashboards/query",
+    response_model=ChartAskOut,
+    summary="Turn a question into a chart and its numbers, as the asker (saves nothing)",
+)
+async def ai_ask_chart(body: ChartAskIn, ctx: CtxDep, uow: UowDep, rt: RuntimeDep) -> ChartAskOut:
+    llm = require_llm(rt)
+    ctx = ctx.with_(via="ai")
+    async with uow.transaction() as s:
+        a = await chart.ask_chart(s, llm, ctx, body.text, body.project_id)
+    return ChartAskOut(
+        question=a.question,
+        kind=a.kind,
+        title=a.title or None,
+        query_spec=a.spec,
+        named=a.named,
+        result=a.result,
+    )
 
 
 # ---------------- AI usage and settings (admin, S3.5.2) ----------------

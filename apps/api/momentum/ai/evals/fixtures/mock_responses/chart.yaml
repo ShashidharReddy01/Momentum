@@ -1,0 +1,55 @@
+# Mock responses for S6.5.2 "ask for a chart" (feature "chart"). Synthetic only. The model answers
+# in names (the server resolves them among what the asker can see), so these fixtures don't depend
+# on any database's uuids. They back the eval cases marked `mock: true` (the phase exit's 15
+# fixture questions) and tests/test_ai_chart.py.
+responses:
+  - match: {contains: "how many open tasks are there"}
+    tool_calls: [{name: submit_result, arguments: {kind: count, title: "Open tasks"}}]
+  - match: {contains: "how many tasks are overdue"}
+    tool_calls: [{name: submit_result, arguments: {kind: count, overdue: true, title: "Overdue"}}]
+  - match: {contains: "show open tasks by assignee"}
+    tool_calls: [{name: submit_result, arguments: {kind: bar, group_by: assignee, title: "Open tasks by assignee"}}]
+  - match: {contains: "overdue, due soon or later"}
+    tool_calls: [{name: submit_result, arguments: {kind: donut, group_by: status, title: "Where open work stands"}}]
+  - match: {contains: "completed per week over the last 3 months"}
+    tool_calls:
+      - name: submit_result
+        arguments: {kind: line, status: completed, time_bucket: week, time_field: completed, window_days: 90, title: "Completed per week"}
+  - match: {contains: "open tasks by section"}
+    tool_calls: [{name: submit_result, arguments: {kind: bar, group_by: section, title: "Open tasks by section"}}]
+  - match: {contains: "by priority as a donut"}
+    tool_calls: [{name: submit_result, arguments: {kind: donut, group_by: priority, title: "Open work by priority"}}]
+  - match: {contains: "list the overdue tasks"}
+    tool_calls: [{name: submit_result, arguments: {kind: list, overdue: true, title: "Overdue tasks"}}]
+  - match: {contains: "how many tasks are blocked"}
+    tool_calls: [{name: submit_result, arguments: {kind: count, blocked: true, title: "Blocked"}}]
+  - match: {contains: "due in the next 7 days, by assignee"}
+    tool_calls: [{name: submit_result, arguments: {kind: bar, group_by: assignee, due_within_days: 7, title: "Due this week by assignee"}}]
+  - match: {contains: "have no assignee"}
+    tool_calls: [{name: submit_result, arguments: {kind: count, people: ["unassigned"], title: "Unassigned"}}]
+  - match: {contains: "open tasks by risk"}
+    tool_calls: [{name: submit_result, arguments: {kind: bar, group_by: field, field: "Risk", title: "Open tasks by risk"}}]
+  - match: {contains: "does mei have"}
+    tool_calls: [{name: submit_result, arguments: {kind: count, people: ["Mei Chen"], title: "Mei's open tasks"}}]
+  - match: {contains: "urgent and high priority tasks"}
+    tool_calls: [{name: submit_result, arguments: {kind: list, priorities: [urgent, high], title: "Urgent and high priority"}}]
+  - match: {contains: "open tasks by project"}
+    tool_calls: [{name: submit_result, arguments: {kind: bar, group_by: project, title: "Open tasks by project"}}]
+
+  # tests/test_ai_chart.py
+  - match: {contains: "revenue by quarter"}
+    tool_calls:
+      - name: submit_result
+        arguments: {question: "I can chart tasks, not revenue. Would open tasks by project help?"}
+  - match: {contains: "tasks for zed"}
+    tool_calls: [{name: submit_result, arguments: {kind: count, people: ["Zed Nobody"]}}]
+  - match: {contains: "by vendor field"}
+    tool_calls: [{name: submit_result, arguments: {kind: bar, group_by: field, field: "Vendor"}}]
+  - match: {contains: "count per assignee"}
+    tool_calls: [{name: submit_result, arguments: {kind: count, group_by: assignee}}]
+  - match: {contains: "in secret plans"}
+    tool_calls: [{name: submit_result, arguments: {kind: count, projects: ["Secret Plans"]}}]
+default:
+  tool_calls:
+    - name: submit_result
+      arguments: {question: "(mock) I can chart tasks by assignee, section, status or over time. Which would help?"}

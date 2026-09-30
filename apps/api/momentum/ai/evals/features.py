@@ -19,6 +19,7 @@ from momentum.agents.extensions import HandlerRun
 from momentum.agents.loader import load_definitions
 from momentum.agents.runtime import execute_run
 from momentum.ai import (
+    chart,
     citations,
     goal_assist,
     quick_add,
@@ -84,6 +85,7 @@ FEATURES = (
     "agent_scribe",
     "goal_check_in",
     "workload_rebalance",
+    "chart",
 )
 
 
@@ -353,6 +355,25 @@ async def _run(
             "tasks": brief.tasks,
         }
         obs.operations, obs.risk = await _operations(session, brief.action_id)
+    elif feature == "chart":
+        # S6.5.2: a question → a chart, run as the asker; a case without `project: null` asks
+        # inside Launch Plan (a project dashboard)
+        scope = case.get("project", "Launch Plan")
+        answer = await chart.ask_chart(
+            session, llm, ctx, inp, world.projects[scope] if scope else None
+        )
+        obs.clarified = answer.question is not None
+        res = answer.result
+        # the title and every group label: a leak check reads what the chart would show
+        obs.text = answer.question or "\n".join(
+            [answer.title, *(g.label for g in (res.groups if res else []))]
+        )
+        obs.data = {
+            "chart": chart.canonical(answer),
+            "value": res.value if res else None,
+            "groups": {g.label: g.value for g in res.groups} if res else None,
+            "task_titles": [t.title for t in res.tasks] if res else None,
+        }
     elif feature == "nl_rule":
         compiled = await compile_rule(
             session, llm, ctx, world.projects[case.get("project", "Launch Plan")], inp

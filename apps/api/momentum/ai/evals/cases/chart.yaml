@@ -1,0 +1,116 @@
+# Ask for a chart (S6.5.2): the phase exit's 15 fixture questions. Each must become exactly the
+# chart below (`chart_exact` compares it with names in place of ids) and, where the eval data
+# makes it checkable, show the right numbers (counted by the server, never by the model). All run
+# as ravi inside the "Launch Plan" project (a project dashboard) unless `project: null` (a
+# workspace dashboard). Launch Plan, as ravi sees it: 9 open top-level tasks (2 overdue, 2 blocked,
+# 2 unassigned), 2 completed. All 15 have mock fixtures; the last two cases are live-only.
+feature: chart
+cases:
+  - id: how_many_open
+    mock: true
+    input: "How many open tasks are there?"
+    expect:
+      chart_exact: {kind: count}
+      chart_value: 9
+  - id: how_many_overdue
+    mock: true
+    input: "How many tasks are overdue?"
+    expect:
+      chart_exact: {kind: count, filters: {overdue: true}}
+      chart_value: 2
+  - id: open_by_assignee
+    mock: true
+    input: "Show open tasks by assignee"
+    expect:
+      chart_exact: {kind: bar, group_by: assignee}
+      chart_groups: {"Ana Souza": 2, "Mei Chen": 2, "Ravi Kumar": 2, "Priya Nair": 1, "Unassigned": 2}
+  - id: share_overdue_vs_soon
+    mock: true
+    input: "What share of open work is overdue, due soon or later? Make it a donut."
+    expect:
+      chart_exact: {kind: donut, group_by: status}
+      chart_groups: {"Overdue": 2, "Due in 7 days": 4, "Due later": 2, "No due date": 1}
+  - id: completed_per_week
+    mock: true
+    input: "Tasks completed per week over the last 3 months"
+    expect:
+      chart_exact:
+        kind: line
+        filters: {status: completed}
+        time_bucket: week
+        time_field: completed
+      chart_window_between: [80, 95]
+  - id: open_by_section
+    mock: true
+    input: "Open tasks by section"
+    expect:
+      chart_exact: {kind: bar, group_by: section}
+      chart_groups: {"Build": 4, "Launch": 4, "Planning": 1}
+  - id: priority_donut
+    mock: true
+    input: "Break down open work by priority as a donut"
+    expect:
+      chart_exact: {kind: donut, group_by: priority}
+      chart_groups: {"Urgent": 1, "High": 2, "Medium": 1, "No priority": 5}
+  - id: list_overdue
+    mock: true
+    input: "List the overdue tasks"
+    expect:
+      chart_exact: {kind: list, filters: {overdue: true}}
+      chart_tasks: ["Sign vendor contract", "Finalize pricing tiers"]
+  - id: how_many_blocked
+    mock: true
+    input: "How many tasks are blocked?"
+    expect:
+      chart_exact: {kind: count, filters: {blocked: true}}
+      chart_value: 2
+  - id: due_this_week_by_assignee
+    mock: true
+    input: "What's due in the next 7 days, by assignee?"
+    expect:
+      chart_exact: {kind: bar, group_by: assignee, filters: {due_within_days: 7}}
+      chart_groups: {"Mei Chen": 2, "Priya Nair": 1, "Unassigned": 1}
+  - id: how_many_unassigned
+    mock: true
+    input: "How many open tasks have no assignee?"
+    expect:
+      chart_exact: {kind: count, filters: {people: ["Unassigned"]}}
+      chart_value: 2
+  - id: open_by_risk_field
+    mock: true
+    input: "Open tasks by risk"
+    expect:
+      chart_exact: {kind: bar, group_by: field, field: "Risk"}
+      chart_groups: {"No value": 9}
+  - id: mei_open_count
+    mock: true
+    input: "How many open tasks does Mei have?"
+    expect:
+      chart_exact: {kind: count, filters: {people: ["Mei Chen"]}}
+      chart_value: 2
+  - id: urgent_and_high_list
+    mock: true
+    input: "Show the urgent and high priority tasks"
+    expect:
+      chart_exact: {kind: list, filters: {priorities: [high, urgent]}}
+      chart_tasks: ["Payment provider approval", "Sign vendor contract", "Finalize pricing tiers"]
+  - id: workspace_open_by_project
+    mock: true
+    project: null
+    input: "Open tasks by project"
+    expect:
+      chart_exact: {kind: bar, group_by: project}
+      mentions_exclude: ["Secret Roadmap"]
+  # live-only
+  - id: revenue_is_not_a_task_chart
+    input: "Chart our revenue by quarter"
+    expect: {clarifies: true}
+  - id: created_per_month
+    input: "How many tasks were created each month this year?"
+    expect:
+      chart_exact:
+        kind: line
+        filters: {status: all}
+        time_bucket: month
+        time_field: created
+      chart_window_between: [270, 366]

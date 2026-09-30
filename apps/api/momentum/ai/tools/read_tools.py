@@ -19,7 +19,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import ColumnElement, and_, func, or_, select
 from sqlalchemy.orm import aliased
 
-from momentum.ai import retrieval
+from momentum.ai import chart, retrieval
 from momentum.ai.embeddings import INDEXED
 from momentum.ai.tools.base import ToolContext, ToolError, ToolResult, tool
 from momentum.ai.tools.fields import fields_view
@@ -37,6 +37,7 @@ from momentum.core.ids import task_key
 from momentum.domain.access import visible_projects_clause
 from momentum.domain.attachments.models import Attachment
 from momentum.domain.comments.models import Comment
+from momentum.domain.dashboards import query as dashboard_query
 from momentum.domain.goals import service as goals
 from momentum.domain.mytasks.service import list_my_tasks as svc_list_my_tasks
 from momentum.domain.portfolios import service as portfolios
@@ -941,6 +942,59 @@ async def suggest_rebalance(tc: ToolContext, args: SuggestRebalanceArgs) -> Tool
     return ToolResult.success(summary, {"rebalance": data})
 
 
+# ---------------- query_metrics (S6.5.2) ----------------
+
+
+@tool(
+    name="query_metrics",
+    description=(
+        "Count tasks the user can see, the way a dashboard chart does: filters (status, overdue, "
+        "blocked, people, projects, sections, tags, priorities, due or completed within N days), "
+        "optionally split by one dimension (group_by: assignee, section, project, status, "
+        "priority, tag, or a single-select field) or over time (time_bucket day/week/month by "
+        "completed, created or due date). measure sum_estimate gives estimated hours. The server "
+        "computes every number: quote them as given. kind list returns the tasks themselves."
+    ),
+    risk="read",
+    scopes=READ,
+)
+async def query_metrics(tc: ToolContext, args: chart.ChartFilters) -> ToolResult:
+    try:
+        r = await chart.resolve(tc.session, tc.ctx, args, None)
+    except chart.Ask as ask:
+        raise ToolError("unclear", ask.question) from None
+    res = await dashboard_query.run(tc.session, tc.ctx, r.kind, r.spec)
+    hours = res.measure == "sum_estimate"
+
+    def num(v: float) -> float:
+        return round(v / 60, 1) if hours else v
+
+    data: dict[str, Any] = {
+        "what": res.description,
+        "unit": "hours" if hours else "tasks",
+        "total": num(res.total),
+        "tasks_matched": res.tasks_total,
+    }
+    if res.value is not None:
+        data["value"] = num(res.value)
+    if res.groups:
+        data["groups"] = [{"label": g.label, "value": num(g.value)} for g in res.groups]
+    if res.series:
+        data["series"] = [
+            {"from": iso(p.start), "to": iso(p.end), "value": num(p.value)} for p in res.series
+        ]
+    if res.tasks:
+        data["tasks"] = [
+            {"key": t.key, "title": t.title, "due_on": iso(t.due_on), "assignee": t.assignee_name}
+            for t in res.tasks
+        ]
+        data["more"] = res.more
+    if hours and res.unestimated:
+        data["tasks_without_estimate"] = res.unestimated
+    data["note"] = "Counts top-level tasks in projects the user can see."
+    return ToolResult.success(res.description, {"metrics": data})
+
+
 TOOLS = [
     search_tasks,
     semantic_search,
@@ -949,6 +1003,7 @@ TOOLS = [
     get_portfolio,
     get_goals,
     suggest_rebalance,
+    query_metrics,
     get_section_tasks,
     list_my_tasks,
     list_user_tasks,

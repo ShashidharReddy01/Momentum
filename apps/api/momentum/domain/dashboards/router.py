@@ -53,6 +53,7 @@ def _widget_out(w: DashboardWidget) -> WidgetOut:
         query_spec=service.widget_spec(w),
         viz=VizIn.model_validate(w.viz),
         version=w.version,
+        created_from_prompt=w.created_from_prompt,
     )
 
 

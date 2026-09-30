@@ -57,6 +57,8 @@ class DashboardWidget(IdMixin, TimestampMixin, SoftDeleteMixin, Base):
     position: Mapped[str] = mapped_column(POSITION)
     version: Mapped[int] = mapped_column(Integer, default=1)
     created_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
+    # S6.5.2: the question Mo drafted this chart from (null when built by hand)
+    created_from_prompt: Mapped[str | None] = mapped_column(Text)
 
     __table_args__ = (
         CheckConstraint(f"kind in {KINDS}", name="kind"),

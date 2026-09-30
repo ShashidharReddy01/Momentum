@@ -66,7 +66,7 @@ export function WidgetEditor({
     <Dialog
       open={open}
       onOpenChange={onOpenChange}
-      title={initial ? 'Edit chart' : 'Add a chart'}
+      title={initial?.id ? 'Edit chart' : 'Add a chart'}
       className="top-[6vh] w-[min(980px,calc(100vw-32px))]"
     >
       {open ? (
@@ -340,7 +340,7 @@ function EditorBody({
             Cancel
           </Button>
           <Button type="submit" variant="primary" disabled={!!problem} loading={saving}>
-            {initial ? 'Save chart' : 'Add chart'}
+            {initial?.id ? 'Save chart' : 'Add chart'}
           </Button>
         </div>
       </form>

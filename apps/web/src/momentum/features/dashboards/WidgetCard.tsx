@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { lazy, Suspense, useState, type ReactNode } from 'react';
 import { DueText } from '@/components/common/DueText';
+import { MoMark } from '@/components/common/MoMark';
 import { Avatar } from '@/components/ui/Avatar';
 import { Button } from '@/components/ui/Button';
 import {
@@ -44,6 +45,8 @@ export interface WidgetItem {
   spec: QuerySpec;
   size: 'sm' | 'md' | 'lg';
   version: number;
+  /** the question Mo drafted this chart from (S6.5.2) */
+  prompt?: string | null;
 }
 
 /** What was clicked: a group (bar, slice, legend row), a time bucket, or the whole widget. */
@@ -148,7 +151,10 @@ export function WidgetCard({
         className={cn('group relative rounded-xl border border-hair-soft bg-surface p-4', SPAN[item.size])}
       >
         <div className="flex items-start justify-between gap-2">
-          <h3 className="text-[13px] font-medium text-muted">{item.title}</h3>
+          <h3 className="flex items-center gap-1 text-[13px] font-medium text-muted">
+            {item.title}
+            <AskedMark prompt={item.prompt} />
+          </h3>
           <div className="-mr-2 -mt-1 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100">
             {menu}
           </div>
@@ -167,7 +173,10 @@ export function WidgetCard({
     >
       <header className="mb-3 flex items-start gap-2">
         <div className="min-w-0 flex-1">
-          <h3 className="truncate text-sm font-semibold">{item.title}</h3>
+          <h3 className="flex min-w-0 items-center gap-1.5 text-sm font-semibold">
+            <span className="truncate">{item.title}</span>
+            <AskedMark prompt={item.prompt} />
+          </h3>
           {data ? (
             <p className="truncate text-xs text-muted" title={data.description}>
               {data.description}
@@ -187,6 +196,21 @@ export function WidgetCard({
       </header>
       <div className="min-h-0 flex-1">{body}</div>
     </section>
+  );
+}
+
+/** Amber ✦: Mo drafted this chart from a question (the numbers are still counted in code). */
+function AskedMark({ prompt }: { prompt?: string | null }) {
+  if (!prompt) return null;
+  return (
+    <span
+      className="inline-flex shrink-0 text-amber-ink"
+      title={`Mo drafted this chart from: “${prompt}”`}
+      aria-label={`Drafted by Mo from: ${prompt}`}
+      role="img"
+    >
+      <MoMark size={12} />
+    </span>
   );
 }
 

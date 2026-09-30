@@ -399,6 +399,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/ai/dashboards/query": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Turn a question into a chart and its numbers, as the asker (saves nothing) */
+        post: operations["ai_ask_chart_api_v1_ai_dashboards_query_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/ai/feedback": {
         parameters: {
             query?: never;
@@ -3989,6 +4006,36 @@ export interface components {
         BriefIn: {
             /** Brief */
             brief: string;
+        };
+        /** ChartAskIn */
+        ChartAskIn: {
+            /**
+             * Project Id
+             * @description Ask inside this project (its Dashboard tab)
+             */
+            project_id?: string | null;
+            /** Text */
+            text: string;
+        };
+        /**
+         * ChartAskOut
+         * @description Either a chart (``kind``, ``title``, ``query_spec`` ready for ``POST
+         *     /dashboards/{id}/widgets``, the filters as names, and its numbers as the asker), or
+         *     ``question`` when Mo needs to ask rather than guess.
+         */
+        ChartAskOut: {
+            /** Kind */
+            kind?: ("count" | "bar" | "line" | "donut" | "list") | null;
+            /** Named */
+            named?: {
+                [key: string]: unknown;
+            };
+            query_spec?: components["schemas"]["QuerySpec"] | null;
+            /** Question */
+            question?: string | null;
+            result?: components["schemas"]["QueryResultOut"] | null;
+            /** Title */
+            title?: string | null;
         };
         /** ChatIn */
         ChatIn: {
@@ -8755,6 +8802,11 @@ export interface components {
         /** WidgetIn */
         WidgetIn: {
             /**
+             * Created From Prompt
+             * @description The question, when Mo drafted this chart
+             */
+            created_from_prompt?: string | null;
+            /**
              * Kind
              * @enum {string}
              */
@@ -8773,6 +8825,8 @@ export interface components {
         };
         /** WidgetOut */
         WidgetOut: {
+            /** Created From Prompt */
+            created_from_prompt?: string | null;
             /**
              * Id
              * Format: uuid
@@ -9750,6 +9804,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ConversationDetailOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ai_ask_chart_api_v1_ai_dashboards_query_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChartAskIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChartAskOut"];
                 };
             };
             /** @description Validation Error */

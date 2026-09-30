@@ -1,8 +1,11 @@
 import { Plus } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useState, type ReactNode } from 'react';
+import { MoMark } from '@/components/common/MoMark';
 import { Button } from '@/components/ui/Button';
+import { useMomentumConfig } from '@/lib/config';
 import { useChannel } from '@/lib/realtime';
+import { AskChart } from './AskChart';
 import { DashboardView, type DrillState } from './DashboardView';
 import {
   dashboardKeys,
@@ -22,6 +25,7 @@ export function itemOf(w: Widget): WidgetItem {
     spec: w.query_spec,
     size: w.viz.size ?? 'md',
     version: w.version,
+    prompt: w.created_from_prompt ?? null,
   };
 }
 
@@ -58,7 +62,13 @@ export function Board({
   const qc = useQueryClient();
   const m = useDashboardMutations(dashboard?.id ?? null);
   const [drill, setDrill] = useState<DrillState | null>(null);
-  const [editing, setEditing] = useState<{ item: WidgetItem | null; index: number | null } | null>(null);
+  const [editing, setEditing] = useState<{
+    item: WidgetItem | null;
+    index: number | null;
+    prompt?: string;
+  } | null>(null);
+  const [asking, setAsking] = useState(false);
+  const aiEnabled = useMomentumConfig().ai_enabled;
   const items = dashboard ? dashboard.widgets.map(itemOf) : (starter ?? []);
 
   // someone else's edit to this dashboard refreshes the layout
@@ -81,8 +91,17 @@ export function Board({
       m.updateWidget.mutate({ widgetId: id, body });
     } else {
       const board = await ensure();
-      m.addWidget.mutate({ dashboardId: board.id, body });
+      const prompt = target?.prompt;
+      m.addWidget.mutate({
+        dashboardId: board.id,
+        body: prompt ? { ...body, created_from_prompt: prompt } : body,
+      });
     }
+  };
+  const addAsked = async (body: WidgetIn) => {
+    setAsking(false);
+    const board = await ensure();
+    m.addWidget.mutate({ dashboardId: board.id, body });
   };
   const remove = async (item: WidgetItem, index: number) => {
     const { id } = await savedAt(item, index);
@@ -103,6 +122,11 @@ export function Board({
       <header className="flex flex-wrap items-center gap-2">
         <div className="mr-auto min-w-0">{title}</div>
         {actions}
+        {aiEnabled ? (
+          <Button variant="ai" onClick={() => setAsking(true)}>
+            <MoMark size={13} /> Ask for a chart
+          </Button>
+        ) : null}
         {editable ? (
           <Button variant="primary" onClick={() => setEditing({ item: null, index: null })}>
             <Plus size={14} aria-hidden /> Add chart
@@ -122,6 +146,17 @@ export function Board({
         banner={banner}
         paneOpen={paneOpen}
         onOrder={onOrder}
+      />
+      <AskChart
+        open={asking}
+        onOpenChange={setAsking}
+        projectId={projectId}
+        editable={editable}
+        onAdd={(body) => void addAsked(body)}
+        onAdjust={(item, prompt) => {
+          setAsking(false);
+          setEditing({ item, index: null, prompt });
+        }}
       />
       <WidgetEditor
         open={editing !== null}
