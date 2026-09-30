@@ -82,7 +82,7 @@ team_id, user_id, role check in (`lead`,`member`), pk (team_id, user_id).
 | default_view | text check in (`list`,`board`,`calendar`,`timeline`,`overview`,`dashboard`) | |
 | brief | jsonb null, brief_text text | Overview brief |
 | status | text check in (`on_track`,`at_risk`,`off_track`,`on_hold`,`complete`) null | Latest status (denormalized from status_updates) |
-| start_on, due_on | date null | |
+| start_on, due_on | date null | Editable since S6.2.1 (overview; editors; activity + undo; start ≤ due) |
 | archived_at | timestamptz null | |
 | is_template | bool default false | |
 | version, created_by, created_via, timestamps, deleted_at | | |

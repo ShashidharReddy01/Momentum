@@ -83,6 +83,10 @@ export function projectHandlers(base = '', teamName = (id: string) => `Team ${id
       projects.push(p);
       return HttpResponse.json({ data: detail(p), meta }, { status: 201 });
     }),
+    // S6.2.1: the overview's summary numbers (no tasks in this in-memory store: honest zeros)
+    http.get(`*${base}/api/v1/projects/:id/overview`, () =>
+      HttpResponse.json({ total_tasks: 0, completed_tasks: 0, overdue_tasks: 0, milestones: [] }),
+    ),
     http.get(`*${base}/api/v1/projects/:id`, ({ params }) => {
       const p = find(params.id);
       return p

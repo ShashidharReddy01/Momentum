@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
-from typing import Literal
+from datetime import date, datetime
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -27,6 +27,11 @@ class ProjectPatchIn(BaseModel):
     color: str | None = Field(default=None, pattern=COLOR_PATTERN)
     privacy: Privacy | None = None
     default_view: View | None = None
+    # S6.2.1: the overview's key dates and brief (a rich-text document, sanitized like a task
+    # description); null clears
+    start_on: date | None = None
+    due_on: date | None = None
+    brief: dict[str, Any] | None = None
 
 
 class ProjectOut(BaseModel):
@@ -42,6 +47,8 @@ class ProjectOut(BaseModel):
     my_role: str
     is_favorite: bool
     version: int
+    start_on: date | None = None
+    due_on: date | None = None
 
 
 class ProjectMemberOut(BaseModel):
@@ -60,6 +67,24 @@ class ProjectDetailOut(ProjectOut):
     team_name: str
     members: list[ProjectMemberOut]
     sections: list[SectionBrief]
+    brief: dict[str, Any] | None = None
+
+
+class MilestoneOut(BaseModel):
+    id: uuid.UUID
+    key: str
+    title: str
+    due_on: date | None
+    completed_at: datetime | None
+
+
+class ProjectOverviewOut(BaseModel):
+    """S6.2.1: the numbers the overview's summary strip needs, in one round trip."""
+
+    total_tasks: int  # top-level, not deleted
+    completed_tasks: int
+    overdue_tasks: int  # open, due before today (the viewer's timezone)
+    milestones: list[MilestoneOut]  # by due date, undated last
 
 
 class FavoriteIn(BaseModel):

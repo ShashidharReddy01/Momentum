@@ -1543,6 +1543,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/{project_id}/overview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Progress, overdue count and milestones for the project overview */
+        get: operations["project_overview_api_v1_projects__project_id__overview_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/{project_id}/risk": {
         parameters: {
             query?: never;
@@ -4638,6 +4655,22 @@ export interface components {
             /** Name */
             name: string;
         };
+        /** MilestoneOut */
+        MilestoneOut: {
+            /** Completed At */
+            completed_at: string | null;
+            /** Due On */
+            due_on: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Key */
+            key: string;
+            /** Title */
+            title: string;
+        };
         /** ModelAliasesOut */
         ModelAliasesOut: {
             /** Default */
@@ -5199,10 +5232,16 @@ export interface components {
         ProjectDetailOut: {
             /** Archived At */
             archived_at: string | null;
+            /** Brief */
+            brief?: {
+                [key: string]: unknown;
+            } | null;
             /** Color */
             color: string | null;
             /** Default View */
             default_view: string;
+            /** Due On */
+            due_on?: string | null;
             /**
              * Id
              * Format: uuid
@@ -5222,6 +5261,8 @@ export interface components {
             privacy: string;
             /** Sections */
             sections: components["schemas"]["SectionBrief"][];
+            /** Start On */
+            start_on?: string | null;
             /** Status */
             status: string | null;
             /**
@@ -5306,6 +5347,8 @@ export interface components {
             color: string | null;
             /** Default View */
             default_view: string;
+            /** Due On */
+            due_on?: string | null;
             /**
              * Id
              * Format: uuid
@@ -5321,6 +5364,8 @@ export interface components {
             owner_id: string | null;
             /** Privacy */
             privacy: string;
+            /** Start On */
+            start_on?: string | null;
             /** Status */
             status: string | null;
             /**
@@ -5331,16 +5376,38 @@ export interface components {
             /** Version */
             version: number;
         };
+        /**
+         * ProjectOverviewOut
+         * @description S6.2.1: the numbers the overview's summary strip needs, in one round trip.
+         */
+        ProjectOverviewOut: {
+            /** Completed Tasks */
+            completed_tasks: number;
+            /** Milestones */
+            milestones: components["schemas"]["MilestoneOut"][];
+            /** Overdue Tasks */
+            overdue_tasks: number;
+            /** Total Tasks */
+            total_tasks: number;
+        };
         /** ProjectPatchIn */
         ProjectPatchIn: {
+            /** Brief */
+            brief?: {
+                [key: string]: unknown;
+            } | null;
             /** Color */
             color?: string | null;
             /** Default View */
             default_view?: ("list" | "board" | "calendar" | "timeline" | "overview" | "dashboard") | null;
+            /** Due On */
+            due_on?: string | null;
             /** Name */
             name?: string | null;
             /** Privacy */
             privacy?: ("team" | "private") | null;
+            /** Start On */
+            start_on?: string | null;
         };
         /** ProjectRef */
         ProjectRef: {
@@ -10585,6 +10652,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ListOut_OtherPlacementOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    project_overview_api_v1_projects__project_id__overview_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectOverviewOut"];
                 };
             };
             /** @description Validation Error */

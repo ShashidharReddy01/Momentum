@@ -13,6 +13,7 @@ from momentum.core.ids import task_key
 from momentum.core.richtext import doc_hash
 from momentum.domain.mytasks.models import MyTaskPlacement
 from momentum.domain.projects.models import Project
+from momentum.domain.projects.schemas import MilestoneOut, ProjectOverviewOut
 from momentum.domain.sections.models import Section
 from momentum.domain.tasks import service
 from momentum.domain.tasks.models import Task, TaskProject
@@ -664,3 +665,28 @@ async def reschedule(
             cascade=body.cascade,
         )
         return MutationOut(data=_plan_out(m.entity), meta=MutationMeta(batch_id=m.batch_id))
+
+
+@router.get(
+    "/projects/{project_id}/overview",
+    response_model=ProjectOverviewOut,
+    summary="Progress, overdue count and milestones for the project overview",
+)
+async def project_overview(project_id: uuid.UUID, ctx: CtxDep, uow: UowDep) -> ProjectOverviewOut:
+    async with uow.transaction() as s:
+        total, done, overdue, milestones = await service.project_overview(s, ctx, project_id)
+        return ProjectOverviewOut(
+            total_tasks=total,
+            completed_tasks=done,
+            overdue_tasks=overdue,
+            milestones=[
+                MilestoneOut(
+                    id=t.id,
+                    key=task_key(t.number),
+                    title=t.title,
+                    due_on=t.due_on,
+                    completed_at=t.completed_at,
+                )
+                for t in milestones
+            ],
+        )

@@ -43,6 +43,8 @@ def _out(p: Project, role: str, favs: set[uuid.UUID]) -> ProjectOut:
         my_role=role,
         is_favorite=p.id in favs,
         version=p.version,
+        start_on=p.start_on,
+        due_on=p.due_on,
     )
 
 
@@ -58,6 +60,7 @@ async def _detail(s: AsyncSession, ctx: Ctx, p: Project, role: str) -> ProjectDe
         team_name=await service.team_name(s, p.team_id),
         members=members,
         sections=sections,
+        brief=p.brief,
     )
 
 

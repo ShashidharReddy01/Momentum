@@ -1967,6 +1967,45 @@ async def list_project_dependencies(
     return [(a, b) for a, b in rows.all()]
 
 
+async def project_overview(
+    session: AsyncSession, ctx: Ctx, project_id: uuid.UUID
+) -> tuple[int, int, int, list[Task]]:
+    """S6.2.1: (total, completed, overdue, milestones) for a project's top-level tasks, for the
+    overview's summary strip. Overdue = open and due before today in the viewer's timezone.
+    Milestones by due date, undated last."""
+    await get_visible_project(session, ctx, project_id)
+    today = today_for(ctx)
+    base = (
+        select(Task)
+        .join(TaskProject, TaskProject.task_id == Task.id)
+        .where(
+            TaskProject.project_id == project_id,
+            Task.parent_id.is_(None),
+            Task.deleted_at.is_(None),
+        )
+    )
+    sq = base.subquery()
+    counts = (
+        await session.execute(
+            select(
+                func.count(),
+                func.count(sq.c.completed_at),
+                func.count().filter(sq.c.completed_at.is_(None), sq.c.due_on < today),
+            ).select_from(sq)
+        )
+    ).one()
+    milestones = list(
+        (
+            await session.execute(
+                base.where(Task.type == "milestone").order_by(
+                    Task.due_on.asc().nulls_last(), Task.number
+                )
+            )
+        ).scalars()
+    )
+    return int(counts[0]), int(counts[1]), int(counts[2]), milestones
+
+
 # ---------- dependency-aware rescheduling (S6.1.2) ----------
 
 

@@ -111,10 +111,13 @@ export function TimelineView({
   projectId,
   canEdit,
   color,
+  projectDue = null,
 }: {
   projectId: string;
   canEdit: boolean;
   color: string | null;
+  /** The project's own due date (S6.2.1), drawn as a dashed "Due" line. */
+  projectDue?: string | null;
 }) {
   const qc = useQueryClient();
   useChannel(`project:${projectId}`, (event) => applyRealtimeEvent(qc, event, { projectId }));
@@ -679,6 +682,15 @@ export function TimelineView({
                 >
                   Today
                 </div>
+                {projectDue ? (
+                  <div
+                    className="absolute top-1 rounded-sm border border-ink-2 bg-surface px-1 text-[10px] leading-4 font-medium text-ink-2"
+                    style={{ left: xOf(range.start, projectDue, dw) + dw, transform: 'translateX(-50%)' }}
+                    title="The project's due date"
+                  >
+                    Due
+                  </div>
+                ) : null}
               </div>
             </div>
 
@@ -696,6 +708,13 @@ export function TimelineView({
                 />
               ))}
               <div className="absolute top-0 h-full w-0.5 bg-info" style={{ left: todayX + dw / 2 - 1 }} />
+              {projectDue ? (
+                <div
+                  data-project-due
+                  className="absolute top-0 h-full border-l-2 border-dashed border-ink-2"
+                  style={{ left: xOf(range.start, projectDue, dw) + dw }}
+                />
+              ) : null}
             </div>
 
             {/* dependency arrows */}

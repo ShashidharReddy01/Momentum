@@ -9,12 +9,13 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from momentum.core.activity import Diff, record_activity
+from momentum.core.activity import Diff, jsonable_diff, record_activity
 from momentum.core.context import Ctx
 from momentum.core.errors import Conflict, NotFound, ValidationFailed
 from momentum.core.events import emit
 from momentum.core.mutation import Mutation
 from momentum.core.ordering import key_between
+from momentum.core.richtext import plain_text, sanitize_doc
 from momentum.core.undo import UndoConflict, undo_handler, undo_op
 from momentum.domain.access import (
     forbid_agent,
@@ -30,7 +31,7 @@ from momentum.domain.teams.models import Team
 from momentum.domain.users.models import User
 
 DEFAULT_SECTION = "To do"
-DETAIL_FIELDS = ("name", "color")  # editors
+DETAIL_FIELDS = ("name", "color", "start_on", "due_on", "brief")  # editors (dates, brief: S6.2.1)
 ADMIN_FIELDS = ("privacy", "default_view")  # project admins (S2.2.3: the roadmap AC says
 # "per-project default view (project admin)"; moved here from DETAIL_FIELDS)
 
@@ -176,11 +177,20 @@ async def update_project(
     for f in ("privacy", "default_view"):
         if f in fields and getattr(patch, f) is None:
             raise ValidationFailed(f"{f} can't be empty")
+    start = patch.start_on if "start_on" in fields else project.start_on
+    due = patch.due_on if "due_on" in fields else project.due_on
+    if start is not None and due is not None and start > due:
+        raise ValidationFailed(
+            "Start date must be on or before the due date", code="dates_out_of_order"
+        )
     changes: Diff = {}
     for f in fields & {*DETAIL_FIELDS, *ADMIN_FIELDS}:
         new = getattr(patch, f)
         if f == "name" and isinstance(new, str):
             new = new.strip()
+        if f == "brief":
+            new = sanitize_doc(new)
+            project.brief_text = plain_text(new) or None
         old = getattr(project, f)
         if old != new:
             changes[f] = (old, new)
@@ -210,7 +220,7 @@ async def update_project(
         type="project.updated",
         entity_type="project",
         entity_id=project.id,
-        data={"changes": {k: [o, n] for k, (o, n) in changes.items()}, "version": project.version},
+        data={"changes": jsonable_diff(changes), "version": project.version},
         channels=_channels(project.id),
         activity_id=act.id,
     )

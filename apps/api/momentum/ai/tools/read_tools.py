@@ -313,8 +313,12 @@ async def get_project(tc: ToolContext, args: GetProjectArgs) -> ToolResult:
     }
     if project.privacy == "team":
         data["note"] = "Members of the team can also edit this project"
+    if project.start_on is not None:
+        data["start_on"] = iso(project.start_on)
     if project.due_on is not None:
         data["due_on"] = iso(project.due_on)
+    if project.brief_text:
+        data["brief"] = project.brief_text[:1500]  # S6.2.1: the overview's brief, as plain text
     return ToolResult.success(project.name, {"project": data})
 
 

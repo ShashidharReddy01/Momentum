@@ -1,5 +1,6 @@
 export { BoardView } from './BoardView';
 export { CalendarView } from './CalendarView';
+export { DatePicker } from './DatePicker';
 export { ProjectTasksView } from './ProjectTasksView';
 export {
   taskKeys,

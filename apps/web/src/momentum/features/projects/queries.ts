@@ -8,6 +8,7 @@ export type Project = components['schemas']['ProjectOut'];
 export type ProjectDetail = components['schemas']['ProjectDetailOut'];
 export type ProjectCreate = components['schemas']['ProjectCreateIn'];
 export type ProjectPatch = components['schemas']['ProjectPatchIn'];
+export type ProjectOverview = components['schemas']['ProjectOverviewOut'];
 
 export const projectKeys = {
   all: ['projects'] as const,
@@ -195,4 +196,15 @@ export function useProjectMembers(projectId: string) {
     onError: (e) => toastError(e),
   });
   return { add, setRole, remove };
+}
+
+/** S6.2.1: progress, overdue count and milestones for the overview's summary strip. */
+export function useProjectOverview(id: string) {
+  const api = useApi();
+  return useQuery({
+    queryKey: ['projects', id, 'overview'] as const,
+    queryFn: async () =>
+      (await api.GET('/api/v1/projects/{project_id}/overview', { params: { path: { project_id: id } } }))
+        .data!,
+  });
 }

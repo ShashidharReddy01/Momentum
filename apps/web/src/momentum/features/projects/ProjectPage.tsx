@@ -42,9 +42,16 @@ import { FieldsDialog } from '@/features/fields';
 import { FormsDialog } from '@/features/forms';
 import { RulesDialog } from '@/features/rules';
 import { SaveAsTemplateDialog, TaskTemplatesDialog } from '@/features/templates';
-import { StatusChip, StatusOverview, type Status } from '@/features/status';
+import { StatusChip, type Status } from '@/features/status';
 import { useMomentumConfig } from '@/lib/config';
-import { useProject, useProjectLifecycle, useToggleFavorite, useUpdateProject } from './queries';
+import {
+  useProject,
+  useProjectLifecycle,
+  useToggleFavorite,
+  useUpdateProject,
+  type ProjectDetail,
+} from './queries';
+import { ProjectOverview } from './ProjectOverview';
 import { ShareDialog } from './ShareDialog';
 import {
   BoardView,
@@ -295,6 +302,7 @@ export function ProjectPage() {
       <TaskNavProvider>
         <ProjectBody
           view={effectiveView}
+          project={p}
           projectId={p.id}
           canEdit={canEdit && !p.archived_at}
           color={p.color}
@@ -307,11 +315,13 @@ export function ProjectPage() {
 /** The list (scrolls on its own) with the task pane docked on the right when `?task=` is set. */
 function ProjectBody({
   view,
+  project,
   projectId,
   canEdit,
   color,
 }: {
   view: string;
+  project: ProjectDetail;
   projectId: string;
   canEdit: boolean;
   color: string | null;
@@ -336,12 +346,18 @@ function ProjectBody({
           <CalendarView key={projectId} projectId={projectId} canEdit={canEdit} color={color} />
         ) : view === 'timeline' ? (
           <Suspense fallback={<Skeleton className="h-64" />}>
-            <TimelineView key={projectId} projectId={projectId} canEdit={canEdit} color={color} />
+            <TimelineView
+              key={projectId}
+              projectId={projectId}
+              canEdit={canEdit}
+              color={color}
+              projectDue={project.due_on ?? null}
+            />
           </Suspense>
         ) : view === 'overview' ? (
-          <StatusOverview
+          <ProjectOverview
             key={projectId}
-            projectId={projectId}
+            project={project}
             canEdit={canEdit}
             startDraft={searchParams.get('draft') === 'mo'}
           />
