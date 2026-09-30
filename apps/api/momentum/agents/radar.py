@@ -1,7 +1,9 @@
 """S5.3.7 Radar · Risk Watcher: a built-in code-backed agent (``handler: momentum.risk_watcher``).
 
 Weekdays at 08:00 (workspace time), one run per project it has been added to (``per: project``).
-It computes heuristic risk signals in code (forecasts join in Phase 6):
+It computes heuristic risk signals in code (``domain/forecasts/signals.py``, shared with the
+forecast's risk score since S6.5.3). When the project has a fresh stored forecast, Radar reads
+its score and drivers instead of recomputing (``note_from_forecast``):
 
 - **overdue**: a quarter or more of the open tasks with a due date are overdue (at least 2);
 - **blocked**: open tasks waiting on an open blocker that is itself overdue or blocked (a chain);
@@ -20,147 +22,49 @@ from __future__ import annotations
 
 import re
 import uuid
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, date, datetime
 from typing import TYPE_CHECKING, Any
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import aliased
 
 from momentum.ai import prompts
 from momentum.ai.context.tokens import safe
 from momentum.ai.errors import AIUnavailable
-from momentum.core.ids import task_key
 from momentum.domain.agents.models import Agent, AgentRun
+from momentum.domain.forecasts.models import Forecast
+from momentum.domain.forecasts.service import SIGNAL_POINTS, fresh
+from momentum.domain.forecasts.signals import level
+from momentum.domain.forecasts.signals import signals as project_signals
 from momentum.domain.projects.models import Project
-from momentum.domain.tasks.models import Task, TaskDependency, TaskProject
 
 if TYPE_CHECKING:
     from momentum.agents.extensions import HandlerResult, HandlerRun
 
 HANDLER = "momentum.risk_watcher"
-OVERDUE_SHARE = 0.25
-OVERDUE_MIN = 2
-NEAR_DUE_DAYS = 3
-GROWTH_WINDOW = timedelta(days=7)
-GROWTH_MIN = 5
-LISTED = 5  # task keys named per signal
 _KEY = re.compile(r"\bT-\d+\b")
-
-
-def _keys(tasks: list[Task]) -> list[str]:
-    return [f"{task_key(t.number)} {t.title}" for t in tasks[:LISTED]]
 
 
 async def signals(
     hrun: HandlerRun, project_id: uuid.UUID, today: date, now: datetime
 ) -> list[dict[str, Any]]:
-    session = hrun.session
-    open_tasks = list(
-        (
-            await session.execute(
-                select(Task)
-                .join(TaskProject, TaskProject.task_id == Task.id)
-                .where(
-                    TaskProject.project_id == project_id,
-                    Task.deleted_at.is_(None),
-                    Task.completed_at.is_(None),
-                )
-                .order_by(Task.due_on.asc().nulls_last(), Task.number)
-            )
-        ).scalars()
-    )
-    found: list[dict[str, Any]] = []
-    dated = [t for t in open_tasks if t.due_on is not None]
-    overdue = [t for t in dated if t.due_on is not None and t.due_on < today]
-    if len(overdue) >= OVERDUE_MIN and len(overdue) >= OVERDUE_SHARE * len(dated):
-        found.append(
-            {
-                "kind": "overdue",
-                "text": f"{len(overdue)} of {len(dated)} dated open tasks are overdue",
-                "tasks": _keys(overdue),
-                "weight": 2 if len(overdue) >= 0.5 * len(dated) else 1,
-            }
-        )
-    ids = {t.id for t in open_tasks}
-    blocker = aliased(Task)
-    edges = (
-        await session.execute(
-            select(TaskDependency.task_id, blocker)
-            .join(blocker, blocker.id == TaskDependency.depends_on_id)
-            .where(
-                TaskDependency.task_id.in_(ids),
-                blocker.deleted_at.is_(None),
-                blocker.completed_at.is_(None),
-            )
-        )
-    ).all()
-    blocked_ids = {tid for tid, _b in edges}
-    chains = [
-        tid
-        for tid, b in edges
-        if b.id in blocked_ids or (b.due_on is not None and b.due_on < today)
-    ]
-    if chains:
-        chained = [t for t in open_tasks if t.id in set(chains)]
-        found.append(
-            {
-                "kind": "blocked",
-                "text": f"{len(chained)} task(s) wait on work that is itself overdue or blocked",
-                "tasks": _keys(chained),
-                "weight": 2 if len(chained) >= 3 else 1,
-            }
-        )
-    near = [
-        t
-        for t in dated
-        if t.assignee_id is None
-        and t.due_on is not None
-        and today <= t.due_on <= today + timedelta(days=NEAR_DUE_DAYS)
-    ]
-    if near:
-        found.append(
-            {
-                "kind": "unassigned",
-                "text": f"{len(near)} task(s) due within {NEAR_DUE_DAYS} days have no one assigned",
-                "tasks": _keys(near),
-                "weight": 1,
-            }
-        )
-    since = now - GROWTH_WINDOW
-    in_project = select(TaskProject.task_id).where(TaskProject.project_id == project_id)
-    added = int(
-        await session.scalar(
-            select(func.count())
-            .select_from(Task)
-            .where(Task.id.in_(in_project), Task.deleted_at.is_(None), Task.created_at >= since)
-        )
-        or 0
-    )
-    done = int(
-        await session.scalar(
-            select(func.count())
-            .select_from(Task)
-            .where(Task.id.in_(in_project), Task.completed_at >= since)
-        )
-        or 0
-    )
-    if added >= GROWTH_MIN and added > 2 * done:
-        found.append(
-            {
-                "kind": "scope",
-                "text": f"{added} tasks added this week and {done} completed",
-                "tasks": [],
-                "weight": 1,
-            }
-        )
-    return found
+    return await project_signals(hrun.session, project_id, today, now)
 
 
-def level(found: list[dict[str, Any]]) -> str:
-    score = sum(int(s["weight"]) for s in found)
-    return "high" if score >= 4 else "medium" if score >= 2 else "low" if score else "none"
+def note_from_forecast(f: Forecast) -> tuple[str, list[dict[str, Any]]]:
+    """Radar's level and signals from a stored forecast (its drivers are Radar's signals plus
+    the forecast against the due date)."""
+    found = [
+        {
+            "kind": d["kind"],
+            "text": d["text"],
+            "tasks": list(d.get("tasks") or []),
+            "weight": max(1, int(d["points"]) // SIGNAL_POINTS),
+        }
+        for d in f.drivers
+    ]
+    return f.risk_level, found
 
 
 async def _summary(hrun: HandlerRun, project: Project, found: list[dict[str, Any]]) -> str:
@@ -213,8 +117,13 @@ async def risk_watcher(hrun: HandlerRun) -> HandlerResult | None:
         today = now.astimezone(ZoneInfo(zone)).date()
     except (KeyError, ValueError):
         today = now.date()
-    found = await signals(hrun, project.id, today, now)
-    risk = level(found)
+    stored = await fresh(session, project.id, now)
+    if stored is not None:
+        risk, found = note_from_forecast(stored)
+        hrun.step(f"Read the stored forecast: risk {round(stored.risk_score)}/100")
+    else:
+        found = await signals(hrun, project.id, today, now)
+        risk = level(found)
     if not found:
         hrun.step(f"No risk signals in {project.name}")
         hrun.output["risk"] = {

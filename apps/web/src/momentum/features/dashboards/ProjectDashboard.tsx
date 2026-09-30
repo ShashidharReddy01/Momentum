@@ -30,7 +30,7 @@ export function ProjectDashboard({ projectId, projectName }: { projectId: string
   const { remove } = useDashboardMutations(dashboard?.id ?? null);
 
   useChannel(`project:${projectId}`, (event) => {
-    if (event.type.startsWith('task.') || event.type.startsWith('section.'))
+    if (event.event.startsWith('task.') || event.event.startsWith('section.'))
       void qc.invalidateQueries({ queryKey: dashboardKeys.data });
   });
 

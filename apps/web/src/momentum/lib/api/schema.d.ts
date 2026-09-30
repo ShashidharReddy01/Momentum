@@ -1894,6 +1894,24 @@ export interface paths {
         patch: operations["set_field_visibility_api_v1_projects__project_id__fields__field_id__visibility_patch"];
         trace?: never;
     };
+    "/api/v1/projects/{project_id}/forecast": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A project's latest forecast (P50/P80/P95 finish dates) and risk score */
+        get: operations["get_forecast_api_v1_projects__project_id__forecast_get"];
+        put?: never;
+        /** Recompute a project's forecast now */
+        post: operations["refresh_forecast_api_v1_projects__project_id__forecast_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/{project_id}/import/csv": {
         parameters: {
             query?: never;
@@ -4523,6 +4541,17 @@ export interface components {
             /** Total */
             total: number;
         };
+        /** DriverOut */
+        DriverOut: {
+            /** Kind */
+            kind: string;
+            /** Points */
+            points: number;
+            /** Tasks */
+            tasks: string[];
+            /** Text */
+            text: string;
+        };
         /**
          * EffectiveAi
          * @description What the running system actually does, after combining environment and workspace.
@@ -4742,6 +4771,59 @@ export interface components {
         FollowersOut: {
             /** Followers */
             followers: string[];
+        };
+        /**
+         * ForecastOut
+         * @description A project's latest forecast. ``p50``/``p80``/``p95``: the dates by which the remaining work
+         *     is done in 50/80/95% of the simulated futures (null unless ``status`` is ``ok``).
+         */
+        ForecastOut: {
+            /**
+             * As Of
+             * Format: date
+             */
+            as_of: string;
+            /**
+             * Computed At
+             * Format: date-time
+             */
+            computed_at: string;
+            /** Drivers */
+            drivers: components["schemas"]["DriverOut"][];
+            /** Due On */
+            due_on: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Inputs */
+            inputs: {
+                [key: string]: unknown;
+            };
+            /** P50 */
+            p50: string | null;
+            /** P80 */
+            p80: string | null;
+            /** P95 */
+            p95: string | null;
+            /**
+             * Project Id
+             * Format: uuid
+             */
+            project_id: string;
+            /**
+             * Risk Level
+             * @enum {string}
+             */
+            risk_level: "none" | "low" | "medium" | "high";
+            /** Risk Score */
+            risk_score: number;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "done" | "no_history";
         };
         /** FormIn */
         FormIn: {
@@ -6526,6 +6608,10 @@ export interface components {
         ProjectFieldVisibilityIn: {
             /** Is Visible */
             is_visible: boolean;
+        };
+        /** ProjectForecastOut */
+        ProjectForecastOut: {
+            forecast: components["schemas"]["ForecastOut"] | null;
         };
         /** ProjectHit */
         ProjectHit: {
@@ -13404,6 +13490,68 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MutationOut_FieldOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_forecast_api_v1_projects__project_id__forecast_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectForecastOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    refresh_forecast_api_v1_projects__project_id__forecast_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectForecastOut"];
                 };
             };
             /** @description Validation Error */

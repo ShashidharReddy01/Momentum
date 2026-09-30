@@ -107,6 +107,8 @@ Frontend build-time variables use the `VITE_MOMENTUM_` prefix, but the SPA prefe
 | Setting | Default | Description |
 |---|---|---|
 | `MOMENTUM_WORKLOAD_DEFAULT_HOURS` | `30` | Weekly hours a person can plan against when neither they nor a workspace admin has set one (0–80). Admins override it per workspace (`workspaces.settings['workload']`), people per themselves (`users.prefs['weekly_hours']`) and per week (`capacity`, e.g. time off). Used by the Workload view and Architect's capacity notes (S6.4.1) |
+| `MOMENTUM_FORECAST_RUNS` | `10000` | Monte Carlo runs per project forecast (100–200,000). About 0.2 s per project at the default (pure Python) (S6.5.3) |
+| `MOMENTUM_FORECASTS_ENABLED` | `true` | The nightly forecast job's kill switch (`compute_forecasts`, nightly at 02:30 on the worker's clock). When off, a forecast can still be refreshed from a project's overview (S6.5.3) |
 
 ## Integrations (Phase 7)
 

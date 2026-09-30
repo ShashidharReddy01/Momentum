@@ -1,6 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { AlertTriangle, CalendarRange, ChevronDown, ChevronRight, Route } from 'lucide-react';
+import { AlertTriangle, CalendarRange, ChevronDown, ChevronRight, Route, TrendingUp } from 'lucide-react';
 import {
   memo,
   useCallback,
@@ -17,6 +17,7 @@ import { Avatar } from '@/components/ui/Avatar';
 import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { forecastDay, useForecast } from '@/features/forecasts';
 import { usePeople, type Person } from '@/features/people';
 import { useSections } from '@/features/sections';
 import { useProjectTasks, useTaskMutations, useTaskNav, type Task } from '@/features/tasks';
@@ -174,13 +175,19 @@ export function TimelineView({
     () => rowsOf(sections.data ?? [], tasks, collapsed),
     [sections.data, tasks, collapsed],
   );
+  // S6.5.3: the forecast cone (P50-P95, P80 marked) sits on the timeline, not one guessed date
+  const forecast = useForecast(projectId).data;
+  const cone = forecast?.status === 'ok' && forecast.p50 && forecast.p80 && forecast.p95 ? forecast : null;
   const range = useMemo(
     () =>
       rangeOf(
-        saved.map(spanOf).filter((s): s is Span => !!s),
+        [
+          ...saved.map(spanOf).filter((s): s is Span => !!s),
+          ...(cone ? [{ start: cone.p50!, end: cone.p95! }] : []),
+        ],
         today,
       ),
-    [saved, today],
+    [saved, today, cone],
   );
   const dw = DAY_WIDTH[zoom];
   const width = range.days * dw;
@@ -576,6 +583,17 @@ export function TimelineView({
               </button>
             ))}
           </div>
+          {cone ? (
+            <button
+              type="button"
+              onClick={() => scrollToDate(xOf(range.start, cone.p50!, dw))}
+              title={`Forecast: 50% likely done by ${forecastDay(cone.p50!)}, 80% by ${forecastDay(cone.p80!)}, 95% by ${forecastDay(cone.p95!)}. Show it on the timeline`}
+              className="inline-flex items-center gap-1.5 rounded-full border border-info bg-info-tint px-2.5 py-1 text-xs text-ink hover:bg-info-tint/70"
+            >
+              <Icon icon={TrendingUp} size={14} />
+              Forecast · likely {forecastDay(cone.p50!)}
+            </button>
+          ) : null}
           {critical.length ? (
             <button
               type="button"
@@ -682,6 +700,16 @@ export function TimelineView({
                 >
                   Today
                 </div>
+                {cone ? (
+                  <div
+                    data-forecast-chip
+                    className="absolute top-1 rounded-sm bg-info px-1 text-[10px] leading-4 font-medium text-surface"
+                    style={{ left: xOf(range.start, cone.p80!, dw) + dw, transform: 'translateX(-50%)' }}
+                    title={`Forecast: 50% likely done by ${forecastDay(cone.p50!)}, 80% by ${forecastDay(cone.p80!)}, 95% by ${forecastDay(cone.p95!)}`}
+                  >
+                    Forecast
+                  </div>
+                ) : null}
                 {projectDue ? (
                   <div
                     className="absolute top-1 rounded-sm border border-ink-2 bg-surface px-1 text-[10px] leading-4 font-medium text-ink-2"
@@ -708,6 +736,22 @@ export function TimelineView({
                 />
               ))}
               <div className="absolute top-0 h-full w-0.5 bg-info" style={{ left: todayX + dw / 2 - 1 }} />
+              {cone ? (
+                <>
+                  <div
+                    data-forecast-cone
+                    className="absolute top-0 h-full bg-info-tint opacity-70"
+                    style={{
+                      left: xOf(range.start, cone.p50!, dw),
+                      width: xOf(range.start, cone.p95!, dw) - xOf(range.start, cone.p50!, dw) + dw,
+                    }}
+                  />
+                  <div
+                    className="absolute top-0 h-full border-l-2 border-info"
+                    style={{ left: xOf(range.start, cone.p80!, dw) + dw }}
+                  />
+                </>
+              ) : null}
               {projectDue ? (
                 <div
                   data-project-due

@@ -64,6 +64,7 @@ const patches: { id: string; body: Record<string, unknown> }[] = [];
 const reschedules: { id: string; body: Record<string, unknown> }[] = [];
 type Shift = { id: string; key: string; title: string; to_start: string; to_due: string; shift_days: number };
 let planShifted: Shift[] = [];
+let forecast: Record<string, unknown> | null = null;
 
 async function boot(
   tasks: ReturnType<typeof task>[],
@@ -86,6 +87,7 @@ async function boot(
       }),
     ),
     http.get('*/api/v1/projects/:pid/dependencies', () => HttpResponse.json({ data: edges })),
+    http.get('*/api/v1/projects/:pid/forecast', () => HttpResponse.json({ forecast })),
     http.post('*/api/v1/tasks/:id/reschedule/preview', async ({ params, request }) => {
       const body = (await request.json()) as Record<string, unknown>;
       const t = tasks.find((x) => x.id === params.id)!;
@@ -176,6 +178,34 @@ describe('Timeline view', () => {
     await waitFor(() =>
       expect(within(chart).getByRole('button', { name: /^T-2 Build, .* days$/ })).toBeInTheDocument(),
     );
+  });
+
+  it('draws the forecast cone: a P50-P95 band with the P80 line and a Forecast chip', async () => {
+    forecast = {
+      id: 'f1',
+      project_id: 'seed-1',
+      computed_at: new Date().toISOString(),
+      as_of: iso(0),
+      status: 'ok',
+      p50: iso(20),
+      p80: iso(26),
+      p95: iso(33),
+      due_on: null,
+      risk_score: 0,
+      risk_level: 'none',
+      drivers: [],
+      inputs: {},
+    };
+    await boot([task(1, 'Wireframes', 'sec-1', 0, 3)], []);
+    const chip = await screen.findByText('Forecast');
+    expect(chip).toHaveAttribute(
+      'title',
+      expect.stringMatching(/^Forecast: 50% likely done by .*, 80% by .*, 95% by /),
+    );
+    const band = document.querySelector<HTMLElement>('[data-forecast-cone]')!;
+    // the band spans P50 to P95 inclusive: 14 days at the current zoom's day width
+    expect([40, 16, 5].map((dw) => dw * 14)).toContain(parseFloat(band.style.width));
+    forecast = null;
   });
 
   it('collapses a section and switches zoom', async () => {

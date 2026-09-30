@@ -27,6 +27,7 @@ function boot(project: Record<string, unknown>, overview: Record<string, unknown
     ...sectionHandlers('', { 'seed-1': ['Backlog'] }),
     ...taskHandlers('', { 'seed-1': { 'sec-1': ['First'] } }),
     http.get('*/api/v1/projects/:id/risk', () => HttpResponse.json(null)),
+    http.get('*/api/v1/projects/:id/forecast', () => HttpResponse.json({ forecast: null })),
     http.get('*/api/v1/projects/:id/status-updates', () =>
       HttpResponse.json({ data: [], meta: { next_cursor: null } }),
     ),

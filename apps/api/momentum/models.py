@@ -10,6 +10,7 @@ from momentum.domain.attachments.models import Attachment
 from momentum.domain.comments.models import Comment, Mention, Reaction
 from momentum.domain.dashboards.models import Dashboard, DashboardWidget
 from momentum.domain.fields.models import FieldDef, FieldValue, ProjectField
+from momentum.domain.forecasts.models import Forecast
 from momentum.domain.forms.models import Form, FormSubmission
 from momentum.domain.goals.models import Goal, GoalLink
 from momentum.domain.integrations.models import ExternalLink, ImportJob
@@ -49,6 +50,7 @@ __all__ = [
     "FieldDef",
     "FieldValue",
     "Follower",
+    "Forecast",
     "Form",
     "FormSubmission",
     "Goal",

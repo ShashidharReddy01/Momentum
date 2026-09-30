@@ -5,6 +5,7 @@ import { lazy, Suspense, useMemo, useRef, useState } from 'react';
 import { Avatar } from '@/components/ui/Avatar';
 import { Icon } from '@/components/ui/Icon';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { ForecastCard, forecastKey } from '@/features/forecasts';
 import { StatusChip, StatusOverview, type Status } from '@/features/status';
 import { DatePicker, useTaskNav } from '@/features/tasks';
 import { cn } from '@/lib/cn';
@@ -56,8 +57,10 @@ export function ProjectOverview({
   const overview = useProjectOverview(project.id);
   // task changes move the numbers; a project edit elsewhere (dates, brief, status) refreshes it
   useChannel(`project:${project.id}`, (event) => {
+    if (event.event === 'project.forecast_updated')
+      void qc.invalidateQueries({ queryKey: forecastKey(project.id) });
     void qc.invalidateQueries({ queryKey: ['projects', project.id, 'overview'] });
-    if (event.type.startsWith('project.') || event.type.startsWith('status_update.'))
+    if (event.event.startsWith('project.') || event.event.startsWith('status_update.'))
       void qc.invalidateQueries({ queryKey: projectKeys.detail(project.id) });
   });
 
@@ -71,6 +74,7 @@ export function ProjectOverview({
       </section>
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
+          <ForecastCard projectId={project.id} />
           <Brief project={project} canEdit={canEdit} />
           <StatusOverview projectId={project.id} canEdit={canEdit} startDraft={startDraft} />
         </div>

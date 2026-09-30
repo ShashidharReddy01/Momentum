@@ -77,6 +77,9 @@ def seed(
     perf: bool = typer.Option(
         False, "--perf", help="Also add the load-test projects (2k list, 500-task timeline)"
     ),
+    history: bool = typer.Option(
+        False, "--history", help="Also add ~20 finished projects for the forecast backtest"
+    ),
 ) -> None:
     """Load the synthetic demo workspace (safe to re-run)."""
     from momentum.core.db import UnitOfWork, create_engine, create_session_factory
@@ -90,6 +93,10 @@ def seed(
         uow = UnitOfWork(create_session_factory(engine)())
         try:
             async with uow.transaction() as session:
+                if history:
+                    from momentum.seed_history import seed_history
+
+                    return await seed_history(session, settings)
                 if perf:
                     return await seed_perf(session, settings)
                 return await run_seed(session, settings)
@@ -98,6 +105,34 @@ def seed(
             await engine.dispose()
 
     typer.echo(run_async(_run()))
+
+
+@cli.command("forecast-backtest")
+def forecast_backtest(
+    runs: int = typer.Option(0, help="Monte Carlo runs per forecast (default: the setting)"),
+) -> None:
+    """Replay every finished project's forecast from its midpoint (S6.5.3). Pass: 70-90% of
+    them finished on or before their P80 date. Seed the history first: seed --history."""
+    from momentum.core.db import UnitOfWork, create_engine, create_session_factory
+    from momentum.domain.forecasts.backtest import backtest
+
+    settings = Settings()
+
+    async def _run() -> bool:
+        engine = create_engine(settings)
+        uow = UnitOfWork(create_session_factory(engine)())
+        try:
+            async with uow.transaction() as session:
+                report = await backtest(session, runs=runs or settings.forecast_runs)
+        finally:
+            await uow.close()
+            await engine.dispose()
+        for line in report.lines():
+            typer.echo(line)
+        return report.passed
+
+    if not run_async(_run()):
+        raise typer.Exit(1)
 
 
 @cli.command()

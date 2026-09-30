@@ -77,6 +77,10 @@ dependency edges (`GET /projects/{id}/dependencies`).
 
 Production build (`vite build`): the dashboards feature is its own lazy chunk (**10.9 KB gzip**), and Recharts sits in a second one, `charts` (**113 KB gzip**), fetched only when the first bar, donut or line renders (number tiles and task lists don't need it). The initial bundle contains no Recharts code (checked by searching the built `index-*.js` for its class names). Each widget is one request (`GET /dashboards/widgets/{id}/data`, or `POST /dashboards/query` for the starter layout), so a slow widget never holds the others; refetches keep the previous render at 60 % opacity.
 
+## Forecasts (S6.5.3, 2026-10-01)
+
+Pure-Python Monte Carlo, 10,000 runs per project: the whole backtest (20 projects, each loaded from the database and simulated) takes about 5 s including process start, so about 0.2 s per project; the nightly job is linear in active projects. `numpy` wasn't needed (kickoff: only if measured too slow).
+
 ## Rules of thumb for future work
 
 - Anything rendered per row must be cheap to mount: no Radix roots, portals, or context providers
