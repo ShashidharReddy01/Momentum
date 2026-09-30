@@ -281,3 +281,27 @@ This is cheap to settle in mock mode (no gateway needed) by inspecting the actua
 1. **Architect `brief_live`, enforced server-side.** The compression guard already existed (`fit_dates` scales a plan into `[start, end]` with a note) but only ran with an explicit end date, which Architect never has. Now a window the brief states becomes the end date: `from_brief.stated_window` reads "over the next four weeks", "a two-month pilot" or "within 10 days" in code (it skips "starting in two weeks"), and otherwise the model reports it as `window_days` (`project_brief/v2`). The plan is then compressed to fit, whatever the model planned. Applies to S3.4.6 "project from brief" as well. Tests cover the parser, the parsed path and the model-reported path.
 2. **ai_step summary kind:** `_summarize_to_comment` passes `source=` (the task and its thread, the same block the other kinds pass).
 3. **`webinar_breakdown_proposed`, traced: not the last-step fix.** On the last step, a tool call ends the loop with `OUT_OF_STEPS` (or the model's answer, if it gives one); it can't produce an empty string, and Teammate has no `add_comment` tool to lose (removed in S5.3.8). An empty string comes only from a final turn with no tool calls and blank text. A test reproduces it: the model writes its answer in the same turn as its tool call, then ends with nothing, and the loop kept only the final turn's text, a gap older than the last-step fix. The loop now answers with the latest text written beside a tool call when the final turn is blank. The report's `tokens_out: 848` with an empty answer fits this: the text was written, then dropped.
+
+## Round 4: live re-run after the round-3 fixes (2026-09-30) — closing run
+
+Verified all three round-3 diffs against the actual code before running anything (`from_brief.py`'s `stated_window` parser + `fit_dates` wiring, `rule_steps.py`'s added `source=`, `loop.py`'s `written` fallback) — all match the description precisely and are minimal, targeted changes, not eval-loosening.
+
+Setup: `momentum llm-check` (10/10, unchanged), full backend suite (**738/738 pass**, matches the claimed count exactly), full live evals, then frontend suite (**334/334 pass**, all 67 files — the earlier attempt had been killed by the harness's own low-memory guard, not a code issue; re-ran clean once memory recovered).
+
+**Result: 219/220 (99.5%). All 21 feature buckets clear their required threshold. `RESULT: PASS`.**
+
+- `agent_architect`: **100% (3/3)**, up from 67% — 4 consecutive failures fixed by one server-side change (the compression already existed for an explicit end date; now a stated or model-reported window becomes that end date too).
+- `ai_step`: 93.3% (14/15) — clears its 85% floor, no regression-guard trip this time (`Δ: -0.0`).
+- Every other feature: 100%.
+
+**One residual case-level failure, checked against its actual output before calling it anything:** `ai_step/draft_reply_answers_newest` — judge scored 1/5, claiming the reply "makes up facts" by asking *"can you follow up with DataCo legal to confirm they're still on track to sign on Friday?"* The full output: *"Thanks for the update. Since launch is blocked, can you follow up with DataCo legal to confirm they're still on track to sign on Friday? If there are any delays, we need to know ASAP so we can adjust the launch timeline."* This contains no invented dates, names, numbers or decisions — it's a plain follow-up question, which the case's own rubric explicitly allows: *"proposing an obvious next step... are not inventions."* The judge's complaint (asking for confirmation implies unfounded "uncertainty") contradicts its own rubric. **This reads as a judge-consistency miss, not a real product defect** — a different critique than the original "today is Monday" bug (which has now passed cleanly for 3 consecutive rounds), so it isn't the same finding recurring, and it doesn't breach `ai_step`'s threshold. Worth a look if the judge prompt gets touched again, not blocking anything now.
+
+### Summary across all four rounds
+| Round | Live evals | Notes |
+|---|---|---|
+| 1 (initial) | 211/221 (95.5%), 5/21 buckets failing | First live run since Phase 5 exit — found real bugs (citations, Sorter, injection edge case, ai_step hallucination, plan_day) |
+| 2 | 213/220 (96.8%), 4/21 buckets failing | Confirmed fixes; found `plan_day`'s decision (not just wording) was still wrong |
+| 3 | 217/220 (98.6%), 2/21 buckets failing | `plan_day` fully fixed (server-enforced); found `agent_architect`'s timeline bug (4/4 reproductions) and a sibling `ai_step` gap |
+| 4 (closing) | **219/220 (99.5%), 0/21 buckets failing — PASS** | `agent_architect` fixed server-side; one judge-consistency case remains, non-blocking |
+
+Combined with backend 738/738, frontend 334/334, `llm-check` 10/10, and e2e J10 passing: **Phase 5 is verified end to end against the real gateway.**
