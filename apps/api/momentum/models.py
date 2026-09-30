@@ -9,9 +9,11 @@ from momentum.domain.agents.models import Agent, AgentRun
 from momentum.domain.attachments.models import Attachment
 from momentum.domain.comments.models import Comment, Mention, Reaction
 from momentum.domain.fields.models import FieldDef, FieldValue, ProjectField
+from momentum.domain.forms.models import Form, FormSubmission
 from momentum.domain.integrations.models import ExternalLink, ImportJob
 from momentum.domain.mytasks.models import MyTaskPlacement
 from momentum.domain.notifications.models import Notification
+from momentum.domain.portfolios.models import Portfolio, PortfolioItem
 from momentum.domain.projects.models import Favorite, Project, ProjectMember
 from momentum.domain.rules.models import Rule, RuleRun
 from momentum.domain.sections.models import Section
@@ -19,6 +21,7 @@ from momentum.domain.status_updates.models import StatusUpdate
 from momentum.domain.tags.models import Tag, TaskTag
 from momentum.domain.tasks.models import Follower, Task, TaskDependency, TaskProject
 from momentum.domain.teams.models import Team, TeamMember
+from momentum.domain.templates.models import Template
 from momentum.domain.users.models import ApiToken, User, UserIdentity
 from momentum.domain.workspace.models import Workspace
 
@@ -40,6 +43,8 @@ __all__ = [
     "FieldDef",
     "FieldValue",
     "Follower",
+    "Form",
+    "FormSubmission",
     "IdempotencyKey",
     "ImportJob",
     "LlmCall",
@@ -47,6 +52,8 @@ __all__ = [
     "MyTaskPlacement",
     "Notification",
     "OutboxEvent",
+    "Portfolio",
+    "PortfolioItem",
     "Project",
     "ProjectField",
     "ProjectMember",
@@ -62,6 +69,7 @@ __all__ = [
     "TaskTag",
     "Team",
     "TeamMember",
+    "Template",
     "User",
     "UserIdentity",
     "Workspace",

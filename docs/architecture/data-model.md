@@ -227,7 +227,7 @@ key text, user_id, method, path, response_status, response_body jsonb, created_a
 
 ## 8. Planning (Phase 6)
 
-- `portfolios`: id, workspace_id, name, owner_id, description, timestamps, deleted_at. `portfolio_items`: portfolio_id, project_id, position.
+- `portfolios` (**as built, S6.2.2, migration 0032**): id, workspace_id, name, description, owner_id, status null (latest check-in, denormalized like `projects.status`, same values), version, timestamps, deleted_at. Visible to every workspace member; the owner and workspace admins edit. `portfolio_items`: portfolio_id + project_id (pk), workspace_id, position (fractional key, `COLLATE "C"`), created_at. Check-ins are `status_updates` rows with `entity_type='portfolio'`. A portfolio's project rows are computed per viewer (projects they can't see are only counted).
 - `goals`: id, workspace_id, parent_id null, name, owner_id, period (`2026-Q4` / custom start/end), metric jsonb (`{type: number|percent|currency, start, target, current}`), progress_source (`manual`,`projects`,`subgoals`), status, timestamps, deleted_at. `goal_links`: goal_id, entity_type (`project`,`portfolio`), entity_id.
 - `capacity`: user_id, week_start date, capacity_minutes int. Default from user prefs.
 - `dashboards`: id, workspace_id, owner_id, name, scope (`project`,`workspace`), scope_id, layout jsonb. `dashboard_widgets`: id, dashboard_id, kind, query_spec jsonb, viz jsonb, position.

@@ -38,6 +38,7 @@ from momentum.domain.access import visible_projects_clause
 from momentum.domain.attachments.models import Attachment
 from momentum.domain.comments.models import Comment
 from momentum.domain.mytasks.service import list_my_tasks as svc_list_my_tasks
+from momentum.domain.portfolios import service as portfolios
 from momentum.domain.projects.models import Project
 from momentum.domain.projects.service import project_members
 from momentum.domain.sections.models import Section
@@ -719,11 +720,81 @@ async def get_attachment_text(tc: ToolContext, args: GetAttachmentTextArgs) -> T
     )
 
 
+# ---------------- get_portfolio (S6.2.2) ----------------
+
+
+class GetPortfolioArgs(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    portfolio: str | None = Field(
+        default=None,
+        max_length=200,
+        description="Portfolio name or id; omit to list every portfolio",
+    )
+
+
+@tool(
+    name="get_portfolio",
+    description=(
+        "Portfolios (named sets of projects): omit `portfolio` to list them; name one to get its "
+        "projects with status, tasks done/total, overdue count, due date and latest update."
+    ),
+    risk="read",
+    scopes=READ,
+)
+async def get_portfolio(tc: ToolContext, args: GetPortfolioArgs) -> ToolResult:
+    s = tc.session
+    listed = await portfolios.list_portfolios(s, tc.ctx)
+    if args.portfolio is None:
+        return ToolResult.success(
+            f"{len(listed)} portfolios",
+            {
+                "portfolios": [
+                    {"id": str(p.id), "name": p.name, "status": p.status, "projects": n}
+                    for p, n in listed
+                ]
+            },
+        )
+    want = args.portfolio.strip().lower()
+    exact = [p for p, _ in listed if str(p.id) == want or p.name.lower() == want]
+    found = exact or [p for p, _ in listed if want in p.name.lower()]
+    if not found:
+        raise ToolError("not_found", f"No portfolio called {args.portfolio!r}")
+    if len(found) > 1:
+        raise ToolError(
+            "ambiguous",
+            "More than one portfolio matches",
+            candidates=[{"id": str(p.id), "name": p.name} for p in found[:8]],
+        )
+    p = found[0]
+    rows, hidden = await portfolios.portfolio_rows(s, tc.ctx, p)
+    data: dict[str, Any] = {
+        "id": str(p.id),
+        "name": p.name,
+        "status": p.status,
+        "projects": [
+            {
+                "name": x.name,
+                "status": x.status,
+                "tasks_done": f["completed_tasks"],
+                "tasks_total": f["total_tasks"],
+                "overdue": f["overdue_tasks"],
+                "due_on": iso(x.due_on) if x.due_on else None,
+                "latest_update": clip(f["latest_update_title"], 200),
+            }
+            for x, f in rows
+        ],
+    }
+    if hidden:
+        data["projects_you_cannot_see"] = hidden
+    return ToolResult.success(p.name, {"portfolio": data})
+
+
 TOOLS = [
     search_tasks,
     semantic_search,
     get_task,
     get_project,
+    get_portfolio,
     get_section_tasks,
     list_my_tasks,
     list_user_tasks,

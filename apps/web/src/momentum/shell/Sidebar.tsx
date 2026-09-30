@@ -6,6 +6,7 @@ import {
   ChevronsUpDown,
   Download,
   Bot,
+  Briefcase,
   FolderPlus,
   Home,
   Inbox,
@@ -52,6 +53,7 @@ const NAV = [
   { to: '/', label: 'Home', icon: Home, end: true },
   { to: '/my-tasks', label: 'My Tasks', icon: ListChecks },
   { to: '/inbox', label: 'Inbox', icon: Inbox },
+  { to: '/portfolios', label: 'Portfolios', icon: Briefcase },
   { to: '/agents', label: 'Agents', icon: Bot },
 ] as const;
 

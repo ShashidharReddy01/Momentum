@@ -56,6 +56,12 @@ async def authorize_channel(session: AsyncSession, ctx: Ctx, channel: str) -> No
         await get_visible_project(session, ctx, entity_id)
     elif kind == "team":
         await get_visible_team(session, ctx, entity_id)
+    elif kind == "portfolio":
+        # S6.2.2: every member can see a portfolio; rows inside are filtered on read, and its
+        # events carry only ids and versions
+        from momentum.domain.portfolios.service import get_portfolio
+
+        await get_portfolio(session, ctx, entity_id)
     else:
         raise DomainError("Unknown channel", code="invalid_channel")
 

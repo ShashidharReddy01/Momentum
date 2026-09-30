@@ -75,7 +75,8 @@ Registered in S3.1.2 unless noted. `semantic_search` arrives with S3.1.4 (embedd
 |---|---|---|---|
 | `search_tasks` | read | 3 | Structured filters (assignee incl. "none", project, due range, overdue, blocked, status, text). Every task brief lists its open blockers (`blocked_by`) |
 | `semantic_search` | read | 3 (S3.1.4) | Hybrid search across tasks/comments/attachments with snippets |
-| `get_task` / `get_project` / `get_section_tasks` | read | 3 | Details incl. recent activity |
+| `get_task` / `get_project` / `get_section_tasks` | read | 3 | Details incl. recent activity (`get_project` also has the project's start/due dates and brief since S6.2.1) |
+| `get_portfolio` | read | 6 (S6.2.2) | List portfolios, or one portfolio's projects (status, tasks done/total, overdue, due, latest update) as the viewer sees them; projects they can't see only counted |
 | `list_my_tasks` / `list_user_tasks` | read | 3 | |
 | `get_project_activity` | read | 3 | Changes in a time window (for status reports); moved due/start dates and priority carry `from`/`to` |
 | `list_people` | read | 3 | Resolve names → users |
@@ -219,6 +220,7 @@ Workspace memory:
 | Agents | worker | per agent | 5 |
 | Agent from description (S5.2.3) | `POST /agents/draft` (checked draft, nothing saved) | smart | 5 |
 | Agent test run (S5.2.3) | `POST /agents/{id}/test-run` (dry run, nothing changed) | per agent | 5 |
+| Portfolio one-liners (S6.2.2) | `POST /ai/portfolios/{id}/lines` (`portfolio_lines/v1`; a line is kept only if every number in it is in that project's facts, else the plain facts line; nothing stored) | fast | 6 |
 | Ask for a chart | `POST /ai/dashboards/query` | default | 6 |
 | Risk explanation / rebalancing | worker + endpoints | default | 6 |
 

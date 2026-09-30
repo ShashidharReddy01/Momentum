@@ -21,6 +21,7 @@ from momentum.ai import (
     memory,
     nl_rule,
     plan_day,
+    portfolio_lines,
     prefs,
     quick_add,
     sse,
@@ -39,6 +40,7 @@ from momentum.ai.prefs import AiPrefs
 from momentum.api.deps import CtxDep, RuntimeDep, UowDep
 from momentum.api.schemas import ListOut, MutationOut
 from momentum.core.errors import ValidationFailed
+from momentum.domain.portfolios import service as portfolios
 from momentum.domain.status_updates.schemas import StatusUpdateIn
 from momentum.domain.status_updates.service import body_text as status_body_text
 from momentum.domain.workspace.service import (
@@ -818,4 +820,49 @@ async def get_admin_ai_usage(
     async with uow.transaction() as s:
         return await usage_report.get_usage_report(
             s, ctx, days=days, unpriced_models=rt.llm.unpriced_models() if rt.llm else []
+        )
+
+
+# ---------------- portfolio one-liners (S6.2.2) ----------------
+
+
+class PortfolioLineOut(BaseModel):
+    project_id: uuid.UUID
+    text: str
+    ai: bool  # false: the plain facts line (the model skipped it, or invented a number)
+
+
+class PortfolioLinesOut(BaseModel):
+    lines: list[PortfolioLineOut]
+
+
+@router.post(
+    "/portfolios/{portfolio_id}/lines",
+    response_model=PortfolioLinesOut,
+    summary="One line per visible project in a portfolio, from its numbers (stores nothing)",
+)
+async def ai_portfolio_lines(
+    portfolio_id: uuid.UUID, ctx: CtxDep, uow: UowDep, rt: RuntimeDep
+) -> PortfolioLinesOut:
+    llm = require_llm(rt)
+    ctx = ctx.with_(via="ai")
+    async with uow.transaction() as s:
+        p = await portfolios.get_portfolio(s, ctx, portfolio_id)
+        rows, _hidden = await portfolios.portfolio_rows(s, ctx, p)
+        facts = [
+            portfolio_lines.ProjectFacts(
+                id=x.id,
+                name=x.name,
+                status=x.status,
+                total=f["total_tasks"],
+                done=f["completed_tasks"],
+                overdue=f["overdue_tasks"],
+                due_on=x.due_on,
+                latest_update=f["latest_update_title"],
+            )
+            for x, f in rows
+        ]
+        out = await portfolio_lines.lines_for(llm, ctx, facts, datetime.now(UTC).date())
+        return PortfolioLinesOut(
+            lines=[PortfolioLineOut(project_id=x.project_id, text=x.text, ai=x.ai) for x in out]
         )

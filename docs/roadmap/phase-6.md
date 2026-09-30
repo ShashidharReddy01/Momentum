@@ -66,6 +66,7 @@
 ### S6.2.2: Portfolios (lite)
 **Scope:** migrations `portfolios`, `portfolio_items` (both with `workspace_id`); portfolio page: table of projects (owner, status, progress % (completed/total), due, latest status snippet, ✦ one-line AI summary), add/remove projects, portfolio status update draft (aggregates project statuses). **Visibility (kickoff Q5):** every workspace member can see a portfolio; owner and workspace admins edit it; each row is shown only if the viewer can see that project.
 **Size:** M
+**As built (2026-09-30):** migration 0032; `domain/portfolios` (create/rename/delete, add/remove project, all undoable; adding needs to see the project); `GET /portfolios[/{id}]` with rows per viewer and `hidden_projects` counted; check-ins `GET|POST /portfolios/{id}/status-updates` (sets `portfolios.status`, undoable) and `GET /portfolios/{id}/status-draft`, built in code (worst project status; counts in the title; at-risk/off-track under Slipped with their latest update, overdue work under Blockers, due in 14 days under Next; nothing invented). ✦ `POST /ai/portfolios/{id}/lines` (fast alias, `portfolio_lines/v1`, one call per table; numbers must come from the facts or the plain line is used). Mo's `get_portfolio` read tool. New realtime channel `portfolio:<id>`. Sidebar entry **Portfolios**. Found while here: `momentum/models.py` didn't register forms and templates, so autogenerate proposed dropping those tables; registered.
 
 ## E6.3 Goals (lite)
 

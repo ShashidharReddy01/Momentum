@@ -8,6 +8,7 @@ import { AsanaImportPage } from '@/features/imports';
 import { MembersPage } from '@/features/members';
 import { InboxPage, NotificationSettingsPage } from '@/features/notifications';
 import { NotFoundPage } from '@/features/placeholders';
+import { PortfolioPage, PortfoliosPage } from '@/features/portfolios';
 import { ProjectPage } from '@/features/projects';
 import { MyTasksPage } from '@/features/mytasks';
 import { SearchPage } from '@/features/search';
@@ -54,6 +55,8 @@ export function buildRoutes(config: RuntimeConfig): RouteObject[] {
         { path: 'task/:taskId', element: <TaskPage />, handle: { crumb: 'Task' } },
         { path: 'tags/:tagId', element: <TagPage />, handle: { crumb: 'Tag' } },
         { path: 'inbox', element: <InboxPage />, handle: { crumb: 'Inbox' } },
+        { path: 'portfolios', element: <PortfoliosPage />, handle: { crumb: 'Portfolios' } },
+        { path: 'portfolios/:portfolioId', element: <PortfolioPage />, handle: { crumb: 'Portfolio' } },
         { path: 'ai/actions/:actionId', element: <AiActionPage />, handle: { crumb: 'Suggestion' } },
         { path: 'agents', element: <AgentsGallery />, handle: { crumb: 'Agents' } },
         { path: 'agents/new', element: <NewAgentPage />, handle: { crumb: 'New agent' } },

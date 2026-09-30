@@ -1,0 +1,10 @@
+# Mock responses for S6.2.2 portfolio one-liners (feature "portfolio_lines"). Synthetic only.
+# Lines carry no numbers, so they always pass the "numbers must come from the facts" check.
+default:
+  tool_calls:
+    - name: submit_result
+      arguments:
+        lines:
+          - {project: 1, text: "Moving steadily; keep an eye on the overdue work."}
+          - {project: 2, text: "Needs attention: the latest update flags a risk."}
+          - {project: 3, text: "Quiet so far; no status posted yet."}

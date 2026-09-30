@@ -251,6 +251,32 @@
   },
   {
     "function": {
+      "description": "Portfolios (named sets of projects): omit `portfolio` to list them; name one to get its projects with status, tasks done/total, overdue count, due date and latest update.",
+      "name": "get_portfolio",
+      "parameters": {
+        "additionalProperties": false,
+        "properties": {
+          "portfolio": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Portfolio name or id; omit to list every portfolio"
+          }
+        },
+        "type": "object"
+      }
+    },
+    "type": "function"
+  },
+  {
+    "function": {
       "description": "Tasks in one section of a project, in their board/list order.",
       "name": "get_section_tasks",
       "parameters": {

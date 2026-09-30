@@ -469,6 +469,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/ai/portfolios/{portfolio_id}/lines": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** One line per visible project in a portfolio, from its numbers (stores nothing) */
+        post: operations["ai_portfolio_lines_api_v1_ai_portfolios__portfolio_id__lines_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/ai/prefs": {
         parameters: {
             query?: never;
@@ -1242,6 +1259,112 @@ export interface paths {
         put?: never;
         /** Mark unread */
         post: operations["mark_unread_api_v1_notifications__notification_id__unread_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/portfolios": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Portfolios in this workspace */
+        get: operations["list_portfolios_api_v1_portfolios_get"];
+        put?: never;
+        /** Create a portfolio */
+        post: operations["create_portfolio_api_v1_portfolios_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/portfolios/{portfolio_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A portfolio and its projects */
+        get: operations["get_portfolio_api_v1_portfolios__portfolio_id__get"];
+        put?: never;
+        post?: never;
+        /** Delete (undoable) */
+        delete: operations["delete_portfolio_api_v1_portfolios__portfolio_id__delete"];
+        options?: never;
+        head?: never;
+        /** Rename or describe */
+        patch: operations["update_portfolio_api_v1_portfolios__portfolio_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/portfolios/{portfolio_id}/projects": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Add a project you can see */
+        post: operations["add_project_api_v1_portfolios__portfolio_id__projects_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/portfolios/{portfolio_id}/projects/{project_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove a project */
+        delete: operations["remove_project_api_v1_portfolios__portfolio_id__projects__project_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/portfolios/{portfolio_id}/status-draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A check-in drafted from the projects' statuses (nothing is saved) */
+        get: operations["status_draft_api_v1_portfolios__portfolio_id__status_draft_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/portfolios/{portfolio_id}/status-updates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A portfolio's status updates, newest first */
+        get: operations["list_statuses_api_v1_portfolios__portfolio_id__status_updates_get"];
+        put?: never;
+        /** Post a portfolio check-in (sets its status; undoable) */
+        post: operations["post_status_api_v1_portfolios__portfolio_id__status_updates_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4445,6 +4568,13 @@ export interface components {
             /** @default {} */
             meta: components["schemas"]["ListMeta"];
         };
+        /** ListOut[PortfolioOut] */
+        ListOut_PortfolioOut_: {
+            /** Data */
+            data: components["schemas"]["PortfolioOut"][];
+            /** @default {} */
+            meta: components["schemas"]["ListMeta"];
+        };
         /** ListOut[ProjectFieldOut] */
         ListOut_ProjectFieldOut_: {
             /** Data */
@@ -4744,6 +4874,11 @@ export interface components {
         /** MutationOut[OkOut] */
         MutationOut_OkOut_: {
             data: components["schemas"]["OkOut"];
+            meta: components["schemas"]["MutationMeta"];
+        };
+        /** MutationOut[PortfolioDetailOut] */
+        MutationOut_PortfolioDetailOut_: {
+            data: components["schemas"]["PortfolioDetailOut"];
             meta: components["schemas"]["MutationMeta"];
         };
         /** MutationOut[ProjectDetailOut] */
@@ -5209,6 +5344,146 @@ export interface components {
             rationale: string;
             /** Today */
             today: string[];
+        };
+        /** PortfolioDetailOut */
+        PortfolioDetailOut: {
+            /** Can Edit */
+            can_edit: boolean;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Description */
+            description: string | null;
+            /** Hidden Projects */
+            hidden_projects: number;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /**
+             * Owner Id
+             * Format: uuid
+             */
+            owner_id: string;
+            /** Project Count */
+            project_count: number;
+            /** Projects */
+            projects: components["schemas"]["PortfolioProjectRow"][];
+            /** Status */
+            status: string | null;
+            /** Version */
+            version: number;
+        };
+        /** PortfolioIn */
+        PortfolioIn: {
+            /** Description */
+            description?: string | null;
+            /** Name */
+            name: string;
+        };
+        /** PortfolioItemIn */
+        PortfolioItemIn: {
+            /**
+             * Project Id
+             * Format: uuid
+             */
+            project_id: string;
+        };
+        /** PortfolioLineOut */
+        PortfolioLineOut: {
+            /** Ai */
+            ai: boolean;
+            /**
+             * Project Id
+             * Format: uuid
+             */
+            project_id: string;
+            /** Text */
+            text: string;
+        };
+        /** PortfolioLinesOut */
+        PortfolioLinesOut: {
+            /** Lines */
+            lines: components["schemas"]["PortfolioLineOut"][];
+        };
+        /** PortfolioOut */
+        PortfolioOut: {
+            /** Can Edit */
+            can_edit: boolean;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Description */
+            description: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /**
+             * Owner Id
+             * Format: uuid
+             */
+            owner_id: string;
+            /** Project Count */
+            project_count: number;
+            /** Status */
+            status: string | null;
+            /** Version */
+            version: number;
+        };
+        /** PortfolioPatchIn */
+        PortfolioPatchIn: {
+            /** Description */
+            description?: string | null;
+            /** Name */
+            name?: string | null;
+        };
+        /**
+         * PortfolioProjectRow
+         * @description One project line of the portfolio table, as the viewer sees it.
+         */
+        PortfolioProjectRow: {
+            /** Color */
+            color: string | null;
+            /** Completed Tasks */
+            completed_tasks: number;
+            /** Due On */
+            due_on: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Latest Update At */
+            latest_update_at: string | null;
+            /** Latest Update Title */
+            latest_update_title: string | null;
+            /** Name */
+            name: string;
+            /** Overdue Tasks */
+            overdue_tasks: number;
+            /** Owner Id */
+            owner_id: string | null;
+            /** Start On */
+            start_on: string | null;
+            /** Status */
+            status: string | null;
+            /** Total Tasks */
+            total_tasks: number;
+        };
+        /** PortfolioStatusDraftOut */
+        PortfolioStatusDraftOut: {
+            draft: components["schemas"]["StatusUpdateIn"];
         };
         /** ProjectCreateIn */
         ProjectCreateIn: {
@@ -8216,6 +8491,37 @@ export interface operations {
             };
         };
     };
+    ai_portfolio_lines_api_v1_ai_portfolios__portfolio_id__lines_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                portfolio_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortfolioLinesOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_ai_prefs_api_v1_ai_prefs_get: {
         parameters: {
             query?: never;
@@ -9889,6 +10195,320 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["NotificationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_portfolios_api_v1_portfolios_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListOut_PortfolioOut_"];
+                };
+            };
+        };
+    };
+    create_portfolio_api_v1_portfolios_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PortfolioIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationOut_PortfolioDetailOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_portfolio_api_v1_portfolios__portfolio_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                portfolio_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortfolioDetailOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_portfolio_api_v1_portfolios__portfolio_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                portfolio_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationOut_OkOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_portfolio_api_v1_portfolios__portfolio_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                portfolio_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PortfolioPatchIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationOut_PortfolioDetailOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_project_api_v1_portfolios__portfolio_id__projects_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                portfolio_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PortfolioItemIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationOut_PortfolioDetailOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_project_api_v1_portfolios__portfolio_id__projects__project_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                portfolio_id: string;
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationOut_PortfolioDetailOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    status_draft_api_v1_portfolios__portfolio_id__status_draft_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                portfolio_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortfolioStatusDraftOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_statuses_api_v1_portfolios__portfolio_id__status_updates_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                portfolio_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListOut_StatusUpdateOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_status_api_v1_portfolios__portfolio_id__status_updates_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                portfolio_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StatusUpdateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationOut_StatusUpdateOut_"];
                 };
             };
             /** @description Validation Error */
