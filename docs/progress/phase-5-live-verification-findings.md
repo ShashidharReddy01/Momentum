@@ -238,3 +238,40 @@ Setup: `momentum agents install --force --only triage --only teammate` (both cha
 3. **Stale cases:** `pricing_decisions_summary` checks `citations_valid` plus its existing content checks instead of `get_task`. `assigned_research` accepts either search tool (`agent_tools_any`): research "from what we have in Momentum" needs a way to search, and `semantic_search` is the better fit for a topic.
 4. **chat grounding:** the scorer now counts an answer as grounded only when it cites a valid source *and* doesn't say it found nothing, since by its own account what it cites doesn't answer the question. A plain "cites something the tools returned" rule wouldn't fix this case: the unrelated projects must have come from a tool result (no hits, no screen). The product's own `grounded` flag is unchanged, because the UI's "No sources from your workspace cited" would be false here.
 5. **Architect `brief_live`:** not touched. Run it 3 times live (`momentum evals --live --feature agent_architect --case brief_live`) before deciding anything.
+
+## Round 3: live re-run after the round-2 fixes (2026-09-30)
+
+Setup: pulled `85af4fb`, verified the actual diffs against the summary above before running anything (plan_day's server-side enforcement, judge/v2, the two stale-case fixes, the chat scorer change — all check out against the real code, not just the description). Then: `momentum llm-check` (10/10, unchanged), `agent_architect/brief_live` three times solo, then the full `momentum evals --live`. Also re-ran the full backend suite (730/730 pass) since agent/prompt code changed. The frontend suite was started but killed mid-run by the harness's own low-memory protection (not a code issue, not restarted per its guidance — pending a deliberate retry).
+
+**Result: 217/220 (98.6%), up from 213/220 (96.8%).** `plan_day` is now a clean 10/10 — confirmed both by the eval and by reading `momentum/ai/plan_day.py` directly: it now hard-removes any blocked task the model still puts in Today and moves it to Later with a note, so the guarantee holds even if a future prompt regresses it. Two feature buckets still fail:
+
+### 1. `agent_architect/brief_live` — confirmed real, 4 consecutive failures, not variance
+
+Run three times solo plus the round-2 run: **4/4 failures, same root cause stated every time** — the plan spans 5–7 weeks against an explicit "next four weeks" request (e.g. round 3's three runs: Nov 4, Nov 5, Nov 11; round 2: Nov 10). This is not touched by anything in the round-2 fix set, so per this project's own precedent ("a case that fails twice is a finding, not noise") this needs an actual fix to `create_project_from_plan`/Architect's prompt: something that compresses the generated task schedule to fit an explicit stated duration, not just longer/shorter nudging. Recommend adding an explicit post-generation check (like `plan_day`'s server-side guard) that caps the plan's span to the requested window rather than trusting the prompt alone, given the pattern of every other fix in this project working best when the server enforces the constraint instead of just asking the model nicely.
+
+### 2. `ai_step` — 93.3% (14/15), clears its 85% floor but trips the "more than 5-point drop vs last run" regression guard
+
+New failure: `ai_step/summarize_thread_content` — judge: *"includes specific pricing amounts ($9, $29, $79) and detailed decisions that are not supported by any valid citations, server notes, or source material provided."* Those numbers are the real seeded facts (same ones confirmed real in round 2). **Root cause, read directly in `momentum/ai/rule_steps.py`:** `_summarize_to_comment` builds its `StepResult` with no `source=` argument at all —
+
+```python
+return StepResult(
+    summary=f"Summarized {summary.count} comments", comment=summary.text, values={}
+)
+```
+
+— unlike `_draft_reply` and the field-guess kind, both of which pass `source=shown`. So the round-2 fix ("give the judge the real source material") never reached this sibling code path: the judge is still grading "no invented facts" on the summarize kind with nothing to check it against, same class of gap, different function. Fix: pass `source=shown` (the same task/thread block the other kinds already capture) from `_summarize_to_comment` too.
+
+### 3. Needs a trace, not another live run: `agent_teammate/webinar_breakdown_proposed`
+
+Checks: `proposes:create_subtasks` ✓, `subtasks_between` ✓ (6 subtasks), but `not_empty` ✗ — the final posted text is a plain empty string, not the `OUT_OF_STEPS` fallback (`tokens_out: 848`, so real work happened). Two candidate explanations, and the JSON report doesn't carry per-step trace detail to distinguish them:
+- the last-step fix (`_with_last_step_note` / `if last: break` in `momentum/ai/loop.py`) discarded a final `add_comment` tool call on the last allowed step, losing the answer entirely for an agent whose "answer" is itself a tool call, not plain text — which would make this specific fix worse than the old `OUT_OF_STEPS` message for any tool-driven final answer, or
+- the model finished normally (`tool_calls=None`) with a blank `c.text` after having already done its tool work in an earlier step, unrelated to the last-step fix.
+
+This is cheap to settle in mock mode (no gateway needed) by inspecting the actual `agent_runs.trace` for a reproduction of this case, or adding a unit test that forces the last step to coincide with a tool call and asserting the agent still posts something. Recommend checking this before the next live run, since if it's the first explanation, it's a real regression in a change that already shipped to two other agents (Sorter, Teammate) and is worth fixing before it's trusted further.
+
+### Suggested next step
+1. `agent_architect`: add a server-side check that compresses/caps the generated plan to an explicitly requested duration, the same pattern that fixed `plan_day`. Don't just re-prompt.
+2. `rule_steps.py`'s `_summarize_to_comment`: pass `source=shown`, same as the other two kinds.
+3. Check `webinar_breakdown_proposed`'s actual run trace (mock mode, no gateway needed) before the next live run — determine whether the last-step fix can silently drop a tool-call-shaped final answer.
+4. Frontend test suite still needs a clean run (killed by a host memory-pressure guard, not a code issue) — retry when convenient, not urgent.
+5. Re-run `momentum llm-check` + `momentum evals --live` after 1–3, confirm all 21 buckets clear, then close the Phase 5 retro in STATUS.md.
