@@ -551,7 +551,12 @@ export function useDependencyMutations(taskId: string) {
   const undoToast = useUndoToast();
   const settle = () => {
     void qc.invalidateQueries({ queryKey: taskKeys.dependencies(taskId) });
-    void qc.invalidateQueries({ predicate: (q) => q.queryKey[2] === 'blocked-tasks' });
+    // the list's "waiting on" icons and the timeline's arrows, in whichever project they're open
+    void qc.invalidateQueries({
+      predicate: (q) =>
+        q.queryKey[0] === 'projects' &&
+        (q.queryKey[2] === 'blocked-tasks' || q.queryKey[2] === 'dependencies'),
+    });
   };
 
   const add = useMutation({

@@ -13,7 +13,7 @@ from momentum.core.ordering import keys_between
 from momentum.core.settings import Settings
 from momentum.domain.projects.models import Project, ProjectMember
 from momentum.domain.sections.models import Section
-from momentum.domain.tasks.models import Follower, Task, TaskProject
+from momentum.domain.tasks.models import Follower, Task, TaskDependency, TaskProject
 from momentum.domain.teams.models import Team, TeamMember
 from momentum.domain.users.models import User
 from momentum.domain.workspace.models import Workspace
@@ -353,15 +353,54 @@ _THINGS = [
 ]
 
 
-async def seed_perf(session: AsyncSession, settings: Settings, n: int = 2000) -> dict[str, int]:
-    """A large synthetic project for performance work (S1.2.6). Safe to re-run."""
-    await seed(session, settings)
-    ws = await ensure_default_workspace(session, settings)
+TIMELINE_PERF_PROJECT = "Load Test Timeline (500)"
+
+
+async def _perf_project(
+    session: AsyncSession, ws: Workspace, owner: User, team: Team, name: str, color: str
+) -> tuple[Project, list[Section]] | None:
+    """A fresh load-test project with the usual five sections, or ``None`` if it already exists
+    (so ``seed --perf`` is safe to re-run)."""
     exists = await session.execute(
-        select(Project.id).where(Project.workspace_id == ws.id, Project.name == PERF_PROJECT)
+        select(Project.id).where(Project.workspace_id == ws.id, Project.name == name)
     )
     if exists.scalar_one_or_none() is not None:
-        return {"perf_tasks_created": 0}
+        return None
+    project = Project(
+        workspace_id=ws.id,
+        team_id=team.id,
+        name=name,
+        color=color,
+        privacy="team",
+        owner_id=owner.id,
+        created_by=owner.id,
+        created_via="import",
+    )
+    session.add(project)
+    await session.flush()
+    session.add(ProjectMember(project_id=project.id, user_id=owner.id, role="admin"))
+    sections = [
+        Section(workspace_id=ws.id, project_id=project.id, name=section_name, position=pos)
+        for section_name, pos in zip(
+            PERF_SECTIONS, keys_between(None, None, len(PERF_SECTIONS)), strict=True
+        )
+    ]
+    session.add_all(sections)
+    await session.flush()
+    return project, sections
+
+
+async def seed_perf(
+    session: AsyncSession, settings: Settings, n: int = 2000, timeline_n: int = 500
+) -> dict[str, int]:
+    """Large synthetic projects for performance work. Safe to re-run.
+
+    - **Load Test (2k)** (S1.2.6): ``n`` tasks for the list.
+    - **Load Test Timeline (500)** (S6.1.1a): ``timeline_n`` dated tasks (a few milestones, a few
+      unscheduled) with about 0.6 dependencies per task, each on an earlier task, for the timeline.
+    """
+    await seed(session, settings)
+    ws = await ensure_default_workspace(session, settings)
     # ordered: the fixed-seed rng below must see users in the same order every run, or seeded
     # assignments (and anything a journey reads from them) change between runs
     users = list(
@@ -377,50 +416,85 @@ async def seed_perf(session: AsyncSession, settings: Settings, n: int = 2000) ->
             select(Team).where(Team.workspace_id == ws.id, Team.name == "Product")
         )
     ).scalar_one()
-    project = Project(
-        workspace_id=ws.id,
-        team_id=team.id,
-        name=PERF_PROJECT,
-        color="proj-10",
-        privacy="team",
-        owner_id=owner.id,
-        created_by=owner.id,
-        created_via="import",
-    )
-    session.add(project)
-    await session.flush()
-    session.add(ProjectMember(project_id=project.id, user_id=owner.id, role="admin"))
-    sections = [
-        Section(workspace_id=ws.id, project_id=project.id, name=name, position=pos)
-        for name, pos in zip(
-            PERF_SECTIONS, keys_between(None, None, len(PERF_SECTIONS)), strict=True
-        )
-    ]
-    session.add_all(sections)
-    await session.flush()
-    rng = random.Random(7)  # noqa: S311 (synthetic data)
     today = datetime.now(UTC).date()
-    per = n // len(sections)
-    for s_index, section in enumerate(sections):
-        count = per if s_index < len(sections) - 1 else n - per * (len(sections) - 1)
-        for pos in keys_between(None, None, count):
-            ws.task_seq += 1
-            assignee = rng.choice(users) if rng.random() < 0.75 else None
-            task = Task(
-                workspace_id=ws.id,
-                number=ws.task_seq,
-                title=f"{rng.choice(_WORDS).capitalize()} {rng.choice(_THINGS)} #{ws.task_seq}",
-                assignee_id=assignee.id if assignee else None,
-                due_on=today + timedelta(days=rng.randint(-10, 40)) if rng.random() < 0.6 else None,
-                created_by=owner.id,
-                created_via="import",
-            )
-            session.add(task)
-            await session.flush()
-            session.add(
-                TaskProject(
-                    task_id=task.id, project_id=project.id, section_id=section.id, position=pos
+    out = {"perf_tasks_created": 0, "timeline_tasks_created": 0, "timeline_dependencies": 0}
+
+    made = await _perf_project(session, ws, owner, team, PERF_PROJECT, "proj-10")
+    if made is not None:
+        project, sections = made
+        rng = random.Random(7)  # noqa: S311 (synthetic data)
+        per = n // len(sections)
+        for s_index, section in enumerate(sections):
+            count = per if s_index < len(sections) - 1 else n - per * (len(sections) - 1)
+            for pos in keys_between(None, None, count):
+                ws.task_seq += 1
+                assignee = rng.choice(users) if rng.random() < 0.75 else None
+                task = Task(
+                    workspace_id=ws.id,
+                    number=ws.task_seq,
+                    title=f"{rng.choice(_WORDS).capitalize()} {rng.choice(_THINGS)} #{ws.task_seq}",
+                    assignee_id=assignee.id if assignee else None,
+                    due_on=today + timedelta(days=rng.randint(-10, 40))
+                    if rng.random() < 0.6
+                    else None,
+                    created_by=owner.id,
+                    created_via="import",
                 )
-            )
+                session.add(task)
+                await session.flush()
+                session.add(
+                    TaskProject(
+                        task_id=task.id, project_id=project.id, section_id=section.id, position=pos
+                    )
+                )
+        out["perf_tasks_created"] = n
+
+    made = await _perf_project(session, ws, owner, team, TIMELINE_PERF_PROJECT, "proj-4")
+    if made is not None:
+        project, sections = made
+        rng = random.Random(11)  # noqa: S311 (synthetic data)
+        created: list[Task] = []
+        per = timeline_n // len(sections)
+        for s_index, section in enumerate(sections):
+            count = per if s_index < len(sections) - 1 else timeline_n - per * (len(sections) - 1)
+            # each section is a phase: later sections start later, and phases overlap
+            phase_start = today - timedelta(days=30) + timedelta(days=s_index * 24)
+            for pos in keys_between(None, None, count):
+                ws.task_seq += 1
+                assignee = rng.choice(users) if rng.random() < 0.85 else None
+                roll = rng.random()
+                start = phase_start + timedelta(days=rng.randint(0, 30))
+                milestone = roll < 0.03
+                unscheduled = 0.03 <= roll < 0.06
+                task = Task(
+                    workspace_id=ws.id,
+                    number=ws.task_seq,
+                    title=f"{rng.choice(_WORDS).capitalize()} {rng.choice(_THINGS)} #{ws.task_seq}",
+                    type="milestone" if milestone else "task",
+                    assignee_id=assignee.id if assignee else None,
+                    start_on=None if milestone or unscheduled else start,
+                    due_on=None
+                    if unscheduled
+                    else start + timedelta(days=0 if milestone else rng.randint(0, 12)),
+                    completed_at=datetime.now(UTC) - timedelta(days=1)
+                    if start + timedelta(days=12) < today and rng.random() < 0.7
+                    else None,
+                    created_by=owner.id,
+                    created_via="import",
+                )
+                session.add(task)
+                await session.flush()
+                session.add(
+                    TaskProject(
+                        task_id=task.id, project_id=project.id, section_id=section.id, position=pos
+                    )
+                )
+                # depend on an earlier nearby task (never a cycle: edges only point backwards)
+                if created and rng.random() < 0.6:
+                    blocker = created[max(0, len(created) - rng.randint(1, 15))]
+                    session.add(TaskDependency(task_id=task.id, depends_on_id=blocker.id))
+                    out["timeline_dependencies"] += 1
+                created.append(task)
+        out["timeline_tasks_created"] = timeline_n
     await session.flush()
-    return {"perf_tasks_created": n}
+    return out

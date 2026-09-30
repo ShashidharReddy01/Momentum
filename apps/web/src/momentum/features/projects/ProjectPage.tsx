@@ -12,7 +12,7 @@ import {
   Users,
   Zap,
 } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { AskMoButton } from '@/components/common/AI';
 import { MoMark } from '@/components/common/MoMark';
@@ -57,11 +57,14 @@ import {
   type ViewKey,
 } from '@/features/tasks';
 
+// Lazy: the timeline is a separate chunk, loaded only when the tab opens (frontend-architecture).
+const TimelineView = lazy(() => import('@/features/timeline').then((m) => ({ default: m.TimelineView })));
+
 const VIEWS = [
   { key: 'list', label: 'List' },
   { key: 'board', label: 'Board' },
   { key: 'calendar', label: 'Calendar' },
-  { key: 'timeline', label: 'Timeline', phase: 6 },
+  { key: 'timeline', label: 'Timeline' },
   { key: 'overview', label: 'Overview' },
 ] as const;
 type LiveView = Exclude<(typeof VIEWS)[number], { phase: number }>['key'];
@@ -320,7 +323,9 @@ function ProjectBody({
       <div
         className={cn(
           'min-w-0 flex-1 px-4 py-5 md:px-8',
-          view === 'board' || view === 'calendar' ? 'overflow-hidden' : 'overflow-auto',
+          view === 'board' || view === 'calendar' || view === 'timeline'
+            ? 'overflow-hidden'
+            : 'overflow-auto',
         )}
       >
         {view === 'list' ? (
@@ -329,6 +334,10 @@ function ProjectBody({
           <BoardView key={projectId} projectId={projectId} canEdit={canEdit} color={color} />
         ) : view === 'calendar' ? (
           <CalendarView key={projectId} projectId={projectId} canEdit={canEdit} color={color} />
+        ) : view === 'timeline' ? (
+          <Suspense fallback={<Skeleton className="h-64" />}>
+            <TimelineView key={projectId} projectId={projectId} canEdit={canEdit} color={color} />
+          </Suspense>
         ) : view === 'overview' ? (
           <StatusOverview
             key={projectId}

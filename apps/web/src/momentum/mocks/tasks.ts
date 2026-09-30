@@ -207,6 +207,7 @@ export function taskHandlers(
       prefs.set(String(params.pid), body);
       return HttpResponse.json(body);
     }),
+    http.get(`*${base}/api/v1/projects/:pid/dependencies`, () => HttpResponse.json({ data: [] })),
     http.get(`*${base}/api/v1/projects/:pid/tasks`, ({ params, request }) => {
       const completed = new URL(request.url).searchParams.get('completed') === 'true';
       const data = tasks

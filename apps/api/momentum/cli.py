@@ -74,7 +74,9 @@ def migrate(revision: str = "head") -> None:
 
 @cli.command()
 def seed(
-    perf: bool = typer.Option(False, "--perf", help="Also add a 2,000-task project (performance)"),
+    perf: bool = typer.Option(
+        False, "--perf", help="Also add the load-test projects (2k list, 500-task timeline)"
+    ),
 ) -> None:
     """Load the synthetic demo workspace (safe to re-run)."""
     from momentum.core.db import UnitOfWork, create_engine, create_session_factory

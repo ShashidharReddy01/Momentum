@@ -137,9 +137,10 @@ Tracked in their phase files; copy the slice list here at each phase kickoff.
 - **Baseline:** `make check` green on `8c7de80` (backend 738/738, web 334/334, lint, format, types, import contracts). A fresh container needs Postgres (the Phase 5 handoff recipe) **and** `pnpm install` in `apps/web` (no root `package.json`); without the latter, `types-check` fails with error 254.
 - **Kickoff answers (product owner, 2026-09-30):** every recommendation accepted (Q1 custom SVG timeline, Q2 split S6.1.1, Q3 capacity, Q4 backtest, Q5 visibility, Q6 J11/J12), plus a UX bar: "the WOW factor, easy for the user to view data, better than Asana" (in `phase-6.md`).
 - **Standing instruction (product owner, 2026-09-30):** do what's recommended and continue slice by slice, committing and pushing each.
-- **Next up:** S6.1.1a Timeline rendering.
+- **Next up:** S6.1.1b Timeline editing (drag, resize, nudge, schedule from the tray).
+- **S6.1.1a notes:** the timeline is live on every project's Timeline tab; try it on **Load Test Timeline (500)** (`momentum seed --perf`). Its synthetic data has many conflicts and overdue tasks by design (random dates), so expect a lot of crit. `tools/perf/timeline-perf.mjs` measures it and takes screenshots.
 - [x] Kickoff (`docs/roadmap/phase-6-kickoff.md`, 2026-09-30); answers recorded, refinements applied to `phase-6.md`
-- [ ] S6.1.1a Timeline rendering · [ ] S6.1.1b Timeline editing · [ ] S6.1.2 Dependency-aware rescheduling
+- [x] S6.1.1a Timeline rendering (2026-09-30) · [ ] S6.1.1b Timeline editing · [ ] S6.1.2 Dependency-aware rescheduling · [ ] S6.1.3 Dependency hand-offs (added 2026-09-30: templates keep dependencies, "you're up" notification, `task.unblocked` rule trigger)
 - [ ] S6.2.1 Project overview tab · [ ] S6.2.2 Portfolios (lite)
 - [ ] S6.3.1 Goals · [ ] S6.3.2 AI for goals
 - [ ] S6.4.1 Workload view · [ ] S6.4.2 AI rebalancing

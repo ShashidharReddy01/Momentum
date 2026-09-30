@@ -20,6 +20,7 @@ from momentum.domain.tasks.schemas import (
     ApprovalDecisionIn,
     BlockedTaskOut,
     DependenciesOut,
+    DependencyEdgeOut,
     DependencyIn,
     FollowerIn,
     FollowersOut,
@@ -591,3 +592,16 @@ async def list_blocked_tasks(
     async with uow.transaction() as s:
         ids = await service.list_blocked_tasks(s, ctx, project_id)
         return ListOut(data=[BlockedTaskOut(task_id=i) for i in ids])
+
+
+@router.get(
+    "/projects/{project_id}/dependencies",
+    response_model=ListOut[DependencyEdgeOut],
+    summary="Every dependency between two tasks of this project (for the timeline)",
+)
+async def list_project_dependencies(
+    project_id: uuid.UUID, ctx: CtxDep, uow: UowDep
+) -> ListOut[DependencyEdgeOut]:
+    async with uow.transaction() as s:
+        edges = await service.list_project_dependencies(s, ctx, project_id)
+        return ListOut(data=[DependencyEdgeOut(task_id=a, depends_on_id=b) for a, b in edges])

@@ -12,7 +12,7 @@
 - **Dashboards:** ask for a chart in words; every chart is built from our tokens, readable in both themes, and clicking a bar opens the tasks behind it.
 - **Everywhere:** empty states explain what to do next; nulls stay honest (no invented data); AI content keeps the amber ✦ accent.
 
-**Build order:** S6.1.1a → S6.1.1b → S6.1.2 → S6.2.1 → S6.2.2 → S6.3.1 → S6.3.2 → S6.4.1 → S6.4.2 → S6.5.1 → S6.5.2 → S6.5.3.
+**Build order:** S6.1.1a → S6.1.1b → S6.1.2 → S6.1.3 → S6.2.1 → S6.2.2 → S6.3.1 → S6.3.2 → S6.4.1 → S6.4.2 → S6.5.1 → S6.5.2 → S6.5.3.
 
 ---
 
@@ -34,6 +34,7 @@
 - `momentum seed --perf` also adds **Load Test Timeline (500)**: 500 dated tasks in 5 sections with ~300 dependencies.
 **Perf budget:** 500 tasks + ~300 dependencies render < 1 s after data arrives; scroll/pan at 60 fps (production build, same method as S1.2.6).
 **Size:** L
+**As built (2026-09-30):** `GET /projects/{id}/dependencies` returns `{task_id, depends_on_id}` edges whose two tasks are both in the project and not deleted (an edge to another project's task is left out; the pane still lists it). Critical path = the longest chain of open, scheduled, dependent tasks by total duration (client-side, `layout.ts`); a conflict = an open dependent that starts before its open blocker's due date (same-day hand-offs allowed). Rows are top-level tasks; "Show completed" adds the latest completed page (as the list). Measured: 0.83 s to the first bar at 4× CPU slowdown, 60 fps scroll (`performance.md`); the whole view is a 7 KB gzip lazy chunk.
 
 ### S6.1.1b: Timeline editing
 **Scope:** drag a bar to move (both dates shift), drag its edges to resize, drag from Unscheduled onto the timeline to schedule (1-day bar at the drop day), `←/→` nudges the focused task 1 day (`Shift` = 1 week), `J/K` move focus; edits through `useTaskMutations` (undo toasts, realtime, version conflicts as elsewhere); a drag shows the new dates in a tooltip while dragging; read-only for viewers.
@@ -41,6 +42,15 @@
 
 ### S6.1.2: Dependency-aware rescheduling
 **Scope:** moving a task with dependents computes the cascade in the **tasks service** (`plan_reschedule`: every dependent that would start before its blocker's new due shifts by the same working-day delta, transitively; returns the diff without writing). The timeline shows the dependents that would move as **ghost bars** during the drag, then a `PreviewCard`-style confirm ("Move T-12 and 4 dependents?" → Apply / Only this task / Cancel). Apply is one `bulk` batch (one undo). "Only this task" applies the move alone and the conflicting arrows turn `--crit`.
+**Size:** M
+
+### S6.1.3: Dependency hand-offs
+**Added 2026-09-30 at the product owner's request** ("if there is a template, one task depends on another to be finished, only then the next one kicks off"). Found missing: project templates drop dependencies, and nothing happens when a task's last blocker is finished.
+**Scope:**
+- **Templates keep dependencies:** a `project` template payload records each task's blockers by position (`depends_on: [task index]`, captured when saving as a template, including AI-drafted templates from S4.3.3); "New from template" replays them through `add_dependency` (one write path, cycle check included). Existing templates without the key keep working.
+- **"You're up" hand-off:** when a task's last open blocker is completed, its assignee gets a notification (new kind `task_unblocked`, respecting notification preferences) naming the finished blocker; undoing that completion doesn't notify twice.
+- **Rules trigger `task.unblocked`** (outbox event + rules vocabulary + `nl_rule` prompt, per the Phase 4 rule), so a project can automate the kick-off, e.g. "when a task is unblocked, move it to In progress and set its start date to today".
+- The list's "waiting on" icon and the timeline's arrows update live when the blocker completes.
 **Size:** M
 
 ## E6.2 Overview, status, portfolios

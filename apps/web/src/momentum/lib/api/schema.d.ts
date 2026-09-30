@@ -1319,6 +1319,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/{project_id}/dependencies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Every dependency between two tasks of this project (for the timeline) */
+        get: operations["list_project_dependencies_api_v1_projects__project_id__dependencies_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/{project_id}/field-values": {
         parameters: {
             query?: never;
@@ -3683,6 +3700,22 @@ export interface components {
             /** Blocking */
             blocking: components["schemas"]["TaskSummaryOut"][];
         };
+        /**
+         * DependencyEdgeOut
+         * @description ``task_id`` is blocked by ``depends_on_id``; both are in the project (S6.1.1a timeline).
+         */
+        DependencyEdgeOut: {
+            /**
+             * Depends On Id
+             * Format: uuid
+             */
+            depends_on_id: string;
+            /**
+             * Task Id
+             * Format: uuid
+             */
+            task_id: string;
+        };
         /** DependencyIn */
         DependencyIn: {
             /**
@@ -4278,6 +4311,13 @@ export interface components {
         ListOut_ConversationOut_: {
             /** Data */
             data: components["schemas"]["ConversationOut"][];
+            /** @default {} */
+            meta: components["schemas"]["ListMeta"];
+        };
+        /** ListOut[DependencyEdgeOut] */
+        ListOut_DependencyEdgeOut_: {
+            /** Data */
+            data: components["schemas"]["DependencyEdgeOut"][];
             /** @default {} */
             meta: components["schemas"]["ListMeta"];
         };
@@ -9902,6 +9942,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ListOut_BlockedTaskOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_project_dependencies_api_v1_projects__project_id__dependencies_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListOut_DependencyEdgeOut_"];
                 };
             };
             /** @description Validation Error */

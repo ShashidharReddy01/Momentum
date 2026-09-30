@@ -185,7 +185,10 @@ function applyTaskEvent(
       // delivered it, so the *other* task's own pane needs its own query invalidated by id too.
       const dependsOnId = str(data.depends_on_id);
       if (dependsOnId) void qc.invalidateQueries({ queryKey: taskKeys.dependencies(dependsOnId) });
-      if (ctx.projectId) void qc.invalidateQueries({ queryKey: taskKeys.blockedTasks(ctx.projectId) });
+      if (ctx.projectId) {
+        void qc.invalidateQueries({ queryKey: taskKeys.blockedTasks(ctx.projectId) });
+        void qc.invalidateQueries({ queryKey: ['projects', ctx.projectId, 'dependencies'] });
+      }
       return;
     }
     default:

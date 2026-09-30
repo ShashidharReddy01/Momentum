@@ -249,6 +249,13 @@ class DependencyIn(BaseModel):
     depends_on_id: uuid.UUID
 
 
+class DependencyEdgeOut(BaseModel):
+    """``task_id`` is blocked by ``depends_on_id``; both are in the project (S6.1.1a timeline)."""
+
+    task_id: uuid.UUID
+    depends_on_id: uuid.UUID
+
+
 class BlockedTaskOut(BaseModel):
     """One task id with an incomplete blocker — the shape the bulk per-project endpoint returns,
     for the list row's "waiting on" icon."""

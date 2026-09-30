@@ -1873,6 +1873,32 @@ async def list_blocked_tasks(
     return list(rows.scalars())
 
 
+async def list_project_dependencies(
+    session: AsyncSession, ctx: Ctx, project_id: uuid.UUID
+) -> list[tuple[uuid.UUID, uuid.UUID]]:
+    """Every dependency edge ``(task_id, depends_on_id)`` whose two tasks are both in this project
+    and not deleted, for the timeline's arrows (S6.1.1a). One query for the whole project. Seeing
+    the project means seeing its tasks, so no per-task check is needed."""
+    await get_visible_project(session, ctx, project_id)
+    Blocker = aliased(Task)
+    BlockerPlacement = aliased(TaskProject)
+    rows = await session.execute(
+        select(TaskDependency.task_id, TaskDependency.depends_on_id)
+        .join(TaskProject, TaskProject.task_id == TaskDependency.task_id)
+        .join(Task, Task.id == TaskDependency.task_id)
+        .join(Blocker, Blocker.id == TaskDependency.depends_on_id)
+        .join(BlockerPlacement, BlockerPlacement.task_id == TaskDependency.depends_on_id)
+        .where(
+            TaskProject.project_id == project_id,
+            BlockerPlacement.project_id == project_id,
+            Task.deleted_at.is_(None),
+            Blocker.deleted_at.is_(None),
+        )
+        .order_by(TaskDependency.created_at)
+    )
+    return [(a, b) for a, b in rows.all()]
+
+
 # ---------- section hooks ----------
 
 

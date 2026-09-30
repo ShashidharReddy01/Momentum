@@ -51,6 +51,28 @@ real hardware scrolling is composited on the GPU.
 7. **gzip** for API responses ≥ 1 KB (App Service containers don't compress for us).
 8. Linear-time grouping (no array spreads inside loops).
 
+## Timeline (S6.1.1a, 2026-09-30)
+
+**Budget** (phase-6.md): 500 tasks with ~300 dependencies render in < 1 s after the view opens, and
+scroll/pan at 60 fps. **Measure:** `momentum seed --perf` also adds **Load Test Timeline (500)**
+(500 dated tasks in 5 overlapping phases, ~15 milestones, ~15 unscheduled, 303 dependencies, each
+on an earlier task); build and serve as above, then
+`node tools/perf/timeline-perf.mjs http://localhost:8000 <cpu-slowdown> [screenshot-dir]`.
+
+| Build container, headless Chromium | 1× | 4× CPU slowdown |
+|---|---|---|
+| Tab click → first bar (incl. the lazy chunk and both API calls) | 0.45 s | **0.83 s** |
+| Rows / arrows in the DOM (of 500 tasks / 303 edges) | 28 / 8 | 29 / 8 |
+| Vertical scroll frame p50 / p95 | 17 / 17 ms | **17 / 33 ms** |
+| Horizontal pan frame p50 / p95 | 17 / 17 ms | 17 / 17 ms |
+| Timeline chunk (JS, gzip) | 7 KB | |
+
+**What makes it cheap:** fixed 36 px rows virtualized with `@tanstack/react-virtual` (the task
+column is `sticky` inside each absolutely positioned row, so both axes scroll in one container);
+arrows computed per render only for edges touching the mounted rows; weekend shading is one CSS
+gradient, not an element per day; `memo` rows with stable callbacks; one query each for tasks and
+dependency edges (`GET /projects/{id}/dependencies`).
+
 ## Rules of thumb for future work
 
 - Anything rendered per row must be cheap to mount: no Radix roots, portals, or context providers

@@ -192,3 +192,60 @@ async def test_undo_add_and_remove_dependency(as_user: Clients) -> None:
         for t in (await ravi.get(f"/api/v1/tasks/{a['id']}/dependencies")).json()["blocked_by"]
     ] == [b["id"]]
     assert add2.status_code == 201
+
+
+async def test_project_dependency_edges_for_the_timeline(as_user: Clients) -> None:
+    """S6.1.1a: one call returns every edge between two tasks of the project; an edge to a task
+    in another project, or to a deleted task, is left out; a non-member gets 404."""
+    ravi = await as_user("ravi")
+    pid = await _project(ravi)
+    other = await _project(ravi, "Mobile App v2")
+    a = await _task(ravi, pid, "A")
+    b = await _task(ravi, pid, "B")
+    c = await _task(ravi, pid, "C")
+    elsewhere = await _task(ravi, other, "Elsewhere")
+    gone = await _task(ravi, pid, "Gone")
+    for task, blocker in ((a, b), (b, c), (a, elsewhere), (c, gone)):
+        r = await ravi.post(
+            f"/api/v1/tasks/{task['id']}/dependencies", json={"depends_on_id": blocker["id"]}
+        )
+        assert r.status_code == 201, r.text
+    assert (await ravi.delete(f"/api/v1/tasks/{gone['id']}")).status_code == 200
+
+    r = await ravi.get(f"/api/v1/projects/{pid}/dependencies")
+    assert r.status_code == 200, r.text
+    edges = {(e["task_id"], e["depends_on_id"]) for e in r.json()["data"]}
+    assert edges == {(a["id"], b["id"]), (b["id"], c["id"])}
+
+    mei = await as_user("mei")  # not a member of the private project
+    assert (await mei.get(f"/api/v1/projects/{other}/dependencies")).status_code == 404
+
+
+async def test_timeline_perf_seed_is_dated_linked_and_rerunnable(
+    as_user: Clients,
+    uow,
+    settings,  # type: ignore[no-untyped-def]
+) -> None:
+    """S6.1.1a: ``seed --perf`` adds a dated, dependency-linked timeline project; re-running adds
+    nothing."""
+    from momentum.seed import TIMELINE_PERF_PROJECT, seed_perf
+
+    async with uow.transaction() as session:
+        first = await seed_perf(session, settings, n=10, timeline_n=60)
+    async with uow.transaction() as session:
+        again = await seed_perf(session, settings, n=10, timeline_n=60)
+    assert first["timeline_tasks_created"] == 60
+    assert first["timeline_dependencies"] > 10
+    assert again == {
+        "perf_tasks_created": 0,
+        "timeline_tasks_created": 0,
+        "timeline_dependencies": 0,
+    }
+
+    ravi = await as_user("ravi")
+    pid = await _project(ravi, TIMELINE_PERF_PROJECT)
+    tasks = (await ravi.get(f"/api/v1/projects/{pid}/tasks")).json()["data"]
+    assert sum(1 for t in tasks if t["due_on"]) > len(tasks) // 2
+    assert any(t["type"] == "milestone" for t in tasks) or len(tasks) < 60
+    edges = (await ravi.get(f"/api/v1/projects/{pid}/dependencies")).json()["data"]
+    assert len(edges) == first["timeline_dependencies"]
