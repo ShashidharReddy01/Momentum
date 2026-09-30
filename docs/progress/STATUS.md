@@ -130,6 +130,21 @@
 ### Phases 6–9
 Tracked in their phase files; copy the slice list here at each phase kickoff.
 
+### Phase 6: Planning and Insight
+> Started 2026-09-30 in parallel with Phase 5's live close-out, at the product owner's instruction, on its own branch `claude/inspiring-bohr-p9xomo` (cut from `claude/intelligent-meitner-9ne4e8` at `8c7de80`). This section is Phase 6's own; the Phase 5 sections above belong to the other session until the branches are merged.
+
+- **Model:** kickoff on Opus 5.5; per-slice tags from `model-guide.md` §4 (S6.1.1 is Opus).
+- **Baseline:** `make check` green on `8c7de80` (backend 738/738, web 334/334, lint, format, types, import contracts). A fresh container needs Postgres (the Phase 5 handoff recipe) **and** `pnpm install` in `apps/web` (no root `package.json`); without the latter, `types-check` fails with error 254.
+- **Waiting on the product owner:** kickoff Q1–Q6 in `docs/roadmap/phase-6-kickoff.md` §4. **Q1 (SVAR React Gantt vs. custom SVG) blocks S6.1.1**; recommendation: custom SVG. No standing "proceed without waiting" instruction exists for Phase 6 yet.
+- **Next up:** S6.1.1 (or S6.1.1a if Q2's split is accepted) once Q1 is answered.
+- [x] Kickoff (`docs/roadmap/phase-6-kickoff.md`, 2026-09-30); refinements in its §2 not yet applied to `phase-6.md` (pending answers)
+- [ ] S6.1.1 Timeline view · [ ] S6.1.2 Dependency-aware rescheduling
+- [ ] S6.2.1 Project overview tab · [ ] S6.2.2 Portfolios (lite)
+- [ ] S6.3.1 Goals · [ ] S6.3.2 AI for goals
+- [ ] S6.4.1 Workload view · [ ] S6.4.2 AI rebalancing
+- [ ] S6.5.1 Dashboards · [ ] S6.5.2 Ask for a chart · [ ] S6.5.3 Forecasting and risk score
+- [ ] Phase 6 exit
+
 ## Plan changes log
 | Date | Change | Reason |
 |---|---|---|
