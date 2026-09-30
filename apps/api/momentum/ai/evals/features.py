@@ -8,7 +8,7 @@ from __future__ import annotations
 import time
 import uuid
 from dataclasses import dataclass, field
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
 from sqlalchemy import select
@@ -18,7 +18,7 @@ from momentum.agents import pulse
 from momentum.agents.extensions import HandlerRun
 from momentum.agents.loader import load_definitions
 from momentum.agents.runtime import execute_run
-from momentum.ai import citations, quick_add, summarize, write
+from momentum.ai import citations, goal_assist, quick_add, summarize, write
 from momentum.ai.agent_draft import draft_agent
 from momentum.ai.breakdown import break_down, project_people
 from momentum.ai.chat import run_chat, start_turn
@@ -45,6 +45,8 @@ from momentum.domain.agents.runs import enqueue_run
 from momentum.domain.agents.schemas import AgentPatchIn
 from momentum.domain.comments.models import Comment
 from momentum.domain.comments.service import create_comment
+from momentum.domain.goals import service as goals_service
+from momentum.domain.goals.schemas import GoalIn
 from momentum.domain.notifications.models import Notification
 from momentum.domain.projects.models import Project
 from momentum.domain.tasks import service as tasks
@@ -73,6 +75,7 @@ FEATURES = (
     "agent_radar",
     "agent_architect",
     "agent_scribe",
+    "goal_check_in",
 )
 
 
@@ -262,6 +265,28 @@ async def _run(
         obs.text = "\n".join([body.title, body.summary, *items])
         obs.data = {"status": body.status, "items": items, "facts": d.facts}
         obs.citations = [c.to_json() for c in await citations.resolve(session, ctx, obs.text)]
+    elif feature == "goal_check_in":
+        # S6.3.2: a goal made for the case (half its period gone), linked to eval projects
+        today = now.date()
+        g = (
+            await goals_service.create_goal(
+                session,
+                ctx,
+                GoalIn(
+                    name=case["goal"],
+                    period_start=today - timedelta(days=45),
+                    period_end=today + timedelta(days=45),
+                    progress_source=case.get("source", "projects"),
+                    metric=case.get("metric"),
+                ),
+            )
+        ).entity
+        for name in case.get("projects", []):
+            await goals_service.link(session, ctx, g.id, "project", world.projects[name])
+        facts, _ = await goal_assist.facts_for(session, ctx, g, today)
+        goal_draft = await goal_assist.draft_check_in(session, llm, ctx, g.id, today)
+        obs.text = f"{goal_draft.draft.title}\n{goal_draft.draft.summary}"
+        obs.data = {"status": goal_draft.draft.status, "ai": goal_draft.ai, "facts": facts}
     elif feature == "plan_day":
         p = await plan_day(session, llm, ctx, registry, now=now)
         obs.text, obs.notes = p.rationale, p.notes

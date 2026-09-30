@@ -59,6 +59,29 @@ function boot(path: string) {
       }),
     ),
     http.get('*/api/v1/goals/:id/check-ins', () => HttpResponse.json({ data: [] })),
+    http.post('*/api/v1/ai/goals/:id/check-in-draft', () =>
+      HttpResponse.json({
+        draft: { status: 'at_risk', title: 'Behind pace on customers', summary: 'Webinar leads are slow.' },
+        ai: true,
+      }),
+    ),
+    http.post('*/api/v1/ai/goals/:id/suggest-links', () =>
+      HttpResponse.json({
+        suggestions: [
+          { entity_type: 'project', id: 'p9', name: 'Webinar series', reason: 'Task T-4 “Customer webinar”' },
+        ],
+      }),
+    ),
+    http.post('*/api/v1/goals/:id/links', async ({ request }) => {
+      posted.push({ url: 'link', body: await request.json() });
+      return HttpResponse.json(
+        {
+          data: { ...CHILD, links: [], hidden_links: 0, children: [] },
+          meta: { activity_id: 'a3', version: 3 },
+        },
+        { status: 201 },
+      );
+    }),
     http.post('*/api/v1/goals', async ({ request }) => {
       posted.push({ url: 'goals', body: await request.json() });
       return HttpResponse.json(
@@ -138,5 +161,31 @@ describe('Goals (S6.3.1)', () => {
       title: 'Webinar converted',
       current: 170,
     });
+  });
+
+  it('lets Mo draft a check-in, marked as AI, that the owner posts', async () => {
+    const { posted, user } = boot('/goals/g2');
+    await user.click(await screen.findByRole('button', { name: /Draft with Mo/ }));
+    const form = await screen.findByRole('form', { name: 'New check-in' });
+    expect(within(form).getByRole('textbox', { name: 'Headline' })).toHaveValue('Behind pace on customers');
+    expect(form).toHaveTextContent('Drafted by Mo');
+    await user.click(within(form).getByRole('button', { name: 'Post check-in' }));
+    await waitFor(() => expect(posted.find((x) => x.url === 'check-in')).toBeTruthy());
+    expect(posted.find((x) => x.url === 'check-in')!.body).toMatchObject({
+      status: 'at_risk',
+      generated_by_ai: true,
+    });
+  });
+
+  it('suggests supporting projects that link only when chosen', async () => {
+    const { posted, user } = boot('/goals/g2');
+    await user.click(await screen.findByRole('button', { name: /Suggest/ }));
+    const list = await screen.findByRole('list', { name: 'Suggested projects' });
+    expect(list).toHaveTextContent('Webinar series');
+    expect(posted.find((x) => x.url === 'link')).toBeUndefined();
+    await user.click(within(list).getByRole('button', { name: 'Link' }));
+    await waitFor(() =>
+      expect(posted.find((x) => x.url === 'link')!.body).toEqual({ entity_type: 'project', entity_id: 'p9' }),
+    );
   });
 });

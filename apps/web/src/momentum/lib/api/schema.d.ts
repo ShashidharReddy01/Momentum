@@ -416,6 +416,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/ai/goals/{goal_id}/check-in-draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Draft a goal check-in from its progress, pace and linked work (stores nothing) */
+        post: operations["ai_goal_check_in_draft_api_v1_ai_goals__goal_id__check_in_draft_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ai/goals/{goal_id}/suggest-links": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Projects that look like they support this goal (links nothing) */
+        post: operations["ai_goal_suggest_links_api_v1_ai_goals__goal_id__suggest_links_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/ai/memory": {
         parameters: {
             query?: never;
@@ -4424,6 +4458,24 @@ export interface components {
             /** Team */
             team: string;
         };
+        /** GoalCheckInDraftBody */
+        GoalCheckInDraftBody: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "on_track" | "at_risk" | "off_track" | "on_hold" | "complete";
+            /** Summary */
+            summary: string;
+            /** Title */
+            title: string;
+        };
+        /** GoalCheckInDraftOut */
+        GoalCheckInDraftOut: {
+            /** Ai */
+            ai: boolean;
+            draft: components["schemas"]["GoalCheckInDraftBody"];
+        };
         /**
          * GoalCheckInIn
          * @description A goal check-in: a status update, optionally moving the metric's current value.
@@ -4568,6 +4620,29 @@ export interface components {
             progress: number | null;
             /** Status */
             status: string | null;
+        };
+        /** GoalLinkSuggestionOut */
+        GoalLinkSuggestionOut: {
+            /**
+             * Entity Type
+             * @default project
+             * @constant
+             */
+            entity_type: "project";
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Reason */
+            reason: string;
+        };
+        /** GoalLinkSuggestionsOut */
+        GoalLinkSuggestionsOut: {
+            /** Suggestions */
+            suggestions: components["schemas"]["GoalLinkSuggestionOut"][];
         };
         /**
          * GoalMetric
@@ -8667,6 +8742,68 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["FeedbackOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ai_goal_check_in_draft_api_v1_ai_goals__goal_id__check_in_draft_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                goal_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GoalCheckInDraftOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ai_goal_suggest_links_api_v1_ai_goals__goal_id__suggest_links_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                goal_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GoalLinkSuggestionsOut"];
                 };
             };
             /** @description Validation Error */

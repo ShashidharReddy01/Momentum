@@ -120,3 +120,23 @@ export function quarters(today = new Date()): { label: string; start: string; en
     };
   });
 }
+
+export type GoalSuggestion = components['schemas']['GoalLinkSuggestionOut'];
+
+/** S6.3.2: Mo drafts a check-in from the goal's numbers, and suggests projects that support it.
+ * Both only propose: nothing is posted or linked until the person does it. */
+export function useGoalAi(id: string) {
+  const api = useApi();
+  const path = { goal_id: id };
+  const draft = useMutation({
+    mutationFn: async () =>
+      (await api.POST('/api/v1/ai/goals/{goal_id}/check-in-draft', { params: { path } })).data!,
+    onError: (e) => toastError(e, "Mo couldn't draft the check-in"),
+  });
+  const suggest = useMutation({
+    mutationFn: async () =>
+      (await api.POST('/api/v1/ai/goals/{goal_id}/suggest-links', { params: { path } })).data!.suggestions,
+    onError: (e) => toastError(e, "Mo couldn't look for projects"),
+  });
+  return { draft, suggest };
+}

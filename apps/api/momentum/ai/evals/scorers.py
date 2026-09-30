@@ -79,6 +79,7 @@ KNOWN = frozenset(
         "preserves",
         "items_cite_tasks",
         "status_in",
+        "ai_draft",
         "today_first_any",
         "today_include",
         "today_exclude",
@@ -247,6 +248,10 @@ def score(obs: Observation, expect: dict[str, Any], *, today: date, asked: str =
         items = obs.data.get("items", [])
         bare = [i for i in items if not KEY.search(i)]
         add(Check("items_cite_tasks", bool(items) and not bare, f"uncited: {bare}"))
+    if "ai_draft" in expect:  # S6.3.2: the model's draft was kept (grounded in the facts)
+        add(
+            Check("ai_draft", obs.data.get("ai") is expect["ai_draft"], f"ai: {obs.data.get('ai')}")
+        )
     if "status_in" in expect:
         add(
             Check(

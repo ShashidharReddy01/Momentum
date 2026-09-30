@@ -2,6 +2,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Briefcase, FolderKanban, Link2, Plus, Target, X } from 'lucide-react';
 import { useMemo, useState, type FormEvent } from 'react';
 import { Link, useParams } from 'react-router';
+import { AICallout, AIBadge } from '@/components/common/AI';
+import { MoMark } from '@/components/common/MoMark';
 import { ErrorState } from '@/components/common/States';
 import { Avatar } from '@/components/ui/Avatar';
 import { Button } from '@/components/ui/Button';
@@ -14,10 +16,20 @@ import { usePeople } from '@/features/people';
 import { usePortfolios } from '@/features/portfolios';
 import { useProjects } from '@/features/projects';
 import { StatusChip, STATUS_LABEL, type Status } from '@/features/status';
+import { useMomentumConfig } from '@/lib/config';
 import { formatRelative } from '@/lib/dates';
 import { useChannel } from '@/lib/realtime';
 import { GoalProgress, NewGoalDialog } from './GoalsPage';
-import { goalKeys, useGoal, useGoalCheckIns, useGoalMutations, useGoals, type GoalDetail } from './queries';
+import {
+  goalKeys,
+  useGoal,
+  useGoalAi,
+  useGoalCheckIns,
+  useGoalMutations,
+  useGoals,
+  type GoalDetail,
+  type GoalSuggestion,
+} from './queries';
 
 const SOURCE_TEXT = {
   manual: 'Measured by its metric, moved at each check-in',
@@ -72,6 +84,7 @@ function GoalBody({ g }: { g: GoalDetail }) {
   const all = useGoals().data ?? [];
   const m = useGoalMutations(g.id);
   const [addingSub, setAddingSub] = useState(false);
+  const [suggestions, setSuggestions] = useState<GoalSuggestion[] | null>(null);
   const metric = g.metric;
 
   return (
@@ -114,8 +127,45 @@ function GoalBody({ g }: { g: GoalDetail }) {
             <h2 id="links-h" className="flex flex-1 items-center gap-2 text-[15px] font-semibold">
               <Icon icon={Link2} size={15} /> Linked work
             </h2>
+            {g.can_edit ? <SuggestButton g={g} onFound={setSuggestions} /> : null}
             {g.can_edit ? <AddLink g={g} onLink={(v) => m.link.mutate(v)} /> : null}
           </div>
+          {suggestions ? (
+            <AICallout
+              label="Mo suggests"
+              className="mb-3"
+              actions={
+                <Button size="sm" variant="text" onClick={() => setSuggestions(null)}>
+                  Dismiss
+                </Button>
+              }
+            >
+              {suggestions.length === 0 ? (
+                <p className="text-sm">No projects you can see look related yet.</p>
+              ) : (
+                <ul aria-label="Suggested projects" className="space-y-2">
+                  {suggestions.map((sug) => (
+                    <li key={sug.id} className="flex items-start gap-2 text-sm">
+                      <div className="min-w-0 flex-1">
+                        <p className="font-medium">{sug.name}</p>
+                        <p className="truncate text-xs text-amber-ink">{sug.reason}</p>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          m.link.mutate({ entity_type: 'project', entity_id: sug.id });
+                          setSuggestions((cur) => (cur ?? []).filter((x) => x.id !== sug.id));
+                        }}
+                      >
+                        Link
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </AICallout>
+          ) : null}
           {g.links.length === 0 ? (
             <p className="text-sm text-muted-2">
               {g.progress_source === 'projects'
@@ -192,6 +242,22 @@ function GoalBody({ g }: { g: GoalDetail }) {
   );
 }
 
+function SuggestButton({ g, onFound }: { g: GoalDetail; onFound: (s: GoalSuggestion[]) => void }) {
+  const aiEnabled = useMomentumConfig().ai_enabled;
+  const ai = useGoalAi(g.id);
+  if (!aiEnabled) return null;
+  return (
+    <Button
+      size="sm"
+      variant="ai"
+      loading={ai.suggest.isPending}
+      onClick={() => ai.suggest.mutate(undefined, { onSuccess: onFound })}
+    >
+      <MoMark size={12} /> Suggest
+    </Button>
+  );
+}
+
 function AddLink({
   g,
   onLink,
@@ -260,11 +326,24 @@ function AddLink({
 function CheckIns({ g }: { g: GoalDetail }) {
   const m = useGoalMutations(g.id);
   const history = useGoalCheckIns(g.id);
+  const ai = useGoalAi(g.id);
+  const aiEnabled = useMomentumConfig().ai_enabled;
   const [open, setOpen] = useState(false);
+  const [drafted, setDrafted] = useState<null | 'ai' | 'plain'>(null);
   const [status, setStatus] = useState<Status>((g.status as Status | null) ?? 'on_track');
   const [title, setTitle] = useState('');
   const [summary, setSummary] = useState('');
   const [current, setCurrent] = useState('');
+  const askMo = () =>
+    ai.draft.mutate(undefined, {
+      onSuccess: (r) => {
+        setStatus(r.draft.status);
+        setTitle(r.draft.title);
+        setSummary(r.draft.summary);
+        setDrafted(r.ai ? 'ai' : 'plain');
+        setOpen(true);
+      },
+    });
   const submit = (e: FormEvent) => {
     e.preventDefault();
     m.checkIn.mutate(
@@ -273,7 +352,7 @@ function CheckIns({ g }: { g: GoalDetail }) {
         title: title.trim(),
         summary: summary.trim(),
         current: g.metric && current.trim() ? Number(current) : null,
-        generated_by_ai: false,
+        generated_by_ai: drafted === 'ai',
       },
       {
         onSuccess: () => {
@@ -281,6 +360,7 @@ function CheckIns({ g }: { g: GoalDetail }) {
           setTitle('');
           setSummary('');
           setCurrent('');
+          setDrafted(null);
         },
       },
     );
@@ -291,6 +371,11 @@ function CheckIns({ g }: { g: GoalDetail }) {
         <h2 id="checkins-h" className="flex-1 text-[15px] font-semibold">
           Check-ins
         </h2>
+        {g.can_edit && !open && aiEnabled ? (
+          <Button size="sm" variant="ai" loading={ai.draft.isPending} onClick={askMo}>
+            <MoMark size={12} /> Draft with Mo
+          </Button>
+        ) : null}
         {g.can_edit && !open ? (
           <Button size="sm" variant="ghost" onClick={() => setOpen(true)}>
             Check in
@@ -303,6 +388,16 @@ function CheckIns({ g }: { g: GoalDetail }) {
           aria-label="New check-in"
           className="space-y-3 rounded-xl border border-hairline bg-surface p-4"
         >
+          {drafted === 'ai' ? (
+            <p className="flex items-center gap-2 text-xs text-amber-ink">
+              <AIBadge /> Drafted by Mo from this goal’s numbers and linked work. Check it before posting.
+            </p>
+          ) : drafted === 'plain' ? (
+            <p className="text-xs text-muted">
+              A plain draft from the goal’s numbers (Mo’s draft used a figure that isn’t in them, so it was
+              set aside).
+            </p>
+          ) : null}
           <div className="flex flex-wrap gap-2">
             <select
               aria-label="Status"

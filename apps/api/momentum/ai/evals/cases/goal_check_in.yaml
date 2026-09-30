@@ -1,0 +1,21 @@
+# Goal check-in drafts (S6.3.2). Each case creates a goal (half of its period gone) linked to eval
+# projects, then drafts. The draft is kept only if every number in it is in the facts; the judge
+# sees the same facts.
+feature: goal_check_in
+cases:
+  - id: launch_goal_draft
+    mock: true
+    goal: "Launch the product on time"
+    projects: ["Launch Plan"]
+    expect: {ai_draft: true, not_empty: true}
+  - id: launch_goal_live
+    goal: "Launch the product on time"
+    projects: ["Launch Plan"]
+    expect: {ai_draft: true, status_in: [at_risk, off_track], mentions_exclude: ["Zenith"]}
+    judge: {rubric: "Status and headline match the facts: progress compared with how much of the period has passed, and the linked project's overdue work. Names Launch Plan. No invented numbers, dates or events."}
+  - id: metric_on_pace_live
+    goal: "Reach 100 paying customers"
+    source: manual
+    metric: {type: number, start: 0, target: 100, current: 55, unit: customers}
+    expect: {ai_draft: true, status_in: [on_track]}
+    judge: {rubric: "Says the goal is roughly on pace (55 of 100 with about half the period gone) without inventing reasons."}

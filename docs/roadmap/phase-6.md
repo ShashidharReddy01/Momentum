@@ -78,6 +78,7 @@
 ### S6.3.2: AI for goals
 **Scope:** ✦ goal check-in narrative from linked work; ✦ "suggest projects that support this goal" (semantic match) → link proposals.
 **Size:** S
+**As built (2026-09-30):** `ai/goal_assist.py`: the check-in draft reads code-computed facts, including **pace** (share of the period gone) so "on track" means something; the model's draft is kept only if its numbers are all in the facts, else a code draft (status by the gap between progress and pace: ≤ 10 points on track, ≤ 25 at risk, else off track). Suggestions use hybrid retrieval (name first: the keyword half ANDs every word). New eval feature `goal_check_in` (1 mock + 2 live-only cases, live threshold 0.85, new `ai_draft` check).
 
 ## E6.4 Workload
 

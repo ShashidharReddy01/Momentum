@@ -18,6 +18,7 @@ from momentum.ai import (
     chat,
     citations,
     from_brief,
+    goal_assist,
     memory,
     nl_rule,
     plan_day,
@@ -865,4 +866,63 @@ async def ai_portfolio_lines(
         out = await portfolio_lines.lines_for(llm, ctx, facts, datetime.now(UTC).date())
         return PortfolioLinesOut(
             lines=[PortfolioLineOut(project_id=x.project_id, text=x.text, ai=x.ai) for x in out]
+        )
+
+
+# ---------------- AI for goals (S6.3.2) ----------------
+
+
+class GoalCheckInDraftBody(BaseModel):
+    status: Literal["on_track", "at_risk", "off_track", "on_hold", "complete"]
+    title: str
+    summary: str
+
+
+class GoalCheckInDraftOut(BaseModel):
+    draft: GoalCheckInDraftBody
+    ai: bool  # false: built in code (the model's draft used a number the facts don't have)
+
+
+class GoalLinkSuggestionOut(BaseModel):
+    entity_type: Literal["project"] = "project"
+    id: uuid.UUID
+    name: str
+    reason: str
+
+
+class GoalLinkSuggestionsOut(BaseModel):
+    suggestions: list[GoalLinkSuggestionOut]
+
+
+@router.post(
+    "/goals/{goal_id}/check-in-draft",
+    response_model=GoalCheckInDraftOut,
+    summary="Draft a goal check-in from its progress, pace and linked work (stores nothing)",
+)
+async def ai_goal_check_in_draft(
+    goal_id: uuid.UUID, ctx: CtxDep, uow: UowDep, rt: RuntimeDep
+) -> GoalCheckInDraftOut:
+    llm = require_llm(rt)
+    ctx = ctx.with_(via="ai")
+    async with uow.transaction() as s:
+        r = await goal_assist.draft_check_in(s, llm, ctx, goal_id, datetime.now(UTC).date())
+        return GoalCheckInDraftOut(draft=GoalCheckInDraftBody(**r.draft.model_dump()), ai=r.ai)
+
+
+@router.post(
+    "/goals/{goal_id}/suggest-links",
+    response_model=GoalLinkSuggestionsOut,
+    summary="Projects that look like they support this goal (links nothing)",
+)
+async def ai_goal_suggest_links(
+    goal_id: uuid.UUID, ctx: CtxDep, uow: UowDep, rt: RuntimeDep
+) -> GoalLinkSuggestionsOut:
+    llm = require_llm(rt)
+    ctx = ctx.with_(via="ai")
+    async with uow.transaction() as s:
+        found = await goal_assist.suggest_projects(s, llm, ctx, goal_id)
+        return GoalLinkSuggestionsOut(
+            suggestions=[
+                GoalLinkSuggestionOut(id=x.project_id, name=x.name, reason=x.reason) for x in found
+            ]
         )

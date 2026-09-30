@@ -222,6 +222,8 @@ Workspace memory:
 | Agent from description (S5.2.3) | `POST /agents/draft` (checked draft, nothing saved) | smart | 5 |
 | Agent test run (S5.2.3) | `POST /agents/{id}/test-run` (dry run, nothing changed) | per agent | 5 |
 | Portfolio one-liners (S6.2.2) | `POST /ai/portfolios/{id}/lines` (`portfolio_lines/v1`; a line is kept only if every number in it is in that project's facts, else the plain facts line; nothing stored) | fast | 6 |
+| Goal check-in draft (S6.3.2) | `POST /ai/goals/{id}/check-in-draft` (`goal_check_in/v1`; facts: progress vs pace, metric, linked work's status/completion/due, sub-goals; kept only if every number is in the facts, else a code-built draft by pace; `ai` flag says which; editors only; nothing stored) | default | 6 |
+| Suggest projects for a goal (S6.3.2) | `POST /ai/goals/{id}/suggest-links` (hybrid retrieval over visible projects and tasks with the goal's name, then name + description; task hits count for their project; already linked left out; links nothing) | embed | 6 |
 | Ask for a chart | `POST /ai/dashboards/query` | default | 6 |
 | Risk explanation / rebalancing | worker + endpoints | default | 6 |
 

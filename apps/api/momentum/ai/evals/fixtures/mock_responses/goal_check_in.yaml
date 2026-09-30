@@ -1,0 +1,9 @@
+# Mock responses for S6.3.2 goal check-in drafts (feature "goal_check_in"). Synthetic only.
+# No numbers, so the draft always passes the "numbers must come from the facts" check.
+default:
+  tool_calls:
+    - name: submit_result
+      arguments:
+        status: at_risk
+        title: "Behind pace; the linked work needs attention"
+        summary: "Progress is behind the share of the quarter that has passed. The linked projects carry overdue work; clearing it is the most useful next step."
