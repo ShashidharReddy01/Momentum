@@ -721,9 +721,80 @@ async def delete_task(tc: ToolContext, args: DeleteTaskArgs) -> ToolResult:
     )
 
 
+class RescheduleTaskArgs(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    task: TaskRef
+    start_on: date | None = None
+    due_on: date | None = None
+    shift_dependents: bool = Field(
+        default=True,
+        description="Also push the tasks that wait on this one so none starts before it's done",
+    )
+
+    @model_validator(mode="after")
+    def _a_date(self) -> RescheduleTaskArgs:
+        if not ({"start_on", "due_on"} & self.model_fields_set):
+            raise ValueError("give start_on and/or due_on")
+        return self
+
+
+@tool(
+    name="reschedule_task",
+    description=(
+        "Move a task's start/due dates and push the tasks that depend on it later so none starts "
+        "before its blocker is due (S6.1.2). Use for 'push X by a week and shift what depends on "
+        "it'. Moving earlier never pulls dependents. For plain date edits use update_task."
+    ),
+    risk="medium",
+    scopes=WRITE,
+    bulk_limit=25,
+)
+async def reschedule_task(tc: ToolContext, args: RescheduleTaskArgs) -> ToolResult:
+    task, _, _ = await resolve_task(tc, args.task)
+    patch: dict[str, Any] = {
+        k: getattr(args, k) for k in ("start_on", "due_on") if k in args.model_fields_set
+    }
+    m = await tasks.reschedule_task(
+        tc.session,
+        tc.ctx,
+        task.id,
+        patch,
+        cascade=args.shift_dependents,
+        batch_id=tc.batch_id,
+    )
+    plan = m.entity
+    key = task_key(task.number)
+    shifted = [
+        {
+            "task": task_key(c.task.number),
+            "title": c.task.title,
+            "start_on": c.to_start.isoformat() if c.to_start else None,
+            "due_on": c.to_due.isoformat() if c.to_due else None,
+            "days_later": c.shift_days,
+        }
+        for c in plan.shifted
+    ]
+    blocked = [task_key(t.number) for t, why in plan.skipped if why == "no_edit_access"]
+    hidden = sum(1 for _, why in plan.skipped if why == "not_visible")
+    note = f" and {len(shifted)} dependent task(s)" if shifted else ""
+    return ToolResult.success(
+        f"{tc.verb('Rescheduled', 'Would reschedule')} {key} {task.title}{note}",
+        {
+            "task": key,
+            "start_on": plan.moved.to_start.isoformat() if plan.moved.to_start else None,
+            "due_on": plan.moved.to_due.isoformat() if plan.moved.to_due else None,
+            "shifted": shifted,
+            "not_shifted_no_access": blocked,
+            "not_shifted_hidden_count": hidden,
+        },
+        targets=[target(task), *(target(c.task) for c in plan.shifted)],
+    )
+
+
 TOOLS = [
     create_task,
     update_task,
+    reschedule_task,
     set_field_value,
     complete_task,
     move_task,

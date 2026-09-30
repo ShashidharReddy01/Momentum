@@ -19,6 +19,7 @@ from momentum.domain.tasks.models import Task, TaskProject
 from momentum.domain.tasks.schemas import (
     ApprovalDecisionIn,
     BlockedTaskOut,
+    DateChangeOut,
     DependenciesOut,
     DependencyEdgeOut,
     DependencyIn,
@@ -27,6 +28,8 @@ from momentum.domain.tasks.schemas import (
     NamedRef,
     OtherPlacementOut,
     ProjectRef,
+    RescheduleIn,
+    RescheduleOut,
     SubtaskCreateIn,
     SubtaskMoveIn,
     TaskBatchCreateIn,
@@ -605,3 +608,59 @@ async def list_project_dependencies(
     async with uow.transaction() as s:
         edges = await service.list_project_dependencies(s, ctx, project_id)
         return ListOut(data=[DependencyEdgeOut(task_id=a, depends_on_id=b) for a, b in edges])
+
+
+def _change(c: service.DateChange) -> DateChangeOut:
+    return DateChangeOut(
+        id=c.task.id,
+        key=task_key(c.task.number),
+        title=c.task.title,
+        from_start=c.from_start,
+        from_due=c.from_due,
+        to_start=c.to_start,
+        to_due=c.to_due,
+        shift_days=c.shift_days,
+    )
+
+
+def _plan_out(plan: service.ReschedulePlan) -> RescheduleOut:
+    return RescheduleOut(
+        moved=_change(plan.moved),
+        shifted=[_change(c) for c in plan.shifted],
+        skipped=[_summary(t) for t, why in plan.skipped if why == "no_edit_access"],
+        hidden_skipped=sum(1 for _, why in plan.skipped if why == "not_visible"),
+    )
+
+
+@router.post(
+    "/tasks/{task_id}/reschedule/preview",
+    response_model=RescheduleOut,
+    summary="What moving this task's dates would do to the tasks that wait on it (no changes)",
+)
+async def preview_reschedule(
+    task_id: uuid.UUID, body: RescheduleIn, ctx: CtxDep, uow: UowDep
+) -> RescheduleOut:
+    async with uow.transaction() as s:
+        plan = await service.plan_reschedule(
+            s, ctx, task_id, body.model_dump(exclude_unset=True, exclude={"cascade"})
+        )
+        return _plan_out(plan)
+
+
+@router.post(
+    "/tasks/{task_id}/reschedule",
+    response_model=MutationOut[RescheduleOut],
+    summary="Move this task's dates and (by default) shift the tasks that wait on it, one undo",
+)
+async def reschedule(
+    task_id: uuid.UUID, body: RescheduleIn, ctx: CtxDep, uow: UowDep
+) -> MutationOut[RescheduleOut]:
+    async with uow.transaction() as s:
+        m = await service.reschedule_task(
+            s,
+            ctx,
+            task_id,
+            body.model_dump(exclude_unset=True, exclude={"cascade"}),
+            cascade=body.cascade,
+        )
+        return MutationOut(data=_plan_out(m.entity), meta=MutationMeta(batch_id=m.batch_id))

@@ -261,3 +261,31 @@ class BlockedTaskOut(BaseModel):
     for the list row's "waiting on" icon."""
 
     task_id: uuid.UUID
+
+
+class RescheduleIn(BaseModel):
+    """New dates for a task (omit a field to keep it; null clears it), and whether the work that
+    waits on it moves too (S6.1.2)."""
+
+    model_config = ConfigDict(extra="forbid")
+    start_on: date | None = None
+    due_on: date | None = None
+    cascade: bool = True
+
+
+class DateChangeOut(BaseModel):
+    id: uuid.UUID
+    key: str
+    title: str
+    from_start: date | None
+    from_due: date | None
+    to_start: date | None
+    to_due: date | None
+    shift_days: int
+
+
+class RescheduleOut(BaseModel):
+    moved: DateChangeOut
+    shifted: list[DateChangeOut]
+    skipped: list[TaskSummaryOut]  # should move, but the caller can only view them
+    hidden_skipped: int = 0  # should move, but in projects the caller can't see

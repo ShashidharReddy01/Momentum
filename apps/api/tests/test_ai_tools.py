@@ -95,6 +95,7 @@ def test_catalog_covers_phase_1_2_tools_with_their_risks() -> None:
         "get_attachment_text": "read",  # S5.1.5
         "create_task": "low",
         "update_task": "low",
+        "reschedule_task": "medium",  # S6.1.2
         "set_field_value": "low",  # S5.3.2 (Sorter)
         "complete_task": "low",
         "move_task": "low",
@@ -547,6 +548,56 @@ async def test_update_task(uow: UnitOfWork, world: World) -> None:
     out = await call(uow, world.tom, "update_task", args, mode="apply")
     assert out.result.error["code"] == "not_found"  # type: ignore[index]
     assert await state(uow) == before
+
+
+async def test_reschedule_task_previews_and_shifts_dependents(
+    uow: UnitOfWork, world: World
+) -> None:
+    """S6.1.2: the dry run shows every dependent that would move and changes nothing; apply moves
+    them all as one undo; the hidden task in priya's project is only counted."""
+    async with uow.transaction() as s:
+        await tasks.update_task(
+            s,
+            world.ravi,
+            world.copy.id,
+            {"start_on": date(2026, 10, 1), "due_on": date(2026, 10, 5)},
+        )
+        await tasks.update_task(
+            s,
+            world.ravi,
+            world.faq.id,
+            {"start_on": date(2026, 10, 6), "due_on": date(2026, 10, 8)},
+        )
+        await tasks.add_dependency(s, world.ravi, world.faq.id, world.copy.id)
+        await tasks.update_task(s, world.priya, world.hidden.id, {"due_on": date(2026, 10, 6)})
+        await tasks.add_dependency(s, world.priya, world.hidden.id, world.copy.id)
+    args = {"task": key(world.copy), "due_on": "2026-10-09"}
+
+    before = await state(uow)
+    dry = await call(uow, world.ana, "reschedule_task", args)
+    assert dry.ok, dry.result
+    assert await state(uow) == before
+    assert {r.label.split(" ")[0] for r in dry.diff} == {key(world.copy), key(world.faq)}
+    assert dry.result.data["shifted"][0]["days_later"] == 3  # type: ignore[index]
+    assert dry.result.data["not_shifted_hidden_count"] == 1  # type: ignore[index]
+    leaked = str(dry.result.data)
+    assert key(world.hidden) not in leaked and world.hidden.title not in leaked
+
+    app = await call(uow, world.ana, "reschedule_task", args, mode="apply")
+    faq = await task_row(uow, world.faq.id)
+    assert (faq.start_on, faq.due_on) == (date(2026, 10, 9), date(2026, 10, 11))
+    await undo_batch(uow, world.ana, app.batch_id)
+    faq = await task_row(uow, world.faq.id)
+    assert (faq.start_on, faq.due_on) == (date(2026, 10, 6), date(2026, 10, 8))
+
+    only = await call(
+        uow, world.ana, "reschedule_task", {**args, "shift_dependents": False}, mode="dry_run"
+    )
+    assert [r.label.split(" ")[0] for r in only.diff] == [key(world.copy)]
+    out = await call(uow, world.ana, "reschedule_task", {"task": key(world.copy)})
+    assert out.result.error["code"] == "invalid_arguments"  # type: ignore[index]
+    out = await call(uow, world.lena, "reschedule_task", args, mode="apply")
+    assert out.result.error["code"] == "forbidden"  # type: ignore[index]
 
 
 async def test_complete_task(uow: UnitOfWork, world: World) -> None:

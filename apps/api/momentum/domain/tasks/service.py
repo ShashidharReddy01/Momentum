@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Sequence
+from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from typing import Any, Literal
 from zoneinfo import ZoneInfo
@@ -1897,6 +1898,175 @@ async def list_project_dependencies(
         .order_by(TaskDependency.created_at)
     )
     return [(a, b) for a, b in rows.all()]
+
+
+# ---------- dependency-aware rescheduling (S6.1.2) ----------
+
+
+@dataclass
+class DateChange:
+    """One task's dates before and after a reschedule."""
+
+    task: Task
+    from_start: date | None
+    from_due: date | None
+    to_start: date | None
+    to_due: date | None
+
+    @property
+    def shift_days(self) -> int:
+        a = self.from_start or self.from_due
+        b = self.to_start or self.to_due
+        return (b - a).days if a and b else 0
+
+
+@dataclass
+class ReschedulePlan:
+    moved: DateChange
+    shifted: list[DateChange]
+    # dependents that should move but can't: ("no_edit_access" | "not_visible"); a task the caller
+    # can't see must only ever be counted, never named
+    skipped: list[tuple[Task, str]]
+
+
+def _end(start: date | None, due: date | None) -> date | None:
+    return due or start
+
+
+def _begin(start: date | None, due: date | None) -> date | None:
+    return start or due
+
+
+async def plan_reschedule(
+    session: AsyncSession, ctx: Ctx, task_id: uuid.UUID, patch: dict[str, Any]
+) -> ReschedulePlan:
+    """What moving a task's dates to ``patch`` (``start_on`` and/or ``due_on``) does to the work
+    that waits on it, without writing anything.
+
+    Finish-to-start, push-only: an open dependent that would start before one of its open blockers
+    is due moves later by just enough (both of its dates, keeping its length), and that repeats
+    down the chain. Nothing is pulled earlier, completed or unscheduled dependents stay put, and a
+    same-day hand-off is fine (the timeline's conflict rule). A dependent the caller can't edit is
+    reported in ``skipped`` (only counted if they can't see it) and the chain stops there. At
+    most ``MAX_BULK`` tasks move."""
+    task, _, role = await get_visible_task(session, ctx, task_id)
+    require_project_role(role, "editor", "reschedule this task")
+    new_start = _as_date(patch["start_on"]) if "start_on" in patch else task.start_on
+    new_due = _as_date(patch["due_on"]) if "due_on" in patch else task.due_on
+    if new_start and new_due and new_start > new_due:
+        raise ValidationFailed(
+            "Start date must be on or before the due date", code="dates_out_of_order"
+        )
+    dates: dict[uuid.UUID, tuple[date | None, date | None]] = {task.id: (new_start, new_due)}
+    tasks_by_id: dict[uuid.UUID, Task] = {task.id: task}
+    skipped: dict[uuid.UUID, tuple[Task, str]] = {}
+    order: list[uuid.UUID] = []
+    queue = [task.id]
+    steps = 0
+    while queue:
+        steps += 1
+        if steps > MAX_BULK * 10:
+            break  # a guard; the graph is acyclic and shifts only go later
+        blocker_id = queue.pop(0)
+        dependents = (
+            await session.execute(
+                select(Task)
+                .join(TaskDependency, TaskDependency.task_id == Task.id)
+                .where(
+                    TaskDependency.depends_on_id == blocker_id,
+                    Task.deleted_at.is_(None),
+                    Task.completed_at.is_(None),
+                )
+                .order_by(Task.number)
+            )
+        ).scalars()
+        for dep in dependents:
+            if dep.id == task.id or dep.id in skipped:
+                continue
+            tasks_by_id.setdefault(dep.id, dep)
+            cur_start, cur_due = dates.get(dep.id, (dep.start_on, dep.due_on))
+            begin = _begin(cur_start, cur_due)
+            if begin is None:
+                continue  # unscheduled: nothing to push
+            blocker_rows = (
+                await session.execute(
+                    select(Task)
+                    .join(TaskDependency, TaskDependency.depends_on_id == Task.id)
+                    .where(
+                        TaskDependency.task_id == dep.id,
+                        Task.deleted_at.is_(None),
+                        Task.completed_at.is_(None),
+                    )
+                )
+            ).scalars()
+            required: date | None = None
+            for b in blocker_rows:
+                b_end = _end(*dates.get(b.id, (b.start_on, b.due_on)))
+                if b_end and (required is None or b_end > required):
+                    required = b_end
+            if required is None or begin >= required:
+                continue
+            try:
+                _, _, dep_role = await get_visible_task(session, ctx, dep.id)
+            except NotFound:
+                skipped[dep.id] = (dep, "not_visible")  # counted, never named
+                continue
+            try:
+                require_project_role(dep_role, "editor", "reschedule this task")
+            except Forbidden:
+                skipped[dep.id] = (dep, "no_edit_access")
+                continue
+            delta = required - begin
+            dates[dep.id] = (
+                cur_start + delta if cur_start else None,
+                cur_due + delta if cur_due else None,
+            )
+            if dep.id not in order:
+                order.append(dep.id)
+                if len(order) >= MAX_BULK:
+                    raise ValidationFailed(
+                        f"This would move more than {MAX_BULK} tasks", code="too_many"
+                    )
+            queue.append(dep.id)
+
+    def change(t: Task) -> DateChange:
+        to_start, to_due = dates[t.id]
+        return DateChange(t, t.start_on, t.due_on, to_start, to_due)
+
+    return ReschedulePlan(
+        moved=change(task),
+        shifted=[change(tasks_by_id[i]) for i in order],
+        skipped=list(skipped.values()),
+    )
+
+
+async def reschedule_task(
+    session: AsyncSession,
+    ctx: Ctx,
+    task_id: uuid.UUID,
+    patch: dict[str, Any],
+    *,
+    cascade: bool = True,
+    batch_id: uuid.UUID | None = None,
+) -> Mutation[ReschedulePlan]:
+    """Move a task's dates and, with ``cascade``, shift the dependents ``plan_reschedule`` finds,
+    all as one undoable batch. Without ``cascade`` only the task moves (the timeline then shows
+    the conflicts it leaves)."""
+    plan = await plan_reschedule(session, ctx, task_id, patch)
+    if not cascade:
+        plan = ReschedulePlan(moved=plan.moved, shifted=[], skipped=[])
+    batch = batch_id or uuid.uuid4()
+    dates = {k: v for k, v in patch.items() if k in ("start_on", "due_on")}
+    await update_task(session, ctx, task_id, dates, batch_id=batch)
+    for c in plan.shifted:
+        shift: dict[str, Any] = {}
+        if c.to_start != c.from_start:
+            shift["start_on"] = c.to_start
+        if c.to_due != c.from_due:
+            shift["due_on"] = c.to_due
+        # both dates in one patch: update_task checks the pair, not each edge on its own
+        await update_task(session, ctx, c.task.id, shift, batch_id=batch)
+    return Mutation(plan, batch_id=batch)
 
 
 # ---------- section hooks ----------

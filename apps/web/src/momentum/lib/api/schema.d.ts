@@ -2238,6 +2238,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/tasks/{task_id}/reschedule": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Move this task's dates and (by default) shift the tasks that wait on it, one undo */
+        post: operations["reschedule_api_v1_tasks__task_id__reschedule_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tasks/{task_id}/reschedule/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** What moving this task's dates would do to the tasks that wait on it (no changes) */
+        post: operations["preview_reschedule_api_v1_tasks__task_id__reschedule_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tasks/{task_id}/subtask-move": {
         parameters: {
             query?: never;
@@ -3693,6 +3727,28 @@ export interface components {
             /** Rows */
             rows: string[][];
         };
+        /** DateChangeOut */
+        DateChangeOut: {
+            /** From Due */
+            from_due: string | null;
+            /** From Start */
+            from_start: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Key */
+            key: string;
+            /** Shift Days */
+            shift_days: number;
+            /** Title */
+            title: string;
+            /** To Due */
+            to_due: string | null;
+            /** To Start */
+            to_start: string | null;
+        };
         /** DependenciesOut */
         DependenciesOut: {
             /** Blocked By */
@@ -4665,6 +4721,11 @@ export interface components {
             data: components["schemas"]["ProjectOut"];
             meta: components["schemas"]["MutationMeta"];
         };
+        /** MutationOut[RescheduleOut] */
+        MutationOut_RescheduleOut_: {
+            data: components["schemas"]["RescheduleOut"];
+            meta: components["schemas"]["MutationMeta"];
+        };
         /** MutationOut[RuleOut] */
         MutationOut_RuleOut_: {
             data: components["schemas"]["RuleOut"];
@@ -5492,6 +5553,35 @@ export interface components {
              * @default false
              */
             workdays_only: boolean;
+        };
+        /**
+         * RescheduleIn
+         * @description New dates for a task (omit a field to keep it; null clears it), and whether the work that
+         *     waits on it moves too (S6.1.2).
+         */
+        RescheduleIn: {
+            /**
+             * Cascade
+             * @default true
+             */
+            cascade: boolean;
+            /** Due On */
+            due_on?: string | null;
+            /** Start On */
+            start_on?: string | null;
+        };
+        /** RescheduleOut */
+        RescheduleOut: {
+            /**
+             * Hidden Skipped
+             * @default 0
+             */
+            hidden_skipped: number;
+            moved: components["schemas"]["DateChangeOut"];
+            /** Shifted */
+            shifted: components["schemas"]["DateChangeOut"][];
+            /** Skipped */
+            skipped: components["schemas"]["TaskSummaryOut"][];
         };
         /** RiskNoteOut */
         RiskNoteOut: {
@@ -12298,6 +12388,76 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MutationOut_OkOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reschedule_api_v1_tasks__task_id__reschedule_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RescheduleIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationOut_RescheduleOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_reschedule_api_v1_tasks__task_id__reschedule_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RescheduleIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RescheduleOut"];
                 };
             };
             /** @description Validation Error */
