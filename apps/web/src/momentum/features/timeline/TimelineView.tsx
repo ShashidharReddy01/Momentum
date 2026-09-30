@@ -28,6 +28,7 @@ import {
   ROW_HEIGHT,
   ZOOMS,
   arrowPath,
+  cascadeOf,
   conflictsOf,
   criticalPath,
   datePatch,
@@ -42,7 +43,15 @@ import {
   type Row,
   type Zoom,
 } from './layout';
-import { useProjectDependencies, type DependencyEdge } from './queries';
+import { toastError } from '@/lib/toast';
+import { CascadeDialog } from './CascadeDialog';
+import {
+  useProjectDependencies,
+  useReschedule,
+  type DatesPatch,
+  type DependencyEdge,
+  type ReschedulePlan,
+} from './queries';
 
 const LEFT = 280; // task column
 const HEADER = 48; // two tick bands
@@ -75,6 +84,9 @@ type Drag =
   | { kind: 'tray'; task: Task; clientX: number; clientY: number; day: string | null };
 
 const MIN_DRAG_PX = 4; // below this a press is a click (opens the task)
+
+/** A move waiting on the server's cascade preview or the person's answer to it (S6.1.2). */
+type Pending = { task: Task; patch: DatesPatch; message: string; plan: ReschedulePlan | null };
 
 /**
  * Timeline view (S6.1.1a): top-level tasks as bars on a time axis, grouped by section.
@@ -118,6 +130,8 @@ export function TimelineView({
   const people = usePeople('', 'all').data;
   const nav = useTaskNav();
   const m = useTaskMutations(projectId);
+  const reschedule = useReschedule(projectId);
+  const [pending, setPending] = useState<Pending | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const pendingCenter = useRef<number | null>(null);
   const [drag, setDragState] = useState<Drag | null>(null);
@@ -135,11 +149,24 @@ export function TimelineView({
   );
   // what's drawn: the saved tasks, with a dragged bar's dates replaced by where it is now
   const tasks = useMemo(() => {
+    if (pending) return saved.map((t) => (t.id === pending.task.id ? { ...t, ...pending.patch } : t));
     if (drag?.kind !== 'bar' || drag.days === 0) return saved;
     const patch = datePatch(drag.task, draggedSpan(drag.span, drag.mode, drag.days), drag.mode);
     return patch ? saved.map((t) => (t.id === drag.task.id ? { ...t, ...patch } : t)) : saved;
-  }, [saved, drag]);
+  }, [saved, drag, pending]);
   const edges: DependencyEdge[] = useMemo(() => deps.data ?? [], [deps.data]);
+  // where the work that waits on a moving task would land (dashed "ghost" bars, S6.1.2)
+  const ghosts = useMemo(() => {
+    if (pending?.plan)
+      return new Map(
+        pending.plan.shifted.map((c) => [
+          c.id,
+          spanOf({ ...pending.task, type: 'task', start_on: c.to_start, due_on: c.to_due })!,
+        ]),
+      );
+    if (drag?.kind !== 'bar' || drag.days === 0) return new Map<string, Span>();
+    return cascadeOf(saved, edges, drag.task.id, draggedSpan(drag.span, drag.mode, drag.days));
+  }, [drag, pending, saved, edges]);
   const { rows, unscheduled } = useMemo(
     () => rowsOf(sections.data ?? [], tasks, collapsed),
     [sections.data, tasks, collapsed],
@@ -279,10 +306,50 @@ export function TimelineView({
         task.type === 'milestone' || span.start === span.end
           ? fmt(span.end)
           : `${fmt(span.start)} – ${fmt(span.end)}`;
-      m.update.mutate({ id: task.id, patch, message: `${verb} ${task.key} to ${when}` });
+      const message = `${verb} ${task.key} to ${when}`;
+      const old = spanOf(task);
+      // only a later end can push anything; earlier moves and new dates save straight away
+      if (!old || span.end <= old.end) {
+        m.update.mutate({ id: task.id, patch, message });
+        return;
+      }
+      setPending({ task, patch, message, plan: null });
+      reschedule
+        .preview(task.id, patch)
+        .then((plan) => {
+          if (plan.shifted.length || plan.skipped.length || plan.hidden_skipped) {
+            setPending({ task, patch, message, plan });
+          } else {
+            setPending(null);
+            m.update.mutate({ id: task.id, patch, message });
+          }
+        })
+        .catch((e: unknown) => {
+          setPending(null);
+          toastError(e, "Couldn't check the tasks that wait on this one");
+        });
     },
-    [m.update],
+    [m.update, reschedule],
   );
+
+  const moveAll = () => {
+    if (!pending?.plan) return;
+    const { task, patch, plan } = pending;
+    const n = plan.shifted.length;
+    reschedule.apply.mutate(
+      {
+        taskId: task.id,
+        patch,
+        message: n ? `Moved ${task.key} and ${n} ${n === 1 ? 'task' : 'tasks'} after it` : pending.message,
+      },
+      { onSettled: () => setPending(null) },
+    );
+  };
+  const moveOnly = () => {
+    if (!pending) return;
+    m.update.mutate({ id: pending.task.id, patch: pending.patch, message: pending.message });
+    setPending(null);
+  };
 
   const dayAt = useCallback(
     (clientX: number): string | null => {
@@ -696,7 +763,8 @@ export function TimelineView({
                   critical={criticalSet.has(row.task.id)}
                   conflict={conflictTasks.has(row.task.id)}
                   person={row.task.assignee_id ? peopleById.get(row.task.assignee_id) : undefined}
-                  canEdit={canEdit}
+                  canEdit={canEdit && !pending}
+                  ghost={ghosts.get(row.task.id)}
                   dragging={drag?.kind === 'bar' && drag.task.id === row.task.id}
                   onOpen={openTask}
                   onHover={dragging ? noop : setHover}
@@ -723,6 +791,9 @@ export function TimelineView({
                     >
                       {rangeText(span)} ({drag.days > 0 ? '+' : ''}
                       {drag.days} {Math.abs(drag.days) === 1 ? 'day' : 'days'})
+                      {ghosts.size
+                        ? ` · ${ghosts.size} ${ghosts.size === 1 ? 'task follows' : 'tasks follow'}`
+                        : ''}
                     </div>
                   );
                 })()
@@ -765,6 +836,12 @@ export function TimelineView({
           </div>
         </div>
       </div>
+      <CascadeDialog
+        plan={pending?.plan ?? null}
+        onAll={moveAll}
+        onOnly={moveOnly}
+        onCancel={() => setPending(null)}
+      />
       <UnscheduledTray tasks={unscheduled} canEdit={canEdit} onOpen={openTask} onDragStart={startTrayDrag} />
       {drag?.kind === 'tray' ? (
         <div
@@ -854,6 +931,7 @@ const TaskRow = memo(function TaskRow({
   conflict,
   person,
   canEdit,
+  ghost,
   dragging,
   onOpen,
   onHover,
@@ -871,6 +949,7 @@ const TaskRow = memo(function TaskRow({
   conflict: boolean;
   person: Person | undefined;
   canEdit: boolean;
+  ghost: Span | undefined;
   dragging: boolean;
   onOpen: (id: string) => void;
   onHover: (h: Hover | null) => void;
@@ -968,6 +1047,20 @@ const TaskRow = memo(function TaskRow({
             </>
           ) : null}
         </button>
+        {ghost ? (
+          <span
+            data-ghost={task.id}
+            aria-hidden
+            className="pointer-events-none absolute rounded-md border-2 border-dashed"
+            style={{
+              left: xOf(rangeStart, ghost.start, dw),
+              width: Math.max(xOf(rangeStart, ghost.end, dw) + dw - xOf(rangeStart, ghost.start, dw), 6),
+              top: (ROW_HEIGHT - BAR_H) / 2,
+              height: BAR_H,
+              borderColor: fill,
+            }}
+          />
+        ) : null}
         <span
           className={cn(
             'pointer-events-none absolute truncate text-xs whitespace-nowrap',

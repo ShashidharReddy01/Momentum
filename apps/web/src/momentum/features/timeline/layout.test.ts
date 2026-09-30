@@ -179,3 +179,26 @@ describe('dragging', () => {
     expect(datePatch(both, { start: '2026-10-05', end: '2026-10-09' }, 'move')).toBeNull();
   });
 });
+
+describe('cascadeOf', () => {
+  it('pushes the chain later just enough, and never pulls it earlier', async () => {
+    const { cascadeOf } = await import('./layout');
+    const tasks = [
+      t('a', '2026-10-01', '2026-10-05'),
+      t('b', '2026-10-06', '2026-10-10'),
+      t('c', '2026-10-11', '2026-10-12'),
+      t('done', '2026-10-06', '2026-10-06', { completed_at: '2026-10-06T09:00:00Z' }),
+    ];
+    const edges = [
+      { task_id: 'b', depends_on_id: 'a' },
+      { task_id: 'c', depends_on_id: 'b' },
+      { task_id: 'done', depends_on_id: 'a' },
+    ];
+    const out = cascadeOf(tasks, edges, 'a', { start: '2026-10-01', end: '2026-10-08' });
+    expect(Object.fromEntries(out)).toEqual({
+      b: { start: '2026-10-08', end: '2026-10-12' },
+      c: { start: '2026-10-12', end: '2026-10-13' },
+    });
+    expect(cascadeOf(tasks, edges, 'a', { start: '2026-09-28', end: '2026-10-02' }).size).toBe(0);
+  });
+});

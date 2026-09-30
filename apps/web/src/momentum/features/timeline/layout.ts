@@ -268,3 +268,53 @@ export function datePatch(
   }
   return Object.keys(patch).length ? patch : null;
 }
+
+/**
+ * Where the open, scheduled tasks that wait on `movedId` would go if it took `span` (S6.1.2):
+ * the client twin of the server's `plan_reschedule`, for the ghost bars shown while dragging.
+ * Finish-to-start, push-only, transitive; a same-day hand-off is fine. The server decides what
+ * actually moves (it also knows about dependents in other projects and edit rights).
+ */
+export function cascadeOf(
+  tasks: DatedTask[],
+  edges: Edge[],
+  movedId: string,
+  span: { start: string; end: string },
+): Map<string, { start: string; end: string }> {
+  const byId = new Map(tasks.map((t) => [t.id, t]));
+  const dates = new Map<string, { start: string; end: string }>([[movedId, span]]);
+  const dependents = new Map<string, string[]>();
+  const blockers = new Map<string, string[]>();
+  for (const e of edges) {
+    (dependents.get(e.depends_on_id) ?? dependents.set(e.depends_on_id, []).get(e.depends_on_id)!).push(
+      e.task_id,
+    );
+    (blockers.get(e.task_id) ?? blockers.set(e.task_id, []).get(e.task_id)!).push(e.depends_on_id);
+  }
+  const shifted = new Map<string, { start: string; end: string }>();
+  const queue = [movedId];
+  let steps = 0;
+  while (queue.length && steps++ < 5000) {
+    const id = queue.shift()!;
+    for (const depId of dependents.get(id) ?? []) {
+      const dep = byId.get(depId);
+      if (!dep || dep.completed_at || depId === movedId) continue;
+      const cur = dates.get(depId) ?? spanOf(dep);
+      if (!cur) continue;
+      let required: string | null = null;
+      for (const bId of blockers.get(depId) ?? []) {
+        const b = byId.get(bId);
+        if (!b || b.completed_at) continue;
+        const bs = dates.get(bId) ?? spanOf(b);
+        if (bs && (required === null || bs.end > required)) required = bs.end;
+      }
+      if (required === null || cur.start >= required) continue;
+      const days = dayDiff(fromISODate(cur.start), fromISODate(required));
+      const next = draggedSpan(cur, 'move', days);
+      dates.set(depId, next);
+      shifted.set(depId, next);
+      queue.push(depId);
+    }
+  }
+  return shifted;
+}

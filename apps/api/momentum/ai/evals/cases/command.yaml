@@ -74,6 +74,18 @@ cases:
   - id: my_overdue_to_tomorrow
     input: "Move all my overdue tasks to tomorrow"
     expect: {tools_any: [list_my_tasks, search_tasks], proposes_any: [update_task, bulk_update_tasks]}
+  # S6.1.2: reschedule_task moves a task and pushes what waits on it (live-only: no fixtures)
+  - id: push_blocker_and_its_dependents
+    input: "Push the vendor contract task to {{today+4}} and shift whatever depends on it"
+    expect:
+      proposes: [reschedule_task]
+      risk: medium
+      targets_include: ["Sign vendor contract", "Payment provider approval"]
+  - id: reschedule_keeps_dependents_in_order
+    input: "Move Finalize pricing tiers to {{today+5}}; nothing that waits on it should start before then"
+    expect:
+      proposes_any: [reschedule_task]
+      targets_include: ["Finalize pricing tiers", "Update pricing page copy"]
   - id: status_update_via_command
     input: "Post a status update on Launch Plan: at risk because the vendor contract is late"
     expect: {proposes: [create_status_update], risk: medium}

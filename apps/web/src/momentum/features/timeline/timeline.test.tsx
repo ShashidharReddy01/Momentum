@@ -61,6 +61,9 @@ function task(
 }
 
 const patches: { id: string; body: Record<string, unknown> }[] = [];
+const reschedules: { id: string; body: Record<string, unknown> }[] = [];
+type Shift = { id: string; key: string; title: string; to_start: string; to_due: string; shift_days: number };
+let planShifted: Shift[] = [];
 
 async function boot(
   tasks: ReturnType<typeof task>[],
@@ -68,6 +71,7 @@ async function boot(
   role: 'admin' | 'viewer' = 'admin',
 ) {
   patches.length = 0;
+  reschedules.length = 0;
   server.use(
     ...authHandlers({ loggedIn: true }).handlers,
     ...teamHandlers(),
@@ -82,6 +86,32 @@ async function boot(
       }),
     ),
     http.get('*/api/v1/projects/:pid/dependencies', () => HttpResponse.json({ data: edges })),
+    http.post('*/api/v1/tasks/:id/reschedule/preview', async ({ params, request }) => {
+      const body = (await request.json()) as Record<string, unknown>;
+      const t = tasks.find((x) => x.id === params.id)!;
+      return HttpResponse.json({
+        moved: {
+          id: t.id,
+          key: t.key,
+          title: t.title,
+          from_start: t.start_on,
+          from_due: t.due_on,
+          to_start: body.start_on ?? t.start_on,
+          to_due: body.due_on ?? t.due_on,
+          shift_days: 0,
+        },
+        shifted: planShifted.map((c) => ({ ...c, from_start: null, from_due: null })),
+        skipped: [],
+        hidden_skipped: 0,
+      });
+    }),
+    http.post('*/api/v1/tasks/:id/reschedule', async ({ params, request }) => {
+      reschedules.push({ id: String(params.id), body: (await request.json()) as Record<string, unknown> });
+      return HttpResponse.json({
+        data: { moved: {}, shifted: [], skipped: [], hidden_skipped: 0 },
+        meta: { batch_id: 'b1' },
+      });
+    }),
     http.patch('*/api/v1/tasks/:id', async ({ params, request }) => {
       const body = (await request.json()) as Record<string, unknown>;
       patches.push({ id: String(params.id), body });
@@ -167,6 +197,9 @@ describe('Timeline view', () => {
 });
 
 describe('Timeline editing', () => {
+  beforeEach(() => {
+    planShifted = [];
+  });
   const bar = (name: RegExp) =>
     within(screen.getByRole('region', { name: 'Timeline chart' })).getByRole('button', { name });
 
@@ -256,5 +289,63 @@ describe('Timeline editing', () => {
     b.focus();
     await user.keyboard('{ArrowRight}');
     expect(patches).toHaveLength(0);
+  });
+});
+
+describe('Dependency-aware rescheduling', () => {
+  const chart = () => screen.getByRole('region', { name: 'Timeline chart' });
+  const bar = (name: RegExp) => within(chart()).getByRole('button', { name });
+  const tasks = () => [task(1, 'Design', 'sec-1', 0, 4), task(2, 'Build', 'sec-2', 5, 9)];
+  const edges = [{ task_id: 't2', depends_on_id: 't1' }];
+  beforeEach(() => {
+    planShifted = [
+      { id: 't2', key: 'T-2', title: 'Build', to_start: iso(7), to_due: iso(11), shift_days: 2 },
+    ];
+  });
+
+  it('shows ghost bars for the tasks that would follow while dragging', async () => {
+    await boot(tasks(), edges);
+    await screen.findByRole('region', { name: 'Timeline chart' });
+    fireEvent.pointerDown(bar(/^T-1 Design/), { button: 0, clientX: 500 });
+    fireEvent.pointerMove(window, { clientX: 500 + 16 * 2 });
+    expect(await screen.findByRole('status')).toHaveTextContent('1 task follows');
+    expect(document.querySelector('[data-ghost="t2"]')).not.toBeNull();
+    fireEvent.keyDown(window, { key: 'Escape' });
+    await waitFor(() => expect(document.querySelector('[data-ghost]')).toBeNull());
+    expect(patches).toHaveLength(0);
+  });
+
+  it('asks before moving dependents, and "Move all" reschedules them as one change', async () => {
+    const user = await boot(tasks(), edges);
+    await screen.findByRole('region', { name: 'Timeline chart' });
+    bar(/^T-1 Design/).focus();
+    await user.keyboard('{ArrowRight}{ArrowRight}');
+    const dialog = await screen.findByRole('dialog', { name: 'Move T-1 and 1 task that waits on it?' });
+    expect(within(dialog).getByRole('list', { name: 'Tasks that would move' })).toHaveTextContent('+2 days');
+    await user.click(within(dialog).getByRole('button', { name: 'Move all 2' }));
+    await waitFor(() => expect(reschedules).toHaveLength(1));
+    expect(reschedules[0]!.body).toMatchObject({ cascade: true });
+    expect(patches).toHaveLength(0);
+  });
+
+  it('"Only this task" moves just the one task', async () => {
+    const user = await boot(tasks(), edges);
+    await screen.findByRole('region', { name: 'Timeline chart' });
+    bar(/^T-1 Design/).focus();
+    await user.keyboard('{ArrowRight}');
+    const dialog = await screen.findByRole('dialog');
+    await user.click(within(dialog).getByRole('button', { name: 'Only T-1' }));
+    await waitFor(() => expect(patches).toHaveLength(1));
+    expect(patches[0]).toEqual({ id: 't1', body: { start_on: iso(1), due_on: iso(5) } });
+    expect(reschedules).toHaveLength(0);
+  });
+
+  it('moving earlier saves straight away without asking', async () => {
+    const user = await boot(tasks(), edges);
+    await screen.findByRole('region', { name: 'Timeline chart' });
+    bar(/^T-2 Build/).focus();
+    await user.keyboard('{ArrowLeft}');
+    await waitFor(() => expect(patches).toHaveLength(1));
+    expect(screen.queryByRole('dialog')).toBeNull();
   });
 });
