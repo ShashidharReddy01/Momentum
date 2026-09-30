@@ -4,6 +4,7 @@ import { AlertTriangle, CalendarRange, ChevronDown, ChevronRight, Route } from '
 import {
   memo,
   useCallback,
+  useEffect,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -18,7 +19,7 @@ import { Icon } from '@/components/ui/Icon';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { usePeople, type Person } from '@/features/people';
 import { useSections } from '@/features/sections';
-import { useProjectTasks, useTaskNav, type Task } from '@/features/tasks';
+import { useProjectTasks, useTaskMutations, useTaskNav, type Task } from '@/features/tasks';
 import { cn } from '@/lib/cn';
 import { dayDiff, fromISODate, toISODate } from '@/lib/dates';
 import { applyRealtimeEvent, useChannel } from '@/lib/realtime';
@@ -29,12 +30,15 @@ import {
   arrowPath,
   conflictsOf,
   criticalPath,
+  datePatch,
+  draggedSpan,
   edgeKey,
   rangeOf,
   rowsOf,
   spanOf,
   ticksOf,
   xOf,
+  type DragMode,
   type Row,
   type Zoom,
 } from './layout';
@@ -53,7 +57,24 @@ const rangeText = (s: { start: string; end: string }) => {
   return s.start === s.end ? fmt(s.start) : `${fmt(s.start)} – ${fmt(s.end)} · ${days} days`;
 };
 
-type Hover = { task: Task; span: { start: string; end: string }; x: number; y: number };
+type Span = { start: string; end: string };
+type Hover = { task: Task; span: Span; x: number; y: number };
+
+/** A drag in progress: a bar being moved or resized, or an unscheduled task being dropped on a
+ * day. Kept in a ref for the window listeners and mirrored in state for rendering. */
+type Drag =
+  | {
+      kind: 'bar';
+      task: Task;
+      span: Span;
+      mode: DragMode;
+      originX: number;
+      startClientX: number;
+      days: number;
+    }
+  | { kind: 'tray'; task: Task; clientX: number; clientY: number; day: string | null };
+
+const MIN_DRAG_PX = 4; // below this a press is a click (opens the task)
 
 /**
  * Timeline view (S6.1.1a): top-level tasks as bars on a time axis, grouped by section.
@@ -66,10 +87,17 @@ type Hover = { task: Task; span: { start: string; end: string }; x: number; y: n
  * Rows are virtualized with a fixed height (like the list), so 500 tasks mount only what's on
  * screen; arrows are drawn only for edges that touch the visible rows. The task column is sticky
  * on the left and the time header sticky on top of one scroll container, so both axes scroll
- * together. Editing (drag, resize, nudge) arrives in S6.1.1b; for now a bar opens the task.
+ * together.
+ *
+ * Editing (S6.1.1b, editors only): drag a bar to move it, drag its edges to change the start or
+ * due date, drag an unscheduled task onto a day to schedule it, `←/→` nudges the focused task a day
+ * (`Shift`: a week), `J/K` move between tasks, `Esc` cancels a drag. While dragging, the task's
+ * new dates are fed through the same layout, so its arrows, conflicts and the critical path update
+ * live. Every change goes through `useTaskMutations().update` (optimistic, undo toast, realtime).
  */
 export function TimelineView({
   projectId,
+  canEdit,
   color,
 }: {
   projectId: string;
@@ -89,14 +117,28 @@ export function TimelineView({
   const deps = useProjectDependencies(projectId);
   const people = usePeople('', 'all').data;
   const nav = useTaskNav();
+  const m = useTaskMutations(projectId);
   const scrollRef = useRef<HTMLDivElement>(null);
   const pendingCenter = useRef<number | null>(null);
+  const [drag, setDragState] = useState<Drag | null>(null);
+  const dragRef = useRef<Drag | null>(null);
+  const suppressClick = useRef(false);
+  const setDrag = useCallback((d: Drag | null) => {
+    dragRef.current = d;
+    setDragState(d);
+  }, []);
 
   const today = useMemo(() => new Date(), []);
-  const tasks = useMemo(
+  const saved = useMemo(
     () => [...(open.data ?? []), ...(showCompleted ? (done.data ?? []) : [])],
     [open.data, done.data, showCompleted],
   );
+  // what's drawn: the saved tasks, with a dragged bar's dates replaced by where it is now
+  const tasks = useMemo(() => {
+    if (drag?.kind !== 'bar' || drag.days === 0) return saved;
+    const patch = datePatch(drag.task, draggedSpan(drag.span, drag.mode, drag.days), drag.mode);
+    return patch ? saved.map((t) => (t.id === drag.task.id ? { ...t, ...patch } : t)) : saved;
+  }, [saved, drag]);
   const edges: DependencyEdge[] = useMemo(() => deps.data ?? [], [deps.data]);
   const { rows, unscheduled } = useMemo(
     () => rowsOf(sections.data ?? [], tasks, collapsed),
@@ -105,10 +147,10 @@ export function TimelineView({
   const range = useMemo(
     () =>
       rangeOf(
-        tasks.map(spanOf).filter((s): s is { start: string; end: string } => !!s),
+        saved.map(spanOf).filter((s): s is Span => !!s),
         today,
       ),
-    [tasks, today],
+    [saved, today],
   );
   const dw = DAY_WIDTH[zoom];
   const width = range.days * dw;
@@ -218,7 +260,154 @@ export function TimelineView({
     });
   }, []);
 
-  const openTask = useCallback((id: string) => nav?.open(id), [nav]);
+  const openTask = useCallback(
+    (id: string) => {
+      if (suppressClick.current) {
+        suppressClick.current = false; // the click that ends a drag
+        return;
+      }
+      nav?.open(id);
+    },
+    [nav],
+  );
+
+  const saveDates = useCallback(
+    (task: Task, span: Span, mode: DragMode, verb: string) => {
+      const patch = datePatch(task, span, mode);
+      if (!patch) return;
+      const when =
+        task.type === 'milestone' || span.start === span.end
+          ? fmt(span.end)
+          : `${fmt(span.start)} – ${fmt(span.end)}`;
+      m.update.mutate({ id: task.id, patch, message: `${verb} ${task.key} to ${when}` });
+    },
+    [m.update],
+  );
+
+  const dayAt = useCallback(
+    (clientX: number): string | null => {
+      const el = scrollRef.current;
+      if (!el) return null;
+      const rect = el.getBoundingClientRect();
+      const x = clientX - rect.left - LEFT + el.scrollLeft;
+      if (clientX < rect.left + LEFT || clientX > rect.right || x < 0) return null;
+      const day = new Date(range.start);
+      day.setDate(day.getDate() + Math.floor(x / dw));
+      return toISODate(day);
+    },
+    [range.start, dw],
+  );
+
+  const startBarDrag = useCallback(
+    (task: Task, span: Span, mode: DragMode, clientX: number) => {
+      if (!canEdit) return;
+      const left = scrollRef.current?.scrollLeft ?? 0;
+      setHover(null);
+      setDrag({ kind: 'bar', task, span, mode, originX: clientX + left, startClientX: clientX, days: 0 });
+    },
+    [canEdit, setDrag],
+  );
+
+  const startTrayDrag = useCallback(
+    (task: Task, clientX: number, clientY: number) => {
+      if (!canEdit) return;
+      setDrag({ kind: 'tray', task, clientX, clientY, day: null });
+    },
+    [canEdit, setDrag],
+  );
+
+  // window listeners for the drag in progress
+  const dragging = drag !== null;
+  useEffect(() => {
+    if (!dragging) return;
+    const onMove = (e: PointerEvent) => {
+      const d = dragRef.current;
+      if (!d) return;
+      if (d.kind === 'bar') {
+        const left = scrollRef.current?.scrollLeft ?? 0;
+        const days = Math.round((e.clientX + left - d.originX) / dw);
+        if (days !== d.days) setDrag({ ...d, days });
+      } else {
+        setDrag({ ...d, clientX: e.clientX, clientY: e.clientY, day: dayAt(e.clientX) });
+      }
+    };
+    const onUp = (e: PointerEvent) => {
+      const d = dragRef.current;
+      setDrag(null);
+      if (!d) return;
+      if (d.kind === 'bar') {
+        if (Math.abs(e.clientX - d.startClientX) < MIN_DRAG_PX) return; // a click
+        suppressClick.current = true;
+        setTimeout(() => (suppressClick.current = false), 0);
+        if (d.days !== 0)
+          saveDates(
+            d.task,
+            draggedSpan(d.span, d.mode, d.days),
+            d.mode,
+            d.mode === 'move' ? 'Moved' : 'Changed',
+          );
+      } else {
+        const day = dayAt(e.clientX);
+        if (!day) return;
+        suppressClick.current = true;
+        setTimeout(() => (suppressClick.current = false), 0);
+        m.update.mutate({
+          id: d.task.id,
+          patch: { due_on: day },
+          message: `Scheduled ${d.task.key} for ${fmt(day)}`,
+        });
+      }
+    };
+    const onKey = (e: globalThis.KeyboardEvent) => {
+      if (e.key === 'Escape') setDrag(null);
+    };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [dragging, dw, dayAt, saveDates, setDrag, m.update]);
+
+  const focusBar = (id: string) => {
+    let tries = 0;
+    const attempt = () => {
+      const el = scrollRef.current?.querySelector<HTMLElement>(`[data-bar="${id}"]`);
+      if (el) el.focus();
+      else if (tries++ < 5) requestAnimationFrame(attempt);
+    };
+    attempt();
+  };
+
+  const onBarKey = useCallback(
+    (task: Task, span: Span, e: KeyboardEvent<HTMLButtonElement>) => {
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && canEdit) {
+        e.preventDefault();
+        const days = (e.key === 'ArrowRight' ? 1 : -1) * (e.shiftKey ? 7 : 1);
+        saveDates(task, draggedSpan(span, 'move', days), 'move', 'Moved');
+        return;
+      }
+      if (e.key === 'j' || e.key === 'k') {
+        e.preventDefault();
+        const i = rowIndex.get(task.id);
+        if (i === undefined) return;
+        const step = e.key === 'j' ? 1 : -1;
+        for (let n = i + step; n >= 0 && n < rows.length; n += step) {
+          const r = rows[n]!;
+          if (r.kind === 'task') {
+            virtualizer.scrollToIndex(n, { align: 'auto' });
+            focusBar(r.task.id);
+            return;
+          }
+        }
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [canEdit, saveDates, rowIndex, rows],
+  );
 
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
     if (!(e.metaKey || e.ctrlKey)) return;
@@ -507,11 +696,51 @@ export function TimelineView({
                   critical={criticalSet.has(row.task.id)}
                   conflict={conflictTasks.has(row.task.id)}
                   person={row.task.assignee_id ? peopleById.get(row.task.assignee_id) : undefined}
+                  canEdit={canEdit}
+                  dragging={drag?.kind === 'bar' && drag.task.id === row.task.id}
                   onOpen={openTask}
-                  onHover={setHover}
+                  onHover={dragging ? noop : setHover}
+                  onDragStart={startBarDrag}
+                  onKey={onBarKey}
                 />
               );
             })}
+
+            {/* the dates a dragged bar would get, beside it */}
+            {drag?.kind === 'bar' && drag.days !== 0
+              ? (() => {
+                  const i = rowIndex.get(drag.task.id);
+                  if (i === undefined) return null;
+                  const span = draggedSpan(drag.span, drag.mode, drag.days);
+                  return (
+                    <div
+                      role="status"
+                      className="pointer-events-none absolute z-40 rounded-md bg-ink px-2 py-0.5 text-xs whitespace-nowrap text-surface tabular-nums shadow-pop"
+                      style={{
+                        left: LEFT + xOf(range.start, span.start, dw),
+                        top: HEADER + i * ROW_HEIGHT - 22,
+                      }}
+                    >
+                      {rangeText(span)} ({drag.days > 0 ? '+' : ''}
+                      {drag.days} {Math.abs(drag.days) === 1 ? 'day' : 'days'})
+                    </div>
+                  );
+                })()
+              : null}
+
+            {/* the day an unscheduled task would land on */}
+            {drag?.kind === 'tray' && drag.day ? (
+              <div
+                className="pointer-events-none absolute z-10 bg-accent-tint"
+                style={{
+                  left: LEFT + xOf(range.start, drag.day, dw),
+                  top: HEADER,
+                  width: dw,
+                  height: bodyHeight,
+                }}
+                aria-hidden
+              />
+            ) : null}
 
             {scheduledCount === 0 ? (
               <div
@@ -520,12 +749,12 @@ export function TimelineView({
               >
                 <p className="max-w-sm rounded-lg border border-hairline bg-surface px-4 py-3 text-center text-sm text-muted shadow-sm">
                   <span className="block font-medium text-ink">Nothing scheduled yet</span>
-                  Give tasks a start or due date and they appear here as bars.
+                  Drag tasks from Unscheduled onto a day, or give them a start or due date.
                 </p>
               </div>
             ) : null}
 
-            {hover ? (
+            {hover && !drag ? (
               <HoverCard
                 hover={hover}
                 critical={criticalSet.has(hover.task.id)}
@@ -536,10 +765,24 @@ export function TimelineView({
           </div>
         </div>
       </div>
-      <UnscheduledTray tasks={unscheduled} onOpen={openTask} />
+      <UnscheduledTray tasks={unscheduled} canEdit={canEdit} onOpen={openTask} onDragStart={startTrayDrag} />
+      {drag?.kind === 'tray' ? (
+        <div
+          role="status"
+          className="pointer-events-none fixed z-50 max-w-60 truncate rounded-md border border-hairline bg-surface px-2 py-1 text-sm shadow-pop"
+          style={{ left: drag.clientX + 12, top: drag.clientY + 12 }}
+        >
+          {drag.task.title}
+          <span className="block text-xs text-muted">
+            {drag.day ? `Schedule for ${fmt(drag.day)}` : 'Drop on a day to schedule'}
+          </span>
+        </div>
+      ) : null}
     </div>
   );
 }
+
+const noop = () => undefined;
 
 const ARROW_COLOR = {
   normal: 'var(--muted-2)',
@@ -610,8 +853,12 @@ const TaskRow = memo(function TaskRow({
   critical,
   conflict,
   person,
+  canEdit,
+  dragging,
   onOpen,
   onHover,
+  onDragStart,
+  onKey,
 }: {
   task: Task;
   span: { start: string; end: string };
@@ -623,8 +870,12 @@ const TaskRow = memo(function TaskRow({
   critical: boolean;
   conflict: boolean;
   person: Person | undefined;
+  canEdit: boolean;
+  dragging: boolean;
   onOpen: (id: string) => void;
   onHover: (h: Hover | null) => void;
+  onDragStart: (task: Task, span: Span, mode: DragMode, clientX: number) => void;
+  onKey: (task: Task, span: Span, e: KeyboardEvent<HTMLButtonElement>) => void;
 }) {
   const done = !!task.completed_at;
   const overdue = !done && span.end < toISODate(new Date());
@@ -673,8 +924,17 @@ const TaskRow = memo(function TaskRow({
           onMouseLeave={() => onHover(null)}
           onFocus={show}
           onBlur={() => onHover(null)}
+          onKeyDown={(e) => onKey(task, span, e)}
+          onPointerDown={(e) => {
+            if (!canEdit || e.button !== 0) return;
+            e.preventDefault(); // no text selection while dragging
+            e.currentTarget.focus();
+            const handle = (e.target as HTMLElement).dataset.handle as DragMode | undefined;
+            onDragStart(task, span, handle ?? 'move', e.clientX);
+          }}
           className={cn(
-            'absolute block focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus',
+            'group absolute block touch-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus',
+            canEdit && (dragging ? 'cursor-grabbing shadow-pop' : 'cursor-grab'),
             milestone ? 'rotate-45 rounded-[3px]' : 'overflow-hidden rounded-md',
             done && 'opacity-45',
             critical && 'ring-2 ring-accent ring-offset-1 ring-offset-surface',
@@ -694,6 +954,18 @@ const TaskRow = memo(function TaskRow({
         >
           {!milestone && progress > 0 ? (
             <span className="absolute inset-y-0 left-0 bg-ink/25" style={{ width: `${progress * 100}%` }} />
+          ) : null}
+          {canEdit && !milestone ? (
+            <>
+              <span
+                data-handle="start"
+                className="absolute inset-y-0 left-0 w-1.5 cursor-ew-resize rounded-l-md group-hover:bg-ink/30"
+              />
+              <span
+                data-handle="end"
+                className="absolute inset-y-0 right-0 w-1.5 cursor-ew-resize rounded-r-md group-hover:bg-ink/30"
+              />
+            </>
           ) : null}
         </button>
         <span
@@ -754,7 +1026,17 @@ function HoverCard({
   );
 }
 
-function UnscheduledTray({ tasks, onOpen }: { tasks: Task[]; onOpen: (id: string) => void }) {
+function UnscheduledTray({
+  tasks,
+  canEdit,
+  onOpen,
+  onDragStart,
+}: {
+  tasks: Task[];
+  canEdit: boolean;
+  onOpen: (id: string) => void;
+  onDragStart: (task: Task, clientX: number, clientY: number) => void;
+}) {
   return (
     <aside aria-label="Unscheduled" className="hidden w-56 shrink-0 flex-col lg:flex">
       <h3 className="mb-2 text-sm font-medium">
@@ -767,7 +1049,16 @@ function UnscheduledTray({ tasks, onOpen }: { tasks: Task[]; onOpen: (id: string
               <button
                 type="button"
                 onClick={() => onOpen(t.id)}
-                className="w-full truncate rounded-md border border-hairline bg-surface px-2 py-1.5 text-left text-sm hover:bg-surface-2"
+                onPointerDown={(e) => {
+                  if (!canEdit || e.button !== 0) return;
+                  e.preventDefault();
+                  onDragStart(t, e.clientX, e.clientY);
+                }}
+                title={canEdit ? 'Drag onto the timeline to schedule' : undefined}
+                className={cn(
+                  'w-full touch-none truncate rounded-md border border-hairline bg-surface px-2 py-1.5 text-left text-sm hover:bg-surface-2',
+                  canEdit && 'cursor-grab',
+                )}
               >
                 {t.title}
               </button>

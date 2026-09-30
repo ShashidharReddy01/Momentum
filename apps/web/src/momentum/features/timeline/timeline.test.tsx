@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
@@ -60,11 +60,18 @@ function task(
   };
 }
 
-async function boot(tasks: ReturnType<typeof task>[], edges: { task_id: string; depends_on_id: string }[]) {
+const patches: { id: string; body: Record<string, unknown> }[] = [];
+
+async function boot(
+  tasks: ReturnType<typeof task>[],
+  edges: { task_id: string; depends_on_id: string }[],
+  role: 'admin' | 'viewer' = 'admin',
+) {
+  patches.length = 0;
   server.use(
     ...authHandlers({ loggedIn: true }).handlers,
     ...teamHandlers(),
-    ...projectHandlers('', undefined, [{ name: 'Website Revamp', my_role: 'admin' }]),
+    ...projectHandlers('', undefined, [{ name: 'Website Revamp', my_role: role }]),
     ...sectionHandlers('', { 'seed-1': ['Design', 'Build'] }),
     ...taskHandlers('', {}),
   );
@@ -75,6 +82,15 @@ async function boot(tasks: ReturnType<typeof task>[], edges: { task_id: string; 
       }),
     ),
     http.get('*/api/v1/projects/:pid/dependencies', () => HttpResponse.json({ data: edges })),
+    http.patch('*/api/v1/tasks/:id', async ({ params, request }) => {
+      const body = (await request.json()) as Record<string, unknown>;
+      patches.push({ id: String(params.id), body });
+      const t = tasks.find((x) => x.id === params.id)!;
+      return HttpResponse.json({
+        data: { ...t, ...body, version: t.version + 1 },
+        meta: { activity_id: 'a1' },
+      });
+    }),
   );
   window.history.replaceState(null, '', '/projects/seed-1/timeline');
   render(<MomentumApp />);
@@ -147,5 +163,98 @@ describe('Timeline view', () => {
   it('shows a helpful empty state for a project with no tasks', async () => {
     await boot([], []);
     expect(await screen.findByText('No tasks yet')).toBeInTheDocument();
+  });
+});
+
+describe('Timeline editing', () => {
+  const bar = (name: RegExp) =>
+    within(screen.getByRole('region', { name: 'Timeline chart' })).getByRole('button', { name });
+
+  it('drags a bar to move both dates by whole days (month zoom: 16 px a day)', async () => {
+    await boot([task(1, 'Wireframes', 'sec-1', 0, 3)], []);
+    await screen.findByRole('region', { name: 'Timeline chart' });
+    const b = bar(/^T-1 Wireframes/);
+    fireEvent.pointerDown(b, { button: 0, clientX: 500 });
+    fireEvent.pointerMove(window, { clientX: 500 + 16 * 3 });
+    expect(await screen.findByRole('status')).toHaveTextContent('(+3 days)');
+    fireEvent.pointerUp(window, { clientX: 500 + 16 * 3 });
+    await waitFor(() => expect(patches).toHaveLength(1));
+    expect(patches[0]).toEqual({ id: 't1', body: { start_on: iso(3), due_on: iso(6) } });
+  });
+
+  it('drags the end handle to change only the due date', async () => {
+    await boot([task(1, 'Wireframes', 'sec-1', 0, 3)], []);
+    await screen.findByRole('region', { name: 'Timeline chart' });
+    const handle = bar(/^T-1 Wireframes/).querySelector('[data-handle="end"]')!;
+    fireEvent.pointerDown(handle, { button: 0, clientX: 500 });
+    fireEvent.pointerMove(window, { clientX: 500 + 16 * 2 });
+    fireEvent.pointerUp(window, { clientX: 500 + 16 * 2 });
+    await waitFor(() => expect(patches).toHaveLength(1));
+    expect(patches[0]!.body).toEqual({ due_on: iso(5) });
+  });
+
+  it('a press without movement opens the task instead of moving it', async () => {
+    await boot([task(1, 'Wireframes', 'sec-1', 0, 3)], []);
+    await screen.findByRole('region', { name: 'Timeline chart' });
+    const b = bar(/^T-1 Wireframes/);
+    fireEvent.pointerDown(b, { button: 0, clientX: 500 });
+    fireEvent.pointerUp(window, { clientX: 501 });
+    fireEvent.click(b);
+    await waitFor(() => expect(window.location.search).toContain('task=t1'));
+    expect(patches).toHaveLength(0);
+  });
+
+  it('nudges the focused task with the arrow keys (Shift: a week)', async () => {
+    const user = await boot([task(1, 'Wireframes', 'sec-1', 0, 3), task(2, 'API', 'sec-2', 4, 9)], []);
+    await screen.findByRole('region', { name: 'Timeline chart' });
+    bar(/^T-1 Wireframes/).focus();
+    await user.keyboard('{ArrowRight}');
+    await waitFor(() => expect(patches).toHaveLength(1));
+    expect(patches[0]!.body).toEqual({ start_on: iso(1), due_on: iso(4) });
+    await user.keyboard('j');
+    await waitFor(() => expect(bar(/^T-2 API/)).toHaveFocus());
+    await user.keyboard('{Shift>}{ArrowLeft}{/Shift}');
+    await waitFor(() => expect(patches).toHaveLength(2));
+    expect(patches[1]).toEqual({ id: 't2', body: { start_on: iso(-3), due_on: iso(2) } });
+  });
+
+  it('schedules an unscheduled task by dropping it on a day', async () => {
+    await boot([task(1, 'Wireframes', 'sec-1', 0, 3), task(2, 'Someday', 'sec-1', null, null)], []);
+    const chart = await screen.findByRole('region', { name: 'Timeline chart' });
+    vi.spyOn(chart, 'getBoundingClientRect').mockReturnValue({
+      left: 0,
+      top: 0,
+      right: 1200,
+      bottom: 800,
+      width: 1200,
+      height: 800,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    });
+    const item = within(screen.getByRole('complementary', { name: 'Unscheduled' })).getByRole('button', {
+      name: 'Someday',
+    });
+    fireEvent.pointerDown(item, { button: 0, clientX: 1300, clientY: 100 });
+    // 280 px task column, then 16 px a day from the range start
+    fireEvent.pointerMove(window, { clientX: 280 + 16 * 10 + 4, clientY: 100 });
+    expect(await screen.findByText(/^Schedule for /)).toBeInTheDocument();
+    fireEvent.pointerUp(window, { clientX: 280 + 16 * 10 + 4, clientY: 100 });
+    await waitFor(() => expect(patches).toHaveLength(1));
+    expect(patches[0]!.id).toBe('t2');
+    expect(Object.keys(patches[0]!.body)).toEqual(['due_on']);
+  });
+
+  it('is read-only for a viewer: no handles, no drag, no nudge', async () => {
+    const user = await boot([task(1, 'Wireframes', 'sec-1', 0, 3)], [], 'viewer');
+    await screen.findByRole('region', { name: 'Timeline chart' });
+    const b = bar(/^T-1 Wireframes/);
+    expect(b.querySelector('[data-handle]')).toBeNull();
+    fireEvent.pointerDown(b, { button: 0, clientX: 500 });
+    fireEvent.pointerMove(window, { clientX: 600 });
+    fireEvent.pointerUp(window, { clientX: 600 });
+    b.focus();
+    await user.keyboard('{ArrowRight}');
+    expect(patches).toHaveLength(0);
   });
 });

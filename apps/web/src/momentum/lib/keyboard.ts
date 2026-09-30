@@ -13,6 +13,8 @@ export function formatCombo(combo: Combo): string[] {
     const named: Record<string, string> = {
       up: '↑',
       down: '↓',
+      left: '←',
+      right: '→',
       backspace: '⌫',
       enter: 'Enter',
       escape: 'Esc',
@@ -81,4 +83,7 @@ export const SHORTCUTS: { combo: Combo; label: string; phase?: number }[] = [
   { combo: 'mod+backspace', label: 'Delete selected' },
   { combo: 'tab', label: 'New row → subtask (Shift+Tab back)' },
   { combo: 'escape', label: 'Clear selection / close details' },
+  // timeline (focus a bar first)
+  { combo: 'right', label: 'Timeline: move a day later (← earlier, ⇧ a week)' },
+  { combo: 'mod+=', label: 'Timeline: zoom in (⌘- out)' },
 ];

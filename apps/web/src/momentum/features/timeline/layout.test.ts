@@ -143,3 +143,39 @@ describe('arrowPath', () => {
     expect(arrowPath(100, 18, 90, 54)).toBe('M100,18 H108 V36 H82 V54 H90');
   });
 });
+
+describe('dragging', () => {
+  const span = { start: '2026-10-05', end: '2026-10-09' };
+  it('moves both edges, and a resize stops at the other edge', async () => {
+    const { draggedSpan } = await import('./layout');
+    expect(draggedSpan(span, 'move', 3)).toEqual({ start: '2026-10-08', end: '2026-10-12' });
+    expect(draggedSpan(span, 'start', -2)).toEqual({ start: '2026-10-03', end: '2026-10-09' });
+    expect(draggedSpan(span, 'start', 9)).toEqual({ start: '2026-10-09', end: '2026-10-09' });
+    expect(draggedSpan(span, 'end', -9)).toEqual({ start: '2026-10-05', end: '2026-10-05' });
+  });
+
+  it('patches only the dates a task uses, and adds an edge when a one-date task is stretched', async () => {
+    const { datePatch } = await import('./layout');
+    const both = t('a', '2026-10-05', '2026-10-09');
+    expect(datePatch(both, { start: '2026-10-06', end: '2026-10-10' }, 'move')).toEqual({
+      start_on: '2026-10-06',
+      due_on: '2026-10-10',
+    });
+    const dueOnly = t('b', null, '2026-10-09');
+    expect(datePatch(dueOnly, { start: '2026-10-11', end: '2026-10-11' }, 'move')).toEqual({
+      due_on: '2026-10-11',
+    });
+    expect(datePatch(dueOnly, { start: '2026-10-07', end: '2026-10-09' }, 'start')).toEqual({
+      start_on: '2026-10-07',
+    });
+    const startOnly = t('c', '2026-10-05', null);
+    expect(datePatch(startOnly, { start: '2026-10-05', end: '2026-10-08' }, 'end')).toEqual({
+      due_on: '2026-10-08',
+    });
+    const milestone = t('m', null, '2026-10-09', { type: 'milestone' });
+    expect(datePatch(milestone, { start: '2026-10-12', end: '2026-10-12' }, 'move')).toEqual({
+      due_on: '2026-10-12',
+    });
+    expect(datePatch(both, { start: '2026-10-05', end: '2026-10-09' }, 'move')).toBeNull();
+  });
+});

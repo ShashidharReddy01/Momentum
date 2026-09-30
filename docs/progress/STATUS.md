@@ -5,8 +5,8 @@
 > Older session handoff notes, the Phase 2 exit record and the Phase 0-1 retros live in `docs/progress/handoff-archive.md` (read them only when a slice touches that area). At the end of every slice, move the previous session's handoff there and keep only the latest one here.
 
 ## Current focus
-- **Phase:** 5: Agents v1 ("Teammates") — **complete** (exit criteria met 2026-09-29; deferred by agreement: live `llm-check`/evals on the product owner's machine, dogfood week post-ship). Next: Phase 6 kickoff.
-- **Next up:** the product owner's live **re-run** after the live-eval fixes (handoff below), then the Phase 6 kickoff.
+- **Phase:** 6: Planning and Insight — **in progress** (see "Phase 6" under Progress). Phase 5: Agents v1 ("Teammates") — **complete and verified live** (exit criteria met 2026-09-29; four rounds of live verification closed 2026-09-30: live evals 219/220, every feature bucket above threshold, `RESULT: PASS`). Still deferred by agreement: the dogfood week (post-ship).
+- **Next up:** Phase 6 slice by slice (Phase 6 section below).
 - **Product-owner instruction (2026-09-26):** finish all remaining slices, then one big local test run against the real gateway (100+ questions/actions covering edge cases), then fix from that run.
 - **Scope note (product owner, 2026-09-26):** the customer-operations capabilities (SQQ, pricing, contracts, invoices, pushes to internal systems as tools and assignable agents) will be done later in the product owner's own codebase, **not in this repo**. Finish the roadmap as written.
 - **Branch:** Phases 3–4 are on `claude/clever-hopper-pbv7yr` (ahead of `main`). Phase 5 continues on `claude/intelligent-meitner-9ne4e8`, which starts from that branch's Phase 4 exit commit.
@@ -21,7 +21,9 @@
 - **Phase 5 AI mode:** mock mode throughout (no gateway in this environment). Deferred to the product owner's machine: `momentum llm-check`, `EVALS_LIVE=1 make evals` at phase exit. The dogfood exit criterion is a post-ship observation, not blocking.
 - **Carried past Phase 4 exit** (kickoff Q6: the inbox/bell gap → S5.0.1 and the forms security review → S5.0.2 (**done**) are now Phase 5 slices; J1 flake **fixed** 2026-09-28, see handoff; the other two stay deferred): a security review pass of S4.2.1's public form endpoint (member-name exposure on assignee questions, no `X-Forwarded-For` handling); wiring `conversational_intake` into the `momentum/ai/evals/` harness (its `EvalWorld` has no notion of a form and the harness models one-shot input → output, not a stateless multi-turn feature); a real per-turn spam counter for conversational intake (currently reuses the submission rate limiter as a coarse guard); the inbox/bell live-update gap (**fixed in S5.0.1**) and the J1 quick-entry flake (**fixed**) found at exit (both described in the Phase 4 exit handoff, now in `handoff-archive.md`).
 
-## Handoff notes (latest session: 2026-09-29, Phase 5 exit)
+## Handoff notes (latest session: 2026-09-30, Phase 5 live verification closed)
+- **Live verification round 4, closing (product owner, 2026-09-30):** `llm-check` 10/10, backend 738/738, frontend 334/334 (the clean re-run, all 67 files), live evals **219/220 (99.5%)**, all 21 feature buckets above threshold, **`RESULT: PASS`**. `agent_architect` went from 67% to 100%: the round-3 `stated_window` + `fit_dates` fix resolved all 4 consecutive failures. Full account: `docs/progress/phase-5-live-verification-findings.md` "Round 4".
+  - **Open, not blocking:** `ai_step/draft_reply_answers_newest` gets 1/5 from the judge for a clean reply (a plain follow-up question, no invented facts), which the case's own rubric allows ("proposing an obvious next step… is not an invention"). A judge-consistency miss, not a product defect, and a different critique from the original "today is Monday" bug (clean 3 rounds running). Look at it next time the judge prompt is touched.
 - **Live verification round 3 (product owner, 2026-09-30):** 217/220 (98.6%); plan_day 10/10. **Addressed (mock mode), awaiting the round 4 live run:**
   - Architect `brief_live` (4 failures in 4 runs, a real bug): the window a brief states is now enforced server-side: `stated_window` reads it in code, else the model's `window_days`, and `fit_dates` compresses the plan into it with a note (`project_brief/v2`).
   - ai_step `summarize_thread_content`: the summary kind now passes the task and thread to the judge as `source`, like the other two kinds.
@@ -125,7 +127,8 @@
 - [x] S5.2.1 Assign a task to an agent (2026-09-29) · [x] S5.2.2 @mention an agent (2026-09-29) · [x] S5.2.3 Agent gallery + create from description (2026-09-29)
 - [x] S5.3.1 Pulse (2026-09-29) · [x] S5.3.2 Sorter (2026-09-29) · [x] S5.3.3 Herald (2026-09-29) · [x] S5.3.4 Nudge (2026-09-29) · [x] S5.3.5 Architect (2026-09-29) · [x] S5.3.6 Scribe (2026-09-29) · [x] S5.3.7 Radar (2026-09-29) · [x] S5.3.8 Teammate (2026-09-29)
 - Build order (kickoff Q3, Q8): S5.0.1 before S5.1.3 · E5.1 (incl. S5.1.5, S5.1.6) → S5.2.1 + S5.3.8 (J10) → S5.2.2 → S5.2.3 → Pulse, Sorter (after S5.0.2), Herald, Nudge, Radar → Architect, Scribe
-- [x] Phase 5 exit (2026-09-29): J10 passes (e2e, mock); budget-cap test; runs page explains every action · deferred: `llm-check` + `EVALS_LIVE=1 make evals` (product owner's machine), dogfood week (post-ship)
+- [x] Phase 5 exit (2026-09-29): J10 passes (e2e, mock); budget-cap test; runs page explains every action
+- [x] Phase 5 live verification (2026-09-30, four rounds): `llm-check` 10/10, live evals 219/220 (99.5%), all 21 buckets pass · deferred: dogfood week (post-ship)
 
 ### Phases 6–9
 Tracked in their phase files; copy the slice list here at each phase kickoff.
@@ -137,10 +140,10 @@ Tracked in their phase files; copy the slice list here at each phase kickoff.
 - **Baseline:** `make check` green on `8c7de80` (backend 738/738, web 334/334, lint, format, types, import contracts). A fresh container needs Postgres (the Phase 5 handoff recipe) **and** `pnpm install` in `apps/web` (no root `package.json`); without the latter, `types-check` fails with error 254.
 - **Kickoff answers (product owner, 2026-09-30):** every recommendation accepted (Q1 custom SVG timeline, Q2 split S6.1.1, Q3 capacity, Q4 backtest, Q5 visibility, Q6 J11/J12), plus a UX bar: "the WOW factor, easy for the user to view data, better than Asana" (in `phase-6.md`).
 - **Standing instruction (product owner, 2026-09-30):** do what's recommended and continue slice by slice, committing and pushing each.
-- **Next up:** S6.1.1b Timeline editing (drag, resize, nudge, schedule from the tray).
+- **Next up:** S6.1.2 Dependency-aware rescheduling (moving a task proposes shifting its dependents).
 - **S6.1.1a notes:** the timeline is live on every project's Timeline tab; try it on **Load Test Timeline (500)** (`momentum seed --perf`). Its synthetic data has many conflicts and overdue tasks by design (random dates), so expect a lot of crit. `tools/perf/timeline-perf.mjs` measures it and takes screenshots.
 - [x] Kickoff (`docs/roadmap/phase-6-kickoff.md`, 2026-09-30); answers recorded, refinements applied to `phase-6.md`
-- [x] S6.1.1a Timeline rendering (2026-09-30) · [ ] S6.1.1b Timeline editing · [ ] S6.1.2 Dependency-aware rescheduling · [ ] S6.1.3 Dependency hand-offs (added 2026-09-30: templates keep dependencies, "you're up" notification, `task.unblocked` rule trigger)
+- [x] S6.1.1a Timeline rendering (2026-09-30) · [x] S6.1.1b Timeline editing (2026-09-30) · [ ] S6.1.2 Dependency-aware rescheduling · [ ] S6.1.3 Dependency hand-offs (added 2026-09-30: templates keep dependencies, "you're up" notification, `task.unblocked` rule trigger)
 - [ ] S6.2.1 Project overview tab · [ ] S6.2.2 Portfolios (lite)
 - [ ] S6.3.1 Goals · [ ] S6.3.2 AI for goals
 - [ ] S6.4.1 Workload view · [ ] S6.4.2 AI rebalancing
@@ -181,8 +184,26 @@ Tracked in their phase files; copy the slice list here at each phase kickoff.
 | 2026-09-24 | Phase 2 started without a human sign-off gate on Phase 1, at explicit product-owner instruction ("finish off Phase 2 as you have all the context", "do not ask any permission... just finish this whole phase at ur own pace") given while unavailable | Phase 1 exit criteria were already met and the product owner asked to proceed rather than wait; noted here per that same instruction to record decisions/blockers instead of stopping |
 
 ## Phase retros
-### Phase 5 (2026-09-29)
-**Exit criteria: met** (J10 e2e against the real worker; the $0.01 budget test; a trace step for every action). Deferred by agreement: live evals and the dogfood week. Full account in `docs/roadmap/phase-5.md` "Phase 5 exit".
+### Phase 5 (2026-09-29, live verification closed 2026-09-30)
+**Exit criteria: met** (J10 e2e against the real worker; the $0.01 budget test; a trace step for every action). **Verified end to end against the real gateway** in four live rounds: `llm-check` 10/10, backend 738/738, frontend 334/334, live evals **219/220 (99.5%), all 21 feature buckets above threshold, `RESULT: PASS`**. Deferred by agreement: the dogfood week (post-ship). Full account in `docs/roadmap/phase-5.md` "Phase 5 exit" and `docs/progress/phase-5-live-verification-findings.md`.
+
+**Live verification, round by round:**
+
+| Round | Live evals | Found and fixed |
+|---|---|---|
+| 1 | 211/221 (95.5%), 5 buckets under threshold | Pulse/Radar citation format (`[T-12]`), Sorter's field-setting and duplicate format, Teammate proposing on an injection, ai_step assuming today's date, plan_day treating capacity as a target, runs ending in `OUT_OF_STEPS` |
+| 2 | 213/220 (96.8%), 4 under | plan_day's decision, not just its wording (a blocked task never goes in Today, enforced server-side); the judge now sees the source material; three stale cases corrected |
+| 3 | 217/220 (98.6%), 2 under | Architect planned past a brief's stated window (4/4 runs): the window is now enforced in code (`stated_window` + `fit_dates`); ai_step's summary kind passes its source to the judge; an answer written beside a tool call is no longer lost |
+| 4 | **219/220 (99.5%), 0 under — PASS** | Clean. One judge-consistency case left (below) |
+
+- **Went well (live verification):**
+  - Every round found something real, and every fix went into the product, not the thresholds: no case was loosened to pass, and the one case made mock-only (`server_corrects_the_draft`) checks our code against a scripted bad model, which has nothing to check live.
+  - Enforcing a hard constraint in code beat prompting for it, twice: plan_day's "blocked never in Today" and Architect's date window both flapped under prompt-only fixes and went to 100% once the server enforced them. **Rule:** when a live case fails the same constraint twice, move the constraint into code.
+  - Reading each failing output before calling it anything kept the numbers honest: several round-1/2 "failures" were harness faults (a judge without its source, stale expectations), and round 4's one miss is a judge contradicting its own rubric, not a product defect.
+- **Went less well:**
+  - The judge needed the source material to judge grounding at all (`judge/v2`); it should have had it from the start. **Rule:** a judge always gets what the model was shown.
+  - A frontend run on the product owner's machine was killed by a memory guard and briefly read as a failure; re-run before reporting.
+- **Open, not blocking:** `ai_step/draft_reply_answers_newest`: the judge scores a clean follow-up question 1/5 against its own rubric. Revisit when the judge prompt is next touched.
 
 - **Went well:**
   - Code-backed agents turned out to be the right default for most starters. When code gathers, counts and applies limits and the model only writes the prose, the evals' hardest criteria (coverage, no invented tasks, rate limits, no nudges on blocked work) hold by construction, and a quiet day costs nothing. ADR-0009's handler mechanism, built for the product owner's scripts, carried six of the eight starters.

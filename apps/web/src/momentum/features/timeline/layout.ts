@@ -223,3 +223,48 @@ export function arrowPath(x1: number, y1: number, x2: number, y2: number): strin
   const mid = y1 + (y2 > y1 ? ROW_HEIGHT / 2 : -ROW_HEIGHT / 2);
   return `M${x1},${y1} H${x1 + gap} V${mid} H${x2 - gap} V${y2} H${x2}`;
 }
+
+export type DragMode = 'move' | 'start' | 'end';
+
+/** A span after dragging `days` in `mode`. A resize never crosses the other edge. */
+export function draggedSpan(
+  span: { start: string; end: string },
+  mode: DragMode,
+  days: number,
+): { start: string; end: string } {
+  const shift = (iso: string) => toISODate(addDays(fromISODate(iso), days));
+  if (mode === 'move') return { start: shift(span.start), end: shift(span.end) };
+  if (mode === 'start') {
+    const s = shift(span.start);
+    return { start: s > span.end ? span.end : s, end: span.end };
+  }
+  const e = shift(span.end);
+  return { start: span.start, end: e < span.start ? span.start : e };
+}
+
+/**
+ * The task fields to send for a new span, touching only the dates the task uses: a due-only task
+ * moved keeps no start date, a milestone moves its due date, and resizing a one-date task adds the
+ * missing edge. Null when nothing changes.
+ */
+export function datePatch(
+  task: DatedTask,
+  span: { start: string; end: string },
+  mode: DragMode,
+): { start_on?: string | null; due_on?: string | null } | null {
+  const patch: { start_on?: string | null; due_on?: string | null } = {};
+  if (task.type === 'milestone') {
+    if (task.due_on !== span.end) patch.due_on = span.end;
+  } else if (mode === 'move') {
+    if (task.start_on !== null && task.start_on !== span.start) patch.start_on = span.start;
+    if (task.due_on !== null && task.due_on !== span.end) patch.due_on = span.end;
+    if (task.start_on === null && task.due_on === null) patch.due_on = span.end;
+  } else {
+    if (span.start !== (task.start_on ?? task.due_on)) patch.start_on = span.start;
+    if (span.end !== (task.due_on ?? task.start_on)) patch.due_on = span.end;
+    // a one-date task keeps both edges once it's been stretched
+    if (task.start_on === null && span.start !== span.end) patch.start_on = span.start;
+    if (task.due_on === null && span.start !== span.end) patch.due_on = span.end;
+  }
+  return Object.keys(patch).length ? patch : null;
+}
