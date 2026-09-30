@@ -23,6 +23,7 @@ async def test_config_is_public_and_describes_auth(client: httpx.AsyncClient) ->
     assert body["api_base"] == "/api/v1"
     assert body["auth"]["mode"] == "dev"
     assert body["auth"]["dev_login"] is True
+    assert body["ai_mock"] is True  # tests run the scripted LLM: the SPA shows the mock marker
 
 
 def test_import_has_no_side_effects() -> None:

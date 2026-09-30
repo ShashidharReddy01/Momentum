@@ -303,6 +303,39 @@
   },
   {
     "function": {
+      "description": "Who is over capacity in the coming weeks and the moves that fix it, computed in code: give a task to someone with room and edit access, else start it later (same due date), else push it later (moves its due date; dependents follow). Changes nothing. To act, propose each move's `call` as given, all together, and say which moves change a due date.",
+      "name": "suggest_rebalance",
+      "parameters": {
+        "additionalProperties": false,
+        "properties": {
+          "project": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Only move this project's work (name or id)"
+          },
+          "weeks": {
+            "default": 4,
+            "description": "How many weeks from this one to fix",
+            "maximum": 12,
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      }
+    },
+    "type": "function"
+  },
+  {
+    "function": {
       "description": "Tasks in one section of a project, in their board/list order.",
       "name": "get_section_tasks",
       "parameters": {

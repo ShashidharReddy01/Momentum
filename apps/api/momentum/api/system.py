@@ -32,6 +32,9 @@ async def config(request: Request, rt: RuntimeDep) -> dict[str, Any]:
         "base_path": base,
         "api_base": f"{base}/api/v1",
         "ai_enabled": s.ai_enabled,
+        # AI answers come from scripted fixtures (dev/test only: production requires a gateway);
+        # the SPA marks AI surfaces with the purple mock indicator
+        "ai_mock": s.ai_enabled and s.llm_mode == "mock",
         "auth": {
             "mode": s.auth_mode,
             "login_url": rt.auth.login_url(f"{base}/"),

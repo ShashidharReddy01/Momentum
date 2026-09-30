@@ -674,6 +674,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/ai/workload/rebalance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Suggest reassignments and date moves that bring people under capacity (proposes) */
+        post: operations["ai_workload_rebalance_api_v1_ai_workload_rebalance_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/ai/write": {
         parameters: {
             query?: never;
@@ -6368,6 +6385,181 @@ export interface components {
             /** User Ids */
             user_ids: string[];
         };
+        /** RebalanceIn */
+        RebalanceIn: {
+            /**
+             * Project Id
+             * @description Only move this project's work
+             */
+            project_id?: string | null;
+            /**
+             * Start
+             * @description A day in the first week (default today)
+             */
+            start?: string | null;
+            /**
+             * Weeks
+             * @default 6
+             */
+            weeks: number;
+        };
+        /** RebalanceMoveOut */
+        RebalanceMoveOut: {
+            /** Due Moved */
+            due_moved: boolean;
+            /** Estimate Minutes */
+            estimate_minutes: number;
+            /**
+             * From Due
+             * Format: date
+             */
+            from_due: string;
+            from_person: components["schemas"]["RebalancePersonRef"];
+            /** From Start */
+            from_start: string | null;
+            /** Key */
+            key: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "reassign" | "start_later" | "push";
+            /** Past Project Due */
+            past_project_due: boolean;
+            /** Project Name */
+            project_name: string;
+            /** Shifted */
+            shifted: components["schemas"]["RebalanceShiftOut"][];
+            /**
+             * Task Id
+             * Format: uuid
+             */
+            task_id: string;
+            /** Text */
+            text: string;
+            /** Title */
+            title: string;
+            /**
+             * To Due
+             * Format: date
+             */
+            to_due: string;
+            to_person: components["schemas"]["RebalancePersonRef"] | null;
+            /** To Start */
+            to_start: string | null;
+            /**
+             * Week Start
+             * Format: date
+             * @description The overloaded week this move was chosen for
+             */
+            week_start: string;
+            /** Weeks Later */
+            weeks_later: number;
+            /** Why */
+            why: string;
+        };
+        /** RebalanceOut */
+        RebalanceOut: {
+            /**
+             * Action Id
+             * @description The proposed action to preview and apply
+             */
+            action_id: string | null;
+            /**
+             * Ai
+             * @description The explanation was written by the model (else built in code)
+             */
+            ai: boolean;
+            /** Headline */
+            headline: string;
+            /** Limited */
+            limited: boolean;
+            /** Moves */
+            moves: components["schemas"]["RebalanceMoveOut"][];
+            /** People */
+            people: components["schemas"]["RebalancePersonOut"][];
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "balanced" | "partial" | "nothing_to_do" | "no_estimates";
+            /** Summary */
+            summary: string;
+            /** Unresolved */
+            unresolved: components["schemas"]["RebalanceUnresolvedOut"][];
+        };
+        /** RebalancePersonOut */
+        RebalancePersonOut: {
+            /** Name */
+            name: string;
+            /**
+             * User Id
+             * Format: uuid
+             */
+            user_id: string;
+            /** Weeks */
+            weeks: components["schemas"]["RebalanceWeekOut"][];
+        };
+        /** RebalancePersonRef */
+        RebalancePersonRef: {
+            /** Name */
+            name: string;
+            /**
+             * User Id
+             * Format: uuid
+             */
+            user_id: string;
+        };
+        /** RebalanceShiftOut */
+        RebalanceShiftOut: {
+            /** Days Later */
+            days_later: number;
+            /** Key */
+            key: string;
+            /**
+             * Task Id
+             * Format: uuid
+             */
+            task_id: string;
+            /** Title */
+            title: string;
+        };
+        /** RebalanceUnresolvedOut */
+        RebalanceUnresolvedOut: {
+            /** Name */
+            name: string;
+            /** Over Minutes */
+            over_minutes: number;
+            /**
+             * Reason
+             * @enum {string}
+             */
+            reason: "nothing_movable" | "no_room";
+            /**
+             * User Id
+             * Format: uuid
+             */
+            user_id: string;
+            /**
+             * Week Start
+             * Format: date
+             */
+            week_start: string;
+        };
+        /** RebalanceWeekOut */
+        RebalanceWeekOut: {
+            /** After Minutes */
+            after_minutes: number;
+            /** Before Minutes */
+            before_minutes: number;
+            /** Capacity Minutes */
+            capacity_minutes: number;
+            /**
+             * Week Start
+             * Format: date
+             */
+            week_start: string;
+        };
         /**
          * RecurrenceIn
          * @description A repeat rule, stored as given (S3.2.1). S4.4.2 generates the next occurrence from it.
@@ -9534,6 +9726,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MutationOut_TemplateOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ai_workload_rebalance_api_v1_ai_workload_rebalance_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RebalanceIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RebalanceOut"];
                 };
             };
             /** @description Validation Error */

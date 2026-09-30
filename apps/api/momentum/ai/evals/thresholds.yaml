@@ -25,6 +25,7 @@ mock:
   agent_architect: 1.0
   agent_scribe: 1.0
   goal_check_in: 1.0
+  workload_rebalance: 1.0
 live:
   command: 0.9
   chat: 0.85
@@ -48,3 +49,4 @@ live:
   agent_architect: 0.9
   agent_scribe: 0.85
   goal_check_in: 0.85
+  workload_rebalance: 0.85

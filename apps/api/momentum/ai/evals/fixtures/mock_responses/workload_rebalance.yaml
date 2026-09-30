@@ -1,0 +1,8 @@
+# Mock responses for S6.4.2 rebalance explanations (feature "workload_rebalance"). Synthetic only.
+# No numbers, so the explanation always passes the "numbers must come from the facts" check.
+default:
+  tool_calls:
+    - name: submit_result
+      arguments:
+        headline: "Spreads the overloaded weeks across people with room"
+        summary: "Work goes to teammates who can edit the project and have room in the same weeks. Dates only move where nobody had room; the preview lists each change."

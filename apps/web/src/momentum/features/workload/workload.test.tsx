@@ -204,3 +204,132 @@ describe('Workload (S6.4.1)', () => {
     await waitFor(() => expect(calls.find((c) => c.url === `week:u1:${W1}`)!.body).toEqual({ hours: 0 }));
   });
 });
+
+const REBALANCE = {
+  status: 'balanced',
+  action_id: 'act1',
+  headline: 'One reassignment brings everyone under capacity',
+  summary: 'Ana Souza was 10h over this week; T-2 goes to Ravi Kumar, who has room.',
+  ai: true,
+  limited: false,
+  unresolved: [],
+  moves: [
+    {
+      kind: 'reassign',
+      task_id: 't2',
+      key: 'T-2',
+      title: 'Legal review',
+      project_name: 'Website Revamp',
+      estimate_minutes: 600,
+      week_start: W1,
+      from_person: { user_id: 'u-ana', name: 'Ana Souza' },
+      to_person: { user_id: 'u1', name: 'Ravi Kumar' },
+      from_start: null,
+      from_due: plus(W1, 2),
+      to_start: null,
+      to_due: plus(W1, 2),
+      weeks_later: 0,
+      due_moved: false,
+      past_project_due: false,
+      shifted: [],
+      text: 'T-2 Legal review (10h): Ana Souza → Ravi Kumar',
+      why: 'Ana Souza was over; Ravi Kumar has room and already works in this project.',
+    },
+  ],
+  people: [
+    {
+      user_id: 'u-ana',
+      name: 'Ana Souza',
+      weeks: [
+        { week_start: W1, capacity_minutes: 1800, before_minutes: 2400, after_minutes: 1800 },
+        { week_start: W2, capacity_minutes: 0, before_minutes: 0, after_minutes: 0 },
+      ],
+    },
+    {
+      user_id: 'u1',
+      name: 'Ravi Kumar',
+      weeks: [
+        { week_start: W1, capacity_minutes: 1800, before_minutes: 600, after_minutes: 1200 },
+        { week_start: W2, capacity_minutes: 1800, before_minutes: 0, after_minutes: 0 },
+      ],
+    },
+  ],
+};
+
+const action = (state: string) => ({
+  id: 'act1',
+  source: 'inline',
+  summary: 'Rebalance: T-2 Legal review (10h): Ana Souza → Ravi Kumar',
+  risk: 'low',
+  state,
+  operations: [],
+  applied_batch_id: state === 'applied' ? 'b9' : null,
+  error: null,
+  created_at: new Date().toISOString(),
+  expires_at: new Date().toISOString(),
+  decided_at: null,
+});
+
+describe('✦ Suggest rebalance (S6.4.2)', () => {
+  it('previews the load after the moves, applies them in one step and undoes them', async () => {
+    const { calls, user } = boot();
+    server.use(
+      http.post('*/api/v1/ai/workload/rebalance', async ({ request }) => {
+        calls.push({ url: 'rebalance', body: await request.json() });
+        return HttpResponse.json(REBALANCE);
+      }),
+      http.post('*/api/v1/ai/actions/act1/apply', () =>
+        HttpResponse.json({ data: action('applied'), outcome: 'applied' }),
+      ),
+      http.post('*/api/v1/ai/actions/act1/undo', () => {
+        calls.push({ url: 'undo', body: null });
+        return HttpResponse.json({ data: action('undone') });
+      }),
+    );
+    await screen.findByRole('grid', { name: 'Workload' });
+    await user.click(screen.getByRole('button', { name: /Suggest rebalance/ }));
+
+    const panel = await screen.findByRole('complementary', { name: 'Suggested rebalance' });
+    expect(calls.find((c) => c.url === 'rebalance')!.body).toEqual({ start: W1, weeks: 6 });
+    expect(within(panel).getByText('One reassignment brings everyone under capacity')).toBeInTheDocument();
+    expect(within(panel).getByText('Legal review')).toBeInTheDocument();
+    expect(within(panel).getByText('T-2')).toBeInTheDocument();
+    // before → after for everyone it touches, and the grid shows the after
+    expect(within(panel).getByRole('heading', { name: 'Load, before → after' })).toBeInTheDocument();
+    const ana = cell(/^Ana Souza, week of .*after the suggested changes: 30h, now 40h/);
+    expect(ana).toHaveTextContent('30h / 30h');
+    expect(ana).toHaveTextContent('was 40h');
+    expect(screen.getByRole('status')).toHaveTextContent(/Nothing is saved until you apply/);
+
+    await user.click(within(panel).getByRole('button', { name: 'Apply 1 change' }));
+    await waitFor(() =>
+      expect(screen.queryByRole('complementary', { name: 'Suggested rebalance' })).toBeNull(),
+    );
+    const toast = (await screen.findByText('Rebalanced: 1 change')).closest('li')!;
+    await user.click(within(toast).getByRole('button', { name: 'Undo' }));
+    await waitFor(() => expect(calls.find((c) => c.url === 'undo')).toBeTruthy());
+  });
+
+  it('says so when nobody is over, with nothing to apply', async () => {
+    const { user } = boot();
+    server.use(
+      http.post('*/api/v1/ai/workload/rebalance', () =>
+        HttpResponse.json({
+          ...REBALANCE,
+          status: 'nothing_to_do',
+          action_id: null,
+          headline: 'Nobody is over capacity',
+          summary: 'Every week shown is within each person’s hours.',
+          ai: false,
+          moves: [],
+          people: [],
+        }),
+      ),
+    );
+    await screen.findByRole('grid', { name: 'Workload' });
+    await user.click(screen.getByRole('button', { name: /Suggest rebalance/ }));
+    const panel = await screen.findByRole('complementary', { name: 'Suggested rebalance' });
+    expect(within(panel).getByText('Nobody is over capacity')).toBeInTheDocument();
+    expect(within(panel).queryByRole('button', { name: /Apply/ })).toBeNull();
+  });
+});

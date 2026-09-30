@@ -76,6 +76,7 @@ Registered in S3.1.2 unless noted. `semantic_search` arrives with S3.1.4 (embedd
 | `search_tasks` | read | 3 | Structured filters (assignee incl. "none", project, due range, overdue, blocked, status, text). Every task brief lists its open blockers (`blocked_by`) |
 | `semantic_search` | read | 3 (S3.1.4) | Hybrid search across tasks/comments/attachments with snippets |
 | `get_task` / `get_project` / `get_section_tasks` | read | 3 | Details incl. recent activity (`get_project` also has the project's start/due dates and brief since S6.2.1) |
+| `suggest_rebalance` | read | 6 (S6.4.2) | Who is over capacity in the coming weeks (`weeks`, optional `project`) and the moves that fix it, from the rebalance heuristic (code): each move's wording, reason, whether it changes a due date, and the exact `update_task` / `reschedule_task` call to propose. Changes nothing; Mo proposes the calls as one action. Only tasks the asker can see and edit; hidden work is never named |
 | `get_goals` | read | 6 (S6.3.1) | List goals (period, owner, status, progress %), or one goal's metric, progress source, links and sub-goals, computed as the viewer |
 | `get_portfolio` | read | 6 (S6.2.2) | List portfolios, or one portfolio's projects (status, tasks done/total, overdue, due, latest update) as the viewer sees them; projects they can't see only counted |
 | `list_my_tasks` / `list_user_tasks` | read | 3 | |
@@ -224,8 +225,9 @@ Workspace memory:
 | Portfolio one-liners (S6.2.2) | `POST /ai/portfolios/{id}/lines` (`portfolio_lines/v1`; a line is kept only if every number in it is in that project's facts, else the plain facts line; nothing stored) | fast | 6 |
 | Goal check-in draft (S6.3.2) | `POST /ai/goals/{id}/check-in-draft` (`goal_check_in/v1`; facts: progress vs pace, metric, linked work's status/completion/due, sub-goals; kept only if every number is in the facts, else a code-built draft by pace; `ai` flag says which; editors only; nothing stored) | default | 6 |
 | Suggest projects for a goal (S6.3.2) | `POST /ai/goals/{id}/suggest-links` (hybrid retrieval over visible projects and tasks with the goal's name, then name + description; task hits count for their project; already linked left out; links nothing) | embed | 6 |
+| Suggest rebalance (S6.4.2) | `POST /ai/workload/rebalance` (`workload_rebalance/v1`; the moves come from a greedy heuristic in `domain/workload/rebalance.py`: reassign within the same weeks → start later with the same due date → push 1–2 weeks through the dependency cascade as a last resort; the model writes only the headline and summary from facts about those moves, kept only if every number is in the facts, else a code-built explanation; `ai` flag says which; the moves are proposed as one action, `update_task` / `reschedule_task`, one undo) | fast | 6 |
 | Ask for a chart | `POST /ai/dashboards/query` | default | 6 |
-| Risk explanation / rebalancing | worker + endpoints | default | 6 |
+| Risk explanation | worker + endpoints | default | 6 |
 
 ## 10. Cost and performance controls
 

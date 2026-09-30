@@ -8,6 +8,7 @@ import {
   Users,
 } from 'lucide-react';
 import { Fragment, useEffect, useMemo, useRef, useState, type DragEvent, type FormEvent } from 'react';
+import { MoMark } from '@/components/common/MoMark';
 import { EmptyState, ErrorState } from '@/components/common/States';
 import { Avatar } from '@/components/ui/Avatar';
 import { Button } from '@/components/ui/Button';
@@ -24,9 +25,11 @@ import { IconButton } from '@/components/ui/IconButton';
 import { Input } from '@/components/ui/Input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/Popover';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { errorText } from '@/features/ai';
 import { useProjects } from '@/features/projects';
 import { formatEffort, hours, TaskNavProvider, TaskPane, useTaskNav } from '@/features/tasks';
 import { cn } from '@/lib/cn';
+import { useMomentumConfig } from '@/lib/config';
 import { addDays, fromISODate, toISODate } from '@/lib/dates';
 import { mondayOf, shiftWeeks, toneOf, weeksBetween, type Tone } from './grid';
 import {
@@ -38,6 +41,7 @@ import {
   type Workload,
   type WorkloadTask,
 } from './queries';
+import { previewOf, RebalancePanel, useRebalance, type LoadPreview } from './Rebalance';
 
 type Mode = 'hours' | 'tasks';
 const WEEK_OPTIONS = [4, 6, 8, 12] as const;
@@ -83,6 +87,14 @@ function WorkloadBody() {
   const q = useWorkload(start, weeks, projectId);
   const projects = useProjects().data;
   const thisWeek = mondayOf(toISODate(new Date()));
+  const aiEnabled = useMomentumConfig().ai_enabled;
+  const rebalance = useRebalance();
+  const suggestion = rebalance.data;
+  const preview = useMemo(() => (suggestion ? previewOf(suggestion) : null), [suggestion]);
+  const suggest = () => rebalance.mutate({ start, weeks, projectId });
+  const { reset: resetSuggestion } = rebalance;
+  // a suggestion is for the weeks and project it was made for
+  useEffect(() => resetSuggestion(), [start, weeks, projectId, resetSuggestion]);
 
   // a team that doesn't estimate yet sees task counts, not a misleading wall of 0h
   const data = q.data;
@@ -169,7 +181,26 @@ function WorkloadBody() {
             ))}
           </select>
           {data?.can_admin ? <DefaultHours data={data} /> : null}
+          {aiEnabled && data?.people.length ? (
+            <Button variant="ai" size="sm" loading={rebalance.isPending} onClick={suggest}>
+              <MoMark size={13} /> Suggest rebalance
+            </Button>
+          ) : null}
         </header>
+        {rebalance.isError ? (
+          <p role="alert" className="mb-3 rounded-md bg-crit-tint px-3 py-2 text-sm text-crit">
+            {errorText(rebalance.error)}
+          </p>
+        ) : null}
+        {preview?.size ? (
+          <p
+            role="status"
+            className="mb-3 flex items-center gap-2 rounded-md border border-dashed border-amber bg-amber-2/60 px-3 py-2 text-[13px] text-amber-ink"
+          >
+            <MoMark size={13} /> Previewing the load after the suggested changes. Nothing is saved until you
+            apply.
+          </p>
+        ) : null}
 
         {q.isPending ? (
           <Skeleton className="h-80" />
@@ -187,10 +218,19 @@ function WorkloadBody() {
             open={open}
             setOpen={setOpen}
             onOpenTask={(id) => nav.open(id)}
+            preview={preview}
           />
         )}
         {data ? <Footnote data={data} /> : null}
       </div>
+      {suggestion && !nav.openId ? (
+        <RebalancePanel
+          result={suggestion}
+          onClose={resetSuggestion}
+          onRetry={suggest}
+          retrying={rebalance.isPending}
+        />
+      ) : null}
       {nav.openId ? (
         <TaskPane
           taskId={nav.openId}
@@ -216,6 +256,7 @@ function Grid({
   open,
   setOpen,
   onOpenTask,
+  preview,
 }: {
   data: Workload;
   mode: Mode;
@@ -223,6 +264,7 @@ function Grid({
   open: { person: string; week: string } | null;
   setOpen: (v: { person: string; week: string } | null) => void;
   onOpenTask: (id: string) => void;
+  preview: LoadPreview | null;
 }) {
   const move = useMoveTask();
   const drag = useRef<Drag | null>(null);
@@ -315,6 +357,7 @@ function Grid({
                     person={p}
                     week={w}
                     mode={mode}
+                    after={p.user_id ? preview?.get(p.user_id)?.get(w.week_start) : undefined}
                     expanded={expanded === w.week_start}
                     onToggle={() =>
                       setOpen(expanded === w.week_start ? null : { person: k, week: w.week_start })
@@ -400,6 +443,7 @@ function WeekCell({
   person,
   week,
   mode,
+  after,
   expanded,
   onToggle,
   dropProps,
@@ -407,20 +451,24 @@ function WeekCell({
   person: PersonLoad;
   week: WeekLoad;
   mode: Mode;
+  /** ✦ rebalance preview: this cell's hours before and after the suggested moves */
+  after?: { before: number; after: number } | undefined;
   expanded: boolean;
   onToggle: () => void;
   dropProps: Record<string, unknown>;
 }) {
   const unassigned = person.user_id === null;
-  const tone: Tone = unassigned ? 'idle' : toneOf(week.planned_minutes, week.capacity_minutes);
-  const pct = week.capacity_minutes ? Math.min(100, (week.planned_minutes / week.capacity_minutes) * 100) : 0;
+  // while a rebalance is previewed, a cell it changes shows the load after it (in hours)
+  const planned = after ? after.after : week.planned_minutes;
+  const tone: Tone = unassigned ? 'idle' : toneOf(planned, week.capacity_minutes);
+  const pct = week.capacity_minutes ? Math.min(100, (planned / week.capacity_minutes) * 100) : 0;
   const main =
-    mode === 'hours'
+    mode === 'hours' || after
       ? unassigned
         ? week.planned_minutes
           ? hours(week.planned_minutes)
           : ''
-        : `${hours(week.planned_minutes)} / ${hours(week.capacity_minutes)}`
+        : `${hours(planned)} / ${hours(week.capacity_minutes)}`
       : week.task_count
         ? `${week.task_count} task${week.task_count === 1 ? '' : 's'}`
         : '';
@@ -431,6 +479,7 @@ function WeekCell({
     `${week.task_count} tasks`,
     week.unestimated ? `${week.unestimated} without an estimate` : null,
     tone === 'crit' ? 'over capacity' : tone === 'warn' ? 'nearly full' : null,
+    after ? `after the suggested changes: ${hours(after.after)}, now ${hours(after.before)}` : null,
   ]
     .filter(Boolean)
     .join(' ');
@@ -451,6 +500,7 @@ function WeekCell({
           TONE[tone],
           unassigned && week.task_count > 0 && 'bg-surface-2 text-ink',
           expanded && 'ring-2 ring-accent',
+          after && 'outline-dashed outline-2 -outline-offset-2 outline-amber',
         )}
       >
         {tone === 'away' ? (
@@ -459,6 +509,11 @@ function WeekCell({
           <span className="tabular font-medium">{main}</span>
         )}
         <span className="flex items-center gap-1 text-[10px] text-muted">
+          {after ? (
+            <span className="text-amber-ink">
+              was <span className="line-through">{hours(after.before)}</span>
+            </span>
+          ) : null}
           {week.override && tone !== 'away' ? <span>{hours(week.capacity_minutes)} this week</span> : null}
           {week.unestimated ? (
             <span className="inline-flex items-center gap-0.5" title="Tasks without an estimate count as 0h">
@@ -466,7 +521,7 @@ function WeekCell({
             </span>
           ) : null}
         </span>
-        {!unassigned && mode === 'hours' && week.capacity_minutes > 0 ? (
+        {!unassigned && (mode === 'hours' || after) && week.capacity_minutes > 0 ? (
           <span className="absolute inset-x-0 bottom-0 h-1 bg-hair-soft" aria-hidden>
             <span className={cn('block h-full', BAR[tone])} style={{ width: `${pct}%` }} />
           </span>

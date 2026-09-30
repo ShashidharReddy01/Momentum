@@ -7,6 +7,8 @@ export interface RuntimeConfig {
   base_path: string;
   api_base: string;
   ai_enabled: boolean;
+  /** AI runs on scripted mock answers (dev/test only); AI surfaces show the purple mock marker. */
+  ai_mock?: boolean;
   auth: { mode: string; login_url: string; dev_login: boolean };
   features: Record<string, boolean>;
 }

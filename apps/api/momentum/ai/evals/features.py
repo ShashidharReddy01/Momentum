@@ -18,7 +18,14 @@ from momentum.agents import pulse
 from momentum.agents.extensions import HandlerRun
 from momentum.agents.loader import load_definitions
 from momentum.agents.runtime import execute_run
-from momentum.ai import citations, goal_assist, quick_add, summarize, write
+from momentum.ai import (
+    citations,
+    goal_assist,
+    quick_add,
+    summarize,
+    workload_rebalance,
+    write,
+)
 from momentum.ai.agent_draft import draft_agent
 from momentum.ai.breakdown import break_down, project_people
 from momentum.ai.chat import run_chat, start_turn
@@ -76,6 +83,7 @@ FEATURES = (
     "agent_architect",
     "agent_scribe",
     "goal_check_in",
+    "workload_rebalance",
 )
 
 
@@ -287,6 +295,27 @@ async def _run(
         goal_draft = await goal_assist.draft_check_in(session, llm, ctx, g.id, today)
         obs.text = f"{goal_draft.draft.title}\n{goal_draft.draft.summary}"
         obs.data = {"status": goal_draft.draft.status, "ai": goal_draft.ai, "facts": facts}
+    elif feature == "workload_rebalance":
+        # S6.4.2: estimates (and due dates, days from today) on eval tasks put people over; the
+        # moves come from code, the model only explains them (kept if every number is in the
+        # facts). `by` sets a task the asker can't see (hidden load: never named or moved).
+        today = now.date()
+        for title, spec in case["tasks"].items():
+            patch: dict[str, Any] = {"estimate_minutes": int(spec["estimate"])}
+            if "due" in spec:
+                patch["due_on"] = today + timedelta(days=int(spec["due"]))
+            by = world.ctx(spec["by"], ctx.settings) if "by" in spec else ctx
+            await tasks.update_task(session, by, world.task_ids[title], patch)
+        sug = await workload_rebalance.suggest_rebalance(
+            session, llm, ctx, registry, start=today, weeks=case.get("weeks", 3), today=today
+        )
+        obs.text = f"{sug.note.headline}\n{sug.note.summary}"
+        obs.data = {
+            "ai": sug.ai,
+            "status": sug.rebalance.status,
+            "facts": workload_rebalance.facts(sug.rebalance),
+        }
+        obs.operations, obs.risk = await _operations(session, sug.action_id)
     elif feature == "plan_day":
         p = await plan_day(session, llm, ctx, registry, now=now)
         obs.text, obs.notes = p.rationale, p.notes

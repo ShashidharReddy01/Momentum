@@ -29,6 +29,7 @@ from momentum.ai import (
     status_draft,
     summarize,
     usage_report,
+    workload_rebalance,
     write,
 )
 from momentum.ai.command import run_command
@@ -44,6 +45,7 @@ from momentum.core.errors import ValidationFailed
 from momentum.domain.portfolios import service as portfolios
 from momentum.domain.status_updates.schemas import StatusUpdateIn
 from momentum.domain.status_updates.service import body_text as status_body_text
+from momentum.domain.workload import rebalance
 from momentum.domain.workspace.service import (
     AiConfig,
     EffectiveAi,
@@ -926,3 +928,176 @@ async def ai_goal_suggest_links(
                 GoalLinkSuggestionOut(id=x.project_id, name=x.name, reason=x.reason) for x in found
             ]
         )
+
+
+# ---------------- S6.4.2: suggest a workload rebalance ----------------
+
+
+class RebalanceIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    start: date | None = Field(default=None, description="A day in the first week (default today)")
+    weeks: int = Field(default=6, ge=1, le=26)
+    project_id: uuid.UUID | None = Field(default=None, description="Only move this project's work")
+
+
+class RebalancePersonRef(BaseModel):
+    user_id: uuid.UUID
+    name: str
+
+
+class RebalanceShiftOut(BaseModel):
+    task_id: uuid.UUID
+    key: str
+    title: str
+    days_later: int
+
+
+class RebalanceMoveOut(BaseModel):
+    kind: Literal["reassign", "start_later", "push"]
+    task_id: uuid.UUID
+    key: str
+    title: str
+    project_name: str
+    estimate_minutes: int
+    week_start: date = Field(description="The overloaded week this move was chosen for")
+    from_person: RebalancePersonRef
+    to_person: RebalancePersonRef | None
+    from_start: date | None
+    from_due: date
+    to_start: date | None
+    to_due: date
+    weeks_later: int
+    due_moved: bool
+    past_project_due: bool
+    shifted: list[RebalanceShiftOut]
+    text: str
+    why: str
+
+
+class RebalanceWeekOut(BaseModel):
+    week_start: date
+    capacity_minutes: int
+    before_minutes: int
+    after_minutes: int
+
+
+class RebalancePersonOut(BaseModel):
+    user_id: uuid.UUID
+    name: str
+    weeks: list[RebalanceWeekOut]
+
+
+class RebalanceUnresolvedOut(BaseModel):
+    user_id: uuid.UUID
+    name: str
+    week_start: date
+    over_minutes: int
+    reason: Literal["nothing_movable", "no_room"]
+
+
+class RebalanceOut(BaseModel):
+    status: Literal["balanced", "partial", "nothing_to_do", "no_estimates"]
+    action_id: uuid.UUID | None = Field(description="The proposed action to preview and apply")
+    headline: str
+    summary: str
+    ai: bool = Field(description="The explanation was written by the model (else built in code)")
+    moves: list[RebalanceMoveOut]
+    people: list[RebalancePersonOut]
+    unresolved: list[RebalanceUnresolvedOut]
+    limited: bool
+
+
+def _rebalance_out(sug: workload_rebalance.Suggestion) -> RebalanceOut:
+    r = sug.rebalance
+
+    def ref(pid: uuid.UUID) -> RebalancePersonRef:
+        return RebalancePersonRef(user_id=pid, name=r.people[pid].name)
+
+    moves = []
+    for mv in r.moves:
+        it = mv.item
+        moves.append(
+            RebalanceMoveOut(
+                kind=mv.kind,
+                task_id=it.id,
+                key=it.key,
+                title=it.title,
+                project_name=it.project_name,
+                estimate_minutes=it.minutes,
+                week_start=mv.week,
+                from_person=ref(mv.person),
+                to_person=ref(mv.to_person) if mv.to_person else None,
+                from_start=it.start_on,
+                from_due=it.due_on,
+                to_start=mv.new_start if mv.kind != "reassign" else it.start_on,
+                to_due=mv.new_due or it.due_on,
+                weeks_later=mv.weeks_later,
+                due_moved=mv.due_moved,
+                past_project_due=mv.past_project_due,
+                shifted=[
+                    RebalanceShiftOut(task_id=s.id, key=s.key, title=s.title, days_later=s.days)
+                    for s in mv.shifted
+                ],
+                text=rebalance.describe(r, mv),
+                why=rebalance.why(r, mv),
+            )
+        )
+    people = [
+        RebalancePersonOut(
+            user_id=pid,
+            name=p.name,
+            weeks=[
+                RebalanceWeekOut(
+                    week_start=w,
+                    capacity_minutes=p.capacity.get(w, 0),
+                    before_minutes=round(r.before.get(pid, {}).get(w, 0)),
+                    after_minutes=round(r.after.get(pid, {}).get(w, 0)),
+                )
+                for w in r.weeks
+            ],
+        )
+        for pid, p in r.people.items()
+    ]
+    return RebalanceOut(
+        status=r.status,
+        action_id=sug.action_id,
+        headline=sug.note.headline,
+        summary=sug.note.summary,
+        ai=sug.ai,
+        moves=moves,
+        people=people,
+        unresolved=[
+            RebalanceUnresolvedOut(
+                user_id=u.person,
+                name=r.people[u.person].name,
+                week_start=u.week,
+                over_minutes=u.over,
+                reason=u.reason,
+            )
+            for u in r.unresolved
+        ],
+        limited=r.limited,
+    )
+
+
+@router.post(
+    "/workload/rebalance",
+    response_model=RebalanceOut,
+    summary="Suggest reassignments and date moves that bring people under capacity (proposes)",
+)
+async def ai_workload_rebalance(
+    body: RebalanceIn, ctx: CtxDep, uow: UowDep, rt: RuntimeDep
+) -> RebalanceOut:
+    llm = require_llm(rt)
+    ctx = ctx.with_(via="ai")
+    async with uow.transaction() as s:
+        sug = await workload_rebalance.suggest_rebalance(
+            s,
+            llm,
+            ctx,
+            rt.tools,
+            start=body.start or datetime.now(UTC).date(),
+            weeks=body.weeks,
+            project_id=body.project_id,
+        )
+        return _rebalance_out(sug)

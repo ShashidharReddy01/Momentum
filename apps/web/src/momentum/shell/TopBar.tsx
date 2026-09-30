@@ -1,5 +1,6 @@
 import { Bell, PanelLeft, Search } from 'lucide-react';
 import { useMatches, useNavigate } from 'react-router';
+import { AIMockMark } from '@/components/common/AI';
 import { MoMark } from '@/components/common/MoMark';
 import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
@@ -72,6 +73,7 @@ export function TopBar() {
         aria-label="Ask Mo"
       >
         <MoMark size={14} /> <span className="max-sm:hidden">Ask Mo</span>
+        <AIMockMark />
       </Button>
       <span className="relative">
         <IconButton

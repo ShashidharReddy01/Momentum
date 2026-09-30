@@ -48,6 +48,8 @@ from momentum.domain.tasks.models import Task, TaskDependency, TaskProject
 from momentum.domain.tasks.service import today_for
 from momentum.domain.teams.models import Team
 from momentum.domain.users.service import list_users
+from momentum.domain.workload import rebalance
+from momentum.domain.workload.rebalance import Move, Rebalance
 
 Status = Literal["open", "completed", "any"]
 READ = ("tasks:read",)
@@ -866,6 +868,79 @@ async def get_goals(tc: ToolContext, args: GetGoalsArgs) -> ToolResult:
     return ToolResult.success(g.name, {"goal": data})
 
 
+# ---------------- suggest_rebalance (S6.4.2) ----------------
+
+
+class SuggestRebalanceArgs(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    weeks: int = Field(default=4, ge=1, le=12, description="How many weeks from this one to fix")
+    project: str | None = Field(
+        default=None, max_length=200, description="Only move this project's work (name or id)"
+    )
+
+
+def _rebalance_call(r: Rebalance, mv: Move) -> dict[str, Any]:
+    """The write-tool call that makes one move (Mo proposes these; nothing is changed here)."""
+    key = mv.item.key
+    if mv.kind == "reassign":
+        assert mv.to_person is not None
+        return {
+            "tool": "update_task",
+            "args": {"task": key, "assignee": r.people[mv.to_person].email},
+        }
+    if mv.kind == "start_later":
+        return {"tool": "update_task", "args": {"task": key, "start_on": iso(mv.new_start)}}
+    args: dict[str, Any] = {"task": key, "due_on": iso(mv.new_due)}
+    if mv.new_start is not None:
+        args["start_on"] = iso(mv.new_start)
+    return {"tool": "reschedule_task", "args": args}
+
+
+@tool(
+    name="suggest_rebalance",
+    description=(
+        "Who is over capacity in the coming weeks and the moves that fix it, computed in code: "
+        "give a task to someone with room and edit access, else start it later (same due date), "
+        "else push it later (moves its due date; dependents follow). Changes nothing. To act, "
+        "propose each move's `call` as given, all together, and say which moves change a due date."
+    ),
+    risk="read",
+    scopes=READ,
+)
+async def suggest_rebalance(tc: ToolContext, args: SuggestRebalanceArgs) -> ToolResult:
+    project_id = (await resolve_project(tc, args.project))[0].id if args.project else None
+    today = today_for(tc.ctx)
+    r = await rebalance.suggest(tc.session, tc.ctx, today, args.weeks, project_id, today=today)
+    data: dict[str, Any] = {
+        "status": r.status,
+        "moves": [
+            {
+                "change": rebalance.describe(r, mv),
+                "why": rebalance.why(r, mv),
+                "changes_due_date": mv.due_moved,
+                "call": _rebalance_call(r, mv),
+            }
+            for mv in r.moves
+        ],
+        "still_over": [
+            {
+                "person": r.people[u.person].name,
+                "week_of": iso(u.week),
+                "over": rebalance.hours(u.over),
+                "reason": u.reason,
+            }
+            for u in r.unresolved
+        ],
+    }
+    summary = {
+        "balanced": f"{len(r.moves)} moves bring everyone under capacity",
+        "partial": f"{len(r.moves)} moves help; {len(r.unresolved)} weeks stay over",
+        "nothing_to_do": "Nobody is over capacity",
+        "no_estimates": "No estimates yet: rebalancing works on hours",
+    }[r.status]
+    return ToolResult.success(summary, {"rebalance": data})
+
+
 TOOLS = [
     search_tasks,
     semantic_search,
@@ -873,6 +948,7 @@ TOOLS = [
     get_project,
     get_portfolio,
     get_goals,
+    suggest_rebalance,
     get_section_tasks,
     list_my_tasks,
     list_user_tasks,

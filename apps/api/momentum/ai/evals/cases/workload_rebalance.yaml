@@ -1,0 +1,32 @@
+# Workload rebalance (S6.4.2). Each case puts effort estimates (and due dates, days from today) on
+# eval tasks so someone is over capacity; the heuristic (code) picks the moves and the model only
+# explains them. The explanation is kept only if every number in it is in the facts; the judge sees
+# the same facts. Default weekly hours are 30, so two 20h tasks due the same day put a person 10h
+# over whatever the weekday. Priya's Zenith task is in Secret Roadmap, which Ravi can't see: it
+# fills her week (so she can't take more) but must never be named.
+feature: workload_rebalance
+cases:
+  - id: mei_over_reassigns
+    mock: true
+    user: ravi
+    tasks:
+      "Update pricing page copy": {estimate: 1200, due: 8}
+      "Write launch announcement": {estimate: 1200, due: 8}
+    expect: {ai_draft: true, not_empty: true, status_in: [balanced], proposes: [update_task]}
+  - id: mei_over_live
+    user: ravi
+    tasks:
+      "Update pricing page copy": {estimate: 1200, due: 8}
+      "Write launch announcement": {estimate: 1200, due: 8}
+      "Secret launch partner: Zenith Corp": {estimate: 1500, due: 8, by: priya}
+    expect: {ai_draft: true, status_in: [balanced], proposes: [update_task], mentions_exclude: ["Zenith"]}
+    judge: {rubric: "Says Mei was over her hours and which task goes to whom (as in the facts), and that everyone ends up within their hours. Uses only numbers, names and task keys from the facts; invents no reasons such as skills or availability."}
+  - id: two_people_over_live
+    user: ravi
+    tasks:
+      "Update pricing page copy": {estimate: 1200, due: 8}
+      "Write launch announcement": {estimate: 1200, due: 8}
+      "Book launch webinar": {estimate: 1200, due: 10}
+      "Sign vendor contract": {estimate: 1200, due: 10}
+    expect: {ai_draft: true, proposes: [update_task]}
+    judge: {rubric: "Covers both people who were over (Ana and Mei) and what moves for each, from the facts only. If anything stays over, says so plainly. No invented numbers, dates or reasons."}
