@@ -135,10 +135,11 @@ Tracked in their phase files; copy the slice list here at each phase kickoff.
 
 - **Model:** kickoff on Opus 5.5; per-slice tags from `model-guide.md` §4 (S6.1.1 is Opus).
 - **Baseline:** `make check` green on `8c7de80` (backend 738/738, web 334/334, lint, format, types, import contracts). A fresh container needs Postgres (the Phase 5 handoff recipe) **and** `pnpm install` in `apps/web` (no root `package.json`); without the latter, `types-check` fails with error 254.
-- **Waiting on the product owner:** kickoff Q1–Q6 in `docs/roadmap/phase-6-kickoff.md` §4. **Q1 (SVAR React Gantt vs. custom SVG) blocks S6.1.1**; recommendation: custom SVG. No standing "proceed without waiting" instruction exists for Phase 6 yet.
-- **Next up:** S6.1.1 (or S6.1.1a if Q2's split is accepted) once Q1 is answered.
-- [x] Kickoff (`docs/roadmap/phase-6-kickoff.md`, 2026-09-30); refinements in its §2 not yet applied to `phase-6.md` (pending answers)
-- [ ] S6.1.1 Timeline view · [ ] S6.1.2 Dependency-aware rescheduling
+- **Kickoff answers (product owner, 2026-09-30):** every recommendation accepted (Q1 custom SVG timeline, Q2 split S6.1.1, Q3 capacity, Q4 backtest, Q5 visibility, Q6 J11/J12), plus a UX bar: "the WOW factor, easy for the user to view data, better than Asana" (in `phase-6.md`).
+- **Standing instruction (product owner, 2026-09-30):** do what's recommended and continue slice by slice, committing and pushing each.
+- **Next up:** S6.1.1a Timeline rendering.
+- [x] Kickoff (`docs/roadmap/phase-6-kickoff.md`, 2026-09-30); answers recorded, refinements applied to `phase-6.md`
+- [ ] S6.1.1a Timeline rendering · [ ] S6.1.1b Timeline editing · [ ] S6.1.2 Dependency-aware rescheduling
 - [ ] S6.2.1 Project overview tab · [ ] S6.2.2 Portfolios (lite)
 - [ ] S6.3.1 Goals · [ ] S6.3.2 AI for goals
 - [ ] S6.4.1 Workload view · [ ] S6.4.2 AI rebalancing

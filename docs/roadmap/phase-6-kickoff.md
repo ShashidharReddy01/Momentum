@@ -2,7 +2,7 @@
 
 **Date:** 2026-09-30 · **Model:** Opus 5.5 for the kickoff (`docs/process/model-guide.md` §2); Phase 6 is not a whole-phase Opus phase, so the per-slice tags in §4 of the guide apply (S6.1.1, S6.1.2, S6.4.2, S6.5.2, S6.5.3 are Opus) · **Phase goal:** see and plan across time, people and goals: timeline, overview, portfolios, goals, workload, dashboards and forecasts.
 
-**Status:** kickoff written, **awaiting the product owner's answers to §4** (Q1 blocks S6.1.1). The refinements in §2 are proposals; they go into `phase-6.md` once §4 is answered, as at the Phase 5 kickoff.
+**Status:** **all §4 questions answered 2026-09-30 by the product owner: every recommendation accepted** ("do everything which is industry best or which you recommend; I need the WOW factor and data that's easy to view; it should feel better than Asana"). §2's refinements are applied to `phase-6.md`, together with a UX bar for the phase. Standing instruction: continue slice by slice, committing and pushing each.
 
 **Parallel start:** started on 2026-09-30 at the product owner's instruction while Phase 5's live verification is still closing out in another session on `claude/intelligent-meitner-9ne4e8`. This work lives on its own branch (`claude/inspiring-bohr-p9xomo`, cut from that branch at `8c7de80`) and doesn't touch the Phase 5 sections of `STATUS.md`. The two branches get merged once both are done.
 
@@ -96,11 +96,18 @@ Baseline: `claude/intelligent-meitner-9ne4e8` at `8c7de80` (Phase 5 live round 3
   | What we'd build anyway | Cascade preview (S6.1.2, server-side), forecast marker and conflict highlighting (the free marker API is PRO), the unscheduled tray | The same, plus the rendering |
 
   **Recommendation: custom SVG.** Its free tier leaves out the parts we'd use most (critical path, markers), its store duplicates ours, and 80–100 KB gzip plus a second design language is a lot to take on for bars and arrows we can draw in ~1k lines with the dnd-kit and virtualization code we already have. The main cost of going custom: roughly one extra working session on S6.1.1 and our own zoom-scale code. If you'd rather take the head start, SVAR's MIT core is licensed so we can use it; I'd then wrap it in `features/timeline/` so it can be swapped out later.
+  **Answered 2026-09-30: custom SVG** (as recommended).
 - **Q2: Split S6.1.1 into rendering (a) and editing (b)?** Recommendation: **yes** (see §2). Alternative: one L slice.
+  **Answered 2026-09-30: yes, split** (S6.1.1a rendering, S6.1.1b editing).
 - **Q3 (capacity semantics; touches permissions): where does capacity come from, and who may change it?** Recommendation: a workspace default (`MOMENTUM_WORKLOAD_DEFAULT_HOURS`, 30 h/week, overridable in workspace settings by an admin), a per-person weekly hours value in their own prefs (for part-timers), and per-week overrides in `capacity` (PTO days reduce that week by 1/5 each). **A person edits their own; a workspace admin edits anyone's.** The grid counts **only tasks the viewer can see**, with a "Only work you can see is counted" note. Alternative: also show an "other work" total without titles, which is more accurate but reveals that private work exists.
+  **Answered 2026-09-30: as recommended** (default → own hours → weekly overrides; self + admin edit; visible work only).
 - **Q4 (forecast backtest and numerics):** Recommendation: **(a)** a deterministic synthetic history (`momentum seed --history`) and the metric "70–90% of backtested projects finish by their P80 date"; **(b)** implement the Monte Carlo in pure Python first and add `numpy` only if the measured nightly cost is too high (it's a ~20 MB runtime dependency, needing its own justification). Alternative for (b): add `numpy` upfront.
+  **Answered 2026-09-30: as recommended** (synthetic history, 70–90% by P80; pure Python first).
 - **Q5 (visibility of portfolios, goals and dashboards; permissions):** Recommendation: portfolios, goals and workspace dashboards are **visible to every workspace member**, editable by their owner and workspace admins; a project dashboard follows the project's visibility and edit rights. Every row and number inside is computed **as the viewer** (a portfolio shows only the projects the viewer can see; a widget's counts exclude what they can't see), so the same dashboard can show different numbers to different people. Alternative: private-by-default portfolios/dashboards with sharing (more UI, like the project Share dialog).
+  **Answered 2026-09-30: as recommended** (workspace-visible, owner/admin edit, computed as the viewer).
 - **Q6 (Phase 6 journeys):** Recommendation: add to `testing-strategy.md` §4: **J11** "Timeline: drag a task that has a dependent → cascade preview → apply → undo restores both" and **J12** "Ask for a chart → preview → add to a project dashboard → it shows on reload" (mock mode). Alternative: one combined journey.
+
+  **Answered 2026-09-30: J11 and J12** added to `testing-strategy.md` §4.
 
 ## 5. Exit criteria (confirm or adjust)
 
