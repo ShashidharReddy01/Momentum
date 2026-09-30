@@ -221,3 +221,28 @@ async def test_ai_off_ends_the_stream_with_an_error_event(app_factory: Any, seed
     assert _events(body) == [
         ("error", {"reason": "disabled", "message": "AI is turned off for this workspace."})
     ]
+
+
+async def test_an_answer_written_beside_a_tool_call_is_kept(uow: UnitOfWork, world: World) -> None:
+    """Phase 5 live round 3 (agent_teammate/webinar_breakdown_proposed): the model wrote its
+    answer in the same turn as its tool call, then ended with nothing. The answer is the text it
+    wrote, not an empty string."""
+    inner = build_llm(make_settings())
+    calls = 0
+
+    class WritesThenStops:
+        async def complete(self, **kwargs: Any) -> Any:
+            nonlocal calls
+            calls += 1
+            done = await inner.complete(**kwargs)
+            if calls == 1:  # the answer and the tool call together
+                return replace(done, text="Here are the steps, proposed for you to apply.")
+            return replace(done, text="", tool_calls=[])  # then a blank final turn
+
+        def __getattr__(self, name: str) -> Any:
+            return getattr(inner, name)
+
+    events = await run(uow, world.ravi, "keep searching forever", llm=WritesThenStops())  # type: ignore[arg-type]
+    text = "".join(d["text"] for d in of(events, "token"))
+    assert text == "Here are the steps, proposed for you to apply."
+    assert of(events, "done") == [{"steps": 2}]

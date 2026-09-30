@@ -8,7 +8,10 @@ turns into real dates and people:
 
 - dates: ``start_on`` (default today) + offsets. With a requested end date, a plan that runs
   past it is scaled to fit (every due date ≤ the end date), with a note; the model is also told
-  the deadline up front;
+  the deadline up front. Without one, a window the brief itself states ("over the next four
+  weeks") is the end date: read by ``stated_window`` in code, else reported by the model as
+  ``window_days`` (Phase 5 live evals: Architect's plans ran 5 to 7 weeks against "the next
+  four weeks" in four runs out of four, so the server enforces it, not the prompt);
 - people: a role's person must be a member of the project's team; anyone else (unknown, or not
   on that team) leaves the task unassigned, with a note naming them;
 - the team: the one asked for (the user must belong to it) or the user's only team.
@@ -17,6 +20,7 @@ turns into real dates and people:
 from __future__ import annotations
 
 import math
+import re
 import uuid
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
@@ -67,6 +71,45 @@ class BriefPlan(BaseModel):
     sections: list[BriefSection] = Field(min_length=1, max_length=12)
     roles: list[BriefRole] = Field(default_factory=list, max_length=20)
     open_questions: list[str] = Field(default_factory=list, max_length=10)
+    window_days: int | None = Field(
+        default=None,
+        ge=1,
+        le=730,
+        description='The time the brief gives the whole project, in days ("over the next four '
+        'weeks" = 28, "a two-month pilot" = 60); null when it gives none',
+    )
+
+
+NUMBERS = {
+    "a": 1, "an": 1, "one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6,
+    "seven": 7, "eight": 8, "nine": 9, "ten": 10, "eleven": 11, "twelve": 12,
+}  # fmt: skip
+UNIT_DAYS = {"day": 1, "week": 7, "month": 30}
+_NUM = r"(\d{1,3}|" + "|".join(NUMBERS) + r")"
+_UNIT = r"(day|week|month)s?"
+WINDOW = re.compile(
+    rf"\b(?:over|within|during|in|for)\s+(?:the\s+)?(?:next\s+)?{_NUM}\s+{_UNIT}\b"
+    rf"|\b{_NUM}[-\s]{_UNIT}\s+(?:project|plan|beta|pilot|sprint|trial|program|programme|"
+    r"campaign|rollout|push|effort)\b",
+    re.I,
+)
+NOT_A_WINDOW = re.compile(
+    r"\b(start|starting|starts|begin|beginning|begins|from|after|kick)\W*$", re.I
+)
+
+
+def stated_window(brief: str) -> int | None:
+    """Days the brief gives the whole project ("over the next four weeks" = 28), or None. A
+    phrase about when it starts ("starting in two weeks") is not a window."""
+    for m in WINDOW.finditer(brief):
+        if NOT_A_WINDOW.search(brief[max(0, m.start() - 20) : m.start()]):
+            continue
+        num, unit = (m.group(1), m.group(2)) if m.group(1) else (m.group(3), m.group(4))
+        n = int(num) if num.isdigit() else NUMBERS[num.lower()]
+        days = n * UNIT_DAYS[unit.lower()]
+        if 1 <= days <= 730:
+            return days
+    return None
 
 
 @dataclass
@@ -158,11 +201,17 @@ async def plan_from_brief(
     if end_on is not None and end_on < start:
         raise ValidationFailed("The end date is before the start date")
     prompt = prompts.load("project_brief")
+    stated = stated_window(brief) if end_on is None else None
     deadline = (
         f" The project starts on {start} and must finish by {end_on}: every due_offset must be "
         f"at most {(end_on - start).days}."
         if end_on
-        else f" The project starts on {start}."
+        else (
+            f" The project starts on {start} and the brief gives it {stated} days: every "
+            f"due_offset must be at most {stated}."
+            if stated
+            else f" The project starts on {start}."
+        )
     )
     text = brief.replace("<", "&lt;").replace(">", "&gt;")
     plan = await extract(
@@ -197,7 +246,12 @@ async def plan_from_brief(
             notes.append(
                 f"{r.person} ({r.role}) isn't a member of {team.name}; their tasks are unassigned."
             )
-    dates, date_notes = fit_dates(plan, start, end_on)
+    window = end_on
+    if window is None and (stated or plan.window_days):
+        days = stated or plan.window_days or 0
+        window = start + timedelta(days=days)
+        notes.append(f"The brief gives the project {days} days: it ends by {window}.")
+    dates, date_notes = fit_dates(plan, start, window)
     notes += date_notes
     sections = []
     for si, sec in enumerate(plan.sections):

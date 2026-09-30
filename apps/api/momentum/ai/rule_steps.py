@@ -168,7 +168,11 @@ async def _summarize_to_comment(
     summary = await summarize.summarize_thread(session, llm, ctx, task_id, now=now)
     await create_comment(session, ctx, task_id, text_doc(summary.text))
     return StepResult(
-        summary=f"Summarized {summary.count} comments", comment=summary.text, values={}
+        summary=f"Summarized {summary.count} comments",
+        comment=summary.text,
+        values={},
+        # the task and its thread, like the other kinds: what the summary must be true to
+        source=await _task_block(session, ctx, task_id, now),
     )
 
 

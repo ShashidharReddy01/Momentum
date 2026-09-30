@@ -99,6 +99,7 @@ async def run_tool_loop(
     result = LoopResult(text="")
     schemas = registry.schemas()
     seen: set[tuple[str, str]] = set()
+    written = ""  # the latest text the model wrote beside a tool call
     for step in range(max_steps):
         result.steps = step + 1
         last = step == max_steps - 1 and max_steps > 1
@@ -132,8 +133,11 @@ async def run_tool_loop(
         result.tokens_in += c.tokens_in
         result.tokens_out += c.tokens_out
         if not c.tool_calls:
-            result.text = c.text.strip()
+            # A model often writes its answer beside its last tool call and then ends with
+            # nothing (Phase 5 live round 3): that text is the answer, not an empty string.
+            result.text = c.text.strip() or written
             return result
+        written = c.text.strip() or written
         if last:
             break
         messages.append(_assistant(c.text, c.tool_calls))

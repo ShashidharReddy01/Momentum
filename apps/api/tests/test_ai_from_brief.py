@@ -4,14 +4,22 @@ else unassigned with a note), the team choice, and the brief treated as data."""
 
 from __future__ import annotations
 
+import json
 import uuid
+from dataclasses import replace
 from datetime import UTC, date, datetime, timedelta
 
 import pytest
 from sqlalchemy import func, select
 
 from momentum.ai.actions import apply_action
-from momentum.ai.from_brief import BriefPlan, BriefResult, fit_dates, plan_from_brief
+from momentum.ai.from_brief import (
+    BriefPlan,
+    BriefResult,
+    fit_dates,
+    plan_from_brief,
+    stated_window,
+)
 from momentum.ai.llm import LLM, build_llm
 from momentum.ai.mock import MockTransport
 from momentum.ai.models import AiAction
@@ -188,3 +196,56 @@ async def test_endpoint(as_user: Clients, uow: UnitOfWork, world: World) -> None
     assert body["name"] == "Relaunch" and body["tasks"] == 6 and body["action_id"]
     r = await ravi.post("/api/v1/ai/projects/from-brief", json={"brief": BRIEF})
     assert r.status_code == 422 and r.json()["code"] == "team_required"
+
+
+@pytest.mark.parametrize(
+    ("text", "days"),
+    [
+        ("Run a customer beta over the next four weeks: recruit ten customers.", 28),
+        ("A two-month pilot with three teams.", 60),
+        ("Ship the new onboarding within 10 days.", 10),
+        ("Starting in two weeks, run a beta with ten customers.", None),  # when, not how long
+        ("Recruit ten customers and collect feedback weekly.", None),
+    ],
+)
+def test_the_window_a_brief_states(text: str, days: int | None) -> None:
+    assert stated_window(text) == days
+
+
+async def test_a_window_in_the_brief_is_enforced(uow: UnitOfWork, world: World) -> None:
+    """Phase 5 live evals: Architect's plans ran 5 to 7 weeks against "the next four weeks" in
+    four runs out of four. The window the brief states is now the plan's end date."""
+    product = await team_id(uow, "Product")
+    llm, spy = spy_llm()
+    brief = BRIEF.replace("Relaunch the website.", "Relaunch the website over the next four weeks.")
+    r = await run(uow, world.ravi, llm=llm, brief=brief, team_id=product, start_on=START)
+    end = START + timedelta(days=28)
+    assert r.end_on <= end  # the mock plan needs 60 days
+    notes = "\n".join(r.notes)
+    assert f"The brief gives the project 28 days: it ends by {end}." in notes
+    assert f"dates were compressed to finish by {end}" in notes
+    assert "the brief gives it 28 days" in spy.requests[0].messages[0]["content"]
+
+
+async def test_the_models_window_is_enforced_when_the_text_has_none(
+    uow: UnitOfWork, world: World
+) -> None:
+    """A window phrased in a way the parser doesn't read ("We have 3 weeks") comes from the
+    model's ``window_days`` instead, and is enforced the same way."""
+
+    class Says21(Spy):
+        def resolve(self, req: ChatRequest) -> RawCompletion:
+            raw = super().resolve(req)
+            call = raw.tool_calls[0]
+            args = json.loads(call.arguments) | {"window_days": 21}
+            return replace(raw, tool_calls=[replace(call, arguments=json.dumps(args))])
+
+    settings = make_settings()
+    llm = build_llm(settings)
+    llm.transport = Says21(settings)
+    product = await team_id(uow, "Product")
+    r = await run(
+        uow, world.ravi, llm=llm, brief="We have 3 weeks. " + BRIEF, team_id=product, start_on=START
+    )
+    assert r.end_on <= START + timedelta(days=21)
+    assert "The brief gives the project 21 days" in "\n".join(r.notes)
