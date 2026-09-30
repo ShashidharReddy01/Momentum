@@ -58,6 +58,7 @@ TriggerType = Literal[
     "task.completed",
     "task.assigned",
     "task.due_approaching",
+    "task.unblocked",
     "form.submitted",
     "approval.decided",
 ]
@@ -432,6 +433,8 @@ def _trigger_words(t: dict[str, Any]) -> str:
         return "a task is completed"
     if kind == "task.assigned":
         return f"a task is assigned to {t['user_id']}" if "user_id" in t else "a task is assigned"
+    if kind == "task.unblocked":
+        return "a task's last blocker is completed"
     if kind == "form.submitted":
         return f"the {t['form_id']} form is submitted" if "form_id" in t else "a form is submitted"
     return "a task's due date is tomorrow"

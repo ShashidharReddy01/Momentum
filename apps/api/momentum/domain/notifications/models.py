@@ -27,6 +27,7 @@ NOTIFICATION_KINDS = (
     "agent_proposal",
     "digest",
     "agent_alert",
+    "unblocked",  # S6.1.3: a task's last blocker is done ("You're up")
 )
 
 

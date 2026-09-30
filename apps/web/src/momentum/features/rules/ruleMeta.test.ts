@@ -45,3 +45,13 @@ describe('AI step metadata (S4.1.5)', () => {
     );
   });
 });
+
+describe('task.unblocked trigger (S6.1.3)', () => {
+  it('is offered and reads back in words', async () => {
+    const { TRIGGERS } = await import('./ruleMeta');
+    expect(TRIGGERS.map((t) => t.type)).toContain('task.unblocked');
+    expect(describeRule({ type: 'task.unblocked' }, [], [{ type: 'mark_complete' }], lookups)).toContain(
+      "a task's last blocker is completed",
+    );
+  });
+});

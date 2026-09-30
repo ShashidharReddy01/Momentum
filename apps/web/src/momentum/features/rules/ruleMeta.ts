@@ -9,6 +9,7 @@ export const TRIGGERS: { type: string; label: string; params: string[] }[] = [
   { type: 'task.completed', label: 'A task is completed', params: [] },
   { type: 'task.assigned', label: 'A task is assigned', params: ['user_id'] },
   { type: 'task.due_approaching', label: "A task's due date is approaching", params: [] },
+  { type: 'task.unblocked', label: 'A task is ready to start (its blockers are done)', params: [] },
   { type: 'form.submitted', label: 'A form is submitted', params: ['form_id'] },
   { type: 'approval.decided', label: 'An approval is decided', params: ['decision'] },
 ];
@@ -126,6 +127,8 @@ function describeTrigger(t: RuleTrigger, l: RuleLookups): string {
       return t.user_id ? `a task is assigned to ${person(l, t.user_id)}` : 'a task is assigned';
     case 'task.due_approaching':
       return "a task's due date is tomorrow";
+    case 'task.unblocked':
+      return "a task's last blocker is completed";
     case 'form.submitted':
       return t.form_id ? `the ${l.forms.get(t.form_id) ?? 'form'} form is submitted` : 'a form is submitted';
     case 'approval.decided':

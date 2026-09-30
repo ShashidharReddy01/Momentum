@@ -20,6 +20,7 @@ const DEFAULT_PREFS = {
   completed: 'in_app' as const,
   due_soon: 'in_app' as const,
   overdue: 'in_app' as const,
+  unblocked: 'in_app' as const,
   digest_time: null as string | null,
 };
 

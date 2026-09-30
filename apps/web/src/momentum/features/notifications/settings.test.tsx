@@ -44,6 +44,14 @@ describe('Notification settings (S2.5.3)', () => {
     await waitFor(() => expect(digest).toHaveValue('09:00'));
   });
 
+  it('offers the "You\'re up" hand-off notification (S6.1.3), on by default', async () => {
+    await boot();
+    const select = await screen.findByLabelText(
+      'A task of mine is ready to start (everything it waited on is done) channel',
+    );
+    expect(select).toHaveValue('in_app');
+  });
+
   it('the sidebar user menu links to the settings page', async () => {
     server.use(
       ...authHandlers({ loggedIn: true }).handlers,

@@ -51,9 +51,10 @@
 **Scope:**
 - **Templates keep dependencies:** a `project` template payload records each task's blockers by position (`depends_on: [task index]`, captured when saving as a template, including AI-drafted templates from S4.3.3); "New from template" replays them through `add_dependency` (one write path, cycle check included). Existing templates without the key keep working.
 - **"You're up" hand-off:** when a task's last open blocker is completed, its assignee gets a notification (new kind `task_unblocked`, respecting notification preferences) naming the finished blocker; undoing that completion doesn't notify twice.
-- **Rules trigger `task.unblocked`** (outbox event + rules vocabulary + `nl_rule` prompt, per the Phase 4 rule), so a project can automate the kick-off, e.g. "when a task is unblocked, move it to In progress and set its start date to today".
+- **Rules trigger `task.unblocked`** (outbox event + rules vocabulary + `nl_rule` prompt, per the Phase 4 rule), so a project can automate the kick-off, e.g. "when a task is unblocked, move it to In progress".
 - The list's "waiting on" icon and the timeline's arrows update live when the blocker completes.
 **Size:** M
+**As built (2026-09-30):** migration 0031 adds the `unblocked` notification kind (and preference, on by default). `set_completed` runs `_hand_off` after a completion: each open dependent with no open blocker left gets a `task.unblocked` event (rules trigger, agent event, realtime refresh) and its assignee a "You're up: \"Build\" is ready to start" notification; the snippet names the blocker only when both tasks are in the same project, otherwise "The last task it was waiting on is done". Undoing the completion re-blocks quietly. Templates: `dependencies` by position in the payload (captured, AI-drafted via `after` titles with `template_from_brief/v2`, replayed with `add_dependency`); `nl_rule/v5` knows the trigger. Deferred: a rules action to set the start date (the rule set has `set_due_relative` only), not needed for the hand-off itself.
 
 ## E6.2 Overview, status, portfolios
 

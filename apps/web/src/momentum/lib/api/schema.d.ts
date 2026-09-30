@@ -3821,6 +3821,8 @@ export interface components {
         };
         /** DraftTask */
         DraftTask: {
+            /** After */
+            after?: string[];
             /** Description */
             description?: string | null;
             /** Due In Days */
@@ -4955,7 +4957,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "assigned" | "mentioned" | "commented" | "completed" | "due_soon" | "overdue" | "rule" | "approval_requested" | "approval_decided" | "agent_proposal" | "digest" | "agent_alert";
+            kind: "assigned" | "mentioned" | "commented" | "completed" | "due_soon" | "overdue" | "rule" | "approval_requested" | "approval_decided" | "agent_proposal" | "digest" | "agent_alert" | "unblocked";
             /** Read At */
             read_at: string | null;
             /** Snippet */
@@ -5014,6 +5016,12 @@ export interface components {
              * @enum {string}
              */
             overdue: "in_app" | "email" | "slack" | "off";
+            /**
+             * Unblocked
+             * @default in_app
+             * @enum {string}
+             */
+            unblocked: "in_app" | "email" | "slack" | "off";
         };
         /**
          * NotificationPrefsOut
@@ -5073,6 +5081,12 @@ export interface components {
              * @enum {string}
              */
             overdue: "in_app" | "email" | "slack" | "off";
+            /**
+             * Unblocked
+             * @default in_app
+             * @enum {string}
+             */
+            unblocked: "in_app" | "email" | "slack" | "off";
         };
         /** NudgeSnoozeIn */
         NudgeSnoozeIn: {

@@ -17,6 +17,7 @@ from momentum.core.activity import Activity, Diff, jsonable_diff, record_activit
 from momentum.core.context import Ctx
 from momentum.core.errors import Conflict, Forbidden, NotFound, ValidationFailed, VersionConflict
 from momentum.core.events import emit
+from momentum.core.ids import task_key
 from momentum.core.mutation import Mutation
 from momentum.core.ordering import even_keys, key_between, keys_between, needs_rebalance
 from momentum.core.richtext import doc_hash, plain_text, preview, sanitize_doc
@@ -1007,7 +1008,73 @@ async def set_completed(
         )
         if (task.recurrence or {}).get("mode", "on_complete") == "on_complete":
             await spawn_next_occurrence(session, ctx, task, placement)
+        await _hand_off(session, ctx, task, placement, act.id)
     return Mutation(task, act.id, batch_id=batch_id, version=task.version)
+
+
+async def _hand_off(
+    session: AsyncSession,
+    ctx: Ctx,
+    blocker: Task,
+    blocker_placement: TaskProject | None,
+    activity_id: uuid.UUID,
+) -> None:
+    """S6.1.3: ``blocker`` was just completed. Every open task that was waiting on it and now has
+    no open blocker left is ready to start: emit ``task.unblocked`` (a rules trigger) and tell its
+    assignee ("You're up"). The blocker is named only when both tasks are in the same project, so
+    the notification never reveals work the assignee may not be able to see. Undoing the
+    completion re-blocks quietly (no notification either way)."""
+    waiting = (
+        await session.execute(
+            select(Task, TaskProject)
+            .join(TaskDependency, TaskDependency.task_id == Task.id)
+            .outerjoin(TaskProject, TaskProject.task_id == Task.id)
+            .where(
+                TaskDependency.depends_on_id == blocker.id,
+                Task.deleted_at.is_(None),
+                Task.completed_at.is_(None),
+            )
+            .order_by(Task.number)
+        )
+    ).all()
+    seen: set[uuid.UUID] = set()
+    for dep, placement in waiting:
+        if dep.id in seen:
+            continue  # multi-homed: one row per project
+        seen.add(dep.id)
+        if await _has_incomplete_blockers(session, dep.id):
+            continue
+        same_project = (
+            placement is not None
+            and blocker_placement is not None
+            and placement.project_id == blocker_placement.project_id
+        )
+        await emit(
+            session,
+            ctx,
+            type="task.unblocked",
+            entity_type="task",
+            entity_id=dep.id,
+            data={
+                "blocker_id": str(blocker.id),
+                "project_id": str(placement.project_id) if placement else None,
+            },
+            channels=channels(dep, placement),
+            activity_id=activity_id,
+        )
+        await notify(
+            session,
+            ctx,
+            user_id=dep.assignee_id,
+            kind="unblocked",
+            entity_type="task",
+            entity_id=dep.id,
+            title=f'You\'re up: "{dep.title}" is ready to start',
+            snippet=f"{task_key(blocker.number)} {blocker.title} is done"
+            if same_project
+            else "The last task it was waiting on is done",
+            activity_id=activity_id,
+        )
 
 
 async def delete_task(

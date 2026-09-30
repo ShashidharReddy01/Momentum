@@ -24,6 +24,7 @@ const KIND_LABEL: Record<Notification['kind'], string> = {
   agent_proposal: 'Agent proposal',
   digest: 'Digest',
   agent_alert: 'Agent alert',
+  unblocked: "You're up",
 };
 
 export function InboxPage() {

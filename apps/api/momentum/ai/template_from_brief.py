@@ -32,6 +32,8 @@ class DraftTask(BaseModel):
     due_in_days: int | None = Field(default=None, ge=0, le=365)
     role: str | None = Field(default=None, max_length=100)
     subtasks: list[str] = Field(default_factory=list, max_length=10)
+    # S6.1.3: titles of other tasks in this template that must be done before this one starts
+    after: list[str] = Field(default_factory=list, max_length=5)
 
 
 class DraftSection(BaseModel):
@@ -93,6 +95,19 @@ def to_payload(draft: TemplateDraft) -> dict[str, Any]:
         return roles[key]
 
     sections = []
+    position = {
+        t.title[:500].strip().lower(): [si, ti]
+        for si, s in enumerate(draft.sections)
+        for ti, t in enumerate(s.tasks)
+    }
+    dependencies = []
+    for si, s in enumerate(draft.sections):
+        for ti, t in enumerate(s.tasks):
+            for title in t.after:
+                blocker = position.get(title.strip().lower())
+                # a title the model made up, or the task itself, is dropped rather than guessed
+                if blocker is not None and blocker != [si, ti]:
+                    dependencies.append({"task": [si, ti], "blocked_by": blocker})
     for s in draft.sections:
         tasks = []
         for t in s.tasks:
@@ -110,4 +125,5 @@ def to_payload(draft: TemplateDraft) -> dict[str, Any]:
         "fields": [],
         "sections": sections,
         "rules": [],
+        "dependencies": dependencies,
     }

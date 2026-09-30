@@ -12,6 +12,7 @@ const CHANNEL_KINDS = [
   'completed',
   'due_soon',
   'overdue',
+  'unblocked',
   'digest',
 ] as const;
 
@@ -22,6 +23,7 @@ const KIND_LABEL: Record<(typeof CHANNEL_KINDS)[number], string> = {
   completed: 'A task I created is completed',
   due_soon: 'Due today',
   overdue: 'Overdue',
+  unblocked: 'A task of mine is ready to start (everything it waited on is done)',
   digest: 'Daily digest (Pulse)',
 };
 

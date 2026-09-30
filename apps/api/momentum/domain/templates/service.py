@@ -42,8 +42,13 @@ from momentum.domain.rules.schemas import RuleIn
 from momentum.domain.rules.service import create_rule, list_rules
 from momentum.domain.sections.models import Section
 from momentum.domain.sections.service import create_section, rename_section
-from momentum.domain.tasks.models import Task, TaskProject
-from momentum.domain.tasks.service import create_subtask, create_task, update_task
+from momentum.domain.tasks.models import Task, TaskDependency, TaskProject
+from momentum.domain.tasks.service import (
+    add_dependency,
+    create_subtask,
+    create_task,
+    update_task,
+)
 from momentum.domain.templates.models import Template
 from momentum.domain.templates.schemas import (
     NewProjectFromTemplateIn,
@@ -258,6 +263,10 @@ async def save_project_template(
 
     roles = _Roles()
     sections_payload = []
+    position: dict[uuid.UUID, list[int]] = {}  # task id -> [section index, task index]
+    for si, section in enumerate(sections):
+        for ti, t in enumerate(by_section.get(section.id, [])):
+            position[t.id] = [si, ti]
     for section in sections:
         tasks_payload = [
             await _capture_task(session, t, roles, users, field_values, reference)
@@ -278,11 +287,31 @@ async def save_project_template(
                         users[uid] = u
     rules_payload = [_capture_rule(r, section_index, roles, users) for r in rules]
 
+    # S6.1.3: "B waits on A" between two of the project's top-level tasks, by position
+    dependencies = (
+        [
+            {"task": position[task_id], "blocked_by": position[blocker_id]}
+            for task_id, blocker_id in (
+                await session.execute(
+                    select(TaskDependency.task_id, TaskDependency.depends_on_id)
+                    .where(
+                        TaskDependency.task_id.in_(position.keys()),
+                        TaskDependency.depends_on_id.in_(position.keys()),
+                    )
+                    .order_by(TaskDependency.created_at)
+                )
+            ).all()
+        ]
+        if position
+        else []
+    )
+
     payload = {
         "roles": roles.as_list(),
         "fields": [str(f) for f in fields],
         "sections": sections_payload,
         "rules": rules_payload,
+        "dependencies": dependencies,
     }
     template = Template(
         workspace_id=ctx.workspace_id,
@@ -486,9 +515,10 @@ async def create_project_from_template(
         with contextlib.suppress(DomainError):
             await attach_field(session, ctx, project.id, fid, None, None)
 
-    for section_id, s in zip(section_ids, sections_payload, strict=True):
-        for t in s.get("tasks") or []:
-            await _instantiate_task(
+    created: dict[tuple[int, int], uuid.UUID] = {}
+    for si, (section_id, s) in enumerate(zip(section_ids, sections_payload, strict=True)):
+        for ti, t in enumerate(s.get("tasks") or []):
+            created[(si, ti)] = await _instantiate_task(
                 session,
                 ctx,
                 project.id,
@@ -499,6 +529,19 @@ async def create_project_from_template(
                 fields_by_id,
                 None,
             )
+
+    # S6.1.3: replay "waits on" links through the one write path (cycle check included); a link
+    # that no longer resolves (an older or hand-edited payload) is skipped, not fatal
+    for dep in payload.get("dependencies") or []:
+        try:
+            task_id = created.get((int(dep["task"][0]), int(dep["task"][1])))
+            blocker_id = created.get((int(dep["blocked_by"][0]), int(dep["blocked_by"][1])))
+        except (KeyError, IndexError, TypeError, ValueError):
+            continue
+        if task_id is None or blocker_id is None or task_id == blocker_id:
+            continue
+        with contextlib.suppress(DomainError):
+            await add_dependency(session, ctx, task_id, blocker_id)
 
     for r in payload.get("rules") or []:
         trigger = dict(r["trigger"])

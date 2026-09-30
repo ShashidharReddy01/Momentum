@@ -72,6 +72,7 @@ TRIGGER_EVENTS: dict[str, tuple[str, ...]] = {
     "task.completed": ("task.completed",),
     "task.assigned": ("task.assigned",),
     "task.due_approaching": ("task.due_approaching",),
+    "task.unblocked": ("task.unblocked",),
     "form.submitted": ("form.submitted",),
     "approval.decided": ("approval.decided",),
 }
@@ -335,7 +336,7 @@ async def _trigger_matches(session: AsyncSession, trig: dict[str, Any], ev: Outb
     if kind == "approval.decided":
         decision = trig.get("decision")
         return decision is None or decision == data.get("state")
-    return kind in ("task.completed", "task.due_approaching")
+    return kind in ("task.completed", "task.due_approaching", "task.unblocked")
 
 
 async def _event_projects(session: AsyncSession, ev: OutboxEvent) -> set[uuid.UUID]:

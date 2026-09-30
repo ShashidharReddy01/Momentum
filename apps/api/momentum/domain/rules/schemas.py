@@ -26,6 +26,7 @@ TRIGGER_PARAMS: dict[str, set[str]] = {
     "task.completed": set(),
     "task.assigned": {"user_id"},
     "task.due_approaching": set(),
+    "task.unblocked": set(),  # S6.1.3: its last open blocker was completed
     "form.submitted": {"form_id"},
     "approval.decided": {"decision"},
 }

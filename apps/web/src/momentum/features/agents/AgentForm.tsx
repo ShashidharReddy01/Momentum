@@ -50,6 +50,7 @@ export const AGENT_EVENTS = [
   'task.moved',
   'task.tagged',
   'task.due_approaching',
+  'task.unblocked',
   'comment.created',
   'project.created',
   'status_update.created',

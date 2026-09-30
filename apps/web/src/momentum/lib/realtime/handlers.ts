@@ -178,6 +178,7 @@ function applyTaskEvent(
       void qc.invalidateQueries({ predicate: (q) => isTaskList(q.queryKey) });
       refreshMineAndHome(qc);
       return;
+    case 'task.unblocked':
     case 'task.dependency_added':
     case 'task.dependency_removed': {
       void qc.invalidateQueries({ queryKey: taskKeys.dependencies(id) });

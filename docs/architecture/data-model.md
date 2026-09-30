@@ -210,7 +210,7 @@ id bigserial pk, workspace_id, type text, entity_type, entity_id, payload jsonb,
 consumer text pk, last_outbox_id bigint, updated_at. Tracks outbox consumers for idempotent dispatch.
 
 ### `notifications`
-id, workspace_id, user_id, kind (`assigned`,`mentioned`,`commented`,`completed`,`due_soon`,`overdue`,`rule`,`approval_requested`,`approval_decided`,`agent_proposal`,`digest`), entity_type, entity_id, activity_id null, title, snippet, priority_score real, read_at, archived_at, created_at. Index (user_id, archived_at, created_at desc). `rule` added in migration 0022 (S4.1.2's `notify_user` action); `agent_alert` added in migration 0028 (S5.1.1; an agent needs an admin's attention, produced from S5.1.2).
+id, workspace_id, user_id, kind (`assigned`,`mentioned`,`commented`,`completed`,`due_soon`,`overdue`,`rule`,`approval_requested`,`approval_decided`,`agent_proposal`,`digest`), entity_type, entity_id, activity_id null, title, snippet, priority_score real, read_at, archived_at, created_at. Index (user_id, archived_at, created_at desc). `rule` added in migration 0022 (S4.1.2's `notify_user` action); `agent_alert` added in migration 0028 (S5.1.1; an agent needs an admin's attention, produced from S5.1.2); `unblocked` added in migration 0031 (S6.1.3: "You're up", sent to a task's assignee when its last open blocker is completed; a per-kind preference like the others).
 
 ### `idempotency_keys`
 key text, user_id, method, path, response_status, response_body jsonb, created_at. pk (user_id, key). Purged after 24h by a periodic job.
@@ -231,6 +231,7 @@ key text, user_id, method, path, response_status, response_body jsonb, created_a
 - `goals`: id, workspace_id, parent_id null, name, owner_id, period (`2026-Q4` / custom start/end), metric jsonb (`{type: number|percent|currency, start, target, current}`), progress_source (`manual`,`projects`,`subgoals`), status, timestamps, deleted_at. `goal_links`: goal_id, entity_type (`project`,`portfolio`), entity_id.
 - `capacity`: user_id, week_start date, capacity_minutes int. Default from user prefs.
 - `dashboards`: id, workspace_id, owner_id, name, scope (`project`,`workspace`), scope_id, layout jsonb. `dashboard_widgets`: id, dashboard_id, kind, query_spec jsonb, viz jsonb, position.
+- **Template payload `dependencies` (S6.1.3, no migration):** a `project` template's payload gains `dependencies: [{task: [section index, task index], blocked_by: [section index, task index]}]` between top-level tasks, captured by "Save as template" and by the AI drafter (`template_from_brief/v2`'s `after` titles), replayed through `add_dependency` after the tasks exist; older payloads without the key still work.
 - `forecasts`: id, project_id, computed_at, p50 date, p80 date, p95 date, risk_score real, drivers jsonb.
 
 ## 9. AI and agents (Phases 3, 5)

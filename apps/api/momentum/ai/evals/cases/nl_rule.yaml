@@ -21,6 +21,14 @@ cases:
         trigger: {type: task.completed}
         conditions: []
         actions: [{type: move_section, section_id: "Done"}]
+  # S6.1.3 (live-only): the hand-off trigger
+  - id: unblocked_move_to_build
+    input: "When everything a task was waiting on is done, move it to Build."
+    expect:
+      rule_exact:
+        trigger: {type: task.unblocked}
+        conditions: []
+        actions: [{type: move_section, section_id: "Build"}]
   - id: urgent_added_notify_ravi
     input: 'When an urgent task is added, notify Ravi Kumar with "Urgent work landed".'
     expect:

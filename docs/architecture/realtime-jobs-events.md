@@ -80,6 +80,7 @@ Event payloads share an envelope:
 | `agent.created` / `agent.updated` | 5 | `key`, `source` (created); `changes` (field names), `version` (updated); channel `workspace:<id>` (S5.1.1). No frontend handler yet (the agents pages arrive in S5.1.3/S5.2.3) |
 | `rule.created` / `rule.updated` / `rule.deleted` | 4 | `project_id` (created, deleted); `changes` (names), `version` (updated); channel `project:<id>` or `workspace:<id>` (S4.1.1; frontend handler in `lib/realtime/handlers.ts` since S4.1.3) |
 | `rule.ran` | 4 | rule_id, status (`success`/`skipped`/`failed`), task_id (S4.1.1; carries the run's depth) |
+| `task.unblocked` | 6 | `blocker_id`, `project_id` (S6.1.3; emitted inside `set_completed` for each open task whose last open blocker was just completed; a rules trigger, an agent event, and the list/timeline refresh their blocker state on it; the assignee also gets an `unblocked` notification) |
 | `task.due_approaching` | 4 | `due_on` (S4.1.2; emitted by the hourly `scan_due_approaching` job, deduped per (task, due date); actor `system`) |
 | `agent_run.started` / `agent_run.finished` | 5 | agent_id, status, cost |
 | `notification.created` | 2 | notification summary (channel `user:<id>` only). Since S5.0.1 the app shell subscribes to `user:<me>` on every page (`features/notifications/live.ts`), so the inbox and the bell update live wherever the person is |

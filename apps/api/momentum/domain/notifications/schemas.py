@@ -20,6 +20,7 @@ NotificationKind = Literal[
     "agent_proposal",
     "digest",
     "agent_alert",
+    "unblocked",
 ]
 
 # The kinds a user can actually toggle in this slice (the rest have no producer yet).
@@ -30,6 +31,7 @@ PREF_KINDS: tuple[NotificationKind, ...] = (
     "completed",
     "due_soon",
     "overdue",
+    "unblocked",
 )
 
 
@@ -71,6 +73,8 @@ class NotificationPrefsOut(BaseModel):
     completed: NotificationChannel = "in_app"
     due_soon: NotificationChannel = "in_app"
     overdue: NotificationChannel = "in_app"
+    # S6.1.3: "You're up": the last task mine was waiting on is done
+    unblocked: NotificationChannel = "in_app"
     digest: NotificationChannel = "in_app"
     digest_time: str | None = None
     # S5.3.4 (kickoff Q7): false = Nudge never reminds me (per task: snooze on My Tasks)
