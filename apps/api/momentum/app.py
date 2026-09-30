@@ -45,6 +45,7 @@ def _api_router(settings: Settings) -> APIRouter:
     from momentum.domain.agents.router import router as agents_router
     from momentum.domain.attachments.router import router as attachments_router
     from momentum.domain.comments.router import router as comments_router
+    from momentum.domain.dashboards.router import router as dashboards_router
     from momentum.domain.fields.router import router as fields_router
     from momentum.domain.forms.router import public_router as forms_public_router
     from momentum.domain.forms.router import router as forms_router
@@ -88,6 +89,7 @@ def _api_router(settings: Settings) -> APIRouter:
     api.include_router(portfolios_router)
     api.include_router(goals_router)
     api.include_router(workload_router)
+    api.include_router(dashboards_router)
     api.include_router(rules_router)
     api.include_router(forms_router)
     api.include_router(forms_public_router)

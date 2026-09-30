@@ -62,6 +62,12 @@ async def authorize_channel(session: AsyncSession, ctx: Ctx, channel: str) -> No
         from momentum.domain.portfolios.service import get_portfolio
 
         await get_portfolio(session, ctx, entity_id)
+    elif kind == "dashboard":
+        # S6.5.1: a workspace dashboard is visible to every member, a project one follows the
+        # project; its events carry only versions (numbers are re-read per viewer)
+        from momentum.domain.dashboards.service import get_dashboard
+
+        await get_dashboard(session, ctx, entity_id)
     elif kind == "goal":
         # S6.3.1: every member can see a goal; events carry only ids and versions
         from momentum.domain.goals.service import get_goal

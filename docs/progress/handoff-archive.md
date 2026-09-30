@@ -2,6 +2,49 @@
 
 > Moved out of `STATUS.md` (2026-09-27) to keep it small: every AI session reads STATUS in full. Newest first. Nothing here is current instruction; the code and the docs are.
 
+## Handoff notes (2026-09-30, Phase 5 live verification closed)
+- **Live verification round 4, closing (product owner, 2026-09-30):** `llm-check` 10/10, backend 738/738, frontend 334/334 (the clean re-run, all 67 files), live evals **219/220 (99.5%)**, all 21 feature buckets above threshold, **`RESULT: PASS`**. `agent_architect` went from 67% to 100%: the round-3 `stated_window` + `fit_dates` fix resolved all 4 consecutive failures. Full account: `docs/progress/phase-5-live-verification-findings.md` "Round 4".
+  - **Open, not blocking:** `ai_step/draft_reply_answers_newest` gets 1/5 from the judge for a clean reply (a plain follow-up question, no invented facts), which the case's own rubric allows ("proposing an obvious next step… is not an invention"). A judge-consistency miss, not a product defect, and a different critique from the original "today is Monday" bug (clean 3 rounds running). Look at it next time the judge prompt is touched.
+- **Live verification round 3 (product owner, 2026-09-30):** 217/220 (98.6%); plan_day 10/10. **Addressed (mock mode), awaiting the round 4 live run:**
+  - Architect `brief_live` (4 failures in 4 runs, a real bug): the window a brief states is now enforced server-side: `stated_window` reads it in code, else the model's `window_days`, and `fit_dates` compresses the plan into it with a note (`project_brief/v2`).
+  - ai_step `summarize_thread_content`: the summary kind now passes the task and thread to the judge as `source`, like the other two kinds.
+  - `webinar_breakdown_proposed`'s empty reply, traced with a test: **not** the last-step fix. A tool call on the last step still ends in the model's answer or `OUT_OF_STEPS`, never an empty string, and Teammate has no `add_comment` to lose. The cause was older: the model wrote its answer beside its `create_subtasks` call and then ended with a blank turn, and the loop kept only the final turn's text. The loop now keeps the latest text written beside a tool call when the final turn is blank.
+  - Still open: the frontend suite's clean re-run on your machine (killed by a memory guard, not a code issue), the round 4 live run, then close the Phase 5 retro.
+- **Live verification round 2 (product owner, 2026-09-29):** 213/220 (96.8%); Pulse, Radar, Sorter and ai_step at 100%, the injection case passes; 4 buckets still under threshold. **Addressed (mock mode), awaiting the round 3 live run:**
+  - plan_day: **decision: a blocked task never goes in Today**, even when due soon or urgent (it can't be started until its blocker is done; the rationale says what it waits on). `plan_day/v3` says so, the server enforces it, and the cases `mei_blocked_later` and `priya_blocked_urgent` now expect it (v2's "unless nothing else is urgent" was the loophole that let Mei's T-35 in).
+  - Judge: `judge/v2` checks claims against the source material; agent_teammate cases now give it everything the model was shown, so `customer_email_draft`'s real $9/$29/$79 can be checked instead of guessed.
+  - Stale cases: `pricing_decisions_summary` checks citations and content instead of `get_task`; `assigned_research` accepts `search_tasks` or `semantic_search` (new `agent_tools_any` check).
+  - chat's `grounded` check: an answer that says it found nothing isn't grounded, whatever it cites for context (eval scorer only; the product's own `grounded` flag, which drives "No sources from your workspace cited", is unchanged).
+  - `agent_architect/brief_live`: untouched; re-run it 3 times live first (`momentum evals --live --feature agent_architect --case brief_live`, three times).
+  - **Still open:** the round 3 live run (`momentum llm-check`, `momentum evals --live --report-dir ../../reports/evals`), then close the Phase 5 retro below with the final numbers.
+- **Live verification (product owner, 2026-09-29):** `llm-check` 10/10, backend 726/726, web 334/334, J10 e2e passes; live evals 211/221 (95.5%) with 5 of 21 feature buckets under threshold. Full findings: `docs/progress/phase-5-live-verification-findings.md`. **Fixed the same day, in mock mode, awaiting the live re-run:**
+  - Pulse and Radar asked for bare `T-12` citations; only `[T-12]` counts. Their prompts now ask for brackets and moved to versioned files (`pulse_intro/v1`, `radar_note/v1`).
+  - `ai_step_reply/v2`: never states or assumes today's date or day (the model isn't told it), nor what happened after the newest comment. Re-run `ai_step/draft_reply_answers_newest` 3 times before calling it fixed (Phase 3 retro precedent).
+  - Sorter charter: makes a lead's call from the title (typo → low), says when Risk is High/Medium, asks for the exact duplicate format, and works in three turns within its 8 steps.
+  - Teammate charter: doesn't re-fetch the task it's shown, batches lookups, proposes subtasks only when explicitly asked, and proposes nothing when the request tries to direct it (decision below).
+  - The tool loop's last allowed step now asks the model to answer with what it has, so runs stop ending in "I couldn't finish that" (the cause of both live `max_steps` failures).
+  - `plan_day/v2`: the capacity is a ceiling, not a target (Ana's webinar, due in 10 days with no priority, stays out of Today); a blocked task is explained in words.
+  - `agent_draft/server_corrects_the_draft` is now mock-only (`live: false`, a new case flag): it checks the server's corrections of a scripted bad draft; the live model's draft needed none, so there were no notes to show.
+  - Found while verifying: after 18:30 UTC (midnight in Asia/Kolkata) a Pulse test and the Radar mock eval failed, because the test's actor had UTC but the user row Asia/Kolkata, and the Radar/Nudge eval triggers used UTC while the eval data's dates are relative to the project owner's day. Test and eval fixes only; the product code was right.
+  - **To do on your machine:** `momentum agents install --force --only triage --only teammate` (their definitions changed), then `momentum llm-check` and `EVALS_LIVE=1 make evals`, and record the outcome in the Phase 5 retro.
+- **Phase 5 is complete** (exit criteria met; see `phase-5.md` "Phase 5 exit"). This session shipped S5.2.1–S5.2.3, S5.0.2, and all eight starter agents; per-slice notes are in `handoff-archive.md`.
+- **What's there now, in short:**
+  - Assign or @mention an agent on a task: it answers in the thread (@mentioning you) and hands the task back for review.
+  - Agent gallery, create an agent from a description, edit, test run, Run now, and "Works in" (give an agent access to projects you manage) on each agent's page.
+  - Starters: Teammate and Sorter are model-driven tool loops; Pulse, Herald, Nudge, Radar, Architect and Scribe are built-in code-backed agents (code selects and limits, the model only writes prose or plans).
+  - Security review of public forms (S5.0.2), with a deploy action: `MOMENTUM_TRUSTED_PROXY_HOPS=1` on Azure App Service.
+- **Found and fixed along the way (worth knowing):** custom-field changes had no activity or undo since Phase 2; an agent planning a project couldn't see its asker's teams; the prefs loader mangled booleans; a new trigger option would have marked every installed agent as edited; the pickers and feed didn't know agent accounts.
+- **Your checklist on the real gateway (deferred by agreement):**
+  1. `make migrate` (0030 is new), then `momentum agents install --force` (or `--only <key>` for agents you haven't edited: the definitions of all eight changed this session).
+  2. Set `MOMENTUM_LLM_PRICE_TABLE` (agent budgets count dollars once the model is priced; until then the 2M-token cap).
+  3. `momentum llm-check`, then `EVALS_LIVE=1 make evals` (nine new agent eval features; live-only cases are the real test of their prompts).
+  4. J10 by hand (checkpoint 2): switch Teammate on, give it a project in "Works in", assign it a task.
+  5. Dogfood week: switch on Pulse, Herald and Sorter, add them to projects; acceptance is on each agent's page.
+- **For the next session (read this first):**
+  - **Branch:** `claude/intelligent-meitner-9ne4e8`, everything pushed.
+  - **Fresh cloud container:** `apt-get install -y postgresql-16-pgvector`; `initdb` into `/home/user/.pgdata` as `postgres`; start with `pg_ctl -o '-p 5432 -k /tmp'`; create role `momentum`/`momentum` (createdb) and databases `momentum` + `momentum_test`; create the `vector`, `pg_trgm` and `citext` extensions in `template1`; then `make install`. Postgres **stops when the container sleeps**: `pg_isready -h 127.0.0.1` before trusting a wall of DB errors. `make check` takes about 11 minutes, so run it in the background; run `ruff format` and `prettier --write` first (a format miss costs a full rerun). E2E: `pnpm build`, then `MOMENTUM_E2E_CHROMIUM=/opt/pw-browsers/chromium pnpm exec playwright test` in `apps/web` (J10 takes ~2 minutes of worker ticks).
+  - **Next:** the Phase 6 kickoff (read `docs/roadmap/phase-6.md`; the model guide says which model), after the product owner's live run above. Radar's forecast signals and Architect's capacity hook are the Phase 6 extension points.
+
 ## Handoff notes (2026-09-29, S5.2.1 – S5.3.6: E5.2 and the starter agents)
 - **Shipped:** you can assign a task to an agent.
   - The assignee picker offers enabled agents that act when assigned (amber ✦ ring, "✦ Agent"); agent assignees show with the ring everywhere; the toast says it will reply in the comments.

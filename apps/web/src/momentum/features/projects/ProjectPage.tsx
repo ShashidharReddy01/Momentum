@@ -66,6 +66,10 @@ import {
 
 // Lazy: the timeline is a separate chunk, loaded only when the tab opens (frontend-architecture).
 const TimelineView = lazy(() => import('@/features/timeline').then((m) => ({ default: m.TimelineView })));
+// Lazy too: dashboards and their charts (Recharts) load only when the tab opens.
+const ProjectDashboard = lazy(() =>
+  import('@/features/dashboards').then((m) => ({ default: m.ProjectDashboard })),
+);
 
 const VIEWS = [
   { key: 'list', label: 'List' },
@@ -73,6 +77,7 @@ const VIEWS = [
   { key: 'calendar', label: 'Calendar' },
   { key: 'timeline', label: 'Timeline' },
   { key: 'overview', label: 'Overview' },
+  { key: 'dashboard', label: 'Dashboard' },
 ] as const;
 type LiveView = Exclude<(typeof VIEWS)[number], { phase: number }>['key'];
 const LIVE_VIEWS: ReadonlySet<string> = new Set(
@@ -353,6 +358,10 @@ function ProjectBody({
               color={color}
               projectDue={project.due_on ?? null}
             />
+          </Suspense>
+        ) : view === 'dashboard' ? (
+          <Suspense fallback={<Skeleton className="h-64" />}>
+            <ProjectDashboard key={projectId} projectId={projectId} projectName={project.name} />
           </Suspense>
         ) : view === 'overview' ? (
           <ProjectOverview

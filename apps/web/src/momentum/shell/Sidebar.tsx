@@ -1,17 +1,18 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import {
   Bell,
+  Bot,
+  Briefcase,
   ChevronDown,
   ChevronRight,
   ChevronsUpDown,
   Download,
-  Bot,
-  Briefcase,
   FolderPlus,
   Gauge,
   Home,
   Inbox,
   KeyRound,
+  LayoutDashboard,
   ListChecks,
   Lock,
   LogOut,
@@ -58,6 +59,7 @@ const NAV = [
   { to: '/portfolios', label: 'Portfolios', icon: Briefcase },
   { to: '/goals', label: 'Goals', icon: Target },
   { to: '/workload', label: 'Workload', icon: Gauge },
+  { to: '/dashboards', label: 'Dashboards', icon: LayoutDashboard },
   { to: '/agents', label: 'Agents', icon: Bot },
 ] as const;
 

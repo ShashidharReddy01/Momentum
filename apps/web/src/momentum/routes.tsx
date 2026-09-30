@@ -60,6 +60,16 @@ export function buildRoutes(config: RuntimeConfig): RouteObject[] {
         { path: 'portfolios', element: <PortfoliosPage />, handle: { crumb: 'Portfolios' } },
         { path: 'goals', element: <GoalsPage />, handle: { crumb: 'Goals' } },
         { path: 'workload', element: <WorkloadPage />, handle: { crumb: 'Workload' } },
+        {
+          path: 'dashboards',
+          lazy: async () => ({ Component: (await import('@/features/dashboards')).DashboardsPage }),
+          handle: { crumb: 'Dashboards' },
+        },
+        {
+          path: 'dashboards/:dashboardId',
+          lazy: async () => ({ Component: (await import('@/features/dashboards')).DashboardPage }),
+          handle: { crumb: 'Dashboard' },
+        },
         { path: 'goals/:goalId', element: <GoalPage />, handle: { crumb: 'Goal' } },
         { path: 'portfolios/:portfolioId', element: <PortfolioPage />, handle: { crumb: 'Portfolio' } },
         { path: 'ai/actions/:actionId', element: <AiActionPage />, handle: { crumb: 'Suggestion' } },

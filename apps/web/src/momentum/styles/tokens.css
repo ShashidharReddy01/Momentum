@@ -59,6 +59,16 @@
   --proj-10: oklch(0.58 0.02 60);
   --proj-11: oklch(0.55 0.09 40);
   --proj-12: oklch(0.62 0.1 110);
+  /* Charts (S6.5.1): categorical series, in this fixed order, never cycled. Validated for
+     colour-blind separation on these surfaces (design-system.md §2); not the project palette. */
+  --chart-1: #2a78d6;
+  --chart-2: #eb6834;
+  --chart-3: #1baf7a;
+  --chart-4: #eda100;
+  --chart-5: #e87ba4;
+  --chart-6: #008300;
+  --chart-7: #4a3aa7;
+  --chart-8: #e34948;
   /* Type: one sans (Inter) + mono for keys/numbers */
   --font-sans: 'Inter Variable', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --font-mono: 'JetBrains Mono Variable', ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -115,6 +125,14 @@
   --info: oklch(0.74 0.12 250);
   --info-tint: oklch(0.29 0.04 250);
   --mock: oklch(0.75 0.15 300);
+  --chart-1: #3987e5;
+  --chart-2: #d95926;
+  --chart-3: #199e70;
+  --chart-4: #c98500;
+  --chart-5: #d55181;
+  --chart-6: #008300;
+  --chart-7: #9085e9;
+  --chart-8: #e66767;
   --mock-tint: oklch(0.3 0.06 300);
   --focus: oklch(0.8 0.15 128);
   --selection: oklch(0.32 0.05 128);

@@ -73,6 +73,10 @@ arrows computed per render only for edges touching the mounted rows; weekend sha
 gradient, not an element per day; `memo` rows with stable callbacks; one query each for tasks and
 dependency edges (`GET /projects/{id}/dependencies`).
 
+## Dashboards (S6.5.1, 2026-09-30)
+
+Production build (`vite build`): the dashboards feature is its own lazy chunk (**10.9 KB gzip**), and Recharts sits in a second one, `charts` (**113 KB gzip**), fetched only when the first bar, donut or line renders (number tiles and task lists don't need it). The initial bundle contains no Recharts code (checked by searching the built `index-*.js` for its class names). Each widget is one request (`GET /dashboards/widgets/{id}/data`, or `POST /dashboards/query` for the starter layout), so a slow widget never holds the others; refetches keep the previous render at 60 % opacity.
+
 ## Rules of thumb for future work
 
 - Anything rendered per row must be cheap to mount: no Radix roots, portals, or context providers

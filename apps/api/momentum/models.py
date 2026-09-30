@@ -8,6 +8,7 @@ from momentum.core.idempotency import IdempotencyKey
 from momentum.domain.agents.models import Agent, AgentRun
 from momentum.domain.attachments.models import Attachment
 from momentum.domain.comments.models import Comment, Mention, Reaction
+from momentum.domain.dashboards.models import Dashboard, DashboardWidget
 from momentum.domain.fields.models import FieldDef, FieldValue, ProjectField
 from momentum.domain.forms.models import Form, FormSubmission
 from momentum.domain.goals.models import Goal, GoalLink
@@ -40,6 +41,8 @@ __all__ = [
     "Attachment",
     "Capacity",
     "Comment",
+    "Dashboard",
+    "DashboardWidget",
     "Embedding",
     "ExternalLink",
     "Favorite",
