@@ -126,3 +126,18 @@ async def test_non_member_cannot_import(as_user: Clients) -> None:
     r = await _commit(kim, pid, {"title_col": "Title"})
     assert r.status_code in (403, 404)
     _ = ravi
+
+
+async def test_effort_column_sets_estimates(as_user: Clients) -> None:
+    """S6.4.1: an effort column ("3h", "90m", "1d", a bare number = hours)."""
+    ravi = await as_user("ravi")
+    pid = await _project(ravi)
+    content = "Title,Effort\nSized in hours,2h30m\nA day,1d\nBare,3\nNonsense,lots\n"
+    r = await _commit(ravi, pid, {"title_col": "Title", "estimate_col": "Effort"}, content)
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["created"] == 4 and any("unrecognized effort 'lots'" in e for e in body["errors"])
+    tasks = (await ravi.get(f"/api/v1/projects/{pid}/tasks")).json()["data"]
+    by_title = {t["title"]: t["estimate_minutes"] for t in tasks}
+    assert by_title["Sized in hours"] == 150 and by_title["A day"] == 480
+    assert by_title["Bare"] == 180 and by_title["Nonsense"] is None

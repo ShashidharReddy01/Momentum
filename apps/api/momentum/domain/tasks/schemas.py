@@ -54,6 +54,7 @@ class TaskOut(BaseModel):
     priority: str | None
     version: int
     created_at: datetime
+    estimate_minutes: int | None = None  # S6.4.1 effort
     subtask_count: int = 0
     completed_subtask_count: int = 0
 
@@ -69,6 +70,7 @@ class TaskCreateIn(BaseModel):
     due_at: datetime | None = None
     priority: Priority | None = None
     recurrence: RecurrenceIn | None = None
+    estimate_minutes: int | None = Field(default=None, ge=0, le=120_000, description="Effort (min)")
 
 
 class TaskBatchCreateIn(BaseModel):
@@ -101,6 +103,9 @@ class TaskPatchIn(BaseModel):
     )
     priority: Priority | None = None
     recurrence: RecurrenceIn | None = None
+    estimate_minutes: int | None = Field(
+        default=None, ge=0, le=120_000, description="Effort in minutes (S6.4.1); null clears it"
+    )
 
 
 class TaskFieldsIn(BaseModel):

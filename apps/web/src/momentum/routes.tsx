@@ -17,6 +17,7 @@ import { TaskPage } from '@/features/tasks';
 import { TagPage } from '@/features/tags';
 import { TeamPage } from '@/features/teams';
 import { TokensPage } from '@/features/tokens';
+import { WorkloadPage } from '@/features/workload';
 import type { RuntimeConfig } from '@/lib/config';
 import { Layout } from '@/shell/Layout';
 
@@ -58,6 +59,7 @@ export function buildRoutes(config: RuntimeConfig): RouteObject[] {
         { path: 'inbox', element: <InboxPage />, handle: { crumb: 'Inbox' } },
         { path: 'portfolios', element: <PortfoliosPage />, handle: { crumb: 'Portfolios' } },
         { path: 'goals', element: <GoalsPage />, handle: { crumb: 'Goals' } },
+        { path: 'workload', element: <WorkloadPage />, handle: { crumb: 'Workload' } },
         { path: 'goals/:goalId', element: <GoalPage />, handle: { crumb: 'Goal' } },
         { path: 'portfolios/:portfolioId', element: <PortfolioPage />, handle: { crumb: 'Portfolio' } },
         { path: 'ai/actions/:actionId', element: <AiActionPage />, handle: { crumb: 'Suggestion' } },

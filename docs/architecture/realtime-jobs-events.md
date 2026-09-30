@@ -82,6 +82,7 @@ Event payloads share an envelope:
 | `rule.ran` | 4 | rule_id, status (`success`/`skipped`/`failed`), task_id (S4.1.1; carries the run's depth) |
 | `portfolio.created` / `portfolio.updated` / `portfolio.deleted` / `portfolio.restored` / `portfolio.project_added` / `portfolio.project_removed` / `portfolio.status_updated` / `portfolio.status_withdrawn` | 6 | `version` only (S6.2.2); channel `portfolio:<id>` (new channel kind: any workspace member may subscribe; rows are re-read with the viewer's visibility, so events never carry project names) |
 | `goal.created` / `goal.updated` / `goal.deleted` / `goal.restored` / `goal.linked` / `goal.unlinked` / `goal.checked_in` / `goal.check_in_withdrawn` | 6 | `version` only (S6.3.1); channel `goal:<id>` (any member may subscribe; progress is re-read per viewer) |
+| `workload.capacity_changed` | 6 | `{user_id, week_start?}` or `{}` for the workspace default (S6.4.1); channel `workspace:<id>` |
 | `task.unblocked` | 6 | `blocker_id`, `project_id` (S6.1.3; emitted inside `set_completed` for each open task whose last open blocker was just completed; a rules trigger, an agent event, and the list/timeline refresh their blocker state on it; the assignee also gets an `unblocked` notification) |
 | `task.due_approaching` | 4 | `due_on` (S4.1.2; emitted by the hourly `scan_due_approaching` job, deduped per (task, due date); actor `system`) |
 | `agent_run.started` / `agent_run.finished` | 5 | agent_id, status, cost |

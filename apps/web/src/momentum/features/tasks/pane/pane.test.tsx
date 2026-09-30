@@ -104,6 +104,19 @@ describe('Task pane', () => {
     );
   });
 
+  it('effort is typed the way people say it, and a nonsense value is flagged, not saved (S6.4.1)', async () => {
+    const user = await boot();
+    await user.click(await screen.findByRole('button', { name: 'Open details for First' }));
+    const effort = await within(pane()).findByRole('textbox', { name: 'Effort' });
+    await user.type(effort, '2h30m{Enter}');
+    await waitFor(() => expect(effort).toHaveValue('2h 30m')); // saved as 150 minutes, shown back
+    await user.clear(effort);
+    await user.type(effort, 'lots{Enter}');
+    expect(effort).toHaveAttribute('aria-invalid', 'true');
+    await user.keyboard('{Escape}');
+    expect(effort).toHaveValue('2h 30m');
+  });
+
   it('delete from the pane closes it and removes the row (with undo)', async () => {
     const user = await boot();
     await user.click(await screen.findByRole('button', { name: 'Open details for Third' }));

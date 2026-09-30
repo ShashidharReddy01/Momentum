@@ -24,6 +24,7 @@ from momentum.domain.tasks.models import Follower, Task, TaskDependency, TaskPro
 from momentum.domain.teams.models import Team, TeamMember
 from momentum.domain.templates.models import Template
 from momentum.domain.users.models import ApiToken, User, UserIdentity
+from momentum.domain.workload.models import Capacity
 from momentum.domain.workspace.models import Workspace
 
 metadata = Base.metadata
@@ -37,6 +38,7 @@ __all__ = [
     "AiSummary",
     "ApiToken",
     "Attachment",
+    "Capacity",
     "Comment",
     "Embedding",
     "ExternalLink",

@@ -47,6 +47,7 @@ import { formatDay, formatDue } from '@/lib/dates';
 import { applyRealtimeEvent, useChannel } from '@/lib/realtime';
 import { AssigneePicker, assignedMessage } from '../AssigneePicker';
 import { DatePicker } from '../DatePicker';
+import { formatEffort, parseEffort } from '../effort';
 import { useSnoozeNudges, useTaskDetail, useTaskDetailMutations, type TaskDetail } from '../detail';
 import { SubtaskList } from '../SubtaskList';
 import { Collaborators } from './Collaborators';
@@ -429,6 +430,18 @@ function PaneBody({
               </FieldButton>
             </DatePicker>
           </Field>
+          <Field label="Effort">
+            <EffortField
+              minutes={task.estimate_minutes ?? null}
+              canEdit={canEdit}
+              onSave={(v) =>
+                m.update.mutate({
+                  patch: { estimate_minutes: v },
+                  message: v === null ? 'Effort removed' : `Effort set: ${formatEffort(v)}`,
+                })
+              }
+            />
+          </Field>
           {task.recurrence ? (
             <Field label="Repeat">
               <div className="flex h-8 items-center gap-2 px-2 text-sm">
@@ -589,6 +602,60 @@ const FieldButton = ({
   </button>
 );
 
+/** S6.4.1: effort as typed ("2h 30m", "90m", "1d", "3" = hours); Enter or blur saves. */
+function EffortField({
+  minutes,
+  canEdit,
+  onSave,
+}: {
+  minutes: number | null;
+  canEdit: boolean;
+  onSave: (m: number | null) => void;
+}) {
+  const [value, setValue] = useState(formatEffort(minutes));
+  const [invalid, setInvalid] = useState(false);
+  useEffect(() => setValue(formatEffort(minutes)), [minutes]);
+  /** Saves a valid value; false (and flagged) when it can't be read. */
+  const commit = (): boolean => {
+    const parsed = value.trim() ? parseEffort(value) : null;
+    if (value.trim() && parsed === null) {
+      setInvalid(true);
+      return false;
+    }
+    setInvalid(false);
+    if (parsed !== minutes) onSave(parsed);
+    else setValue(formatEffort(minutes));
+    return true;
+  };
+  return (
+    <input
+      aria-label="Effort"
+      aria-invalid={invalid || undefined}
+      title={invalid ? 'Try 2h 30m, 90m or 1d' : undefined}
+      disabled={!canEdit}
+      value={value}
+      placeholder="No estimate"
+      onChange={(e) => {
+        setValue(e.target.value);
+        setInvalid(false);
+      }}
+      onBlur={() => void commit()}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' && commit()) e.currentTarget.blur(); // invalid: stay to fix it
+        if (e.key === 'Escape') {
+          e.stopPropagation(); // reset the field, don't close the pane
+          setValue(formatEffort(minutes));
+          setInvalid(false);
+        }
+      }}
+      className={cn(
+        'tabular h-8 w-40 rounded-md bg-transparent px-2 text-sm placeholder:text-muted hover:bg-surface-2 focus:bg-surface-2 focus:outline-none disabled:pointer-events-none',
+        invalid && 'ring-1 ring-crit',
+      )}
+    />
+  );
+}
+
 function TitleField({
   task,
   canEdit,
@@ -626,7 +693,7 @@ function TitleField({
       readOnly={!canEdit}
       onFocus={() => setEditing(true)}
       onChange={(e) => setValue(e.target.value)}
-      onBlur={commit}
+      onBlur={() => void commit()}
       onKeyDown={(e) => {
         if (e.key === 'Enter') {
           e.preventDefault();

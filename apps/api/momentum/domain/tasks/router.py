@@ -71,6 +71,7 @@ def task_out(t: Task, p: TaskProject | None, counts: tuple[int, int] | None = No
         priority=t.priority,
         version=t.version,
         created_at=t.created_at,
+        estimate_minutes=t.estimate_minutes,
         subtask_count=counts[0] if counts else 0,
         completed_subtask_count=counts[1] if counts else 0,
     )
@@ -139,6 +140,7 @@ async def create_task(
             due_at=body.due_at,
             priority=body.priority,
             recurrence=body.recurrence.model_dump(exclude_none=True) if body.recurrence else None,
+            estimate_minutes=body.estimate_minutes,
         )
         t, p = m.entity
         return MutationOut(

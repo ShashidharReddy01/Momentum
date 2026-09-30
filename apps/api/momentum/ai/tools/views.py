@@ -110,6 +110,8 @@ async def task_briefs(tc: ToolContext, tasks: list[Task]) -> list[dict[str, Any]
             b["due_at"] = iso(t.due_at)
         if t.priority is not None:
             b["priority"] = t.priority
+        if t.estimate_minutes is not None:
+            b["estimate_minutes"] = t.estimate_minutes
         if t.id in where:
             b["project"], b["section"] = where[t.id]
         if t.id in blockers:

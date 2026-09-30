@@ -9,9 +9,10 @@ What it plans depends on what it's given:
   the comment or text as guidance (``break_down``).
 
 The plan is never applied by Architect: it's proposed (``confirm``) to the person who asked, who
-reviews it on the run page or from their inbox. **Capacity hook (full in Phase 6):** for each
-suggested owner it counts their open tasks due inside the plan's window and adds a note when
-someone already carries a lot; Phase 6's capacity model replaces this count.
+reviews it on the run page or from their inbox. **Capacity (S6.4.1):** for each suggested owner
+it adds a note when their estimated work already planned inside the plan's window exceeds their
+hours there (the workload capacity model), or, when little of it is estimated, when they already
+have ``CAPACITY_WARN`` or more open tasks due in it.
 """
 
 from __future__ import annotations
@@ -21,14 +22,12 @@ import uuid
 from datetime import UTC, date, datetime, timedelta
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import func, select
-
 from momentum.ai.breakdown import break_down
 from momentum.ai.from_brief import plan_from_brief
 from momentum.core.errors import ValidationFailed
 from momentum.domain.projects.models import Project
-from momentum.domain.tasks.models import Task
 from momentum.domain.users.models import User
+from momentum.domain.workload import service as workload
 
 if TYPE_CHECKING:
     from momentum.agents.extensions import HandlerResult, HandlerRun
@@ -61,27 +60,25 @@ def _assignees(calls: list[Any]) -> set[uuid.UUID]:
 async def capacity_notes(
     hrun: HandlerRun, people: set[uuid.UUID], start: date, end: date
 ) -> list[str]:
-    """The Phase 6 hook: a heads-up per suggested owner who already has ``CAPACITY_WARN`` or more
-    open tasks due in the plan's window. Phase 6 swaps this count for its capacity model."""
+    """A heads-up per suggested owner who is already full in the plan's window: planned effort
+    over their capacity (S6.4.1), or ``CAPACITY_WARN``+ open tasks due there when unestimated."""
+    loads = await workload.load_between(
+        hrun.session, hrun.settings, hrun.ctx.workspace_id, people, start, end
+    )
     notes = []
-    for person_id in sorted(people):
-        open_due = int(
-            await hrun.session.scalar(
-                select(func.count())
-                .select_from(Task)
-                .where(
-                    Task.assignee_id == person_id,
-                    Task.deleted_at.is_(None),
-                    Task.completed_at.is_(None),
-                    Task.due_on >= start,
-                    Task.due_on <= end,
-                )
+    for person_id in sorted(loads):
+        planned, capacity, open_due = loads[person_id]
+        over = planned > capacity
+        if not over and open_due < CAPACITY_WARN:
+            continue
+        person = await hrun.session.get(User, person_id)
+        name = person.name if person else "Someone"
+        if over:
+            notes.append(
+                f"Capacity: {name} already has {planned / 60:.0f}h planned against "
+                f"{capacity / 60:.0f}h available in this window."
             )
-            or 0
-        )
-        if open_due >= CAPACITY_WARN:
-            person = await hrun.session.get(User, person_id)
-            name = person.name if person else "Someone"
+        else:
             notes.append(f"Capacity: {name} already has {open_due} open tasks due in this window.")
     return notes
 

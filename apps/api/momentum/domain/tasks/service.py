@@ -193,6 +193,26 @@ RECURRENCE_MODES = ("on_complete", "on_schedule")
 MONTHLY_WEEKS = (1, 2, 3, 4, -1)
 
 
+MAX_ESTIMATE = 60 * 8 * 250  # a working year, in minutes: anything above is a typo
+
+
+def _check_estimate(value: Any) -> int | None:
+    """S6.4.1: effort in whole minutes, or None to clear."""
+    if value is None:
+        return None
+    try:
+        minutes = int(value)
+    except (TypeError, ValueError):
+        raise ValidationFailed(
+            "Effort must be a number of minutes", code="invalid_estimate"
+        ) from None
+    if minutes < 0 or minutes > MAX_ESTIMATE:
+        raise ValidationFailed(
+            "Effort must be between 0 and a working year", code="invalid_estimate"
+        )
+    return minutes
+
+
 def _check_priority(value: Any) -> str | None:
     if value is None:
         return None
@@ -406,9 +426,10 @@ async def create_task(
     priority: str | None = None,
     recurrence: dict[str, Any] | None = None,
     recurrence_parent_id: uuid.UUID | None = None,
+    estimate_minutes: int | None = None,
 ) -> Mutation[tuple[Task, TaskProject]]:
-    """Create a task (optionally already assigned, dated, prioritized and with a repeat rule:
-    quick add is one change, one undo)."""
+    """Create a task (optionally already assigned, dated, prioritized, sized and with a repeat
+    rule: quick add is one change, one undo)."""
     _, role = await get_visible_project(session, ctx, project_id)
     require_project_role(role, "editor", "add tasks")
     title = " ".join(title.split())
@@ -422,12 +443,14 @@ async def create_task(
     )
     priority = _check_priority(priority)
     recurrence = _check_recurrence(recurrence)
+    estimate_minutes = _check_estimate(estimate_minutes)
     task = Task(
         workspace_id=ctx.workspace_id,
         number=await _next_number(session, ctx.workspace_id),
         title=title,
         assignee_id=assignee_id,
         priority=priority,
+        estimate_minutes=estimate_minutes,
         recurrence=recurrence,
         recurrence_parent_id=recurrence_parent_id,
         created_by=ctx.actor.id,
@@ -440,6 +463,8 @@ async def create_task(
         created["priority"] = (None, priority)
     if recurrence is not None:
         created["recurrence"] = (None, recurrence)
+    if estimate_minutes is not None:
+        created["estimate_minutes"] = (None, estimate_minutes)
     dates = {
         k: v
         for k, v in (("start_on", start_on), ("due_on", due_on), ("due_at", due_at))
@@ -571,6 +596,10 @@ async def update_task(
         priority = _check_priority(patch["priority"])
         if priority != task.priority:
             changes["priority"] = (task.priority, priority)
+    if "estimate_minutes" in patch:
+        estimate = _check_estimate(patch["estimate_minutes"])
+        if estimate != task.estimate_minutes:
+            changes["estimate_minutes"] = (task.estimate_minutes, estimate)
     if "recurrence" in patch:
         recurrence = _check_recurrence(patch["recurrence"])
         if recurrence != task.recurrence:

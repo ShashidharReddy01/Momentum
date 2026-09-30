@@ -17,6 +17,7 @@ export { TaskRow } from './TaskRow';
 export { dropNeighbors, emptySelection, step, type DropPlacement, type Selection } from './selection';
 export { dropTask, isTaskList, syncTask, useTaskDetailMutations } from './detail';
 export type { TaskPatch } from './queries';
+export { formatEffort, hours, parseEffort } from './effort';
 export type { TaskDetail } from './detail';
 export { QuickAddDialog } from './QuickAddDialog';
 export { commentKey, feedKey } from './comments';

@@ -83,7 +83,7 @@ Registered in S3.1.2 unless noted. `semantic_search` arrives with S3.1.4 (embedd
 | `list_people` | read | 3 | Resolve names → users |
 | `get_attachment_text` | read | 5 (S5.1.5) | Text of a file on a task or its comments (by name; `ambiguous` with candidates), capped at 20,000 characters; `not_ready` while extraction is pending. `get_task` lists attachment names |
 | `create_task` | low | 3 | |
-| `update_task` | low | 3 | Title, assignee, start/due dates, description (priority: no service writes it yet) |
+| `update_task` | low | 3 | Title, assignee, start/due dates, description, effort (`estimate_minutes`, S6.4.1) (priority: no service writes it yet) |
 | `complete_task` | low | 3 | |
 | `move_task` | low | 3 | Section, or another project (add there + remove here, one batch) |
 | `add_comment` | low | 3 | Always marked AI |

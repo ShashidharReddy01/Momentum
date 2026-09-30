@@ -142,6 +142,10 @@ class Settings(BaseSettings):
     agent_max_steps: int = Field(default=15, ge=1, le=50)
     agent_timeout_s: int = Field(default=300, ge=10, le=3600)
 
+    # S6.4.1: the weekly hours a person can plan against when neither they nor the workspace
+    # admin has set one (workload view, Architect's capacity notes).
+    workload_default_hours: float = Field(default=30, ge=0, le=80)
+
     # Integrations (S2.7.1) — overridable so J6's e2e journey can point this at a local recorded
     # fixture server instead of the real Asana API (see tools/e2e/asana_fixture_server.py).
     asana_base_url: str = "https://app.asana.com/api/1.0"

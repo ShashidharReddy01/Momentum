@@ -8,6 +8,7 @@ import {
   Bot,
   Briefcase,
   FolderPlus,
+  Gauge,
   Home,
   Inbox,
   KeyRound,
@@ -56,6 +57,7 @@ const NAV = [
   { to: '/inbox', label: 'Inbox', icon: Inbox },
   { to: '/portfolios', label: 'Portfolios', icon: Briefcase },
   { to: '/goals', label: 'Goals', icon: Target },
+  { to: '/workload', label: 'Workload', icon: Gauge },
   { to: '/agents', label: 'Agents', icon: Bot },
 ] as const;
 

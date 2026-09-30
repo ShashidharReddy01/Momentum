@@ -2865,6 +2865,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/workload": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Who is carrying what, week by week */
+        get: operations["get_workload_api_v1_workload_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workload/people/{user_id}/hours": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** A person's usual weekly hours (themselves or an admin) */
+        put: operations["put_hours_api_v1_workload_people__user_id__hours_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workload/people/{user_id}/weeks/{week_start}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** A person's hours for one week, e.g. time off (themselves or an admin) */
+        put: operations["put_week_api_v1_workload_people__user_id__weeks__week_start__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workload/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** The workspace's default weekly hours (admins) */
+        put: operations["put_default_api_v1_workload_settings_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/workspace/settings": {
         parameters: {
             query?: never;
@@ -4791,6 +4859,19 @@ export interface components {
             /** Team Name */
             team_name: string;
         };
+        /** HoursIn */
+        HoursIn: {
+            /**
+             * Hours
+             * @description Hours per week; null = back to the default
+             */
+            hours?: number | null;
+        };
+        /** HoursOut */
+        HoursOut: {
+            /** Hours */
+            hours: number | null;
+        };
         /** ImportJobOut */
         ImportJobOut: {
             /**
@@ -5271,6 +5352,11 @@ export interface components {
             data: components["schemas"]["GoalDetailOut"];
             meta: components["schemas"]["MutationMeta"];
         };
+        /** MutationOut[HoursOut] */
+        MutationOut_HoursOut_: {
+            data: components["schemas"]["HoursOut"];
+            meta: components["schemas"]["MutationMeta"];
+        };
         /** MutationOut[ListOut[TaskOut]] */
         MutationOut_ListOut_TaskOut__: {
             data: components["schemas"]["ListOut_TaskOut_"];
@@ -5407,6 +5493,8 @@ export interface components {
             due_at: string | null;
             /** Due On */
             due_on: string | null;
+            /** Estimate Minutes */
+            estimate_minutes?: number | null;
             /**
              * Id
              * Format: uuid
@@ -5741,6 +5829,42 @@ export interface components {
             id: string;
             /** Name */
             name: string;
+        };
+        /** PersonLoadOut */
+        PersonLoadOut: {
+            /** Avatar Url */
+            avatar_url?: string | null;
+            /**
+             * Can Edit
+             * @description You can change this person's hours (yourself, or admin)
+             */
+            can_edit: boolean;
+            /**
+             * Hidden
+             * @description Open tasks in projects you can't see (counted, not named)
+             */
+            hidden: number;
+            /**
+             * Hours Source
+             * @enum {string}
+             */
+            hours_source: "person" | "workspace" | "setting";
+            /** Name */
+            name: string;
+            /**
+             * No Date
+             * @description Open tasks you can see with no due date (not placed)
+             */
+            no_date: number;
+            /**
+             * User Id
+             * @description Null for the unassigned row
+             */
+            user_id: string | null;
+            /** Weekly Minutes */
+            weekly_minutes: number;
+            /** Weeks */
+            weeks: components["schemas"]["WeekLoadOut"][];
         };
         /** PlanDayOut */
         PlanDayOut: {
@@ -7187,6 +7311,11 @@ export interface components {
             due_at?: string | null;
             /** Due On */
             due_on?: string | null;
+            /**
+             * Estimate Minutes
+             * @description Effort (min)
+             */
+            estimate_minutes?: number | null;
             /** Priority */
             priority?: ("urgent" | "high" | "medium" | "low") | null;
             recurrence?: components["schemas"]["RecurrenceIn"] | null;
@@ -7230,6 +7359,8 @@ export interface components {
             due_at: string | null;
             /** Due On */
             due_on: string | null;
+            /** Estimate Minutes */
+            estimate_minutes?: number | null;
             /** Followers */
             followers?: string[];
             /**
@@ -7381,6 +7512,8 @@ export interface components {
             due_at: string | null;
             /** Due On */
             due_on: string | null;
+            /** Estimate Minutes */
+            estimate_minutes?: number | null;
             /**
              * Id
              * Format: uuid
@@ -7440,6 +7573,11 @@ export interface components {
             due_at?: string | null;
             /** Due On */
             due_on?: string | null;
+            /**
+             * Estimate Minutes
+             * @description Effort in minutes (S6.4.1); null clears it
+             */
+            estimate_minutes?: number | null;
             /** Priority */
             priority?: ("urgent" | "high" | "medium" | "low") | null;
             recurrence?: components["schemas"]["RecurrenceIn"] | null;
@@ -7842,6 +7980,95 @@ export interface components {
             msg: string;
             /** Error Type */
             type: string;
+        };
+        /** WeekLoadOut */
+        WeekLoadOut: {
+            /** Capacity Minutes */
+            capacity_minutes: number;
+            /**
+             * Override
+             * @description This week's capacity was set for this week (e.g. time off)
+             */
+            override: boolean;
+            /** Planned Minutes */
+            planned_minutes: number;
+            /** Task Count */
+            task_count: number;
+            /**
+             * Unestimated
+             * @description Tasks this week with no effort estimate
+             */
+            unestimated: number;
+            /**
+             * Week Start
+             * Format: date
+             */
+            week_start: string;
+        };
+        /** WorkloadOut */
+        WorkloadOut: {
+            /** Can Admin */
+            can_admin: boolean;
+            /** Default Minutes */
+            default_minutes: number;
+            /**
+             * Default Source
+             * @enum {string}
+             */
+            default_source: "workspace" | "setting";
+            /** People */
+            people: components["schemas"]["PersonLoadOut"][];
+            /**
+             * Start
+             * Format: date
+             */
+            start: string;
+            /** Tasks */
+            tasks: components["schemas"]["WorkloadTaskOut"][];
+            unassigned: components["schemas"]["PersonLoadOut"];
+            /** Weeks */
+            weeks: string[];
+        };
+        /** WorkloadTaskOut */
+        WorkloadTaskOut: {
+            /** Assignee Id */
+            assignee_id: string | null;
+            /**
+             * Due On
+             * Format: date
+             */
+            due_on: string;
+            /** Estimate Minutes */
+            estimate_minutes: number | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Number */
+            number: number;
+            /** Overdue */
+            overdue: boolean;
+            /**
+             * Project Id
+             * Format: uuid
+             */
+            project_id: string;
+            /** Project Name */
+            project_name: string;
+            /** Start On */
+            start_on: string | null;
+            /** Title */
+            title: string;
+            /** Version */
+            version: number;
+            /**
+             * Weeks
+             * @description Minutes of this task in each week it touches
+             */
+            weeks: {
+                [key: string]: number;
+            };
         };
         /** WorkspaceOut */
         WorkspaceOut: {
@@ -14793,6 +15020,145 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ListOut_UserOut_"];
+                };
+            };
+        };
+    };
+    get_workload_api_v1_workload_get: {
+        parameters: {
+            query?: {
+                /** @description A day in the first week (default today) */
+                start?: string | null;
+                weeks?: number;
+                /** @description Only this project's work */
+                project_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkloadOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_hours_api_v1_workload_people__user_id__hours_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HoursIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationOut_HoursOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_week_api_v1_workload_people__user_id__weeks__week_start__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: string;
+                week_start: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HoursIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationOut_HoursOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_default_api_v1_workload_settings_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HoursIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationOut_HoursOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

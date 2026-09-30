@@ -102,6 +102,12 @@ Frontend build-time variables use the `VITE_MOMENTUM_` prefix, but the SPA prefe
 | `MOMENTUM_AI_AUTO_APPLY_LOW_RISK` | `false` | Workspace default for ⌘K/chat |
 | `MOMENTUM_AI_DEBUG_CAPTURE` | `false` | Store prompts/responses for 7 days (never in prod by default) |
 
+## Planning (Phase 6)
+
+| Setting | Default | Description |
+|---|---|---|
+| `MOMENTUM_WORKLOAD_DEFAULT_HOURS` | `30` | Weekly hours a person can plan against when neither they nor a workspace admin has set one (0–80). Admins override it per workspace (`workspaces.settings['workload']`), people per themselves (`users.prefs['weekly_hours']`) and per week (`capacity`, e.g. time off). Used by the Workload view and Architect's capacity notes (S6.4.1) |
+
 ## Integrations (Phase 7)
 
 | Setting | Description |

@@ -83,6 +83,9 @@ class _TaskFields(BaseModel):
     start_on: date | None = None
     due_on: date | None = None
     priority: Literal["urgent", "high", "medium", "low"] | None = None
+    estimate_minutes: int | None = Field(
+        default=None, ge=0, le=120_000, description="Effort in minutes (e.g. 90, or 480 for a day)"
+    )
     description: str | None = Field(
         default=None, max_length=20_000, description="Plain text; replaces the description"
     )
@@ -95,7 +98,7 @@ class _TaskFields(BaseModel):
                 patch["assignee_id"] = None
             else:
                 patch["assignee_id"] = (await resolve_person(tc, self.assignee)).id
-        for f in ("start_on", "due_on", "priority"):
+        for f in ("start_on", "due_on", "priority", "estimate_minutes"):
             if f in given:
                 patch[f] = getattr(self, f)
         if "description" in given:

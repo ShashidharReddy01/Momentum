@@ -631,6 +631,20 @@
             ],
             "default": null
           },
+          "estimate_minutes": {
+            "anyOf": [
+              {
+                "maximum": 120000,
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Effort in minutes (e.g. 90, or 480 for a day)"
+          },
           "priority": {
             "anyOf": [
               {
@@ -737,6 +751,20 @@
               }
             ],
             "default": null
+          },
+          "estimate_minutes": {
+            "anyOf": [
+              {
+                "maximum": 120000,
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Effort in minutes (e.g. 90, or 480 for a day)"
           },
           "priority": {
             "anyOf": [
@@ -1738,6 +1766,20 @@
                           }
                         ],
                         "default": null
+                      },
+                      "estimate_minutes": {
+                        "anyOf": [
+                          {
+                            "maximum": 120000,
+                            "minimum": 0,
+                            "type": "integer"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "default": null,
+                        "description": "Effort in minutes (e.g. 90, or 480 for a day)"
                       },
                       "priority": {
                         "anyOf": [

@@ -26,6 +26,7 @@ from momentum.core.errors import ValidationFailed
 from momentum.domain.access import get_visible_project, require_project_role
 from momentum.domain.integrations.models import ImportJob
 from momentum.domain.sections.service import create_section, list_sections
+from momentum.domain.tasks.effort import parse_effort
 from momentum.domain.tasks.service import create_task, set_completed
 from momentum.domain.users.models import User
 
@@ -45,6 +46,7 @@ class CsvColumnMapping(BaseModel):
     assignee_email_col: str | None = None
     due_on_col: str | None = None
     completed_col: str | None = None
+    estimate_col: str | None = None  # S6.4.1: "3h", "90m", "1d"; a bare number is hours
 
 
 class CsvImportResult(BaseModel):
@@ -136,6 +138,13 @@ async def import_csv(
                 except ValueError:
                     errors.append(f"row {i}: unrecognized date {raw!r} (expected YYYY-MM-DD)")
 
+        estimate: int | None = None
+        if mapping.estimate_col:
+            raw = row.get(mapping.estimate_col, "").strip()
+            estimate = parse_effort(raw) if raw else None
+            if raw and estimate is None:
+                errors.append(f"row {i}: unrecognized effort {raw!r} (e.g. 3h, 90m, 1d)")
+
         try:
             task_m = await create_task(
                 session,
@@ -145,6 +154,7 @@ async def import_csv(
                 section_id=section_id,
                 assignee_id=assignee_id,
                 due_on=due_on,
+                estimate_minutes=estimate,
             )
         except ValidationFailed as e:
             skipped += 1
