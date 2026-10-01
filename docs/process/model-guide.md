@@ -107,6 +107,16 @@ After Opus unblocks it, switch back to Sonnet for the rest of the phase.
 | S6.4.2 AI rebalancing | **O** | S6.5.1 Dashboards | S |
 | S6.5.2 Ask for a chart | **O** | S6.5.3 Forecasting + risk score | **O** |
 
+### Phase 6.5: UI/UX revamp
+Design work is judgment-heavy (visual systems, layout under tight sizes, interaction feel): Opus throughout, Sonnet acceptable for the screen-by-screen applications once UX1–UX3 set the system.
+
+| Slice | Model | Slice | Model |
+|---|---|---|---|
+| UX1 Foundations | **O** | UX2 Shell | **O** |
+| UX3 Task list and pane | **O** | UX4 Board, Calendar, Timeline | S |
+| UX5 Home, My Tasks, Inbox | S | UX6 Planning screens | S |
+| UX7 AI, agents, settings, overlays | S | UX8 Exit | **O** |
+
 ### Phase 7: Integrations
 | Slice | Model | Slice | Model |
 |---|---|---|---|

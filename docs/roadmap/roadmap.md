@@ -11,6 +11,7 @@ Local-only through Phase 8. Azure deployment and go-live in Phase 9.
 | 4 | Workflow and intake | Rules (+NL, AI steps), forms (+conversational), templates, approvals, recurring | J9 | 2–3 weeks |
 | 5 | Agents v1 | Runtime, agents as teammates, 8 starter agents, runs UI, budgets, autonomy | J10 | 3–4 weeks |
 | 6 | Planning and insight | Timeline, overview, portfolios, goals, workload, dashboards, forecasting | Phase-6 journeys | 3–4 weeks |
+| 6.5 | UI/UX revamp | Light theme redesign (Wayfinding), shell that fits scaled laptops, task list and pane, every screen to the Linear / Height bar (added 2026-10-01 by the product owner) | Visual audit at 5 viewports × 2 themes, axe, e2e | 1–2 weeks |
 | 7 | Integrations | MCP server, Slack, Outlook calendar, email-to-task | Slack create-task + digest | 2–3 weeks |
 | 8 | Hardening | PWA, performance, export/import, security review, a11y, admin | Perf + a11y checks | 1–2 weeks |
 | 9 | Azure and go-live | Adapters, Bicep, Easy Auth, pipeline, office LiteLLM check, import real data | Go-live checklist | 1–2 weeks |

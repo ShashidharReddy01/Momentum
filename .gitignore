@@ -24,3 +24,7 @@ infra/litellm/config.yaml
 
 # AI eval reports (make evals)
 reports/
+
+# design-skill working files (decision boards, local config)
+.impeccable/mocks/
+.impeccable/config.local.json

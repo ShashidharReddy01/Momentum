@@ -35,6 +35,8 @@ Docs are the **source of truth for intent**. Code must match them, and when the 
 | Process | `process/model-guide.md` | Which model (Opus 5.5 / Sonnet 5) for each slice, and when to escalate |
 | Roadmap | `roadmap/roadmap.md` | Phases, dependencies, milestones |
 | Roadmap | `roadmap/phase-0.md` … `phase-9.md` | Epics → slices with acceptance criteria and tests |
+| Roadmap | `roadmap/phase-6.5.md` | Phase 6.5: UI/UX revamp (audit, direction, slices UX1–UX8) |
+| Design | `../PRODUCT.md`, `../DESIGN.md` | Product record and the visual design contract (Wayfinding), read before any UI work |
 | Progress | `progress/STATUS.md` | Live tracker (updated every slice) |
 | Slice procedure | `process/slice-session.md` | How one AI session builds one slice (and prints the next prompt) |
 | Progress archive | `progress/handoff-archive.md` | Older handoff notes and retros (read only when relevant) |
