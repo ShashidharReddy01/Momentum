@@ -17,6 +17,7 @@ Docs are the **source of truth for intent**. Code must match them, and when the 
 |---|---|---|
 | Product | `product/vision-and-scope.md` | Vision, personas, principles, scope matrix, glossary |
 | Product | `product/research/asana-analysis.md` | Background research on Asana (reference only) |
+| Product | `product/asana-vs-momentum.md` | Feature comparison against Asana's basic plans (updated at phase exits) |
 | Architecture | `architecture/overview.md` | Layers, modules, dependency rules, request lifecycle |
 | Architecture | `architecture/data-model.md` | Every table, column, index, constraint |
 | Architecture | `architecture/api-conventions.md` | REST shape, errors, pagination, concurrency, undo |
