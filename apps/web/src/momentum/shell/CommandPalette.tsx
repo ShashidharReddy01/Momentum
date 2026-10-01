@@ -90,7 +90,7 @@ export function CommandPalette() {
           label: 'Toggle sidebar',
           icon: PanelLeft,
           shortcut: 'mod+\\',
-          run: ui.toggleSidebar,
+          run: () => ui.toggleSidebar(),
         },
         { id: 'theme', label: 'Toggle dark theme', icon: Moon, run: ui.toggleTheme },
         {

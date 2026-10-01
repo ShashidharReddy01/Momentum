@@ -1,69 +1,69 @@
 # Momentum Design System
 
 Two themes, one system:
-- **Light = "Paper":** warm cream surfaces, ink text, and **ink as the brand accent** (solid ink primary buttons, ink brand mark).
+- **Light = "Wayfinding"** (Phase 6.5): a graphite rail, a cool grey floor with white working surfaces, graphite primary buttons, and lime only as the "you are here" marker, the selection tint and the focus ring. The visual contract is `DESIGN.md` at the repo root.
 - **Dark = "Graphite":** charcoal surfaces with a **lime signal accent**.
 
-**Amber is reserved for AI** in both themes, and **purple marks dev-only mock data**. Typography is Inter throughout, with JetBrains Mono for keys and numbers. Theme choice: user menu → Light (Paper) / Dark (Graphite); the default follows the OS preference. See ADR-0005 amendments for how we got here.
+**Amber is reserved for AI** in both themes, and **purple marks dev-only mock data**. Typography is Atkinson Hyperlegible Next throughout, with Atkinson Hyperlegible Mono for keys and figures. Theme choice: user menu → Light / Dark (Graphite); the default follows the OS preference. See ADR-0005 amendments for how we got here.
 
 ## 1. Principles
 
 1. **Calm density.** Lots of information, little noise. Hairlines separate; whitespace groups; hierarchy comes from weight and size, not from decorative fonts.
-2. **One accent per theme.** Ink (light) or lime (dark) for primary actions and the brand mark. Nothing else competes with it.
+2. **One accent per theme.** Graphite (light) or lime (dark) for primary actions. Lime is the only brand colour in both; in light it appears only as the current-place marker, the selection tint and the deep focus ring, never as text on white.
 3. **Color lives in text, dots, and thin bars, never filled pills.** Named exceptions: the primary button, project color chips, avatar fallbacks, board card color strips, heat grids (workload, dashboards).
 4. **Amber means AI.** Anything authored or proposed by Mo or an agent uses the amber treatment (dashed amber border + left amber bar + ✦ label). Nothing else may use amber.
 5. **Purple means mock.** Only dev/test mock data uses the purple token. It never appears in production.
 6. **Honest emptiness.** Nulls render as muted "—" or an EmptyState with a next action. Never invent placeholder values.
 7. **Keyboard first.** Every primary action has a shortcut, shown in tooltips and menus (`<Kbd>`).
-8. **Motion is functional.** 100–160 ms transitions for state changes (panes, menus, completion). No decorative entrance animations. Reduced motion is respected.
+8. **Motion is functional.** `--dur-1/2/3` (100 / 160 / 240 ms) with `--ease` (exponential ease-out) for state changes; every control answers a press (scale 0.97); menus, popovers and dialogs get a short entry (`m-pop-in`, `m-sheet-in`, `m-fade-in`). No decorative entrances. Reduced motion keeps colour and opacity changes and drops transforms.
 
 ## 2. Tokens (`styles/tokens.css`, scoped to `.momentum-root`)
 
-| Group | Tokens | Light · Paper (oklch) | Dark · Graphite (oklch) | Use |
+| Group | Tokens | Light · Wayfinding | Dark · Graphite (oklch) | Use |
 |---|---|---|---|---|
-| Surfaces | `--canvas`, `--sidebar`, `--surface`, `--surface-2` | 0.975 0.012 85 / 0.955 0.014 85 / 0.995 0.004 85 / 0.972 0.007 85 | 0.205 / 0.17 / 0.24 / 0.275 (hue 255, chroma ≈0.007) | App background, sidebar, cards/panes/rows, hover/inputs |
-| Lines | `--hairline`, `--hair-soft` | 0.88 / 0.93 | 0.32 / 0.28 | Borders, dividers |
-| Ink | `--ink`, `--ink-2`, `--muted`, `--muted-2` | 0.22 / 0.35 / 0.50 / 0.64 (warm) | 0.95 / 0.86 / 0.68 / 0.56 | Text hierarchy |
-| Sidebar | `--sidebar-ink`, `--sidebar-muted`, `--sidebar-hover`, `--sidebar-active`, `--sidebar-line` | from ink/surfaces | own values | Sidebar can diverge from content |
-| Accent | `--accent`, `--accent-hover`, `--accent-tint`, `--on-accent` | **ink** 0.22 0.015 60 on cream | **lime** 0.87 0.18 128 with dark text | Primary buttons, brand mark, focus (dark) |
+| Surfaces | `--canvas`, `--sidebar`, `--surface`, `--surface-2` | `#F3F5F7` floor / `#1B1F25` graphite rail / `#FFFFFF` / `#ECEFF3` | 0.205 / 0.17 / 0.24 / 0.275 (hue 255, chroma ≈0.007) | Floor, rail, cards/panes/rows, hover/inputs |
+| Lines | `--hairline`, `--hair-soft` | `#D3D9E0` / `#E4E8ED` | 0.32 / 0.28 | Borders, dividers |
+| Ink | `--ink`, `--ink-2`, `--muted`, `--muted-2` | `#0E1217` / `#29303A` / `#56616D` / `#66717E` (all ≥ 4.5:1 on white and floor) | 0.95 / 0.86 / 0.68 / 0.56 | Text hierarchy |
+| Rail | `--sidebar-ink`, `--sidebar-muted`, `--sidebar-hover`, `--sidebar-active`, `--sidebar-line`, `--marker` | `#F2F4F6` / `#A3ADB8` / `#262B33` / `#313742` / `#2A3039` / lime `#A3E635` | own values, same lime marker | Graphite in both themes; only the current item is bright |
+| Accent | `--accent`, `--accent-hover`, `--accent-tint`, `--on-accent` | **graphite** `#1B1F25` / `#2C323B`, tint `#E6F3CF`, white text | **lime** 0.87 0.18 128 with dark text | Primary buttons, brand mark |
 | AI | `--amber`, `--amber-hi`, `--amber-2`, `--amber-ink` | 0.78 0.14 75 … | 0.80 0.14 75 … | **AI content only** |
 | Status | `--ok`, `--warn`, `--crit`, `--info` (+ `-tint`) | | | Due/overdue text, status dots |
 | Mock | `--mock`, `--mock-tint` | 0.52 0.18 300 | 0.75 0.15 300 | **Dev only** |
-| Interaction | `--focus`, `--selection` | blue focus, soft blue selection | lime focus, lime-tinted selection | |
+| Interaction | `--focus`, `--selection` | deep lime `#4D7C0F` ring, lime tint `#E6F3CF` | lime focus, lime-tinted selection | |
 | Projects | `--proj-1` … `--proj-12` | 12 hues at matched lightness | same | Project chips, avatars |
 | Charts (S6.5.1) | `--chart-1` … `--chart-8` | blue `#2a78d6`, orange `#eb6834`, aqua `#1baf7a`, yellow `#eda100`, magenta `#e87ba4`, green `#008300`, violet `#4a3aa7`, red `#e34948` | `#3987e5`, `#d95926`, `#199e70`, `#c98500`, `#d55181`, `#008300`, `#9085e9`, `#e66767` | Categorical chart series only, **in this order, never cycled** (validated with the dataviz palette checker on our own surfaces: adjacent CVD ΔE ≥ 9.1 light / 8.4 dark, normal-vision ≥ 19.6 / 19.3; three light slots sit under 3:1 on `--surface`, so every chart ships visible values and a table view). `--proj-*` are not a chart palette: neighbouring slots are too close for colour-blind readers |
-| Shape | `--r-sm 4`, `--r-md 6`, `--r-lg 8`, `--r-xl 12`; `--shadow-pop`, `--shadow-pane` | | | |
-| Layout | `--sidebar-w 240`, `--topbar-h 48`, `--pane-w 560`, `--askmo-w 420`, `--row-h 36` | | | |
+| Shape | `--r-sm 4`, `--r-md 6`, `--r-lg 8`, `--r-xl 12`; `--shadow-raise` (controls), `--shadow-pop` (menus, popovers), `--shadow-pane` | | | |
+| Motion | `--dur-1 100ms`, `--dur-2 160ms`, `--dur-3 240ms`, `--ease` cubic-bezier(0.16, 1, 0.3, 1) | | | Transitions and entries; `pressable` utility for custom press feedback |
+| Layout | `--sidebar-w 240`, `--rail-collapsed-w 56`, `--topbar-h 44`, `--pane-w 560`, `--askmo-w 420`, `--row-h 34` | | | |
 
 Tailwind v4 `@theme inline` maps tokens to utilities (`bg-canvas`, `bg-surface`, `text-ink`, `text-muted`, `border-hairline`, `bg-accent`, `text-on-accent`, `bg-sidebar`, `text-sidebar-ink`, `text-amber-ink`, …). **Raw color literals in components are forbidden** (ESLint rule). Never hard-code "dark means lime" in components; always use `accent`.
 
 ## 3. Typography
 
-One family: **Inter** (variable, self-hosted), plus **JetBrains Mono** for keys, numbers, and timestamps.
+One family: **Atkinson Hyperlegible Next** (variable, self-hosted, designed for legibility), plus **Atkinson Hyperlegible Mono** for task keys, code and figures. Sizes are set for an effective 1280–1536 px window, so body is 14 px. Weights 400 / 600 / 700 only. Numbers in tables, counts, dates and `[data-numeric]` elements use tabular figures (`base.css`).
 
 | Role | Class | Size / line | Weight |
 |---|---|---|---|
-| Page title | `page-title` | 20/28, tracking −0.01em | 600 |
-| Section title | `text-[15px] font-semibold` | 15/22 | 600 |
-| Card / group title | `text-[13px] font-semibold` | 13/18 | 600 |
-| Section label (sidebar groups, menu labels) | `section-label` | 12/16, sentence case | 600, muted |
-| Body | default | 14/20 | 400 |
-| Row text | `text-[13.5px]` | 13.5/20 | 400 (500 for emphasis) |
-| Meta | `text-[13px] text-muted` / `text-xs` | 13/18, 12/16 | 400 |
-| Mono | `font-mono tabular` | 12/16 | 500 |
+| Display (rare: big numbers, empty heroes) | `text-display` | 24/30, tracking −0.01em | 700 |
+| Page title | `page-title` (or `text-title`) | 20/26, tracking −0.01em | 700 |
+| Section / card heading | `text-heading font-semibold` | 16/22 | 600 |
+| Body, row text | `text-body` (default) | 14/20 | 400 (600 for emphasis) |
+| Meta | `text-meta text-muted` | 13/18 | 400 |
+| Label (sidebar groups, column headers, menu labels) | `section-label` / `text-label` | 12/16, sentence case, +0.01em | 600 |
+| Mono | `font-mono` | 12/16 | 500 |
 
-Mo's text uses the same typography as everything else. Its identity comes from the amber AI container and the ✦ mark, not from a different font.
+Screens move off one-off sizes (`text-[15px]`, `text-[13.5px]`) onto these utilities slice by slice (UX2–UX7). Mo's text uses the same typography as everything else. Its identity comes from the amber AI container and the ✦ mark, not from a different font.
 
 ## 4. Core components (all in `components/ui` or `components/common`)
 
 | Component | Notes |
 |---|---|
-| `Button` | `primary` (solid accent: ink in light, lime in dark), `sidebar` (on the sidebar), `ai` (amber, *only* for buttons that run an AI action), `ghost` (hairline border), `text`, `danger`. Sizes `sm`/`md`/`icon`. Loading state with spinner. |
+| `Button` | Semibold; 160 ms colour and shadow transitions; press scale 0.97; 2 px focus ring; `aria-busy` cursor. `primary` (solid accent: graphite in light, lime in dark), `sidebar` (on the sidebar), `ai` (amber, *only* for buttons that run an AI action), `ghost` (hairline border), `text`, `danger`. Sizes `sm`/`md`/`icon`. Loading state with spinner. |
 | `IconButton` | Always has `aria-label` + tooltip with shortcut |
-| `Input`, `Textarea`, `NumberInput` | Paper-2 background, hairline border, focus ring |
+| `Input`, `Textarea`, `NumberInput` | White surface, hairline border with a darker hover, `shadow-raise`, focus border plus a 2 px soft ring; `aria-invalid` turns the border `crit` (errors in words under the field) |
 | `Select`, `Combobox` | Radix; searchable; used by pickers |
 | `AssigneePicker`, `DatePicker` (NL input "next fri" + calendar), `ProjectPicker`, `SectionPicker`, `TagPicker`, `FieldValueEditor` | Domain pickers built on Combobox/Popover |
-| `Popover`, `DropdownMenu`, `ContextMenu`, `Dialog`, `Sheet` (slide-over), `Tooltip` | Radix, portaled into `.momentum-root` |
+| `Popover`, `DropdownMenu`, `ContextMenu`, `Dialog`, `Sheet` (slide-over), `Tooltip` | Radix, portaled into `.momentum-root`. Menus and popovers scale in from their trigger (`m-pop-in`, Radix transform origin); dialogs rise in (`m-sheet-in`) over a 25% ink scrim and never exceed the window (they scroll inside); tooltips fade in after the delay; menu items are 32 px |
 | `Tabs` (underline, for views) and `Segmented` (sub-modes) | Two named idioms, not interchangeable |
 | `Toast` | With Undo action for mutations (5s), error toasts with retry |
 | `Avatar`, `AvatarStack` | Agents get a ✦ amber ring |

@@ -10,6 +10,7 @@ import { useUnreadCount } from '@/features/notifications';
 import { cn } from '@/lib/cn';
 import { useNarrow } from '@/lib/media';
 import { useUi } from '@/stores/ui';
+import { useRail } from './rail';
 
 export interface RouteHandle {
   crumb?: string;
@@ -18,9 +19,7 @@ export interface RouteHandle {
 export function TopBar() {
   const navigate = useNavigate();
   const unread = useUnreadCount().data ?? 0;
-  const toggleSidebar = useUi((s) => s.toggleSidebar);
-  const drawerOpen = useUi((s) => s.drawerOpen);
-  const setDrawerOpen = useUi((s) => s.setDrawerOpen);
+  const rail = useRail();
   const narrow = useNarrow();
   const setPaletteOpen = useUi((s) => s.setPaletteOpen);
   const askMoOpen = useUi((s) => s.askMoOpen);
@@ -37,7 +36,7 @@ export function TopBar() {
         icon={PanelLeft}
         label={narrow ? 'Open menu' : 'Toggle sidebar'}
         shortcut="mod+\"
-        onClick={narrow ? () => setDrawerOpen(!drawerOpen) : toggleSidebar}
+        onClick={rail.toggle}
       />
       <nav aria-label="Breadcrumb" className="min-w-0 flex-1">
         <ol className="flex min-w-0 items-center gap-1.5 text-sm">

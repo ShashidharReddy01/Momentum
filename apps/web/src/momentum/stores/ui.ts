@@ -21,7 +21,13 @@ export interface MoRequest {
 
 export interface UiState {
   theme: Theme;
+  /** The rail shows icons only (wide windows; remembered). */
   sidebarCollapsed: boolean;
+  /** Below 1280px the rail starts as icons; this expands it for the session (not persisted). */
+  railExpanded: boolean;
+  /** Teams folded in the rail (remembered). */
+  collapsedTeams: string[];
+  toggleTeam: (teamId: string) => void;
   /** Sidebar drawer on narrow screens (not persisted). */
   drawerOpen: boolean;
   /** Quick add task dialog (Create → Task, `Q`). */
@@ -36,7 +42,8 @@ export interface UiState {
   setCrumbs: (c: string[] | null) => void;
   setTheme: (t: Theme) => void;
   toggleTheme: () => void;
-  toggleSidebar: () => void;
+  /** Toggles the wide-window preference, or the session expansion below 1280px. */
+  toggleSidebar: (compact?: boolean) => void;
   setAskMoOpen: (open: boolean) => void;
   setPaletteOpen: (open: boolean) => void;
   setShortcutsOpen: (open: boolean) => void;
@@ -85,6 +92,14 @@ export function createUiStore(storageKey = 'momentum.ui'): StoreApi<UiState> {
       (set, get) => ({
         theme: prefersDark() ? 'dark' : 'light',
         sidebarCollapsed: false,
+        railExpanded: false,
+        collapsedTeams: [],
+        toggleTeam: (teamId) => {
+          const now = get().collapsedTeams;
+          set({
+            collapsedTeams: now.includes(teamId) ? now.filter((t) => t !== teamId) : [...now, teamId],
+          });
+        },
         drawerOpen: false,
         quickAddOpen: false,
         setQuickAddOpen: (quickAddOpen) => set({ quickAddOpen }),
@@ -96,7 +111,10 @@ export function createUiStore(storageKey = 'momentum.ui'): StoreApi<UiState> {
         setCrumbs: (crumbs) => set({ crumbs }),
         setTheme: (theme) => set({ theme }),
         toggleTheme: () => set({ theme: get().theme === 'dark' ? 'light' : 'dark' }),
-        toggleSidebar: () => set({ sidebarCollapsed: !get().sidebarCollapsed }),
+        toggleSidebar: (compact = false) =>
+          compact
+            ? set({ railExpanded: !get().railExpanded })
+            : set({ sidebarCollapsed: !get().sidebarCollapsed }),
         setAskMoOpen: (askMoOpen) => set({ askMoOpen }),
         setPaletteOpen: (paletteOpen) =>
           set(paletteOpen ? { paletteOpen } : { paletteOpen, paletteQuery: '' }),
@@ -118,7 +136,11 @@ export function createUiStore(storageKey = 'momentum.ui'): StoreApi<UiState> {
       {
         name: storageKey,
         storage: createJSONStorage(safeLocalStorage),
-        partialize: (s) => ({ theme: s.theme, sidebarCollapsed: s.sidebarCollapsed }),
+        partialize: (s) => ({
+          theme: s.theme,
+          sidebarCollapsed: s.sidebarCollapsed,
+          collapsedTeams: s.collapsedTeams,
+        }),
       },
     ),
   );

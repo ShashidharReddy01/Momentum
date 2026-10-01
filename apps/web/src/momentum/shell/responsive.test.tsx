@@ -60,3 +60,52 @@ describe('Narrow screens', () => {
     await waitFor(() => expect(screen.queryByRole('navigation', { name: 'Main' })).toBeNull());
   });
 });
+
+function compactScreen() {
+  vi.stubGlobal('matchMedia', (q: string) => ({
+    matches: q.includes('1279'),
+    media: q,
+    addEventListener: () => undefined,
+    removeEventListener: () => undefined,
+  }));
+}
+
+describe('The rail (UX2)', () => {
+  function boot() {
+    server.use(
+      ...authHandlers({ loggedIn: true }).handlers,
+      ...homeHandlers().handlers,
+      ...teamHandlers(),
+      ...projectHandlers('', undefined, [{ name: 'Website Revamp', my_role: 'admin' }]),
+      ...sectionHandlers('', { 'seed-1': ['Backlog'] }),
+      ...taskHandlers(),
+      ...onboardingHandlers(),
+    );
+    window.history.replaceState(null, '', '/');
+    render(<MomentumApp />);
+  }
+
+  it('below 1280px starts as icons with named links, and the top-bar toggle expands it', async () => {
+    compactScreen();
+    boot();
+    const user = userEvent.setup();
+    const nav = await screen.findByRole('navigation', { name: 'Main' });
+    await waitFor(() => expect(nav).toHaveAttribute('data-icons-only'));
+    expect(screen.getByRole('link', { name: 'My Tasks' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Create' })).toBeVisible();
+    expect(await screen.findByRole('button', { name: 'Account menu' })).toBeVisible();
+    await user.click(screen.getByRole('button', { name: 'Toggle sidebar' }));
+    expect(nav).not.toHaveAttribute('data-icons-only');
+    expect(screen.getByText('Momentum')).toBeVisible();
+  });
+
+  it('on wide windows the toggle collapses to icons and remembers it', async () => {
+    boot();
+    const user = userEvent.setup();
+    const nav = await screen.findByRole('navigation', { name: 'Main' });
+    expect(nav).not.toHaveAttribute('data-icons-only');
+    await user.click(await screen.findByRole('button', { name: 'Toggle sidebar' }));
+    expect(nav).toHaveAttribute('data-icons-only');
+    expect(window.localStorage.getItem('momentum.ui')).toContain('"sidebarCollapsed":true');
+  });
+});

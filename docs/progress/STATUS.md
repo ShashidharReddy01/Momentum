@@ -6,7 +6,7 @@
 
 ## Current focus
 - **Phase:** 6: Planning and Insight — **complete** (exit criteria met 2026-10-01; one live check left for the product owner: `momentum evals --live --feature chart`). Phase 5: Agents v1 — complete and verified live (2026-09-30).
-- **Phase 6.5: UI/UX revamp — in progress** (kickoff 2026-10-01; plan, audit and slices in `docs/roadmap/phase-6.5.md`; design contract `DESIGN.md`, product record `PRODUCT.md`). Direction **Wayfinding** chosen by the product owner on the decision page. **Next up: UX1 Foundations** (tokens, Atkinson Hyperlegible Next + Mono, type scale, states, motion).
+- **Phase 6.5: UI/UX revamp — in progress** (kickoff 2026-10-01; plan, audit and slices in `docs/roadmap/phase-6.5.md`; design contract `DESIGN.md`, product record `PRODUCT.md`). Direction **Wayfinding** chosen by the product owner on the decision page. **UX1 Foundations done 2026-10-01** (Wayfinding tokens, Atkinson Hyperlegible Next + Mono, type scale, motion tokens, control states; ADR-0005 amendment 3). **UX2 Shell in progress:** the rail is done (pinned header and footer, scrolling middle, fits a 600 px window, icons-only below 1280 px or on ⌘, team folding remembered, lime marker, Create menu opens beside the rail); still to do: the compact page header component.
 - **Product-owner instruction (2026-09-26):** finish all remaining slices, then one big local test run against the real gateway (100+ questions/actions covering edge cases), then fix from that run.
 - **Scope note (product owner, 2026-09-26):** the customer-operations capabilities (SQQ, pricing, contracts, invoices, pushes to internal systems as tools and assignable agents) will be done later in the product owner's own codebase, **not in this repo**. Finish the roadmap as written.
 - **Branch:** Phases 3–4 are on `claude/clever-hopper-pbv7yr` (ahead of `main`). Phase 5 continues on `claude/intelligent-meitner-9ne4e8`, which starts from that branch's Phase 4 exit commit.
@@ -113,7 +113,7 @@ Tracked in their phase files; copy the slice list here at each phase kickoff.
 
 ### Phase 6.5: UI/UX revamp
 - [x] Kickoff (2026-10-01): audit at 7 viewports × 2 themes, `PRODUCT.md`, direction Wayfinding (`DESIGN.md`), plan `phase-6.5.md`
-- [ ] UX1 Foundations · [ ] UX2 Shell · [ ] UX3 Task list and pane · [ ] UX4 Board, Calendar, Timeline
+- [x] UX1 Foundations (2026-10-01) · [ ] UX2 Shell · [ ] UX3 Task list and pane · [ ] UX4 Board, Calendar, Timeline
 - [ ] UX5 Home, My Tasks, Inbox · [ ] UX6 Planning screens · [ ] UX7 AI, agents, settings, overlays · [ ] UX8 Exit
 - **Branches (2026-09-30, product owner: "put everything in one"):** checked every remote branch: `claude/inspiring-bohr-p9xomo` already contains every commit of `main`, `claude/clever-hopper-pbv7yr`, `claude/intelligent-meitner-9ne4e8` (including the Phase 5 round-4 close) and `claude/amazing-knuth-u6v1s2`. It is now the single line of work; `main` was fast-forwarded to it. The older branches can be deleted on GitHub whenever convenient (nothing on them is missing here).
 - **Local machine note (2026-09-30):** the product owner's Windows machine has no `make`; this session ran the gate's steps directly (same commands as `make check`) and used its own databases (`momentum_bohr`, `momentum_bohr_test`) in the shared Docker Postgres so two checkouts can't collide on `momentum_test`.

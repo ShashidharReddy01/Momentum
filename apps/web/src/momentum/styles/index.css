@@ -51,6 +51,7 @@
   --color-mock-tint: var(--mock-tint);
   --color-focus: var(--focus);
   --color-selection: var(--selection);
+  --color-marker: var(--marker);
 
   --font-sans: var(--font-sans);
   --font-mono: var(--font-mono);
@@ -61,6 +62,23 @@
   --radius-xl: var(--r-xl);
   --shadow-pop: var(--shadow-pop);
   --shadow-pane: var(--shadow-pane);
+  --shadow-raise: var(--shadow-raise);
+
+  /* Type scale (DESIGN.md): 12 label · 13 meta · 14 body · 16 heading · 20 title · 24 display */
+  --text-label: 12px;
+  --text-label--line-height: 16px;
+  --text-meta: 13px;
+  --text-meta--line-height: 18px;
+  --text-body: 14px;
+  --text-body--line-height: 20px;
+  --text-heading: 16px;
+  --text-heading--line-height: 22px;
+  --text-title: 20px;
+  --text-title--line-height: 26px;
+  --text-display: 24px;
+  --text-display--line-height: 30px;
+
+  --ease-out: var(--ease);
 
   --breakpoint-sm: 640px;
   --breakpoint-md: 900px;
@@ -73,6 +91,7 @@
   font-size: 12px;
   line-height: 16px;
   font-weight: 600;
+  letter-spacing: 0.01em;
   color: var(--muted);
 }
 
@@ -83,8 +102,18 @@
 /* Page title: one sans, hierarchy through weight and size. */
 @utility page-title {
   font-size: 20px;
-  line-height: 28px;
-  font-weight: 600;
+  line-height: 26px;
+  font-weight: 700;
   letter-spacing: -0.01em;
   color: var(--ink);
+}
+
+/* Press feedback for anything clickable that isn't a Button (rows, chips, tiles). */
+@utility pressable {
+  transition:
+    transform var(--dur-1) var(--ease),
+    background-color var(--dur-1) var(--ease);
+  &:active {
+    transform: scale(0.985);
+  }
 }

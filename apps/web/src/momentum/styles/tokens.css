@@ -1,32 +1,37 @@
 /* Momentum design tokens (docs/frontend/design-system.md §2).
-   Light = "Paper" (warm cream surfaces, ink accent). Dark = "Graphite" (charcoal, lime accent).
+   Light = "Wayfinding" (graphite rail, white floor, lime marker; DESIGN.md). Dark = "Graphite"
+   (charcoal, lime accent): the same world with the lights down.
    Amber is reserved for AI in both. Scoped to .momentum-root so Momentum can be embedded
    without leaking styles. */
 .momentum-root {
+  /* Light = "Wayfinding" (Phase 6.5, DESIGN.md): a graphite signage rail shared with the dark
+     theme, a crisp white work floor, lime as the only brand colour (the "you are here" marker,
+     selection and focus). */
   /* Surfaces */
-  --canvas: oklch(0.975 0.012 85);
-  --sidebar: oklch(0.955 0.014 85);
-  --surface: oklch(0.995 0.004 85);
-  --surface-2: oklch(0.972 0.007 85);
-  --hairline: oklch(0.88 0.01 85);
-  --hair-soft: oklch(0.93 0.008 85);
+  --canvas: #f3f5f7; /* the floor */
+  --sidebar: #1b1f25; /* the rail */
+  --surface: #ffffff;
+  --surface-2: #eceff3;
+  --hairline: #d3d9e0;
+  --hair-soft: #e4e8ed;
   --topbar: var(--canvas);
-  /* Sidebar */
-  --sidebar-ink: var(--ink);
-  --sidebar-muted: var(--muted);
-  --sidebar-hover: var(--surface-2);
-  --sidebar-active: var(--surface);
-  --sidebar-line: var(--hair-soft);
-  /* Ink */
-  --ink: oklch(0.22 0.015 60);
-  --ink-2: oklch(0.35 0.012 60);
-  --muted: oklch(0.5 0.01 60);
-  --muted-2: oklch(0.64 0.008 60);
-  /* Brand accent: primary actions, brand mark (ink on paper) */
-  --accent: oklch(0.22 0.015 60);
-  --accent-hover: oklch(0.32 0.014 60);
-  --accent-tint: oklch(0.93 0.012 70);
-  --on-accent: oklch(0.975 0.012 85);
+  /* Rail (sidebar): quiet until hovered; the current place gets the lime marker */
+  --sidebar-ink: #f2f4f6;
+  --sidebar-muted: #a3adb8;
+  --sidebar-hover: #262b33;
+  --sidebar-active: #313742;
+  --sidebar-line: #2a3039;
+  --marker: #a3e635;
+  /* Ink (all ≥ 4.5:1 on surface and floor) */
+  --ink: #0e1217;
+  --ink-2: #29303a;
+  --muted: #56616d;
+  --muted-2: #66717e;
+  /* Brand accent: primary actions (a graphite signage block) */
+  --accent: #1b1f25;
+  --accent-hover: #2c323b;
+  --accent-tint: #e6f3cf;
+  --on-accent: #ffffff;
   /* AI (amber): AI-authored content ONLY */
   --amber: oklch(0.78 0.14 75);
   --amber-hi: oklch(0.85 0.12 80);
@@ -43,9 +48,9 @@
   --info-tint: oklch(0.95 0.02 250);
   --mock: oklch(0.52 0.18 300); /* DEV ONLY */
   --mock-tint: oklch(0.95 0.04 300);
-  /* Interaction */
-  --focus: oklch(0.6 0.15 250);
-  --selection: oklch(0.93 0.03 250);
+  /* Interaction: lime, deep enough to read on white */
+  --focus: #4d7c0f;
+  --selection: #e6f3cf;
   /* Project palette (chips, board strips, avatars) */
   --proj-1: oklch(0.66 0.14 25);
   --proj-2: oklch(0.7 0.13 60);
@@ -69,25 +74,29 @@
   --chart-6: #008300;
   --chart-7: #4a3aa7;
   --chart-8: #e34948;
-  /* Type: one sans (Inter) + mono for keys/numbers */
-  --font-sans: 'Inter Variable', system-ui, -apple-system, 'Segoe UI', sans-serif;
-  --font-mono: 'JetBrains Mono Variable', ui-monospace, SFMono-Regular, Menlo, monospace;
+  /* Type: one legibility family (DESIGN.md) + its mono for keys and code */
+  --font-sans: 'Atkinson Hyperlegible Next Variable', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'Atkinson Hyperlegible Mono Variable', ui-monospace, SFMono-Regular, Menlo, monospace;
   /* Radius, shadow, motion */
   --r-sm: 4px;
   --r-md: 6px;
   --r-lg: 8px;
   --r-xl: 12px;
-  --shadow-pop: 0 8px 24px -8px oklch(0.2 0.02 60 / 0.18), 0 0 0 1px var(--hairline);
-  --shadow-pane: -12px 0 32px -16px oklch(0.2 0.02 60 / 0.2);
-  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --shadow-pop: 0 10px 28px -10px rgb(14 18 23 / 0.22), 0 0 0 1px var(--hairline);
+  --shadow-pane: -14px 0 32px -18px rgb(14 18 23 / 0.28);
+  --shadow-raise: 0 1px 2px rgb(14 18 23 / 0.06);
+  /* Motion: exponential ease-out; press is instant-feeling, reveals are quick */
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
   --dur-1: 100ms;
   --dur-2: 160ms;
+  --dur-3: 240ms;
   /* Layout */
   --sidebar-w: 240px;
-  --topbar-h: 48px;
+  --rail-collapsed-w: 56px;
+  --topbar-h: 44px;
   --pane-w: 560px;
   --askmo-w: 420px;
-  --row-h: 36px;
+  --row-h: 34px;
   color-scheme: light;
 }
 
@@ -104,6 +113,7 @@
   --sidebar-hover: oklch(0.23 0.007 255);
   --sidebar-active: oklch(0.27 0.008 255);
   --sidebar-line: oklch(0.24 0.007 255);
+  --marker: oklch(0.87 0.18 128);
   --ink: oklch(0.95 0.004 255);
   --ink-2: oklch(0.86 0.005 255);
   --muted: oklch(0.68 0.008 255);
@@ -138,5 +148,6 @@
   --selection: oklch(0.32 0.05 128);
   --shadow-pop: 0 8px 24px -8px oklch(0 0 0 / 0.55), 0 0 0 1px var(--hairline);
   --shadow-pane: -8px 0 24px -12px oklch(0 0 0 / 0.55);
+  --shadow-raise: 0 1px 2px oklch(0 0 0 / 0.4);
   color-scheme: dark;
 }

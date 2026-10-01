@@ -1,3 +1,4 @@
-/* Self-hosted fonts (no CDN): works on locked-down office networks and when embedded. */
-@import '@fontsource-variable/inter/index.css';
-@import '@fontsource-variable/jetbrains-mono/index.css';
+/* Self-hosted fonts (no CDN): works on locked-down office networks and when embedded.
+   Atkinson Hyperlegible Next is designed for legibility (DESIGN.md); its mono sets keys and code. */
+@import '@fontsource-variable/atkinson-hyperlegible-next/index.css';
+@import '@fontsource-variable/atkinson-hyperlegible-mono/index.css';

@@ -16,7 +16,10 @@ export function DropdownMenuContent({ className, ...props }: ComponentProps<type
       <M.Content
         sideOffset={6}
         align="start"
-        className={cn('z-50 min-w-[200px] rounded-lg bg-surface p-1 shadow-pop', className)}
+        className={cn(
+          'z-50 min-w-[200px] origin-[var(--radix-dropdown-menu-content-transform-origin)] rounded-lg bg-surface p-1 shadow-pop data-[state=open]:animate-[m-pop-in_var(--dur-2)_var(--ease)]',
+          className,
+        )}
         {...props}
       />
     </M.Portal>
@@ -33,7 +36,7 @@ export function DropdownMenuItem({
   return (
     <M.Item
       className={cn(
-        'flex cursor-pointer select-none items-center gap-2 rounded-md px-2 py-1.5 text-sm outline-none data-[disabled]:cursor-default data-[disabled]:text-muted-2 data-[highlighted]:bg-surface-2',
+        'flex h-8 cursor-pointer select-none items-center gap-2 rounded-md px-2 text-sm outline-none transition-colors duration-100 data-[disabled]:cursor-default data-[disabled]:text-muted-2 data-[highlighted]:bg-surface-2',
         className,
       )}
       {...props}
@@ -55,7 +58,7 @@ export function DropdownMenuRadioItem({ className, children, ...props }: Compone
   return (
     <M.RadioItem
       className={cn(
-        'flex cursor-pointer select-none items-center gap-2 rounded-md px-2 py-1.5 text-sm outline-none data-[disabled]:cursor-default data-[disabled]:text-muted-2 data-[highlighted]:bg-surface-2',
+        'flex h-8 cursor-pointer select-none items-center gap-2 rounded-md px-2 text-sm outline-none transition-colors duration-100 data-[disabled]:cursor-default data-[disabled]:text-muted-2 data-[highlighted]:bg-surface-2',
         className,
       )}
       {...props}

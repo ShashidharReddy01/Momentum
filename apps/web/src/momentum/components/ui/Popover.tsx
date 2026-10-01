@@ -15,7 +15,10 @@ export function PopoverContent({ className, align = 'start', ...props }: Compone
       <P.Content
         align={align}
         sideOffset={6}
-        className={cn('z-50 rounded-lg bg-surface p-1 shadow-pop outline-none', className)}
+        className={cn(
+          'z-50 rounded-lg bg-surface p-1 shadow-pop outline-none data-[state=open]:animate-[m-pop-in_var(--dur-2)_var(--ease)]',
+          className,
+        )}
         {...props}
       />
     </P.Portal>

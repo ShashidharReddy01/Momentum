@@ -16,8 +16,19 @@
     color: var(--ink);
     background: var(--canvas);
     -webkit-font-smoothing: antialiased;
-    font-feature-settings: 'cv11', 'ss01', 'ss03';
     min-height: 100dvh;
+    caret-color: var(--ink);
+    /* scrollbars belong to the design too: thin, in the hairline colour */
+    scrollbar-width: thin;
+    scrollbar-color: var(--hairline) transparent;
+  }
+  .momentum-root :where(*) {
+    scrollbar-width: thin;
+    scrollbar-color: var(--hairline) transparent;
+  }
+  /* numbers in tables, counts and dates line up (the font has tabular figures) */
+  .momentum-root :where(table, time, [data-numeric]) {
+    font-variant-numeric: tabular-nums;
   }
   .momentum-root :where(button, input, select, textarea) {
     font: inherit;
@@ -45,13 +56,41 @@
   }
   .momentum-root ::selection {
     background: var(--selection);
+    color: var(--ink);
   }
+  /* Reduced motion keeps state changes visible (colour and opacity still fade quickly) and
+     drops movement: no transforms, no keyframe animation, no smooth scrolling. */
   @media (prefers-reduced-motion: reduce) {
     .momentum-root *,
     .momentum-root *::before,
     .momentum-root *::after {
       animation-duration: 1ms !important;
-      transition-duration: 1ms !important;
+      animation-iteration-count: 1 !important;
+      scroll-behavior: auto !important;
+      transition-property: color, background-color, border-color, opacity !important;
     }
+    .momentum-root :where(*):active {
+      transform: none !important;
+    }
+  }
+}
+
+/* Entry motion (DESIGN.md: quick, exponential ease-out, from an already-visible default).
+   Prefixed so a host page's keyframes can't collide. */
+@keyframes m-pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.97) translateY(-2px);
+  }
+}
+@keyframes m-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes m-sheet-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.985);
   }
 }

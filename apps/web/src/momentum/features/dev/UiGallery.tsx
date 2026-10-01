@@ -79,12 +79,12 @@ export function UiGallery() {
       </Section>
 
       <Section title="Typography">
-        <p className="page-title">Page title · Inter 20/600</p>
-        <p className="text-[15px] font-semibold">Section title · Inter 15/600</p>
-        <p className="section-label">Section label · Inter 12/600</p>
-        <p>Body text · Inter 14/20. The quick brown fox jumps over the lazy dog.</p>
+        <p className="page-title">Page title · Atkinson Next 20/700</p>
+        <p className="text-heading font-semibold">Section title · Atkinson Next 16/600</p>
+        <p className="section-label">Section label · Atkinson Next 12/600</p>
+        <p>Body text · Atkinson Next 14/20. The quick brown fox jumps over the lazy dog.</p>
         <p className="font-mono text-xs tabular">T-1024 · 2026-09-26 · 12:30</p>
-        <p className="text-[13px] text-muted">Meta · Inter 13 muted: created by Ana · 2 days ago</p>
+        <p className="text-[13px] text-muted">Meta · Atkinson Next 13 muted: created by Ana · 2 days ago</p>
       </Section>
 
       <Section title="Buttons">

@@ -2,23 +2,33 @@ import { useSyncExternalStore } from 'react';
 
 /** Below the `md` breakpoint (900px): sidebar becomes a drawer, panes go full-screen. */
 const NARROW = '(max-width: 899.98px)';
+/** Below 1280px (tablets, small laptops): the rail starts as icons (Phase 6.5, UX2). */
+const COMPACT = '(max-width: 1279.98px)';
 
-function query(): MediaQueryList | null {
+function query(q: string): MediaQueryList | null {
   try {
-    return typeof window.matchMedia === 'function' ? window.matchMedia(NARROW) : null;
+    return typeof window.matchMedia === 'function' ? window.matchMedia(q) : null;
   } catch {
     return null;
   }
 }
 
-export function useNarrow(): boolean {
+function useMedia(q: string): boolean {
   return useSyncExternalStore(
     (onChange) => {
-      const q = query();
-      q?.addEventListener('change', onChange);
-      return () => q?.removeEventListener('change', onChange);
+      const m = query(q);
+      m?.addEventListener('change', onChange);
+      return () => m?.removeEventListener('change', onChange);
     },
-    () => query()?.matches ?? false,
+    () => query(q)?.matches ?? false,
     () => false,
   );
+}
+
+export function useNarrow(): boolean {
+  return useMedia(NARROW);
+}
+
+export function useCompact(): boolean {
+  return useMedia(COMPACT);
 }

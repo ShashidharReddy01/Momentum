@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode, type UIEvent } from 'react';
 import {
   Bell,
   Bot,
@@ -38,6 +38,7 @@ import {
 } from '@/components/ui/DropdownMenu';
 import { Icon } from '@/components/ui/Icon';
 import { IconButton } from '@/components/ui/IconButton';
+import { Tooltip } from '@/components/ui/Tooltip';
 import { useLogout, useMe } from '@/features/auth';
 import {
   NewProjectDialog,
@@ -51,6 +52,7 @@ import { cn } from '@/lib/cn';
 import { useNarrow } from '@/lib/media';
 import { useMomentumConfig } from '@/lib/config';
 import { useUi } from '@/stores/ui';
+import { useRail } from './rail';
 
 const NAV = [
   { to: '/', label: 'Home', icon: Home, end: true },
@@ -64,7 +66,7 @@ const NAV = [
 ] as const;
 
 export function Sidebar() {
-  const collapsed = useUi((s) => s.sidebarCollapsed);
+  const { iconsOnly } = useRail();
   const drawerOpen = useUi((s) => s.drawerOpen);
   const setDrawerOpen = useUi((s) => s.setDrawerOpen);
   const setQuickAddOpen = useUi((s) => s.setQuickAddOpen);
@@ -73,6 +75,7 @@ export function Sidebar() {
   const [newTeam, setNewTeam] = useState(false);
   const [newProject, setNewProject] = useState(false);
   const [fromBrief, setFromBrief] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
   // the drawer closes when you go somewhere, or when the window gets wide again
   useEffect(() => setDrawerOpen(false), [location.pathname, narrow, setDrawerOpen]);
   useEffect(() => {
@@ -81,62 +84,76 @@ export function Sidebar() {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [narrow, drawerOpen, setDrawerOpen]);
+  const onScroll = (e: UIEvent<HTMLDivElement>) => setScrolled(e.currentTarget.scrollTop > 0);
   return (
     <>
       {narrow && drawerOpen ? (
         <button
           type="button"
           aria-label="Close menu"
-          className="fixed inset-0 z-40 bg-ink/20"
+          className="fixed inset-0 z-40 bg-ink/25 animate-[m-fade-in_var(--dur-2)_var(--ease)]"
           onClick={() => setDrawerOpen(false)}
         />
       ) : null}
+      {/* Pinned header · scrolling middle · pinned footer: the profile and settings stay
+          reachable at any window height (Phase 6.5, UX2). */}
       <nav
         aria-label="Main"
         hidden={narrow && !drawerOpen}
+        data-icons-only={iconsOnly || undefined}
         className={cn(
-          'flex h-dvh flex-col border-r border-sidebar-line bg-sidebar text-sidebar-ink transition-[width] duration-150',
+          'flex h-dvh shrink-0 flex-col bg-sidebar text-sidebar-ink transition-[width] duration-[var(--dur-2)] ease-[var(--ease)]',
           narrow
             ? drawerOpen
-              ? 'fixed inset-y-0 left-0 z-50 w-[min(var(--sidebar-w),85vw)] shadow-pop'
+              ? 'fixed inset-y-0 left-0 z-50 w-[min(var(--sidebar-w),85vw)] shadow-pop animate-[m-sheet-in_var(--dur-3)_var(--ease)]'
               : 'hidden'
-            : collapsed
-              ? 'w-0 overflow-hidden border-r-0'
+            : iconsOnly
+              ? 'w-[var(--rail-collapsed-w)]'
               : 'w-[var(--sidebar-w)]',
         )}
       >
-        <div className="flex h-[var(--topbar-h)] items-center gap-2 px-4">
-          <BrandMark size={22} />
-          <span className="text-[15px] font-semibold tracking-tight">Momentum</span>
-        </div>
-        <div className="px-3 pb-2">
+        <div
+          className={cn(
+            'flex shrink-0 flex-col gap-3 border-b px-3 pt-3 pb-3 transition-colors',
+            scrolled ? 'border-sidebar-line' : 'border-transparent',
+            iconsOnly && 'items-center px-2',
+          )}
+        >
+          <div className={cn('flex h-7 items-center gap-2', iconsOnly ? 'justify-center' : 'px-1')}>
+            <BrandMark size={22} />
+            {iconsOnly ? null : <span className="text-heading font-bold tracking-tight">Momentum</span>}
+          </div>
           <CreateMenu
+            iconsOnly={iconsOnly}
             onNewTask={() => setQuickAddOpen(true)}
             onNewTeam={() => setNewTeam(true)}
             onNewProject={() => setNewProject(true)}
             onFromBrief={() => setFromBrief(true)}
           />
         </div>
-        <ul className="flex flex-col gap-0.5 px-2">
-          {NAV.map((n) => (
-            <li key={n.to}>
-              <NavItem to={n.to} end={'end' in n ? n.end : false}>
-                <Icon icon={n.icon} />
-                {n.label}
+        <div
+          onScroll={onScroll}
+          className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain px-2 pt-1 pb-4 [scrollbar-color:var(--color-sidebar-active)_transparent]"
+        >
+          <ul className="flex flex-col gap-px">
+            {NAV.map((n) => (
+              <li key={n.to}>
+                <NavItem to={n.to} end={'end' in n ? n.end : false} label={n.label} iconsOnly={iconsOnly}>
+                  <Icon icon={n.icon} />
+                </NavItem>
+              </li>
+            ))}
+            <li>
+              <NavItem to="/ask" label="Ask Mo" iconsOnly={iconsOnly}>
+                <MoMark size={16} />
               </NavItem>
             </li>
-          ))}
-          <li>
-            <NavItem to="/ask">
-              <MoMark size={16} />
-              Ask Mo
-            </NavItem>
-          </li>
-        </ul>
-        <FavoritesSection />
-        <TeamsSection onNewTeam={() => setNewTeam(true)} />
-        <div className="mt-auto border-t border-sidebar-line p-2">
-          <UserMenu />
+          </ul>
+          <FavoritesSection iconsOnly={iconsOnly} />
+          <TeamsSection iconsOnly={iconsOnly} onNewTeam={() => setNewTeam(true)} />
+        </div>
+        <div className={cn('shrink-0 border-t border-sidebar-line p-2', iconsOnly && 'px-1.5')}>
+          <UserMenu iconsOnly={iconsOnly} />
         </div>
         <NewTeamDialog open={newTeam} onOpenChange={setNewTeam} />
         <NewProjectDialog open={newProject} onOpenChange={setNewProject} />
@@ -146,44 +163,78 @@ export function Sidebar() {
   );
 }
 
-function NavItem({ to, end, children }: { to: string; end?: boolean; children: ReactNode }) {
-  return (
+/** A rail row: quiet until hovered; the current place gets the lime "you are here" marker.
+ * With icons only, the label moves into a tooltip (and stays the accessible name). */
+function NavItem({
+  to,
+  end,
+  label,
+  iconsOnly = false,
+  trailing,
+  children,
+}: {
+  to: string;
+  end?: boolean;
+  label: string;
+  iconsOnly?: boolean;
+  trailing?: ReactNode;
+  children: ReactNode;
+}) {
+  const link = (
     <NavLink
       to={to}
       end={end}
+      aria-label={iconsOnly ? label : undefined}
       className={({ isActive }) =>
         cn(
-          'flex h-8 items-center gap-2.5 rounded-md px-2.5 text-sm text-sidebar-ink/85 hover:bg-sidebar-hover hover:text-sidebar-ink',
-          isActive && 'bg-sidebar-active font-medium text-sidebar-ink',
+          'relative flex h-8 items-center gap-2.5 rounded-md px-2.5 text-body text-sidebar-muted transition-colors duration-[var(--dur-1)] select-none hover:bg-sidebar-hover hover:text-sidebar-ink active:bg-sidebar-active',
+          iconsOnly && 'justify-center px-0',
+          isActive &&
+            'bg-sidebar-active font-semibold text-sidebar-ink before:absolute before:inset-y-2 before:left-0 before:w-[3px] before:rounded-r-full before:bg-marker',
         )
       }
     >
       {children}
+      {iconsOnly ? null : <span className="min-w-0 flex-1 truncate">{label}</span>}
+      {iconsOnly ? null : trailing}
     </NavLink>
+  );
+  return iconsOnly ? (
+    <Tooltip content={label} side="right">
+      {link}
+    </Tooltip>
+  ) : (
+    link
   );
 }
 
 function SidebarSection({
   title,
   action,
+  iconsOnly,
   children,
 }: {
   title: string;
   action?: ReactNode;
+  iconsOnly: boolean;
   children: ReactNode;
 }) {
   return (
-    <section className="mt-5">
-      <div className="flex items-center justify-between pr-2">
-        <h2 className="section-label px-4 pb-1 !text-sidebar-muted">{title}</h2>
-        {action}
-      </div>
+    <section aria-label={title} className="mt-4">
+      {iconsOnly ? (
+        <div aria-hidden className="mx-3 mb-2 h-px bg-sidebar-line" />
+      ) : (
+        <div className="flex h-7 items-center justify-between pr-1 pl-2.5">
+          <h2 className="section-label !text-sidebar-muted">{title}</h2>
+          {action}
+        </div>
+      )}
       {children}
     </section>
   );
 }
 
-function TeamsSection({ onNewTeam }: { onNewTeam: () => void }) {
+function TeamsSection({ iconsOnly, onNewTeam }: { iconsOnly: boolean; onNewTeam: () => void }) {
   const teams = useTeams();
   const projects = useProjects();
   const byTeam = new Map<string, Project[]>();
@@ -191,6 +242,7 @@ function TeamsSection({ onNewTeam }: { onNewTeam: () => void }) {
   return (
     <SidebarSection
       title="Teams"
+      iconsOnly={iconsOnly}
       action={
         <IconButton
           icon={Plus}
@@ -202,17 +254,20 @@ function TeamsSection({ onNewTeam }: { onNewTeam: () => void }) {
       }
     >
       {teams.isPending ? null : (teams.data ?? []).length === 0 ? (
-        <p className="flex items-center gap-2 px-4 text-xs text-sidebar-muted">
-          <Icon icon={Users} size={14} /> No teams yet.
-        </p>
+        iconsOnly ? null : (
+          <p className="flex items-center gap-2 px-2.5 text-meta text-sidebar-muted">
+            <Icon icon={Users} size={14} /> No teams yet.
+          </p>
+        )
       ) : (
-        <ul className="flex flex-col gap-0.5 px-2">
+        <ul className="flex flex-col gap-px">
           {teams.data?.map((t) => (
             <TeamTree
               key={t.id}
               teamId={t.id}
               name={t.name}
               color={t.color}
+              iconsOnly={iconsOnly}
               projects={byTeam.get(t.id) ?? []}
             />
           ))}
@@ -223,25 +278,42 @@ function TeamsSection({ onNewTeam }: { onNewTeam: () => void }) {
 }
 
 function CreateMenu({
+  iconsOnly,
   onNewTask,
   onNewTeam,
   onNewProject,
   onFromBrief,
 }: {
+  iconsOnly: boolean;
   onNewTask: () => void;
   onNewTeam: () => void;
   onNewProject: () => void;
   onFromBrief: () => void;
 }) {
   const aiEnabled = useMomentumConfig().ai_enabled;
+  const trigger = (
+    <DropdownMenuTrigger asChild>
+      <Button
+        variant="sidebar"
+        aria-label={iconsOnly ? 'Create' : undefined}
+        className={cn(iconsOnly ? 'h-8 w-8 px-0' : 'w-full justify-start')}
+      >
+        <Icon icon={Plus} />
+        {iconsOnly ? null : 'Create'}
+      </Button>
+    </DropdownMenuTrigger>
+  );
+  // opens beside the rail, so it never covers the navigation it belongs to
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="sidebar" className="w-full justify-start">
-          <Icon icon={Plus} /> Create
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent>
+      {iconsOnly ? (
+        <Tooltip content="Create" side="right">
+          {trigger}
+        </Tooltip>
+      ) : (
+        trigger
+      )}
+      <DropdownMenuContent side="right" align="start" sideOffset={10} className="w-56">
         <DropdownMenuItem onSelect={onNewTask} shortcut="q">
           <Icon icon={ListChecks} /> Task
         </DropdownMenuItem>
@@ -261,7 +333,7 @@ function CreateMenu({
   );
 }
 
-function UserMenu() {
+function UserMenu({ iconsOnly }: { iconsOnly: boolean }) {
   const me = useMe();
   const logout = useLogout();
   const navigate = useNavigate();
@@ -274,21 +346,34 @@ function UserMenu() {
       <DropdownMenuTrigger asChild>
         <button
           type="button"
-          className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left hover:bg-sidebar-hover"
+          className={cn(
+            'flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left transition-colors duration-[var(--dur-1)] hover:bg-sidebar-hover active:bg-sidebar-active',
+            iconsOnly && 'justify-center px-0',
+          )}
           aria-label="Account menu"
         >
-          <Avatar name={user.name} src={user.avatar_url} size={26} />
-          <span className="min-w-0 flex-1">
-            <span className="block truncate text-sm font-medium">{user.name}</span>
-            <span className="block truncate text-xs text-sidebar-muted">{me.data?.workspace.name}</span>
-          </span>
-          <Icon icon={ChevronsUpDown} size={14} className="text-sidebar-muted" />
+          <Avatar name={user.name} src={user.avatar_url} size={28} />
+          {iconsOnly ? null : (
+            <>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-body font-semibold">{user.name}</span>
+                <span className="block truncate text-label text-sidebar-muted">
+                  {me.data?.workspace.name}
+                </span>
+              </span>
+              <Icon icon={ChevronsUpDown} size={14} className="text-sidebar-muted" />
+            </>
+          )}
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent side="top" className="w-[var(--radix-dropdown-menu-trigger-width)]">
+      <DropdownMenuContent
+        side={iconsOnly ? 'right' : 'top'}
+        align={iconsOnly ? 'end' : 'start'}
+        sideOffset={8}
+        className="w-60"
+      >
         <DropdownMenuItem onSelect={toggleTheme}>
-          <Icon icon={theme === 'dark' ? Sun : Moon} />{' '}
-          {theme === 'dark' ? 'Light theme (Paper)' : 'Dark theme (Graphite)'}
+          <Icon icon={theme === 'dark' ? Sun : Moon} /> {theme === 'dark' ? 'Light theme' : 'Dark theme'}
         </DropdownMenuItem>
         <DropdownMenuItem onSelect={() => navigate('/settings/notifications')}>
           <Icon icon={Bell} /> Notification settings
@@ -314,16 +399,28 @@ function UserMenu() {
   );
 }
 
-function ProjectLink({ p }: { p: Project }) {
+function ProjectDot({ color, round = false }: { color: string | null | undefined; round?: boolean }) {
   return (
-    <NavItem to={`/projects/${p.id}`}>
+    <span aria-hidden className="grid h-4 w-4 shrink-0 place-items-center">
       <span
-        aria-hidden
-        className="h-2.5 w-2.5 shrink-0 rounded-[3px]"
-        style={{ background: colorVar(p.color) }}
+        className={cn('h-2.5 w-2.5', round ? 'rounded-full' : 'rounded-[3px]')}
+        style={{ background: colorVar(color) }}
       />
-      <span className="truncate">{p.name}</span>
-      {p.privacy === 'private' ? <Icon icon={Lock} size={12} className="ml-auto text-sidebar-muted" /> : null}
+    </span>
+  );
+}
+
+function ProjectLink({ p, iconsOnly }: { p: Project; iconsOnly: boolean }) {
+  return (
+    <NavItem
+      to={`/projects/${p.id}`}
+      label={p.name}
+      iconsOnly={iconsOnly}
+      trailing={
+        p.privacy === 'private' ? <Icon icon={Lock} size={12} className="text-sidebar-muted" /> : null
+      }
+    >
+      <ProjectDot color={p.color} />
     </NavItem>
   );
 }
@@ -332,42 +429,49 @@ function TeamTree({
   teamId,
   name,
   color,
+  iconsOnly,
   projects,
 }: {
   teamId: string;
   name: string;
   color: string | null | undefined;
+  iconsOnly: boolean;
   projects: Project[];
 }) {
-  const [open, setOpen] = useState(true);
+  const folded = useUi((s) => s.collapsedTeams.includes(teamId));
+  const toggleTeam = useUi((s) => s.toggleTeam);
+  if (iconsOnly) {
+    return (
+      <li>
+        <NavItem to={`/teams/${teamId}`} label={name} iconsOnly>
+          <ProjectDot color={color} round />
+        </NavItem>
+      </li>
+    );
+  }
   return (
     <li>
-      <div className="group flex items-center">
-        <button
-          type="button"
-          aria-label={open ? `Collapse ${name}` : `Expand ${name}`}
-          aria-expanded={open}
-          onClick={() => setOpen(!open)}
-          className="grid h-8 w-5 shrink-0 place-items-center rounded text-sidebar-muted hover:text-sidebar-ink"
-        >
-          <Icon icon={open ? ChevronDown : ChevronRight} size={13} />
-        </button>
-        <div className="min-w-0 flex-1">
-          <NavItem to={`/teams/${teamId}`}>
-            <span
-              aria-hidden
-              className="h-2.5 w-2.5 shrink-0 rounded-full"
-              style={{ background: colorVar(color) }}
-            />
-            <span className="truncate">{name}</span>
-          </NavItem>
-        </div>
+      <div className="relative">
+        <NavItem to={`/teams/${teamId}`} label={name}>
+          <ProjectDot color={color} round />
+        </NavItem>
+        {projects.length > 0 ? (
+          <button
+            type="button"
+            aria-label={folded ? `Expand ${name}` : `Collapse ${name}`}
+            aria-expanded={!folded}
+            onClick={() => toggleTeam(teamId)}
+            className="absolute top-1 right-1 grid h-6 w-6 place-items-center rounded text-sidebar-muted transition-colors hover:bg-sidebar-active hover:text-sidebar-ink"
+          >
+            <Icon icon={folded ? ChevronRight : ChevronDown} size={14} />
+          </button>
+        ) : null}
       </div>
-      {open && projects.length > 0 ? (
-        <ul className="ml-5 flex flex-col gap-0.5">
+      {!folded && projects.length > 0 ? (
+        <ul className="ml-[17px] flex flex-col gap-px border-l border-sidebar-line pl-1.5">
           {projects.map((p) => (
             <li key={p.id}>
-              <ProjectLink p={p} />
+              <ProjectLink p={p} iconsOnly={false} />
             </li>
           ))}
         </ul>
@@ -376,19 +480,21 @@ function TeamTree({
   );
 }
 
-function FavoritesSection() {
+function FavoritesSection({ iconsOnly }: { iconsOnly: boolean }) {
   const favorites = useFavorites();
+  const list = favorites.data ?? [];
+  if (iconsOnly && list.length === 0) return null;
   return (
-    <SidebarSection title="Favorites">
-      {(favorites.data ?? []).length === 0 ? (
-        <p className="flex items-center gap-2 px-4 text-xs text-sidebar-muted">
+    <SidebarSection title="Favorites" iconsOnly={iconsOnly}>
+      {list.length === 0 ? (
+        <p className="flex items-center gap-2 px-2.5 text-meta text-sidebar-muted">
           <Icon icon={Star} size={13} /> Star a project to pin it here.
         </p>
       ) : (
-        <ul className="flex flex-col gap-0.5 px-2">
-          {favorites.data?.map((p) => (
+        <ul className="flex flex-col gap-px">
+          {list.map((p) => (
             <li key={p.id}>
-              <ProjectLink p={p} />
+              <ProjectLink p={p} iconsOnly={iconsOnly} />
             </li>
           ))}
         </ul>
