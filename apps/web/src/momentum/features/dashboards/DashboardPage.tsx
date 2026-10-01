@@ -65,7 +65,7 @@ function DashboardBody() {
                   aria-label="Dashboard name"
                 />
               ) : (
-                <h1 className="text-xl font-semibold">{d.name}</h1>
+                <h1 className="page-title">{d.name}</h1>
               )
             }
             actions={

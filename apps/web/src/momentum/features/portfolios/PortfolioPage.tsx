@@ -72,7 +72,7 @@ function PortfolioBody({ p }: { p: PortfolioDetail }) {
     <div className="mx-auto max-w-6xl space-y-6 px-4 py-6 md:px-8">
       <header className="flex flex-wrap items-start gap-3">
         <div className="min-w-0 flex-1">
-          <h1 className="flex items-center gap-2 text-xl font-semibold">
+          <h1 className="flex items-center gap-2 page-title">
             <Icon icon={Briefcase} size={18} className="text-muted" />
             <span className="truncate">{p.name}</span>
             {p.status ? <StatusChip status={p.status as Status} /> : null}

@@ -27,7 +27,7 @@ export function DashboardsPage() {
   return (
     <div className="mx-auto max-w-5xl px-4 py-6 md:px-8">
       <header className="mb-6 flex items-center gap-3">
-        <h1 className="flex-1 text-xl font-semibold">Dashboards</h1>
+        <h1 className="flex-1 page-title">Dashboards</h1>
         <Button variant="primary" onClick={() => setAdding(true)}>
           <Icon icon={Plus} size={15} /> New dashboard
         </Button>

@@ -115,7 +115,7 @@ function WorkloadBody() {
     <div className="flex h-full min-h-0">
       <div className="min-w-0 flex-1 overflow-auto px-4 py-6 md:px-8">
         <header className="mb-4 flex flex-wrap items-center gap-2">
-          <h1 className="mr-auto text-xl font-semibold">Workload</h1>
+          <h1 className="mr-auto page-title">Workload</h1>
           <label className="sr-only" htmlFor="workload-project">
             Project
           </label>

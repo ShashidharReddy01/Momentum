@@ -7,7 +7,7 @@ export function AiActionPage() {
   const { actionId } = useParams();
   return (
     <div className="mx-auto w-full max-w-2xl px-6 py-8">
-      <h1 className="mb-4 text-lg font-semibold">Suggested changes</h1>
+      <h1 className="mb-4 page-title">Suggested changes</h1>
       <PreviewCard actionId={actionId!} />
     </div>
   );

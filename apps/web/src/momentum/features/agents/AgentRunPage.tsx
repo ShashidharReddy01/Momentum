@@ -53,7 +53,7 @@ function RunDetail({ run }: { run: AgentRunDetail }) {
           <MoMark size={13} /> {run.agent.name}
         </Link>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-          <h1 className="text-lg font-semibold">Run · {TRIGGER_LABEL[run.trigger] ?? run.trigger}</h1>
+          <h1 className="page-title">Run · {TRIGGER_LABEL[run.trigger] ?? run.trigger}</h1>
           <StatusBadge status={run.status} />
         </div>
         <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">

@@ -92,7 +92,7 @@ function GoalBody({ g }: { g: GoalDetail }) {
       <header className="flex flex-wrap items-start gap-6 rounded-xl border border-hairline bg-surface p-5">
         <Ring value={g.progress} />
         <div className="min-w-0 flex-1 space-y-1">
-          <h1 className="flex items-center gap-2 text-xl font-semibold">
+          <h1 className="flex items-center gap-2 page-title">
             <Icon icon={Target} size={18} className="text-muted" />
             <span className="truncate">{g.name}</span>
             {g.status ? <StatusChip status={g.status as Status} /> : null}

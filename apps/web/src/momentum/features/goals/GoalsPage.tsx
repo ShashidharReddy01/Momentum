@@ -57,7 +57,7 @@ export function GoalsPage() {
   return (
     <div className="mx-auto max-w-5xl px-4 py-6 md:px-8">
       <header className="mb-4 flex flex-wrap items-center gap-3">
-        <h1 className="flex-1 text-xl font-semibold">Goals</h1>
+        <h1 className="flex-1 page-title">Goals</h1>
         <div className="flex rounded-md bg-surface-2 p-0.5 text-sm" role="group" aria-label="Period">
           {(
             [

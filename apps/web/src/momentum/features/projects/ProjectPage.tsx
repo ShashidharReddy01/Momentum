@@ -143,8 +143,8 @@ export function ProjectPage() {
 
   return (
     <div className="flex h-full flex-col">
-      <header className="border-b border-hair-soft px-4 md:px-8 pt-5">
-        <div className="flex items-center gap-3">
+      <header className="border-b border-hairline bg-surface px-4 pt-3 md:px-8">
+        <div className="flex min-h-9 items-center gap-3">
           <span
             aria-hidden
             className="h-4 w-4 shrink-0 rounded-[5px]"
@@ -179,7 +179,7 @@ export function ProjectPage() {
                   name={m.user.name}
                   src={m.user.avatar_url}
                   size={24}
-                  className="ring-2 ring-canvas"
+                  className="ring-2 ring-surface"
                 />
               ))}
             </div>
@@ -249,11 +249,11 @@ export function ProjectPage() {
             ) : null}
           </div>
         </div>
-        <nav aria-label="Project views" className="mt-3 flex gap-5">
+        <nav aria-label="Project views" className="mt-1 flex gap-1">
           {VIEWS.map((v) =>
             'phase' in v ? (
               <Tooltip key={v.key} content={`Arrives in Phase ${v.phase}`}>
-                <span className="cursor-default border-b-2 border-transparent pb-2 text-sm text-muted-2">
+                <span className="flex h-9 cursor-default items-center border-b-2 border-transparent px-2 text-body text-muted-2">
                   {v.label}
                 </span>
               </Tooltip>
@@ -263,10 +263,10 @@ export function ProjectPage() {
                 to={`/projects/${p.id}/${v.key}`}
                 aria-current={effectiveView === v.key ? 'page' : undefined}
                 className={cn(
-                  '-mb-px border-b-2 pb-2 text-sm',
+                  '-mb-px flex h-9 items-center rounded-t-md border-b-2 px-2 text-body transition-colors duration-[var(--dur-1)]',
                   effectiveView === v.key
-                    ? 'border-ink font-medium text-ink'
-                    : 'border-transparent text-muted hover:text-ink',
+                    ? 'border-ink font-semibold text-ink'
+                    : 'border-transparent text-muted hover:bg-surface-2 hover:text-ink',
                 )}
               >
                 {v.label}

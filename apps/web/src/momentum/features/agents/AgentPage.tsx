@@ -41,7 +41,7 @@ export function AgentPage() {
           <span className="flex h-9 w-9 items-center justify-center rounded-full bg-amber-2 ring-2 ring-amber">
             <MoMark size={16} className="text-amber-ink" />
           </span>
-          <h1 className="text-lg font-semibold">{a.name}</h1>
+          <h1 className="page-title">{a.name}</h1>
           <span className={a.enabled ? 'text-sm text-ok' : 'text-sm text-muted'}>
             {a.enabled ? 'On' : 'Off'}
           </span>

@@ -210,7 +210,7 @@ function AgentFormShell({ title, children }: { title: string; children: React.Re
   const isAdmin = useMe().data?.user.role === 'admin';
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 px-6 py-8">
-      <h1 className="text-lg font-semibold">{title}</h1>
+      <h1 className="page-title">{title}</h1>
       {isAdmin ? children : <p className="text-sm text-muted">Only workspace admins can change agents.</p>}
     </div>
   );
