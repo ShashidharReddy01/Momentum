@@ -42,6 +42,10 @@ Measured with Playwright on the seeded workspace (22 extra projects from `seed -
 
 **What already works (keep):** realtime and undo everywhere, keyboard shortcuts and the ⌘K palette, the dark theme's palette, AI marking (amber ✦), honest empty states, the dashboard and forecast visuals from Phase 6.
 
+## Showcase data (added 2026-10-01, product owner)
+
+"Load data under every page with every possibility, and see it as the admin." The first audit ran on thin demo data (due dates only, few dependencies, empty inbox), which made screens like the timeline look broken (one-day bars at quarter zoom). **`momentum seed --showcase`** (`apps/api/momentum/seed_showcase.py`, tested) builds, through the services as the real people: a rich project (spans, milestones, a dependency chain with an overdue blocker, subtasks, all priorities, estimates, a very long title, recurring, approval, multi-homed, custom fields, tags, @mentions, two status updates), a private project, a marketing project with a request form, submissions and a rule, an operations project, an empty project, a portfolio with a check-in, goals (linked work, a metric, a sub-goal), workspace and project dashboards (one chart drafted from a question), capacity overrides, the starter agents and forecasts. The audit is re-run on it as **Avery (admin)**, a member (Ravi) and a project viewer.
+
 ## Slices (build order)
 
 Slices are named UX1…UX8 to avoid colliding with S6.5.x. Each ships tokens/components first, then screens, and is verified at the five viewports in both themes with before/after screenshots.

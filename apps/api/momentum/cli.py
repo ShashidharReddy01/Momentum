@@ -80,6 +80,9 @@ def seed(
     history: bool = typer.Option(
         False, "--history", help="Also add ~20 finished projects for the forecast backtest"
     ),
+    showcase: bool = typer.Option(
+        False, "--showcase", help="Also add a workspace that exercises every screen (UI reviews)"
+    ),
 ) -> None:
     """Load the synthetic demo workspace (safe to re-run)."""
     from momentum.core.db import UnitOfWork, create_engine, create_session_factory
@@ -93,6 +96,10 @@ def seed(
         uow = UnitOfWork(create_session_factory(engine)())
         try:
             async with uow.transaction() as session:
+                if showcase:
+                    from momentum.seed_showcase import seed_showcase
+
+                    return await seed_showcase(session, settings)
                 if history:
                     from momentum.seed_history import seed_history
 
