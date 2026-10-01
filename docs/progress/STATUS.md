@@ -113,8 +113,8 @@ Tracked in their phase files; copy the slice list here at each phase kickoff.
 
 ### Phase 6.5: UI/UX revamp
 - [x] Kickoff (2026-10-01): audit at 7 viewports × 2 themes, `PRODUCT.md`, direction Wayfinding (`DESIGN.md`), plan `phase-6.5.md`
-- [x] UX1 Foundations (2026-10-01) · [x] UX2 Shell (2026-10-01) · [x] UX3 List columns (2026-10-01) · [ ] UX4 Board, Calendar, Timeline
-- [ ] UX5 Home, My Tasks, Inbox · [ ] UX6 Planning screens · [ ] UX7 AI, agents, settings, overlays · [ ] UX8 Exit
+- [x] UX1 Foundations (2026-10-01) · [x] UX2 Shell (2026-10-01) · [x] UX3 List columns (2026-10-01) · [x] UX4 Board/Calendar/Timeline (2026-10-01)
+- [x] UX5 Home/Tasks/Inbox (2026-10-01) · [x] UX6 Planning (2026-10-01) · [x] UX7 AI/agents/overlays (2026-10-01) · [ ] UX8 Exit
 - **Branches (2026-09-30, product owner: "put everything in one"):** checked every remote branch: `claude/inspiring-bohr-p9xomo` already contains every commit of `main`, `claude/clever-hopper-pbv7yr`, `claude/intelligent-meitner-9ne4e8` (including the Phase 5 round-4 close) and `claude/amazing-knuth-u6v1s2`. It is now the single line of work; `main` was fast-forwarded to it. The older branches can be deleted on GitHub whenever convenient (nothing on them is missing here).
 - **Local machine note (2026-09-30):** the product owner's Windows machine has no `make`; this session ran the gate's steps directly (same commands as `make check`) and used its own databases (`momentum_bohr`, `momentum_bohr_test`) in the shared Docker Postgres so two checkouts can't collide on `momentum_test`.
 - **Backlog cleared (2026-09-30, before S6.4.2):** (1) mock-mode AI output now carries the purple *mock* marker: `/config` reports `ai_mock`, and `AICallout`, `AIBadge` and the top bar's Ask Mo button show a "MOCK" chip (`AIMockMark`); (2) migration **0035** renames the two agent unique constraints to the naming convention, so autogenerate reports no drift. Still open by agreement: the dogfood week (post-ship), the Phase 4 carry-overs listed under Current focus, and the `ai_step/draft_reply_answers_newest` judge-consistency note.
