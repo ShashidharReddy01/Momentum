@@ -433,7 +433,7 @@ function Column({
             <button
               type="button"
               onClick={() => setAdding(true)}
-              className="flex h-8 w-full items-center gap-1.5 rounded-md px-2 text-[13px] text-muted hover:bg-surface hover:text-ink"
+              className="flex h-8 w-full items-center gap-1.5 rounded-md px-1.5 text-[13px] text-muted hover:bg-surface hover:text-ink"
             >
               <Icon icon={Plus} size={14} /> Add card
             </button>
@@ -492,17 +492,24 @@ function Card({
       }}
       {...drag.listeners}
       className={cn(
-        'group/card relative flex cursor-pointer flex-col gap-1.5 rounded-md border border-hairline bg-surface p-2.5 text-left outline-none',
+        'group/card relative flex cursor-pointer flex-col gap-1.5 rounded-md border border-hairline bg-surface pt-5 px-2.5 pb-2.5 text-left outline-none',
         'hover:border-muted-2 focus-visible:shadow-[inset_0_0_0_2px_var(--focus)]',
         drag.isDragging && 'opacity-40',
       )}
     >
       {color ? (
-        <span
-          aria-hidden
-          className="absolute inset-y-0 left-0 w-0.5 rounded-l-md"
-          style={{ background: `var(--${color})` }}
-        />
+        <>
+          <span
+            aria-hidden
+            className="absolute top-0 inset-x-0 h-1 rounded-t-md"
+            style={{ background: `var(--${color})` }}
+          />
+          <span
+            aria-hidden
+            className="absolute top-2.5 left-2.5 h-2 w-2 rounded-sm"
+            style={{ background: `var(--${color})` }}
+          />
+        </>
       ) : null}
       <div className="flex items-start gap-2">
         <CompleteCheck
