@@ -238,7 +238,7 @@ const RowBody = memo(function RowBody({
   const assigneeCell = (
     <Cell
       disabled={!canEdit}
-      className="w-36 @max-3xl:w-10"
+      className={LIST_COLS.assignee}
       aria-label={assignee ? `Assignee: ${assignee.name}` : 'Assign'}
       aria-keyshortcuts="A"
       onClick={() => setPicker('assignee')}
@@ -246,9 +246,7 @@ const RowBody = memo(function RowBody({
       {assignee ? (
         <>
           <Avatar name={assignee.name} src={assignee.avatar_url} size={20} isAgent={assignee.is_agent} />
-          <span className="truncate text-[12.5px] text-ink-2 @max-3xl:hidden">
-            {assignee.name.split(' ')[0]}
-          </span>
+          <span className="truncate text-meta text-ink-2 @max-3xl:hidden">{assignee.name.split(' ')[0]}</span>
         </>
       ) : (
         <Placeholder icon={UserRound} show={canEdit} />
@@ -258,7 +256,7 @@ const RowBody = memo(function RowBody({
   const dueCell = (
     <Cell
       disabled={!canEdit}
-      className="w-32 @max-3xl:w-28 @max-md:w-20"
+      className={LIST_COLS.due}
       aria-label={task.due_on ? `Due ${formatDue(task.due_on, task.due_at)}` : 'Set due date'}
       aria-keyshortcuts="D"
       onClick={() => setPicker('due')}
@@ -316,7 +314,7 @@ const RowBody = memo(function RowBody({
       tabIndex={0}
       onKeyDown={onRowKey}
       className={cn(
-        'group/row relative flex h-9 items-center gap-2.5 border-b border-hair-soft px-2 transition-opacity duration-300 outline-none hover:bg-surface-2 focus-visible:bg-surface-2 focus-visible:shadow-[inset_2px_0_0_var(--focus)]',
+        'group/row relative flex h-[var(--row-h)] items-center gap-2.5 border-b border-hair-soft px-2 transition-opacity duration-300 outline-none hover:bg-surface-2 focus-visible:bg-surface-2 focus-visible:shadow-[inset_2px_0_0_var(--focus)]',
         (done || fading) && 'text-muted',
         fading && 'opacity-60',
         selected && 'bg-selection hover:bg-selection focus-visible:bg-selection',
@@ -353,7 +351,7 @@ const RowBody = memo(function RowBody({
             onChange={(e) => setDraft(e.target.value)}
             onBlur={commit}
             onKeyDown={onKey}
-            className="h-7 w-full min-w-0 rounded-sm border border-focus bg-surface px-1 text-[13.5px] outline-none"
+            className="h-7 w-full min-w-0 rounded-sm border border-focus bg-surface px-1 text-body outline-none"
           />
         ) : (
           <button
@@ -361,7 +359,7 @@ const RowBody = memo(function RowBody({
             disabled={!canEdit}
             onClick={() => setEditing(true)}
             className={cn(
-              'max-w-full min-w-0 cursor-text truncate rounded-sm px-0.5 text-left text-[13.5px] hover:ring-1 hover:ring-hairline disabled:cursor-default disabled:hover:ring-0',
+              'max-w-full min-w-[6rem] shrink cursor-text truncate rounded-sm px-0.5 text-left text-body hover:ring-1 hover:ring-hairline disabled:cursor-default disabled:hover:ring-0',
               done && 'line-through decoration-muted-2',
             )}
           >
@@ -384,9 +382,33 @@ const RowBody = memo(function RowBody({
             ↳ {task.completed_subtask_count}/{task.subtask_count}
           </button>
         ) : null}
+        {fields?.length || tags?.length || otherProjects?.length ? (
+          <span className="ml-2 flex h-6 min-w-0 shrink-[4] flex-wrap items-center gap-1 overflow-hidden @max-3xl:hidden">
+            {otherProjects?.map((p) => (
+              <span
+                key={p.id}
+                title={`Also in ${p.name}`}
+                className="inline-flex h-6 items-center gap-1 rounded-md bg-surface-2 px-1.5 text-xs text-muted"
+              >
+                <span
+                  aria-hidden
+                  className="h-2 w-2 shrink-0 rounded-sm"
+                  style={{ background: p.color ? `var(--${p.color})` : 'var(--muted-2)' }}
+                />
+                {p.name}
+              </span>
+            ))}
+            {tags?.map((t) => (
+              <TagChip key={t.id} tag={t} />
+            ))}
+            {fields?.map((f) => (
+              <FieldValueChip key={f.field.id} field={f.field} value={fieldValues?.get(f.field.id) ?? null} />
+            ))}
+          </span>
+        ) : null}
       </div>
       {project ? (
-        <span className="flex w-40 shrink-0 items-center gap-1.5 truncate text-xs text-muted @max-3xl:w-24 @max-md:hidden">
+        <span className={cn('flex items-center gap-1.5 truncate text-meta text-muted', LIST_COLS.project)}>
           <span
             aria-hidden
             className="h-2 w-2 shrink-0 rounded-sm"
@@ -395,7 +417,12 @@ const RowBody = memo(function RowBody({
           <span className="truncate">{project.name}</span>
         </span>
       ) : null}
-      <span className="w-14 shrink-0 text-right font-mono text-[11px] text-muted-2 opacity-0 group-hover/row:opacity-100 @max-3xl:hidden">
+      <span
+        className={cn(
+          'text-right font-mono text-label text-muted-2 opacity-0 group-hover/row:opacity-100',
+          LIST_COLS.key,
+        )}
+      >
         {isTemp(task.id) ? '…' : task.key}
       </span>
       {/* Pickers and the menu mount only while open: most rows never open them, and each
@@ -432,50 +459,38 @@ const RowBody = memo(function RowBody({
       ) : (
         dueCell
       )}
-      {fields?.length || tags?.length || otherProjects?.length ? (
-        <span className="flex min-w-0 shrink flex-wrap items-center gap-1 @max-3xl:hidden">
-          {otherProjects?.map((p) => (
-            <span
-              key={p.id}
-              title={`Also in ${p.name}`}
-              className="inline-flex h-6 items-center gap-1 rounded-md bg-surface-2 px-1.5 text-xs text-muted"
-            >
-              <span
-                aria-hidden
-                className="h-2 w-2 shrink-0 rounded-sm"
-                style={{ background: p.color ? `var(--${p.color})` : 'var(--muted-2)' }}
-              />
-              {p.name}
-            </span>
-          ))}
-          {tags?.map((t) => (
-            <TagChip key={t.id} tag={t} />
-          ))}
-          {fields?.map((f) => (
-            <FieldValueChip key={f.field.id} field={f.field} value={fieldValues?.get(f.field.id) ?? null} />
-          ))}
-        </span>
-      ) : null}
-      {detailsButton}
-      {canEdit ? (
-        menuOpen ? (
-          <DropdownMenu open onOpenChange={setMenuOpen}>
-            <DropdownMenuTrigger asChild>{menuButton}</DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem className="text-crit" onSelect={() => onDelete(task)}>
-                <Icon icon={Trash2} /> Delete task
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        ) : (
-          menuButton
-        )
-      ) : (
-        <span className="w-7" />
-      )}
+      <span className={LIST_COLS.actions}>
+        {detailsButton}
+        {canEdit ? (
+          menuOpen ? (
+            <DropdownMenu open onOpenChange={setMenuOpen}>
+              <DropdownMenuTrigger asChild>{menuButton}</DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem className="text-crit" onSelect={() => onDelete(task)}>
+                  <Icon icon={Trash2} /> Delete task
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            menuButton
+          )
+        ) : null}
+      </span>
     </div>
   );
 });
+
+/** Column tracks shared by every row and the list header, so cells line up whatever a row
+ * carries (Phase 6.5, UX3). Columns repack in whole steps as the list narrows: the key hides,
+ * the assignee becomes an avatar, then the actions collapse. */
+export const LIST_COLS = {
+  check: 'w-[18px] shrink-0',
+  key: 'w-14 shrink-0 @max-3xl:hidden',
+  project: 'w-40 shrink-0 @max-3xl:w-24 @max-md:hidden',
+  assignee: 'w-36 shrink-0 @max-3xl:w-10',
+  due: 'w-36 shrink-0 @max-3xl:w-28 @max-md:w-24',
+  actions: 'flex w-[58px] shrink-0 items-center justify-end gap-0.5 @max-md:w-7',
+} as const;
 
 /** A clickable list cell that opens a picker; forwards the Radix trigger props. */
 const Cell = forwardRef<HTMLButtonElement, ComponentProps<'button'>>(function Cell(
@@ -532,7 +547,7 @@ export function DraftRow({
     <div
       role="listitem"
       aria-label="New task"
-      className="flex h-9 items-center gap-2.5 border-b border-hair-soft px-2"
+      className="flex h-[var(--row-h)] items-center gap-2.5 border-b border-hair-soft px-2"
     >
       <CompleteCheck checked={false} disabled label="New task" onChange={() => {}} />
       <input
@@ -579,7 +594,7 @@ export function DraftRow({
             onCancel();
           }
         }}
-        className="h-7 min-w-0 flex-1 rounded-sm bg-transparent px-1 text-[13.5px] outline-none placeholder:text-muted-2"
+        className="h-7 min-w-0 flex-1 rounded-sm bg-transparent px-1 text-body outline-none placeholder:text-muted-2"
       />
     </div>
   );

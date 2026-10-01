@@ -97,8 +97,28 @@ export function formatDue(
   now = new Date(),
 ): string {
   if (!dueOn) return '';
-  const due = formatDay(dueOn, now) + (dueAt ? ` ${formatTime(new Date(dueAt))}` : '');
-  return startOn ? `${formatDay(startOn, now)} – ${due}` : due;
+  const time = dueAt ? ` ${formatTime(new Date(dueAt))}` : '';
+  if (!startOn) return formatDay(dueOn, now) + time;
+  // Ranges stay short so they fit a list cell: weekday names are dropped, and a range inside
+  // one month names the month once ("Sep 25 – 30").
+  const near = (iso: string) => Math.abs(dayDiff(now, fromISODate(iso))) <= 1;
+  const start = fromISODate(startOn);
+  const end = fromISODate(dueOn);
+  const short = (iso: string) => (near(iso) ? formatDay(iso, now) : formatDate(fromISODate(iso), now));
+  if (
+    !near(startOn) &&
+    !near(dueOn) &&
+    !time &&
+    start.getFullYear() === end.getFullYear() &&
+    start.getMonth() === end.getMonth()
+  )
+    return `${short(startOn)} – ${end.getDate()}`;
+  return `${short(startOn)} – ${short(dueOn)}${time}`;
+}
+
+/** "Oct 5", or "Oct 5, 2027" outside this year. */
+function formatDate(d: Date, now: Date): string {
+  return d.getFullYear() === now.getFullYear() ? MONTH_DAY.format(d) : MONTH_DAY_YEAR.format(d);
 }
 
 /** Monday of the week after `now`. */
