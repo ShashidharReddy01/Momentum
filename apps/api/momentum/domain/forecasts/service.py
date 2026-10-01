@@ -46,12 +46,13 @@ MIN_WEEKS = 2  # of history before a forecast means anything
 ESTIMATED_SHARE = 0.7  # of open and of recently finished work, to forecast in hours
 SIGNAL_POINTS = 12  # risk points per Radar signal weight
 FRESH = timedelta(hours=36)  # Radar trusts a stored forecast this old
+HORIZON_DAYS = 3 * 365  # a P95 further out than this is not a forecast, it's "not converging"
 
 
 @dataclass
 class Result:
     as_of: date
-    status: str  # ok | done | no_history
+    status: str  # ok | done | no_history | growing
     p50: date | None = None
     p80: date | None = None
     p95: date | None = None
@@ -148,9 +149,6 @@ async def compute(session: AsyncSession, project: Project, as_of: date, *, runs:
         for r in open_
     }
     chain = longest_chain(durations, [(str(a), str(b)) for a, b in edges])
-    # stable for a given day; a simulation, not security
-    rng = random.Random(f"{project.id}:{as_of.isoformat()}")  # noqa: S311
-    days = simulate(remaining, samples, runs=runs, rng=rng, floor_days=chain, added=added)
     inputs: dict[str, Any] = {
         "mode": "hours" if hours else "tasks",
         "remaining": round(remaining / 60, 1) if hours else int(remaining),
@@ -161,9 +159,18 @@ async def compute(session: AsyncSession, project: Project, as_of: date, *, runs:
         "chain_days": chain,
         "runs": runs,
     }
+    if sum(added) >= sum(samples):
+        # work arrived at least as fast as it was finished: at this pace it never ends, and a
+        # date would be a fiction (found with the showcase data, 2026-10-01)
+        return Result(as_of, "growing", inputs=inputs)
+    # stable for a given day; a simulation, not security
+    rng = random.Random(f"{project.id}:{as_of.isoformat()}")  # noqa: S311
+    days = simulate(remaining, samples, runs=runs, rng=rng, floor_days=chain, added=added)
     if days is None:
         return Result(as_of, "no_history", inputs=inputs)
     p = percentiles(days)
+    if p.p95 > HORIZON_DAYS:
+        return Result(as_of, "growing", inputs=inputs)
     return Result(
         as_of,
         "ok",
@@ -194,6 +201,17 @@ async def risk(
         for s in found
     ]
     due = project.due_on
+    if result.status == "growing":
+        drivers.append(
+            {
+                "kind": "forecast",
+                "text": (
+                    "Work is being added faster than it gets done: at this pace it won't finish"
+                ),
+                "tasks": [],
+                "points": 40 if due is not None else 25,
+            }
+        )
     if due is not None and result.status == "ok":
         assert result.p50 and result.p80 and result.p95
         if result.p50 > due:

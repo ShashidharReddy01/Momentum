@@ -1,9 +1,13 @@
 import type { Forecast } from './queries';
 
-/** "Nov 12" for a YYYY-MM-DD date (read as a local date). */
-export function day(iso: string): string {
+/** "Nov 12" for a YYYY-MM-DD date (read as a local date), "Feb 11, 2027" outside this year. */
+export function day(iso: string, now = new Date()): string {
   const [y, m, d] = iso.split('-').map(Number);
-  return new Date(y!, m! - 1, d!).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  return new Date(y!, m! - 1, d!).toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    ...(y === now.getFullYear() ? {} : { year: 'numeric' }),
+  });
 }
 
 export function daysBetween(a: string, b: string): number {
@@ -42,6 +46,9 @@ export function basis(f: Forecast): string {
     `${i.remaining ?? 0} ${unit} left`,
     `${Math.round(avg * 10) / 10} ${unit}/week over the last ${i.weeks ?? 0} weeks`,
   ];
-  if (i.runs) parts.push(`${i.runs.toLocaleString()} simulated futures`);
+  const added = (f.inputs as { added?: number[] }).added ?? [];
+  const addedAvg = added.length ? added.reduce((a, b) => a + b, 0) / added.length : 0;
+  if (addedAvg > 0) parts.push(`${Math.round(addedAvg * 10) / 10} ${unit}/week added`);
+  if (i.runs && f.status === 'ok') parts.push(`${i.runs.toLocaleString()} simulated futures`);
   return parts.join(' · ');
 }

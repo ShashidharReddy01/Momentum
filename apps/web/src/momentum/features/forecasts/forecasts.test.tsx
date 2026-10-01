@@ -9,7 +9,7 @@ import { addDays, toISODate } from '@/lib/dates';
 import { createApiClient } from '@/lib/api/client';
 import { ApiContext } from '@/providers/api';
 import { ForecastCard } from './ForecastCard';
-import { basis, verdict } from './model';
+import { basis, day, verdict } from './model';
 import type { Forecast } from './queries';
 
 const server = setupServer();
@@ -77,9 +77,15 @@ describe('forecast model (S6.5.3)', () => {
     expect(verdict(forecast({ due_on: null })).tone).toBe('none');
   });
 
+  it('names the year only when it is not this year', () => {
+    const year = new Date().getFullYear();
+    expect(day(`${year}-03-04`)).not.toMatch(String(year));
+    expect(day(`${year + 1}-03-04`)).toMatch(String(year + 1));
+  });
+
   it('says what it is based on', () => {
     expect(basis(forecast())).toBe(
-      `12 tasks left · 3.5 tasks/week over the last 6 weeks · ${(10000).toLocaleString()} simulated futures`,
+      `12 tasks left · 3.5 tasks/week over the last 6 weeks · 0.5 tasks/week added · ${(10000).toLocaleString()} simulated futures`,
     );
   });
 });
@@ -96,6 +102,17 @@ describe('ForecastCard (S6.5.3)', () => {
     expect(why).toHaveTextContent('+40');
     expect(why).toHaveTextContent('T-4 Copy');
     expect(within(card).getByText('52')).toBeInTheDocument();
+  });
+
+  it('says there is no finish date while work grows faster than it gets done', async () => {
+    server.use(
+      http.get('*/api/v1/projects/:id/forecast', () =>
+        HttpResponse.json({ forecast: forecast({ status: 'growing', p50: null, p80: null, p95: null }) }),
+      ),
+    );
+    renderWithProviders(<ForecastCard projectId="p1" />);
+    expect(await screen.findByText(/no finish date to forecast yet/)).toBeInTheDocument();
+    expect(screen.queryByText(/^Likely done/)).toBeNull();
   });
 
   it('is honest when there is nothing to go on, and refreshes on request', async () => {

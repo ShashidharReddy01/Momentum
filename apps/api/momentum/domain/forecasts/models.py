@@ -14,7 +14,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from momentum.core.db import Base, IdMixin
 
-STATUSES = ("ok", "done", "no_history")
+STATUSES = ("ok", "done", "no_history", "growing")
 LEVELS = ("none", "low", "medium", "high")
 
 
@@ -27,7 +27,8 @@ class Forecast(IdMixin, Base):
         DateTime(timezone=True), server_default=func.now()
     )
     as_of: Mapped[date] = mapped_column(Date)
-    # ok: dates below; done: nothing open; no_history: too little finished work to go on
+    # ok: dates below; done: nothing open; no_history: too little finished work to go on;
+    # growing: work arrives at least as fast as it is finished, so there is no end date
     status: Mapped[str] = mapped_column(String(16))
     p50: Mapped[date | None] = mapped_column(Date)
     p80: Mapped[date | None] = mapped_column(Date)

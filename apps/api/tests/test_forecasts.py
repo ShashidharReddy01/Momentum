@@ -144,6 +144,43 @@ async def test_a_forecast_as_of_the_past_ignores_what_came_later(
     assert past.status == "ok" and past.inputs["remaining"] == 12  # the last three weeks' work
 
 
+async def test_work_growing_faster_than_it_is_done_has_no_date(
+    uow: UnitOfWork, settings: Settings, seeded: None
+) -> None:
+    project = await _project(uow)
+    await _history(uow, project, weeks=6, per_week=1, left=4)
+    async with uow.transaction() as s:  # ten tasks added in the last fortnight, one done a week
+        p = await s.get(Project, project.id)
+        assert p is not None
+        from momentum.domain.workspace.models import Workspace
+
+        ws = await s.get(Workspace, p.workspace_id)
+        assert ws is not None
+        section_id = (
+            await s.execute(
+                select(TaskProject.section_id).where(TaskProject.project_id == p.id).limit(1)
+            )
+        ).scalar_one()
+        for i in range(10):
+            ws.task_seq += 1
+            t = Task(
+                workspace_id=p.workspace_id,
+                number=ws.task_seq,
+                title=f"Late addition {i}",
+                created_at=datetime.now(UTC) - timedelta(days=i % 12),
+            )
+            s.add(t)
+            await s.flush()
+            s.add(
+                TaskProject(
+                    task_id=t.id, project_id=p.id, section_id=section_id, position=f"z{i:03d}"
+                )
+            )
+    async with uow.transaction() as s:
+        r = await service.compute(s, project, datetime.now(UTC).date(), runs=500)
+    assert r.status == "growing" and r.p50 is None
+
+
 async def test_no_history_and_done(uow: UnitOfWork, seeded: None) -> None:
     project = await _project(uow)
     await _history(uow, project, weeks=1, per_week=2, left=5)  # one week: too little to go on

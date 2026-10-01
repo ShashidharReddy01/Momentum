@@ -51,6 +51,18 @@ export function ForecastCard({ projectId }: { projectId: string }) {
           <Icon icon={CheckCircle2} size={15} className="text-ok" aria-hidden /> Nothing left to forecast:
           every task is done.
         </p>
+      ) : f.status === 'growing' ? (
+        <div className="space-y-3">
+          <p className="flex items-start gap-2 text-sm text-ink-2">
+            <Icon icon={AlertTriangle} size={15} className="mt-0.5 shrink-0 text-warn" aria-hidden />
+            <span>
+              Work is being added at least as fast as it gets done, so there is no finish date to forecast
+              yet. Finishing more than gets added each week brings one back.
+            </span>
+          </p>
+          <Risk f={f} />
+          <p className="text-xs text-muted">{basis(f)}</p>
+        </div>
       ) : f.status === 'no_history' ? (
         <p className="text-sm text-muted">
           Not enough finished work to forecast yet. A forecast needs at least two weeks of this project&apos;s

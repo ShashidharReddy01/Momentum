@@ -94,6 +94,9 @@ class Showcase:
         self.today = datetime.now(UTC).date()
         self.ids: dict[str, uuid.UUID] = {}  # task title → id
         self.done: list[tuple[uuid.UUID, date, date]] = []  # (task, created, completed)
+        # every task's synthetic creation day: a project is planned up front, not all today
+        self.created: dict[uuid.UUID, date] = {}
+        self.kickoff = self.today - timedelta(days=28)  # the current project's planning day
 
     def ctx(self, local: str) -> Ctx:
         u = self.u[local]
@@ -126,6 +129,8 @@ class Showcase:
         brief: str | None = None,
     ) -> tuple[Project, dict[str, uuid.UUID]]:
         ctx = self.ctx(owner)
+        # tasks are planned at kickoff, a week before the project starts
+        self.kickoff = (self.d(start) or self.today - timedelta(days=21)) - timedelta(days=7)
         team_id = (await self.s.execute(select(Team.id).where(Team.name == team))).scalar_one()
         project = (
             await create_project(
@@ -200,10 +205,10 @@ class Showcase:
             if sub_done:
                 await tasks.set_completed(self.s, ctx, s.id, True)
         self.ids[title] = t.id
+        self.created[t.id] = self.kickoff
         if done:
-            created = self.d(start if start is not None else (due or 0) - 5) or self.today
             finished = self.d(due) or self.today
-            self.done.append((t.id, created - timedelta(days=3), finished))
+            self.done.append((t.id, self.kickoff, finished))
         return t.id
 
     async def depends(self, owner: str, task: str, blocker: str) -> None:
@@ -226,7 +231,16 @@ class Showcase:
                     completed_at=datetime.combine(finished, time(16), tzinfo=UTC),
                 )
             )
+        for tid, created_on in self.created.items():
+            if any(tid == d[0] for d in self.done):
+                continue
+            await self.s.execute(
+                update(Task)
+                .where(Task.id == tid)
+                .values(created_at=datetime.combine(created_on, time(9), tzinfo=UTC))
+            )
         self.done.clear()
+        self.created.clear()
 
 
 async def seed_showcase(session: AsyncSession, settings: Settings) -> dict[str, int]:

@@ -4823,7 +4823,7 @@ export interface components {
              * Status
              * @enum {string}
              */
-            status: "ok" | "done" | "no_history";
+            status: "ok" | "done" | "no_history" | "growing";
         };
         /** FormIn */
         FormIn: {

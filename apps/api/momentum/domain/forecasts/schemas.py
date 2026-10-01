@@ -22,7 +22,7 @@ class ForecastOut(BaseModel):
     project_id: uuid.UUID
     computed_at: datetime
     as_of: date
-    status: Literal["ok", "done", "no_history"]
+    status: Literal["ok", "done", "no_history", "growing"]
     p50: date | None
     p80: date | None
     p95: date | None
