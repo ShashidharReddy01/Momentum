@@ -1,45 +1,29 @@
-# Phase 9: Azure Deployment and Go-Live
+# Phase 7: Integrations and MCP
 
-**Goal:** Momentum running in the office Azure environment behind Easy Auth (Entra ID), using the office LiteLLM (Bedrock Claude + Cohere v3), with the team's Asana data imported. Milestone **M5**.
+**Goal:** Momentum works where people already are: Slack, Outlook calendar, email, and any MCP-capable AI client.
 
-**Read first:** architecture/embedding-and-portability.md §3, architecture/configuration.md, architecture/auth-and-permissions.md §2.
-
-**Kickoff prerequisites (ask IT early, ideally during Phase 7):** allowed region(s); App Service + PG Flexible approval; VNet/private endpoint requirements; who creates the Entra app registration and app role `Momentum.Admin`; LiteLLM endpoint, virtual key, model aliases, and network reachability from App Service; registry choice (ACR); CI system (GitHub Actions or Azure DevOps).
-
-**Exit criteria:** go-live checklist complete; the team logs in via Entra; Asana import done; backups verified; rollback tested once (slot swap back).
+**Exit criteria:** create a task from a Slack message; daily digest arrives by Slack DM; Claude Desktop (or another MCP client) can list and update tasks with a personal token; the calendar shows focus blocks in Plan my day.
 
 ---
 
-## E9.1 Azure adapters
+### S7.1: API tokens and MCP server (M) — **MCP dropped (product owner, 2026-09-26)**
+**Decision:** no MCP server. **Personal API tokens moved to Phase 5 as S5.1.6** (product owner, 2026-09-28; ADR-0009), so nothing from S7.1 remains here.
 
-| Slice | Scope | AC | Size |
-|---|---|---|---|
-| S9.1.1 Blob storage | `storage/azure_blob.py` (SAS upload/download URLs, managed identity or connection string), Azurite in compose for tests; `momentum migrate-files --from local --to azure_blob` | All attachment tests pass against Azurite | M |
-| S9.1.2 Telemetry | Azure Monitor OpenTelemetry exporter enabled by setting; custom metrics (AI tokens/cost, job failures, WS connections) | Traces visible in App Insights (verified in env) | S |
-| S9.1.3 Office LiteLLM check | Run `momentum llm-check` against the office gateway from an App Service console or a pipeline job; tune `LLM_SUPPORTS_STREAMING_TOOLS`, timeouts, price table; run `EVALS_LIVE=1 make evals` | All checks pass; eval thresholds met | S |
+**Scope:** settings UI for personal API tokens (create with scopes/expiry, shown once, revoke); FastMCP server at `/mcp` (streamable HTTP) exposing registry tools (read + write with the same preview/confirm semantics. Write tools return a proposal link unless the token has the `ai:auto_apply` scope); docs page "Connect Claude/VS Code to Momentum".
+**AC:** a token without `tasks:write` can't create tasks; all MCP writes appear with `created_via=mcp`.
 
-## E9.2 Infrastructure as code
+### S7.2: Slack app (L)
+**Scope:** `integrations/slack` with Bolt for Python. Local: **Socket Mode** (`SLACK_APP_TOKEN`). Prod: Events API + interactivity at `/webhooks/slack` (Easy Auth excluded path, signature verification). Features: link Slack user ↔ Momentum user (by email); DM notifications (per user prefs); message shortcut "Create Momentum task" (modal: title prefilled, project, assignee, due) with backlink; link unfurls for task/project URLs (permission-checked: unfurl only if the Slack user maps to a Momentum user who can see it); `/momentum` slash command (`/momentum add …`, `/momentum my`); chat with Mo in DMs (read-only answers + proposals that open in Momentum to apply); rule action "post to channel" (high risk, confirm for agents).
+**AC:** no Momentum content is revealed in Slack to users without access; Slack retries don't create duplicate tasks (idempotency by event id).
 
-| Slice | Scope | Size |
-|---|---|---|
-| S9.2.1 Bicep core | `infra/bicep/main.bicep` + modules: App Service plan (Linux), Web App for Containers (Always On, Web sockets, health check `/healthz`, staging slot, app settings with Key Vault references, managed identity), PostgreSQL Flexible Server (PG16, `azure.extensions` = `VECTOR,PG_TRGM,CITEXT`, backups, firewall/private access per policy), Storage account + container, Key Vault, Log Analytics + App Insights, ACR; parameter files `office.bicepparam` (+ `rehearsal.bicepparam`) | M |
-| S9.2.2 Easy Auth config | `authsettingsV2`: Entra ID provider (client id, tenant issuer), `unauthenticatedClientAction: Return401` with `excludedPaths` (`/healthz`, `/api/v1/config`, `/api/public/*`, `/f/*`, `/webhooks/*`, `/mcp`), token store on, allowed audiences; SPA login redirect handled by the app | S |
-| S9.2.3 Networking (optional) | VNet integration, private endpoints for PG/Storage/Key Vault, outbound to LiteLLM and Slack allowed | M |
+### S7.3: Outlook calendar via Microsoft Graph (M)
+**Scope:** app registration (delegated or application permissions, decided at kickoff with IT constraints); read free/busy + events for linked users; Plan my day accounts for meetings and proposes focus blocks (optionally create tentative events. High risk, confirm); workload capacity reduces for OOO events.
 
-## E9.3 Pipeline and go-live
+### S7.4: Email-to-task (M)
+**Scope:** per-project inbound address (`<project-slug>+<token>@<domain>`) via an inbound email webhook provider or a Graph mailbox poller (decided at kickoff); parse subject/body/attachments → task; Scribe agent option for meeting-notes emails; sender must be a workspace user (else rejected).
 
-| Slice | Scope | Size |
-|---|---|---|
-| S9.3.1 CI/CD | Pipeline: `make check` → build image (tag = git sha) → push to ACR → deploy to staging slot → run migrations (release step with advisory lock) → smoke tests (`momentum smoke`) → manual approval → swap | M |
-| S9.3.2 Runbooks | `docs/runbooks/deploy.md`, `rollback.md` (swap back; migrations are backward-compatible via expand/contract), `backup-restore.md` (PITR), `lift-and-shift.md`, `incident.md` (AI kill switch, disable agents, read-only mode) | S |
-| S9.3.3 Go-live | Configure prod settings; install the Slack app for the prod URL; seed workspace (no synthetic data); admins bootstrap; run the Asana importer against the real workspace; invite users; hypercare checklist for week 1 (daily error review, AI cost check, feedback channel) | M |
+### S7.5: Outgoing webhooks (S)
+**Scope:** workspace webhooks subscribing to event types; HMAC signature; retries with backoff; delivery log.
 
-## Go-live checklist
-- [ ] Settings reviewed (`MOMENTUM_ENV=production`, no dev auth, `SECRET_KEY` from Key Vault)
-- [ ] Easy Auth on; direct access without login returns 401; excluded paths behave as expected
-- [ ] `momentum smoke` passes on the production URL
-- [ ] Backup PITR enabled; a restore test was done in the rehearsal environment
-- [ ] AI budget set; agents enabled deliberately (start with Pulse + Herald in confirm mode)
-- [ ] Slack app installed; digest test received
-- [ ] Asana import verified by project owners (spot-check counts)
-- [ ] Feedback channel announced; STATUS updated with the go-live date
+### S7.6 (optional, later): Code-host integration
+**Scope:** link PRs/commits to tasks by key (`T-123`), auto-move on merge. Only if the team asks.

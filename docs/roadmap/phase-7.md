@@ -1,29 +1,15 @@
-# Phase 7: Integrations and MCP
+# Phase 8: Hardening (Local)
 
-**Goal:** Momentum works where people already are: Slack, Outlook calendar, email, and any MCP-capable AI client.
+**Goal:** production quality before deployment: performance, security, accessibility, data portability, and admin completeness.
 
-**Exit criteria:** create a task from a Slack message; daily digest arrives by Slack DM; Claude Desktop (or another MCP client) can list and update tasks with a personal token; the calendar shows focus blocks in Plan my day.
+**Exit criteria:** perf budgets met; security checklist complete with no high findings; axe shows no serious violations on key pages; export → import round-trip is lossless on the seed workspace.
 
----
-
-### S7.1: API tokens and MCP server (M) — **MCP dropped (product owner, 2026-09-26)**
-**Decision:** no MCP server. **Personal API tokens moved to Phase 5 as S5.1.6** (product owner, 2026-09-28; ADR-0009), so nothing from S7.1 remains here.
-
-**Scope:** settings UI for personal API tokens (create with scopes/expiry, shown once, revoke); FastMCP server at `/mcp` (streamable HTTP) exposing registry tools (read + write with the same preview/confirm semantics. Write tools return a proposal link unless the token has the `ai:auto_apply` scope); docs page "Connect Claude/VS Code to Momentum".
-**AC:** a token without `tasks:write` can't create tasks; all MCP writes appear with `created_via=mcp`.
-
-### S7.2: Slack app (L)
-**Scope:** `integrations/slack` with Bolt for Python. Local: **Socket Mode** (`SLACK_APP_TOKEN`). Prod: Events API + interactivity at `/webhooks/slack` (Easy Auth excluded path, signature verification). Features: link Slack user ↔ Momentum user (by email); DM notifications (per user prefs); message shortcut "Create Momentum task" (modal: title prefilled, project, assignee, due) with backlink; link unfurls for task/project URLs (permission-checked: unfurl only if the Slack user maps to a Momentum user who can see it); `/momentum` slash command (`/momentum add …`, `/momentum my`); chat with Mo in DMs (read-only answers + proposals that open in Momentum to apply); rule action "post to channel" (high risk, confirm for agents).
-**AC:** no Momentum content is revealed in Slack to users without access; Slack retries don't create duplicate tasks (idempotency by event id).
-
-### S7.3: Outlook calendar via Microsoft Graph (M)
-**Scope:** app registration (delegated or application permissions, decided at kickoff with IT constraints); read free/busy + events for linked users; Plan my day accounts for meetings and proposes focus blocks (optionally create tentative events. High risk, confirm); workload capacity reduces for OOO events.
-
-### S7.4: Email-to-task (M)
-**Scope:** per-project inbound address (`<project-slug>+<token>@<domain>`) via an inbound email webhook provider or a Graph mailbox poller (decided at kickoff); parse subject/body/attachments → task; Scribe agent option for meeting-notes emails; sender must be a workspace user (else rejected).
-
-### S7.5: Outgoing webhooks (S)
-**Scope:** workspace webhooks subscribing to event types; HMAC signature; retries with backoff; delivery log.
-
-### S7.6 (optional, later): Code-host integration
-**Scope:** link PRs/commits to tasks by key (`T-123`), auto-move on merge. Only if the team asks.
+| Slice | Scope | AC | Size |
+|---|---|---|---|
+| S8.1 PWA and mobile | Manifest, service worker (static assets only, no API caching of private data), responsive My Tasks/Inbox/Task pane, touch DnD fallbacks | Installable; usable at 390px width | M |
+| S8.2 Performance pass | Query plans for top 20 endpoints, missing indexes, N+1 audit, bundle analysis and splitting, locust 15-user scenario on a 20k-task workspace | p95 < 150 ms API; shell JS ≤ 300 KB gz | M |
+| S8.3 Export / import | `momentum export` (versioned JSON bundle + optional files, ids preserved) and `momentum import` (into an empty workspace or schema); admin UI trigger for export | Round-trip test: counts and checksums equal | M |
+| S8.4 Security review | OWASP ASVS L1 checklist: authz on every endpoint (automated test that enumerates routes and asserts auth), CSRF, upload validation (type, size, AV hook optional), rate limits (login-adjacent, public forms, AI endpoints), security headers (CSP with nonce, HSTS in prod, frame-ancestors), dependency audit (`pip-audit`, `pnpm audit`), secrets scan, prompt-injection test suite for agents (malicious task text/comment/email fixtures) | No high findings; injection fixtures can't trigger unauthorized writes | M |
+| S8.5 Accessibility | Keyboard-only walkthrough of all journeys; axe in Playwright on key pages; screen-reader labels for list/board/pane; focus management audit | No serious violations | S |
+| S8.6 Admin completeness | Members (invite, role, disable, transfer ownership), teams admin, AI settings, agents policy, integrations status, background jobs panel (failed jobs, retry), audit view (activity search for admins) | Admin can do everything without DB access | M |
+| S8.7 Backup/restore runbook (local rehearsal) | `pg_dump -n momentum` + files → restore into a fresh environment script; document | Restore rehearsal succeeds | S |

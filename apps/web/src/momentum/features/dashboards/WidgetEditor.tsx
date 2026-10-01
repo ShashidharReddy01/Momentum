@@ -1,4 +1,4 @@
-import { BarChart3, Hash, LineChart, ListChecks, PieChart, type LucideIcon } from 'lucide-react';
+import { BarChart3, Hash, LineChart, ListChecks, PieChart, X, type LucideIcon } from 'lucide-react';
 import { useMemo, useState, type ReactNode } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Dialog } from '@/components/ui/Dialog';
@@ -16,9 +16,11 @@ import {
   KIND_LABELS,
   newDraft,
   specOf,
+  withoutNarrow,
   type Draft,
+  type NarrowKey,
 } from './model';
-import type { WidgetIn, WidgetKind } from './queries';
+import { useSpecData, type FilterName, type WidgetIn, type WidgetKind } from './queries';
 import { WidgetCard, type WidgetItem } from './WidgetCard';
 
 const KIND_ICONS: Record<WidgetKind, LucideIcon> = {
@@ -104,8 +106,14 @@ function EditorBody({
     const all = projectId ? (projectFields.data ?? []).map((pf) => pf.field) : (library.data ?? []);
     return all.filter((f) => f.type === 'single_select');
   }, [projectId, projectFields.data, library.data]);
-  const fieldName = selectFields.find((f) => f.id === d.fieldId)?.name ?? null;
   const spec = useMemo(() => specOf(d), [d]);
+  // the preview's own query (shared cache with the card below): names for the narrowing chips,
+  // and the field's name when a chart (say, one Mo drafted) splits by a field this list lacks
+  const previewData = useSpecData(d.kind, spec, projectId).data;
+  const listed = selectFields.find((f) => f.id === d.fieldId);
+  const fieldName = listed?.name ?? (d.fieldId ? (previewData?.field_name ?? null) : null);
+  const fieldOptions: [string, string][] = selectFields.map((f) => [f.id, f.name]);
+  if (d.fieldId && !listed) fieldOptions.push([d.fieldId, fieldName ?? 'Custom field']);
   const title = d.titleTouched ? d.title : autoTitle(d, fieldName);
   const problem = draftProblem({ ...d, title });
   const preview: WidgetItem = { id: null, kind: d.kind, title, spec, size: d.size, version: 0 };
@@ -196,10 +204,16 @@ function EditorBody({
                 </Chip>
               </>
             ) : null}
-            <Chip on={d.mine} onClick={() => set({ mine: !d.mine })}>
+            <Chip
+              on={d.mine}
+              onClick={() =>
+                set(d.mine ? { mine: false } : { mine: true, narrow: { ...d.narrow, assignees: undefined } })
+              }
+            >
               Assigned to me
             </Chip>
           </div>
+          <NarrowChips draft={d} names={previewData?.filter_names ?? []} onRemove={setD} />
           {d.status !== 'completed' && !d.overdue ? (
             <Choice
               label="Due"
@@ -243,10 +257,7 @@ function EditorBody({
                 label="Field"
                 value={d.fieldId ?? ''}
                 onChange={(v) => set({ fieldId: v || null })}
-                options={[
-                  ['', 'Choose a field…'],
-                  ...selectFields.map((f) => [f.id, f.name] as [string, string]),
-                ]}
+                options={[['', 'Choose a field…'], ...fieldOptions]}
               />
             ) : null}
             <Choice
@@ -416,6 +427,82 @@ function Choice({
           </option>
         ))}
       </select>
+    </div>
+  );
+}
+
+const NARROW_WORDS: Record<FilterName['filter'], string> = {
+  project_ids: 'Project',
+  section_ids: 'Section',
+  assignees: 'Assignee',
+  tag_ids: 'Tag',
+  priorities: 'Priority',
+};
+
+function shortDate(iso: string): string {
+  const [y, m, day] = iso.split('-').map(Number);
+  return new Date(y!, m! - 1, day!).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
+/** The filters the form has no control for (a chart Mo drafted or one saved through the API can
+ * carry them), each removable, so editing never drops one silently. Names come from the server
+ * as the viewer may see them; until they arrive a chip says what kind of filter it is. */
+function NarrowChips({
+  draft,
+  names,
+  onRemove,
+}: {
+  draft: Draft;
+  names: FilterName[];
+  onRemove: (d: Draft) => void;
+}) {
+  const n = draft.narrow;
+  const chips: { id: string; text: string; remove: () => void }[] = [];
+  for (const key of Object.keys(NARROW_WORDS) as FilterName['filter'][]) {
+    for (const value of (n[key as NarrowKey] as string[] | undefined) ?? []) {
+      const name = names.find((x) => x.filter === key && x.key === value)?.label;
+      chips.push({
+        id: `${key}:${value}`,
+        text: `${NARROW_WORDS[key]}: ${name ?? '…'}`,
+        remove: () => onRemove(withoutNarrow(draft, key as NarrowKey, value)),
+      });
+    }
+  }
+  if (n.due_from || n.due_to) {
+    const text =
+      n.due_from && n.due_to
+        ? `Due ${shortDate(n.due_from)} – ${shortDate(n.due_to)}`
+        : n.due_from
+          ? `Due from ${shortDate(n.due_from)}`
+          : `Due by ${shortDate(n.due_to!)}`;
+    chips.push({
+      id: 'due-range',
+      text,
+      remove: () => onRemove(withoutNarrow(withoutNarrow(draft, 'due_from'), 'due_to')),
+    });
+  }
+  if (!chips.length) return null;
+  return (
+    <div className="space-y-1.5">
+      <p className="text-xs font-medium text-muted">Also only</p>
+      <ul className="flex flex-wrap gap-1.5">
+        {chips.map((c) => (
+          <li
+            key={c.id}
+            className="inline-flex items-center gap-1 rounded-full border border-hairline bg-surface-2 py-0.5 pl-2.5 pr-1 text-[13px] text-ink-2"
+          >
+            {c.text}
+            <button
+              type="button"
+              aria-label={`Remove ${c.text}`}
+              onClick={c.remove}
+              className="rounded-full p-0.5 text-muted hover:bg-hairline hover:text-ink"
+            >
+              <Icon icon={X} size={12} aria-hidden />
+            </button>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

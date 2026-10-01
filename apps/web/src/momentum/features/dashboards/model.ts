@@ -142,6 +142,21 @@ export function fullSpec(
   };
 }
 
+/** Filters the form has no control for (projects, sections, tags, priorities, named people, a
+ * due-date range). A chart drafted by Mo or saved through the API can carry them; the editor
+ * keeps them, shows each as a removable chip, and never drops one silently. */
+export interface Narrow {
+  project_ids?: string[];
+  section_ids?: string[];
+  tag_ids?: string[];
+  priorities?: NonNullable<Filters['priorities']>;
+  /** assignees other than exactly "me" (the form's own chip) */
+  assignees?: string[];
+  due_from?: string | null;
+  due_to?: string | null;
+}
+export type NarrowKey = keyof Narrow;
+
 /** The editor's state: plain choices, turned into a spec that is valid by construction. */
 export interface Draft {
   kind: WidgetKind;
@@ -161,6 +176,7 @@ export interface Draft {
   measure: 'count' | 'sum_estimate';
   limit: number;
   size: 'sm' | 'md' | 'lg';
+  narrow: Narrow;
 }
 
 export const DEFAULT_SIZE: Record<WidgetKind, Draft['size']> = {
@@ -190,7 +206,34 @@ export function newDraft(kind: WidgetKind = 'bar'): Draft {
     measure: 'count',
     limit: kind === 'list' ? 10 : 8,
     size: DEFAULT_SIZE[kind],
+    narrow: {},
   };
+}
+
+function narrowOf(f: Partial<Filters>): Narrow {
+  const n: Narrow = {};
+  if (f.project_ids?.length) n.project_ids = [...f.project_ids];
+  if (f.section_ids?.length) n.section_ids = [...f.section_ids];
+  if (f.tag_ids?.length) n.tag_ids = [...f.tag_ids];
+  if (f.priorities?.length) n.priorities = [...f.priorities];
+  const a = f.assignees ?? [];
+  if (a.length && !(a.length === 1 && a[0] === 'me')) n.assignees = [...a];
+  if (f.due_from) n.due_from = f.due_from;
+  if (f.due_to) n.due_to = f.due_to;
+  return n;
+}
+
+/** The draft without one narrowing value (`value` omitted: the whole filter, e.g. a date range). */
+export function withoutNarrow(d: Draft, key: NarrowKey, value?: string): Draft {
+  const narrow = { ...d.narrow };
+  if (key === 'due_from' || key === 'due_to' || value === undefined) {
+    delete narrow[key];
+  } else {
+    const left = ((narrow[key] as string[] | undefined) ?? []).filter((v) => v !== value);
+    if (left.length) (narrow as Record<string, string[]>)[key] = left;
+    else delete narrow[key];
+  }
+  return { ...d, narrow };
 }
 
 export function draftOf(item: {
@@ -219,6 +262,7 @@ export function draftOf(item: {
     measure: s.measure ?? 'count',
     limit: s.limit ?? (item.kind === 'list' ? 10 : 8),
     size: item.size,
+    narrow: narrowOf(f),
   };
 }
 
@@ -230,7 +274,15 @@ export function specOf(d: Draft): QuerySpec {
   if (d.kind === 'line' && d.timeField === 'completed' && status === 'open') status = 'completed';
   if ((d.overdue || d.blocked) && status === 'completed') status = 'open';
   const filters: Filters = { status, overdue: d.overdue, blocked: d.blocked };
+  const n = d.narrow;
+  if (n.project_ids?.length) filters.project_ids = n.project_ids;
+  if (n.section_ids?.length) filters.section_ids = n.section_ids;
+  if (n.tag_ids?.length) filters.tag_ids = n.tag_ids;
+  if (n.priorities?.length) filters.priorities = n.priorities;
+  if (n.due_from) filters.due_from = n.due_from;
+  if (n.due_to) filters.due_to = n.due_to;
   if (d.mine) filters.assignees = ['me'];
+  else if (n.assignees?.length) filters.assignees = n.assignees;
   if (d.dueWithin !== null && !d.overdue) filters.due_within_days = d.dueWithin;
   if (d.completedWithin !== null && status !== 'open') filters.completed_within_days = d.completedWithin;
   const spec = fullSpec({ filters, measure: d.kind === 'list' ? 'count' : d.measure });
@@ -266,7 +318,7 @@ export function autoTitle(d: Draft, fieldName?: string | null): string {
       ? 'Blocked tasks'
       : { open: 'Open tasks', completed: 'Completed tasks', all: 'Tasks' }[f.status ?? 'open'];
   if (s.measure === 'sum_estimate') what = `Estimated hours (${what.toLowerCase()})`;
-  if (f.assignees?.[0] === 'me') what = `My ${what.toLowerCase()}`;
+  if (d.mine) what = `My ${what.toLowerCase()}`;
   if (d.kind === 'line') {
     const verb = { completed: 'Completed', created: 'Created', due: 'Due' }[d.timeField];
     return `${verb} per ${d.bucket}`;

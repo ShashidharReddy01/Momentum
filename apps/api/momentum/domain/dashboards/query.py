@@ -50,6 +50,7 @@ from momentum.domain.dashboards.schemas import (
     STATUS_KEYS,
     DrillIn,
     DrillOut,
+    FilterNameOut,
     GroupOut,
     PointOut,
     QueryResultOut,
@@ -591,6 +592,83 @@ def describe(spec: QuerySpec, field_name: str | None = None) -> str:
     return line
 
 
+async def filter_names(session: AsyncSession, ctx: Ctx, spec: QuerySpec) -> list[FilterNameOut]:
+    """Names for the spec's list filters, as this viewer may see them: a project or section
+    outside their visibility is named generically, never by its real name."""
+    f = spec.filters
+    out: list[FilterNameOut] = []
+    if f.project_ids:
+        seen: dict[uuid.UUID, str] = {
+            i: n
+            for i, n in await session.execute(
+                select(Project.id, Project.name).where(
+                    Project.id.in_(f.project_ids), visible_projects_clause(ctx)
+                )
+            )
+        }
+        out += [
+            FilterNameOut(
+                filter="project_ids", key=str(i), label=seen.get(i, "A project you can't see")
+            )
+            for i in f.project_ids
+        ]
+    if f.section_ids:
+        seen = {
+            i: n
+            for i, n in await session.execute(
+                select(Section.id, Section.name)
+                .join(Project, Project.id == Section.project_id)
+                .where(Section.id.in_(f.section_ids), visible_projects_clause(ctx))
+            )
+        }
+        out += [
+            FilterNameOut(
+                filter="section_ids", key=str(i), label=seen.get(i, "A section you can't see")
+            )
+            for i in f.section_ids
+        ]
+    if f.assignees:
+        ids = [u for u in (_uuid(a) for a in f.assignees) if u is not None]
+        names: dict[uuid.UUID, str] = (
+            {
+                i: n
+                for i, n in await session.execute(
+                    select(User.id, User.name).where(
+                        User.id.in_(ids), User.workspace_id == ctx.workspace_id
+                    )
+                )
+            }
+            if ids
+            else {}
+        )
+        for a in f.assignees:
+            label = (
+                "Me"
+                if a == "me"
+                else "Unassigned"
+                if a == NONE_KEY
+                else names.get(uuid.UUID(a), "Someone not in this workspace")
+            )
+            out.append(FilterNameOut(filter="assignees", key=a, label=label))
+    if f.tag_ids:
+        seen = {
+            i: n
+            for i, n in await session.execute(
+                select(Tag.id, Tag.name).where(
+                    Tag.id.in_(f.tag_ids), Tag.workspace_id == ctx.workspace_id
+                )
+            )
+        }
+        out += [
+            FilterNameOut(filter="tag_ids", key=str(i), label=seen.get(i, "A deleted tag"))
+            for i in f.tag_ids
+        ]
+    out += [
+        FilterNameOut(filter="priorities", key=p, label=PRIORITY_LABELS[p]) for p in f.priorities
+    ]
+    return out
+
+
 # ---------- entry points ----------
 
 
@@ -634,6 +712,8 @@ async def run(
         total=total,
         tasks_total=n,
         unestimated=unestimated if spec.measure == "sum_estimate" else 0,
+        filter_names=await filter_names(session, ctx, spec),
+        field_name=field_name,
         computed_at=datetime.now(UTC),
     )
     if kind == "count":

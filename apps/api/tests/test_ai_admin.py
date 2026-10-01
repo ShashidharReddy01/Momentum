@@ -217,7 +217,10 @@ async def test_usage_report_aggregates_by_feature_user_and_day(
     by_feature = {r.feature: r for r in report.by_feature}
     assert by_feature["chat"].calls == 2 and by_feature["chat"].errors == 1
     assert by_feature["quick_add"].calls == 1
-    assert report.month_spend_usd == Decimal("0.06")
+    # the month so far: yesterday's error call counts only when yesterday is in this month (on
+    # the 1st it isn't; this test used to fail on the first day of every month)
+    in_month = yesterday.month == today.month
+    assert report.month_spend_usd == (Decimal("0.06") if in_month else Decimal("0.04"))
     by_user = {r.user_id: r for r in report.by_user}
     assert by_user[world.ravi.actor.id].calls == 2
     assert by_user[world.ana.actor.id].calls == 1

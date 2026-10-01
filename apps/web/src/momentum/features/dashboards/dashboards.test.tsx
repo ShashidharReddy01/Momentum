@@ -280,6 +280,72 @@ describe('Ask for a chart (S6.5.2)', () => {
     expect(added).toHaveLength(0);
   });
 
+  it('"Adjust first" keeps the filters the form has no control for, as removable chips', async () => {
+    const { added, user } = boot();
+    const previews: { query_spec: { filters?: Record<string, unknown> } }[] = [];
+    server.use(
+      http.post('*/api/v1/ai/dashboards/query', () =>
+        HttpResponse.json({
+          kind: 'bar',
+          title: 'Overdue work by assignee',
+          query_spec: {
+            group_by: 'assignee',
+            filters: {
+              status: 'open',
+              overdue: true,
+              blocked: false,
+              project_ids: ['p1'],
+              priorities: ['high'],
+            },
+          },
+          named: { projects: ['Website Revamp'] },
+          result: DATA['w-bar'],
+        }),
+      ),
+      http.post('*/api/v1/dashboards/query', async ({ request }) => {
+        const body = (await request.json()) as {
+          kind: string;
+          query_spec: { filters?: Record<string, unknown> };
+        };
+        previews.push(body);
+        const f = body.query_spec.filters ?? {};
+        return HttpResponse.json({
+          ...DATA['w-bar'],
+          kind: body.kind,
+          filter_names: [
+            ...((f.project_ids as string[] | undefined) ?? []).map((key) => ({
+              filter: 'project_ids',
+              key,
+              label: 'Website Revamp',
+            })),
+            ...((f.priorities as string[] | undefined) ?? []).map((key) => ({
+              filter: 'priorities',
+              key,
+              label: 'High',
+            })),
+          ],
+        });
+      }),
+    );
+    await user.click(await screen.findByRole('button', { name: 'Ask for a chart' }));
+    const asking = await screen.findByRole('dialog', { name: 'Ask for a chart' });
+    await user.type(within(asking).getByLabelText('What do you want to see?'), 'overdue in website revamp');
+    await user.click(within(asking).getByRole('button', { name: /Ask$/ }));
+    await user.click(await within(asking).findByRole('button', { name: 'Adjust first' }));
+
+    const editor = await screen.findByRole('dialog', { name: 'Add a chart' });
+    expect(await within(editor).findByText('Project: Website Revamp')).toBeInTheDocument();
+    expect(within(editor).getByText('Priority: High')).toBeInTheDocument();
+    await user.click(within(editor).getByRole('button', { name: 'Remove Priority: High' }));
+    await waitFor(() => expect(previews.at(-1)?.query_spec.filters).not.toHaveProperty('priorities'));
+    await user.click(within(editor).getByRole('button', { name: 'Add chart' }));
+    await waitFor(() => expect(added).toHaveLength(1));
+    expect(added[0]).toMatchObject({
+      query_spec: { group_by: 'assignee', filters: { overdue: true, project_ids: ['p1'] } },
+    });
+    expect((added[0]!.query_spec as { filters: object }).filters).not.toHaveProperty('priorities');
+  });
+
   it('marks a chart Mo drafted with the amber sparkle and its question', async () => {
     boot();
     const card = await screen.findByRole('region', { name: 'Open tasks by assignee' });

@@ -16,6 +16,7 @@ export type GroupRow = components['schemas']['GroupOut'];
 export type SeriesPoint = components['schemas']['PointOut'];
 export type TaskRow = components['schemas']['TaskRowOut'];
 export type Drill = components['schemas']['DrillOut'];
+export type FilterName = components['schemas']['FilterNameOut'];
 type Meta = components['schemas']['MutationMeta'];
 
 export const dashboardKeys = {

@@ -294,6 +294,16 @@ class TaskRowOut(BaseModel):
     project_color: str | None
 
 
+class FilterNameOut(BaseModel):
+    """A readable name for one value of a list filter (a project, section, person, tag or
+    priority), so a chart can say what it is narrowed to and the editor can show it. A value the
+    viewer can't see is named generically, never by its real name."""
+
+    filter: Literal["project_ids", "section_ids", "assignees", "tag_ids", "priorities"]
+    key: str
+    label: str
+
+
 class QueryResultOut(BaseModel):
     """One widget's numbers, computed as the viewer. ``value`` for a count, ``groups`` for a bar
     or donut, ``series`` for a line, ``tasks`` for a list; ``total`` and ``tasks_total`` cover
@@ -311,6 +321,8 @@ class QueryResultOut(BaseModel):
     series: list[PointOut] = Field(default_factory=list)
     tasks: list[TaskRowOut] = Field(default_factory=list)
     more: int = 0  # list rows past the limit
+    filter_names: list[FilterNameOut] = Field(default_factory=list)
+    field_name: str | None = None  # the custom field a group_by 'field' chart splits by
     computed_at: datetime
 
 

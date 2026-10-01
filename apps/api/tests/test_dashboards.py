@@ -332,3 +332,33 @@ async def test_estimates_and_custom_field_groups(as_user: Clients) -> None:
     assert "by Stage" in out["description"]
     got = await _drill(ravi, spec, project_id=pid, key=build)
     assert [x["title"] for x in got["tasks"]] == ["unknown"]
+
+
+async def test_filter_names_are_what_the_viewer_may_see(as_user: Clients) -> None:
+    """The editor shows a chart's narrowing filters by name (2026-10-01): a project the viewer
+    can't see is named generically, never by its real name."""
+    ravi, mei = await as_user("ravi"), await as_user("mei")
+    web, hidden = await _project(ravi), await _project(ravi, "Mobile App v2")  # mei: not a member
+    me = await _user_id(ravi, "ravi")
+    spec = {
+        "filters": {
+            "project_ids": [web, hidden],
+            "assignees": ["me", "none", me],
+            "priorities": ["urgent"],
+        }
+    }
+    names = {
+        (n["filter"], n["key"]): n["label"]
+        for n in (await _run(ravi, "count", spec))["filter_names"]
+    }
+    assert names[("project_ids", web)] == "Website Revamp"
+    assert names[("project_ids", hidden)] == "Mobile App v2"
+    assert names[("assignees", "me")] == "Me" and names[("assignees", "none")] == "Unassigned"
+    assert names[("assignees", me)].startswith("Ravi")
+    assert names[("priorities", "urgent")] == "Urgent"
+    hers = {
+        (n["filter"], n["key"]): n["label"]
+        for n in (await _run(mei, "count", spec))["filter_names"]
+    }
+    assert hers[("project_ids", hidden)] == "A project you can't see"
+    assert hers[("project_ids", web)] == "Website Revamp"

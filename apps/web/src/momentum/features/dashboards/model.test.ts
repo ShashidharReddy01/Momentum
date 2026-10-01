@@ -6,10 +6,12 @@ import {
   draftProblem,
   formatAverage,
   formatValue,
+  fullSpec,
   newDraft,
   seriesHeadline,
   share,
   specOf,
+  withoutNarrow,
 } from './model';
 import type { GroupRow } from './queries';
 
@@ -92,5 +94,47 @@ describe('dashboard model (S6.5.1)', () => {
       tasks: value,
     }));
     expect(seriesHeadline(pts)).toEqual({ latest: 6, average: 2 });
+  });
+});
+
+describe('filters the form has no control for (S6.5.2)', () => {
+  const spec = fullSpec({
+    group_by: 'assignee',
+    filters: {
+      status: 'open',
+      overdue: true,
+      project_ids: ['p1', 'p2'],
+      tag_ids: ['t1'],
+      priorities: ['urgent'],
+      assignees: ['me', 'none'],
+      due_from: '2026-10-01',
+      due_to: '2026-10-31',
+    },
+  });
+
+  it('keeps them through the editor instead of dropping them', () => {
+    const d = draftOf({ kind: 'bar', title: 'Late work', spec, size: 'md' });
+    expect(d.mine).toBe(false); // "me" with others isn't the "Assigned to me" chip
+    expect(specOf(d).filters).toMatchObject({
+      project_ids: ['p1', 'p2'],
+      tag_ids: ['t1'],
+      priorities: ['urgent'],
+      assignees: ['me', 'none'],
+      due_from: '2026-10-01',
+      due_to: '2026-10-31',
+      overdue: true,
+    });
+  });
+
+  it('removes one value, a whole range, and yields to "Assigned to me"', () => {
+    const d = draftOf({ kind: 'bar', title: 'Late work', spec, size: 'md' });
+    const one = specOf(withoutNarrow(d, 'project_ids', 'p1')).filters!;
+    expect(one.project_ids).toEqual(['p2']);
+    const none = specOf(withoutNarrow(withoutNarrow(d, 'tag_ids', 't1'), 'due_from')).filters!;
+    expect(none.tag_ids).toBeUndefined();
+    expect(none.due_from).toBeUndefined();
+    expect(none.due_to).toBe('2026-10-31');
+    expect(specOf({ ...d, mine: true }).filters!.assignees).toEqual(['me']);
+    expect(autoTitle({ ...d, titleTouched: false })).toBe('Overdue tasks by assignee');
   });
 });

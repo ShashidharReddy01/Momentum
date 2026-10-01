@@ -4759,6 +4759,23 @@ export interface components {
             /** Value */
             value: unknown | null;
         };
+        /**
+         * FilterNameOut
+         * @description A readable name for one value of a list filter (a project, section, person, tag or
+         *     priority), so a chart can say what it is narrowed to and the editor can show it. A value the
+         *     viewer can't see is named generically, never by its real name.
+         */
+        FilterNameOut: {
+            /**
+             * Filter
+             * @enum {string}
+             */
+            filter: "project_ids" | "section_ids" | "assignees" | "tag_ids" | "priorities";
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+        };
         /** FollowerIn */
         FollowerIn: {
             /**
@@ -6878,6 +6895,10 @@ export interface components {
             computed_at: string;
             /** Description */
             description: string;
+            /** Field Name */
+            field_name?: string | null;
+            /** Filter Names */
+            filter_names?: components["schemas"]["FilterNameOut"][];
             /** Groups */
             groups?: components["schemas"]["GroupOut"][];
             /**
