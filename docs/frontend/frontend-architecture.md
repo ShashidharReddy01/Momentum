@@ -174,4 +174,4 @@ export function useUpdateTask() {
 - All interactive elements are reachable by keyboard; Radix gives focus management for menus and dialogs.
 - Visible focus ring token (`--focus`). Contrast AA minimum (checked in the design-system doc).
 - `aria-live` for toasts and AI streaming status; reduced-motion respected.
-- `jsx-a11y` lint rules on; Playwright runs axe checks on key pages (Phase 8).
+- `jsx-a11y` lint rules on; Playwright runs axe checks on key pages (Phase 7).

@@ -8,7 +8,7 @@
 
 **Momentum is Asana, laid out the way you already know — teams, projects, sections, tasks — except an assistant named Mo sits on every screen and does the parts of "work about work" that used to be yours: updating fields, writing status reports, chasing overdue people, planning your day, and turning a rough plan into a real project.** On top of Mo, a small set of **agents** — named, visible teammates like Herald and Nudge — do recurring jobs on a schedule or when tagged in, the same way a human coworker would, except every single thing they do is logged, explainable, and undoable.
 
-It's built for one team of 10–15 people, meant to replace their Asana subscription entirely, and designed so the whole thing (data, AI, integrations) can later be lifted into a different host application without a rewrite.
+It's built for about 150 people in one workspace (originally one team of 10–15; re-planned 2026-10-01), meant to replace their Asana subscription entirely, and designed so the whole thing (data, AI, integrations) can later be lifted into a different host application without a rewrite.
 
 ---
 
@@ -183,7 +183,7 @@ Once this phase lands, Momentum adds the "zoom out" views a PM or lead actually 
 
 ---
 
-## 9. Where your team already works: integrations *(Phase 7 — not yet built)*
+## 9. Where your team already works: integrations *(Phase 9 — not yet built)*
 
 - **Slack:** create a Momentum task straight from a Slack message (a right-click shortcut, prefilled), get your daily digest as a Slack DM, have task/project links unfurl into rich previews (only for people who actually have access — nothing leaks to someone without permission), and talk to Mo directly in a Slack DM.
 - **Outlook / Microsoft 365 calendar:** Plan My Day accounts for your actual meetings when it proposes focus blocks, and workload capacity drops automatically for days you're out of office.

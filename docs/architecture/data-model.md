@@ -308,7 +308,7 @@ id, workspace_id, entity_type, entity_id, kind (`thread`,`project_week`,`inbox`,
 id, workspace_id, user_id, target_type (`ai_message`,`ai_action`,`agent_run`), target_id, rating (+1/−1), comment, created_at.
 **As built (S3.3.1, migration 0019):** unique (user_id, target_type, target_id): a second rating replaces the first. Only the owner of the conversation (messages) or the person an action was proposed for can rate it; `agent_run` arrives in Phase 5.
 
-## 10. Integrations (Phase 7)
+## 10. Integrations (Phase 9)
 
 - `integration_accounts`: id, workspace_id, provider (`slack`,`graph`), external_workspace_id, config jsonb, secrets_ref (Key Vault/env reference, not the secret), installed_by, timestamps.
 - `external_links`: id, workspace_id, entity_type, entity_id, provider, external_id, url, meta jsonb (e.g., Slack message permalink; Asana gid for imported rows).

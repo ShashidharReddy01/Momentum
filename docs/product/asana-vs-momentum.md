@@ -7,9 +7,9 @@
 | | Asana | Momentum | Plan to close |
 |---|---|---|---|
 | Mobile apps | Native iOS and Android apps, plus desktop apps | Responsive web only | Phase 6.5 (phone layouts); no native app planned |
-| Integrations | 100+ (Slack, Teams, Gmail/Outlook, Google Drive, Zoom, Zapier) | Asana and CSV import, API tokens | Phase 7: Slack, Outlook calendar, email-to-task, outgoing webhooks |
-| Calendar sync | Google/Outlook calendar export | None | Phase 7 (Outlook via Microsoft Graph) |
-| Maturity | Years of polish, offline support, large-scale reliability, vendor support | New; built for one team of 10–15 | Phase 6.5 (UI), Phase 8 (hardening), Phase 9 (Azure go-live) |
+| Integrations | 100+ (Slack, Teams, Gmail/Outlook, Google Drive, Zoom, Zapier) | Asana and CSV import, API tokens | Phase 9, after go-live: Slack first; Outlook calendar, email-to-task, outgoing webhooks later |
+| Calendar sync | Google/Outlook calendar export | None | Phase 9 (Outlook via Microsoft Graph) |
+| Maturity | Years of polish, offline support, large-scale reliability, vendor support | New; planned for ~150 people in one workspace (Phase 7 load-tests 150 accounts) | Phase 6.5 (UI), Phase 7 (hardening), Phase 8 (Azure go-live) |
 | Project messages | A Messages tab per project | Task comments and project status updates | Not planned |
 
 ## What we have that Asana's basic plans don't
@@ -30,4 +30,4 @@
 
 ## Summary
 
-On features, Momentum already exceeds Asana's basic plans, especially AI, forecasting, and the features Asana keeps for Advanced. Asana still leads on mobile apps, integrations, and product maturity. Phase 6.5 (UI/UX) and Phase 7 (integrations) target those gaps.
+On features, Momentum already exceeds Asana's basic plans, especially AI, forecasting, and the features Asana keeps for Advanced. Asana still leads on mobile apps, integrations, and product maturity. Phase 6.5 (UI/UX) and Phase 9 (integrations) target those gaps.

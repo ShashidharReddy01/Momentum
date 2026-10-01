@@ -1,6 +1,6 @@
 # Phase 7 redesign: Hardening and Asana-ready (design)
 
-> Agreed with the product owner on 2026-10-01 (brainstorming session). This spec drives the Phase 6 exit doc changes and the Phase 7 kickoff. The phase file `docs/roadmap/phase-7.md` is rewritten from it at the Phase 6 exit.
+> Agreed with the product owner on 2026-10-01 (brainstorming session). Applied the same day: `docs/roadmap/phase-7.md` was rewritten from it and the roadmap renumbered. **Reconciled 2026-10-01:** a parallel session had meanwhile closed Phase 6 and started **Phase 6.5 (UI/UX revamp)**; that phase stays in place and Phase 7 starts after it.
 
 ## 1. Why
 
@@ -8,11 +8,12 @@
 - **Audience changed.** Many of the new users are moving off Asana. Their first weeks decide adoption, so the existing features (Phases 0–6) must be close to flawless across every scenario and edge case, UI, backend and AI/agents alike, with the good-to-haves that make it feel finished.
 - "Perfect" is made measurable: an edge-case matrix per feature backed by tests, a severity-ranked register with zero open P0/P1 at exit, a 150-user load test meeting budgets, an Asana parity checklist signed off by the product owner, and live AI evals meeting thresholds.
 
-## 2. Roadmap change (applied at the Phase 6 exit)
+## 2. Roadmap change (applied 2026-10-01)
 
 | New # | Phase | Was |
 |---|---|---|
-| 6 | Planning and Insight | 6 (finish S6.5.2, S6.5.3, exit first) |
+| 6 | Planning and Insight | 6 (complete 2026-10-01) |
+| 6.5 | UI/UX revamp | added 2026-10-01 by the product owner (in progress) |
 | **7** | **Hardening and Asana-ready** | old Phase 8, much expanded |
 | **8** | **Azure deployment and go-live** | old Phase 9 |
 | **9** | **Integrations (post-production)** | old Phase 7 |
@@ -61,7 +62,7 @@
 
 | # | Step | Model |
 |---|---|---|
-| 0 | Finish S6.5.2, S6.5.3, Phase 6 exit (applies §2 doc changes + ADR) | per model-guide; exit Opus |
+| 0 | Finish Phase 6.5 (UI/UX revamp) as planned in `phase-6.5.md` | per model-guide |
 | 1 | Phase 7 kickoff + E7.0 audit | Opus |
 | 2 | Register review with the product owner | — |
 | 3 | E7.1 scale | Opus |

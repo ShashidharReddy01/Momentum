@@ -53,7 +53,7 @@ class LLM:
 async def update_task(ctx: Ctx, task_ref: TaskRef, patch: TaskPatchIn) -> ToolResult: ...
 ```
 
-- Arguments are Pydantic models → JSON Schema for OpenAI-style `tools`, and for MCP (Phase 7).
+- Arguments are Pydantic models → JSON Schema for OpenAI-style `tools`, and for MCP (Phase 9).
 - `TaskRef` accepts `id`, `key` (`T-123`), or `{title_query, project}`. The tool resolves it and fails loudly on ambiguity (returns candidates).
 - Each write tool is implemented by calling the domain service. The registry runs it in **dry-run** (SAVEPOINT + rollback) to produce `preview_diff`, and in **apply** mode inside an activity batch.
 - `ToolResult` is compact, model-friendly JSON (ids, keys, titles, changed fields), never whole ORM dumps.

@@ -1,6 +1,6 @@
 """S2.6.1: file storage abstraction (`docs/architecture/overview.md`'s `StorageBackend`).
 
-Only `local` (the filesystem) is implemented — Azure Blob is Phase 9 per
+Only `local` (the filesystem) is implemented — Azure Blob is Phase 8 per
 `docs/architecture/configuration.md`. `key` is always a server-generated, UUID-based path
 (never derived from user-supplied input like a filename), so there is no path-traversal
 surface to defend against here.
@@ -59,5 +59,5 @@ def build_storage(settings: Settings) -> StorageBackend:
         return LocalStorageBackend(settings.storage_local_dir)
     raise NotImplementedError(
         f"Storage backend {settings.storage_backend!r} isn't implemented yet "
-        "(Azure Blob is Phase 9)"
+        "(Azure Blob is Phase 8)"
     )

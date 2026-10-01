@@ -1,4 +1,4 @@
-"""Logging (structlog) setup. OpenTelemetry exporters are wired in Phase 9."""
+"""Logging (structlog) setup. OpenTelemetry exporters are wired in Phase 8."""
 
 from __future__ import annotations
 

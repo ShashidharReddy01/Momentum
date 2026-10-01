@@ -2,7 +2,7 @@
 # (momentum/agents/scribe.py). Run it with notes (paste, or load a .txt/.md/.vtt file) and a
 # project, or on a task that has the notes in its description or attached (docx, pdf, txt, md,
 # vtt). It lists the decisions and proposes one task per action item (owners only from the
-# project, no past dates) to the person who ran it. Email-in arrives in Phase 7.
+# project, no past dates) to the person who ran it. Email-in arrives in Phase 9.
 key: meeting_notes
 name: Scribe · Meeting Notes
 avatar: scribe

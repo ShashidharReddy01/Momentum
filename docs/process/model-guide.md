@@ -117,29 +117,33 @@ Design work is judgment-heavy (visual systems, layout under tight sizes, interac
 | UX5 Home, My Tasks, Inbox | S | UX6 Planning screens | S |
 | UX7 AI, agents, settings, overlays | S | UX8 Exit | **O** |
 
-### Phase 7: Integrations
+### Phase 7: Hardening and Asana-ready (re-planned 2026-10-01; was Phase 8)
 | Slice | Model | Slice | Model |
 |---|---|---|---|
-| S7.1 API tokens + MCP server | **O** (auth) | S7.2 Slack app | **O** (data exposure rules) |
-| S7.3 Outlook calendar | S | S7.4 Email-to-task | S |
-| S7.5 Outgoing webhooks | S | S7.6 Code-host (optional) | S |
+| Kickoff + E7.0 Audit (register, parity checklist) | **O** | S7.1.1 Scale ADR | **O** |
+| S7.1.2 Load test and fixes | **O** | E7.2 P0 fixes | **O** (security, permissions) |
+| E7.2 P1/P2 fixes | S | S7.3.1 Eval expansion | **O** (AI safety) |
+| S7.3.2 Live run | **O** | S7.4.1 Custom-field reporting | S |
+| S7.4.2 Full Asana import | **O** (data mapping) | S7.4.3 Email notifications | S |
+| S7.4.4 Familiarity | S | S7.5.1 Export / import | S |
+| S7.5.2 Security review | **O** | S7.5.3 Accessibility | S |
+| S7.5.4 Admin completeness | S | S7.5.5 Backup/restore rehearsal | S |
 
-### Phase 8: Hardening
+### Phase 8: Azure and go-live (was Phase 9)
 | Slice | Model | Slice | Model |
 |---|---|---|---|
-| S8.1 PWA and mobile | S | S8.2 Performance pass | **O** |
-| S8.3 Export / import | S | S8.4 Security review | **O** |
-| S8.5 Accessibility | S | S8.6 Admin completeness | S |
-| S8.7 Backup/restore rehearsal | S | | |
+| S8.1.1 Blob storage | S | S8.1.2 Telemetry | S |
+| S8.1.3 Office LiteLLM check | S | S8.2.1 Bicep core | S |
+| S8.2.2 Easy Auth config | **O** (auth) | S8.2.3 Networking | S |
+| S8.3.1 CI/CD | S | S8.3.2 Runbooks | S |
+| S8.3.3 Go-live | **O** (final verification) | | |
 
-### Phase 9: Azure and go-live
+### Phase 9: Integrations, after go-live (was Phase 7)
 | Slice | Model | Slice | Model |
 |---|---|---|---|
-| S9.1.1 Blob storage | S | S9.1.2 Telemetry | S |
-| S9.1.3 Office LiteLLM check | S | S9.2.1 Bicep core | S |
-| S9.2.2 Easy Auth config | **O** (auth) | S9.2.3 Networking | S |
-| S9.3.1 CI/CD | S | S9.3.2 Runbooks | S |
-| S9.3.3 Go-live | **O** (final verification) | | |
+| S9.1 API tokens + MCP server (done as S5.1.6; MCP dropped) | — | S9.2 Slack app | **O** (data exposure rules) |
+| S9.3 Outlook calendar | S | S9.4 Email-to-task | S |
+| S9.5 Outgoing webhooks | S | S9.6 Code-host (optional) | S |
 
 ## 5. Rough split
 

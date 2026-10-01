@@ -6,7 +6,7 @@ The model sees the user's open tasks (key, section, due date, priority, blocked 
 submits keys. The server keeps only keys of those tasks, drops duplicates, keeps blocked tasks
 out of Today (they can't be started; Phase 5 live evals), caps Today at ``CAPACITY``, and only
 moves to Later what is currently in Today; each correction is a note.
-Estimates and calendar time come later (no estimates field yet; calendar is Phase 7).
+Estimates and calendar time come later (no estimates field yet; calendar is Phase 9).
 """
 
 from __future__ import annotations

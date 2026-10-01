@@ -7,7 +7,7 @@ pdf, txt, md, vtt: extracted on upload). It returns the decisions and one propos
 action item, with an owner only when the notes name someone on the project, a due date only when
 the notes give one (never in the past), and a link back to where the notes came from. The tasks
 are proposed (``confirm``) to the person who ran it; on a task, Scribe also answers in the
-thread. Email-in (Phase 7) will hand an email's body to the same handler as its ``input``.
+thread. Email-in (Phase 9) will hand an email's body to the same handler as its ``input``.
 """
 
 from __future__ import annotations

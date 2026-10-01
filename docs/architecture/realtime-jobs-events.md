@@ -21,7 +21,7 @@ connections. `dispatched_at` is still set (first writer wins) as a cross-process
 
 **Job dispatch (Phase 2+, not yet built):** the same outbox additionally feeds
 Procrastinate jobs for **rules** (Phase 4), **notifications** (Phase 2), **embeddings**
-(Phase 3), **agent event triggers** (Phase 5), and **integrations** (Phase 7). Job
+(Phase 3), **agent event triggers** (Phase 5), and **integrations** (Phase 9). Job
 consumers are at-least-once and must be idempotent; each gets its own row in the generic
 `consumer_offsets(consumer, last_event_id)` table (e.g. `consumer='notifications'`) —
 the same table realtime uses per-connection (`consumer='ws:<user_id>'`), so this is one
@@ -178,7 +178,7 @@ test it; what shipped:
 
 Rules:
 - Jobs take **ids, not objects**, and reload state. They must be idempotent.
-- Retries: exponential backoff, max 5 (AI: 3). Failures are logged with `request_id`/`job_id`, and permanent failures surface in the admin "Background jobs" panel (Phase 8).
+- Retries: exponential backoff, max 5 (AI: 3). Failures are logged with `request_id`/`job_id`, and permanent failures surface in the admin "Background jobs" panel (Phase 7).
 - Periodic tasks (cron) are defined in `momentum/jobs/schedule.py` and deduplicated by Procrastinate's `queueing_lock`, so they're safe with several instances.
 - `WORKER_MODE=embedded` starts the worker inside the web process lifespan. `separate` runs `momentum worker`.
 - **As built (Phase 3):** periodic tasks live next to their jobs (`jobs/tasks.py` heartbeat, `jobs/ai.py`), not in a `schedule.py`. `expire_ai_actions` (maintenance, every 15 min, S3.1.3) and `index_embeddings` (ai, every minute, S3.1.4). `index_embeddings` is an **outbox consumer** with its own `consumer_offsets` row (`embeddings`): it re-indexes each task/comment/attachment/project an event names, at most once per run, locks its cursor row for the run (two workers never double-process), and on a gateway failure stops *before* the failing event so the next run retries it. Jobs get a session and a gateway from `jobs/db.py` (`job_session()`, `job_llm()`).

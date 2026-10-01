@@ -138,7 +138,7 @@ import { MomentumApp } from '@momentum/web';     // workspace package from apps/
 | Need | Command |
 |---|---|
 | Same Postgres major version | `pg_dump -n momentum -Fc > momentum.dump` → `pg_restore -d <target> momentum.dump` |
-| Different infra / partial | `momentum export --out bundle.zip [--with-files]` → `momentum import bundle.zip` (Phase 8) |
+| Different infra / partial | `momentum export --out bundle.zip [--with-files]` → `momentum import bundle.zip` (Phase 7) |
 | New identity provider or tenant | Keep `MOMENTUM_IDENTITY_LINK_BY_EMAIL=true`; users re-link by email on first login |
 | Different embedding model | `momentum reindex` (Phase 3+) |
 | Attachments | Copy the storage container (AzCopy / `aws s3 sync`), or use the bundle with `--with-files` |

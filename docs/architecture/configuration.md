@@ -67,7 +67,7 @@ Frontend build-time variables use the `VITE_MOMENTUM_` prefix, but the SPA prefe
 |---|---|---|
 | `MOMENTUM_STORAGE_BACKEND` | `local` | `local` · `azure_blob` |
 | `MOMENTUM_STORAGE_LOCAL_DIR` | `./.data/files` | |
-| `MOMENTUM_AZURE_BLOB_ACCOUNT_URL` / `_CONTAINER` / `_CONNECTION_STRING` | | Phase 9; managed identity if no connection string |
+| `MOMENTUM_AZURE_BLOB_ACCOUNT_URL` / `_CONTAINER` / `_CONNECTION_STRING` | | Phase 8; managed identity if no connection string |
 | `MOMENTUM_MAX_UPLOAD_MB` | `50` | |
 
 ## AI
@@ -110,7 +110,7 @@ Frontend build-time variables use the `VITE_MOMENTUM_` prefix, but the SPA prefe
 | `MOMENTUM_FORECAST_RUNS` | `10000` | Monte Carlo runs per project forecast (100–200,000). About 0.2 s per project at the default (pure Python) (S6.5.3) |
 | `MOMENTUM_FORECASTS_ENABLED` | `true` | The nightly forecast job's kill switch (`compute_forecasts`, nightly at 02:30 on the worker's clock). When off, a forecast can still be refreshed from a project's overview (S6.5.3) |
 
-## Integrations (Phase 7)
+## Integrations (Phase 9)
 
 | Setting | Description |
 |---|---|
@@ -125,7 +125,7 @@ Frontend build-time variables use the `VITE_MOMENTUM_` prefix, but the SPA prefe
 | Setting | Default | Description |
 |---|---|---|
 | `MOMENTUM_OTEL_ENABLED` | `false` | |
-| `MOMENTUM_APPLICATIONINSIGHTS_CONNECTION_STRING` | | Phase 9 (Azure Monitor exporter) |
+| `MOMENTUM_APPLICATIONINSIGHTS_CONNECTION_STRING` | | Phase 8 (Azure Monitor exporter) |
 | `MOMENTUM_SENTRY_DSN` | | Optional alternative |
 
 ## Frontend runtime config (`GET /api/v1/config`, unauthenticated-safe subset)

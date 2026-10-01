@@ -14,7 +14,7 @@
 | Frontend unit/component | Vitest + Testing Library + MSW | Components, hooks, reducers, keyboard behavior | `make check` |
 | E2E | Playwright (Chromium) against `make dev` stack with seed data | Critical user journeys | `make e2e` (before phase exit) |
 | Portability | pytest + Vitest | Mounting under base path, non-default schema | `make check` |
-| Accessibility | Playwright + axe | Key pages have no serious violations | Phase 8 |
+| Accessibility | Playwright + axe | Key pages have no serious violations | Phase 7 |
 
 ## 2. Fixtures and factories
 
@@ -64,7 +64,7 @@
 - MSW handlers in `src/momentum/mocks/handlers/*` are generated from the same OpenAPI types (typed responses).
 - Test by role/label, not class names.
 - Keyboard: every list/pane test includes at least one keyboard-only path.
-- Visual regression is not in v1 (maybe Phase 8 with Playwright screenshots for key screens).
+- Visual regression is not in v1 (maybe Phase 7 with Playwright screenshots for key screens).
 
 ## 6. AI evals
 
@@ -99,7 +99,7 @@ expect:
 
 **As built (S3.5.1):** `momentum/ai/evals/`: `cases/<feature>.yaml` (one file per feature, `cases: [{id, user, input | task | project | action…, screen?, history?, expect, judge?, mock?}]`; 141 cases over command, chat, both summaries, break down, status draft, plan my day, writing help, quick add, project from brief), `fixtures/workspaces/launch_v1.yaml` (a "Launch Plan" project with blockers, a pricing decision thread, a slipped date, unassigned work, and a private "Secret Roadmap" for leak checks; dates relative to today; built through the services by `workspace.py`), `features.py` (runs a case through the real feature code in its own **rolled-back** transaction), `scorers.py` (structural: tools, proposals, targets, risk, clarify; citation validity; leak checks `mentions_exclude`; uncertainty; per-feature: quick-add fields, status items cite tasks, plan order, subtask count and people, due dates before the end date, rewrite length/preserved facts; unknown expect keys are refused), `runner.py` (placeholders `{{key:Title}}` / `{{today+N}}`, judge with the `smart` alias and `prompts/judge/v1` in live mode only, per-feature thresholds in `thresholds.yaml`, >5-point regression vs the previous report of the same mode, JSON report), `main.py` + CLI `momentum evals [--live] [--feature] [--case] [--all]` on a throwaway `*_evals` database (`MOMENTUM_EVALS_DATABASE_URL`). Mock mode runs the 21 cases with handwritten fixtures (all must pass); live mode runs all 118. Thresholds (live): command 90%, chat 85%, status draft 100%, summaries/break down/write/brief 90%, plan my day and quick add 85%. **Later (Phase 3 exit):** every feature has 10+ cases so one failure can't sink a 90% threshold; a case that failed only because the AI was unreachable (`ai_unavailable`) is left out of the rate and the run is `INCOMPLETE` (exit 1, rerun) instead of a quality failure; partial (`--case`/`--feature`) and incomplete reports are never the regression baseline; `mentions_exclude` ignores words the asker typed themselves (echoing a name reveals nothing; a cited private title still fails); the judge sees the proposed operations and a plan's end date; `clarifies` accepts a question in words when nothing is proposed. Rubrics may only ask for what the feature can see (the inbox summarizer sees comment notifications, not assignments).
 
-## 7. Performance checks (Phase 8)
+## 7. Performance checks (Phase 7)
 
 - API: `locust` scenario for 15 concurrent users. p95 < 150 ms for list/patch endpoints on a 20k-task workspace.
 - Frontend: list with 2,000 tasks, scripted scroll + edits, no long tasks > 100 ms (Playwright trace).

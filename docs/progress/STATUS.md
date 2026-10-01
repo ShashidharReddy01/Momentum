@@ -6,6 +6,7 @@
 
 ## Current focus
 - **Phase:** 6: Planning and Insight — **complete** (exit criteria met 2026-10-01; one live check left for the product owner: `momentum evals --live --feature chart`). Phase 5: Agents v1 — complete and verified live (2026-09-30).
+- **Plan change (product owner, 2026-10-01):** Momentum will serve **~150 people in one workspace**, many moving off Asana. After Phase 6.5: **Phase 7 Hardening and Asana-ready** (audit-first edge-case register reviewed by the product owner, zero open P0/P1, 150-user load test, AI/agent hardening, custom-field reporting, full Asana import, email notifications, security, a11y, admin) → **Phase 8 Azure go-live** → **Phase 9 Integrations after go-live** (Slack first). Phases renumbered (old 8 → 7, old 9 → 8, old 7 → 9); mobile/PWA moved to Later. Design: `docs/superpowers/specs/2026-10-01-phase-7-hardening-design.md`; phase files `phase-7.md` to `phase-9.md`.
 - **Phase 6.5: UI/UX revamp — in progress** (kickoff 2026-10-01; plan, audit and slices in `docs/roadmap/phase-6.5.md`; design contract `DESIGN.md`, product record `PRODUCT.md`). Direction **Wayfinding** chosen by the product owner on the decision page. **UX1 Foundations done 2026-10-01** (Wayfinding tokens, Atkinson Hyperlegible Next + Mono, type scale, motion tokens, control states; ADR-0005 amendment 3). **UX2 Shell in progress:** the rail is done (pinned header and footer, scrolling middle, fits a 600 px window, icons-only below 1280 px or on ⌘, team folding remembered, lime marker, Create menu opens beside the rail); still to do: the compact page header component.
 - **Product-owner instruction (2026-09-26):** finish all remaining slices, then one big local test run against the real gateway (100+ questions/actions covering edge cases), then fix from that run.
 - **Scope note (product owner, 2026-09-26):** the customer-operations capabilities (SQQ, pricing, contracts, invoices, pushes to internal systems as tools and assignable agents) will be done later in the product owner's own codebase, **not in this repo**. Finish the roadmap as written.
@@ -37,8 +38,8 @@
 | # | Question | Needed by | Status |
 |---|---|---|---|
 | 1 | Model ids for the `fast` and `smart` aliases (gateway = Portkey; `default` = the Bedrock Sonnet id from the product owner's pipeline; Cohere = English embed v3, 1024 dims) | Before `EVALS_LIVE` runs (Phase 3 exit) | **answered 2026-09-26:** the same Sonnet 4 id for all three aliases for now; revisit with usage data |
-| 2 | Office Azure constraints (region, networking, Entra app registration owner) | Phase 9 kickoff (ask during Phase 7) | open |
-| 3 | Target host project for plugging in (stack/auth) | Before Phase 8 | open (INTEGRATION_GUIDE.md covers all modes) |
+| 2 | Office Azure constraints (region, networking, Entra app registration owner, **mail relay for notification emails**) | Phase 8 kickoff (ask during Phase 7) | open |
+| 3 | Target host project for plugging in (stack/auth) | Before Phase 7 | open (INTEGRATION_GUIDE.md covers all modes) |
 | 4 | Add an optional Cohere rerank step (rerank-v3.5 via the gateway) to S3.1.4 hybrid retrieval, off by default? (kickoff Q2) | S3.1.4 | **answered 2026-09-26: yes**, off by default |
 | 6 | Phase 5 kickoff Q1–Q7 (agent access, autonomy defaults, rollout, budgets, Pulse default time, carry-overs, Nudge snooze) | S5.1.1 | **answered 2026-09-28:** all recommendations accepted (see `phase-5-kickoff.md` §5) |
 | 7 | When a person asks an agent (assign/@mention/run now), may it use access that person lacks? | S5.1.3 | **answered 2026-09-29:** no, only what both see (lower role); scheduled/event runs keep the agent's own access |
@@ -166,6 +167,7 @@ Tracked in their phase files; copy the slice list here at each phase kickoff.
 | 2026-10-01 | S6.5.3: the Monte Carlo bootstraps each past week's throughput **paired with the work added that week** (scope growth), not throughput alone; forecasts can be refreshed by anyone who can see the project; forecast rows record no activity (computed data) | Throughput alone gave 14/20 = 70%, on the edge of the pass band and optimistic in every miss; modelling the scope growth the history shows is the standard fix, not tuning |
 | 2026-09-30 | S6.5.1: `dashboards` has `project_id` (not `scope_id`) and no `layout` column (order = widget `position`, width = widget `viz.size`); a project's tab shows a live starter layout until its first edit saves it | A real foreign key for the one scoped kind; layout lives with each widget, so reordering is one row and one undo |
 | 2026-09-30 | S6.4.1: a week's capacity override is set in hours ("Away all week" = 0), not PTO days; Architect keeps the open-task count as a fallback for unestimated work | Hours cover part days and short weeks with one control; without the fallback a team that doesn't estimate would never get a capacity warning |
+| 2026-10-01 | Roadmap re-planned for ~150 users: Phase 7 = Hardening and Asana-ready (old 8, expanded), 8 = Azure go-live (old 9), 9 = Integrations after go-live (old 7, Slack first); mobile/PWA to Later | Product owner: user base grows past 100, many from Asana; existing features must be near-flawless before go-live; integrations can follow production |
 
 ## Phase retros
 ### Phase 6 (2026-10-01)

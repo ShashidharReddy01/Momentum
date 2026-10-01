@@ -1,4 +1,4 @@
-"""Tool argument models → JSON Schema in the OpenAI ``tools`` format (and, in Phase 7, MCP).
+"""Tool argument models → JSON Schema in the OpenAI ``tools`` format (and, in Phase 9, MCP).
 
 Pydantic's schema is post-processed so every gateway and model family accepts it: ``$ref``s are
 inlined (some providers reject ``$defs``), and the auto-generated ``title`` keys are dropped

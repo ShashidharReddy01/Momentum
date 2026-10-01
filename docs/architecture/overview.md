@@ -8,7 +8,7 @@ Momentum is a **modular monolith** shipped as **one container image**:
 - **PostgreSQL 16** is the only stateful dependency: relational data, full-text search (`tsvector`, `pg_trgm`), vectors (`pgvector`), the job queue (Procrastinate), and realtime fan-out (`LISTEN/NOTIFY`).
 - A **worker** (Procrastinate) runs rules, agents, embeddings, notifications, digests, and integrations. It runs embedded in the web process (`WORKER_MODE=embedded`) or as a separate process with the same image (`momentum worker`).
 - **AI** goes through an OpenAI-compatible gateway (LiteLLM → Bedrock Claude, Cohere Embed v3).
-- **Files** go through a `StorageBackend` (local filesystem; Azure Blob in Phase 9).
+- **Files** go through a `StorageBackend` (local filesystem; Azure Blob in Phase 8).
 
 ```mermaid
 flowchart LR
@@ -121,7 +121,7 @@ See `frontend/frontend-architecture.md`. The SPA is built into `apps/web/dist` a
 |---|---|---|---|---|---|
 | `local` | `dev` or `easyauth-sim` | Docker Postgres | `mock` or any LiteLLM | local fs | Your machine (Phases 0–8) |
 | `test` | `dev` (fixtures) | testcontainers Postgres | `mock` | tmp dir | `make check` |
-| `production` | `easyauth` (or `host`/`oidc` when embedded elsewhere) | Azure PG Flexible | office LiteLLM | Azure Blob | Phase 9 |
+| `production` | `easyauth` (or `host`/`oidc` when embedded elsewhere) | Azure PG Flexible | office LiteLLM | Azure Blob | Phase 8 |
 
 ## 7. Key ADRs
 

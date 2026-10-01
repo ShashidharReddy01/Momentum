@@ -2,7 +2,7 @@
 
 ## 1. Vision
 
-**Momentum keeps work moving.** It gives a small team (10–15 people) Asana's familiar way of organizing work: teams → projects → sections → tasks → subtasks, seen as list, board, calendar, or timeline. It removes the "work about work" with **Mo**, an assistant available on every screen, and with **agents** that act as teammates.
+**Momentum keeps work moving.** It gives an organization of about 150 people in one workspace (originally scoped for one team of 10–15; re-planned 2026-10-01) Asana's familiar way of organizing work: teams → projects → sections → tasks → subtasks, seen as list, board, calendar, or timeline. It removes the "work about work" with **Mo**, an assistant available on every screen, and with **agents** that act as teammates.
 
 **One-line pitch:** *Asana's layout, with an assistant that does the updating, summarizing, chasing, and planning for you.*
 
