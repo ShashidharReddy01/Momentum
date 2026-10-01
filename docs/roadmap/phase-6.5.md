@@ -40,6 +40,13 @@ Measured with Playwright on the seeded workspace (22 extra projects from `seed -
 12. Mixed font families (Inter + JetBrains Mono) and many one-off sizes (11, 12, 13, 14, 15, 17, 20 px) across screens.
 13. Browser surfaces untouched: default scrollbars, selection colour and caret.
 
+**Found with the showcase data (admin and member, 2026-10-01):**
+14. **P0: the project list's columns don't line up.** Rows with tags, custom fields or date ranges push Assignee and Due left or right row by row, away from their headers; the list needs real columns (a grid with fixed tracks), not flowing items.
+15. **P1:** a section whose tasks are all done shows only "Add task", with no "4 completed" hint; date ranges in the list truncate ("Sep 25 – Wednes…").
+16. **P1 (fixed):** forecasts on the ten-year cap read as "Sep 18" with no year (see `phase-6.md`); now `growing` with no dates, and dates outside this year show the year.
+17. **P2:** sub-goal periods print raw ISO dates; the header's member avatars overlap; the timeline's bar labels run into arrows and the due line, and every bar is the same project colour with no state.
+18. **P2:** the inbox is a column of grey filled boxes with bullets; notification kinds read as faint prefixes rather than a scannable structure.
+
 **What already works (keep):** realtime and undo everywhere, keyboard shortcuts and the ⌘K palette, the dark theme's palette, AI marking (amber ✦), honest empty states, the dashboard and forecast visuals from Phase 6.
 
 ## Showcase data (added 2026-10-01, product owner)
