@@ -255,7 +255,7 @@ function Due({ iso }: { iso: string | null }) {
   return (
     <span>
       {DATE.format(fromISODate(iso))}{' '}
-      <span className={cn('text-xs', left < 0 ? 'text-crit' : left <= 7 ? 'text-warn' : 'text-muted')}>
+      <span className={cn('text-meta', left < 0 ? 'text-crit' : left <= 7 ? 'text-warn' : 'text-muted')}>
         {left < 0 ? `${-left}d late` : left === 0 ? 'today' : `${left}d`}
       </span>
     </span>
