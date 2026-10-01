@@ -39,4 +39,8 @@ test('J12: ask for a chart → preview → add to a project dashboard → it sho
     card.getByRole('img', { name: 'Drafted by Mo from: How many tasks are blocked?' }),
   ).toBeVisible();
   await expect(card.locator('button[title]')).toContainText(counted);
+
+  // leave Website Revamp remembered on List: later journeys open the project expecting it
+  await page.getByRole('navigation', { name: 'Project views' }).getByRole('link', { name: 'List' }).click();
+  await settled(page);
 });

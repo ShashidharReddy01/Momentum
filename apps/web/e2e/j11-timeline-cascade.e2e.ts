@@ -35,8 +35,15 @@ async function dates(api: APIRequestContext, id: string) {
 test('J11: move a task with a dependent → cascade preview → apply → undo restores both', async ({ page }) => {
   await login(page);
   const api = page.request;
-  const projects = (await (await api.get('/api/v1/projects')).json()).data as { id: string; name: string }[];
-  const pid = projects.find((p) => p.name === 'Website Revamp')!.id;
+  // its own project: the journeys share one database, and Website Revamp's sections are what
+  // J3, J4 and J9 drag and count
+  const teams = (await (await api.get('/api/v1/teams')).json()).data as { id: string; name: string }[];
+  const made = await api.post('/api/v1/projects', {
+    headers: H,
+    data: { team_id: teams.find((t) => t.name === 'Product')!.id, name: 'J11 Timeline' },
+  });
+  expect(made.ok()).toBeTruthy();
+  const pid = (await made.json()).data.id as string;
   const blocker = await task(api, pid, 'J11 blocker', 1, 3);
   const dependent = await task(api, pid, 'J11 dependent', 4, 6);
   const dep = await api.post(`/api/v1/tasks/${dependent}/dependencies`, {

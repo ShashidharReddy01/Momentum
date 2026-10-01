@@ -5,8 +5,8 @@
 > Older session handoff notes, the Phase 2 exit record and the Phase 0-1 retros live in `docs/progress/handoff-archive.md` (read them only when a slice touches that area). At the end of every slice, move the previous session's handoff there and keep only the latest one here.
 
 ## Current focus
-- **Phase:** 6: Planning and Insight — **in progress** (see "Phase 6" under Progress). Phase 5: Agents v1 ("Teammates") — **complete and verified live** (exit criteria met 2026-09-29; four rounds of live verification closed 2026-09-30: live evals 219/220, every feature bucket above threshold, `RESULT: PASS`). Still deferred by agreement: the dogfood week (post-ship).
-- **Next up:** Phase 6 slice by slice (Phase 6 section below).
+- **Phase:** 6: Planning and Insight — **complete** (exit criteria met 2026-10-01; one live check left for the product owner: `momentum evals --live --feature chart`). Phase 5: Agents v1 — complete and verified live (2026-09-30).
+- **Next up:** **Phase 6.5: UI/UX revamp** (product owner, 2026-10-01: frontend and UX only, "the best of best": a complete light-theme redesign, sizing and fonts, the sidebar at 100% zoom (Admin/profile cut off), the Create button overlap, the task pane, click feedback, every screen near perfect). Starts with a kickoff: a screenshot audit of every screen at real viewport sizes and three light-theme directions shown on the real app for the product owner to choose (ADR-0005 amendment).
 - **Product-owner instruction (2026-09-26):** finish all remaining slices, then one big local test run against the real gateway (100+ questions/actions covering edge cases), then fix from that run.
 - **Scope note (product owner, 2026-09-26):** the customer-operations capabilities (SQQ, pricing, contracts, invoices, pushes to internal systems as tools and assignable agents) will be done later in the product owner's own codebase, **not in this repo**. Finish the roadmap as written.
 - **Branch:** Phases 3–4 are on `claude/clever-hopper-pbv7yr` (ahead of `main`). Phase 5 continues on `claude/intelligent-meitner-9ne4e8`, which starts from that branch's Phase 4 exit commit.
@@ -21,7 +21,8 @@
 - **Phase 5 AI mode:** mock mode throughout (no gateway in this environment). Deferred to the product owner's machine: `momentum llm-check`, `EVALS_LIVE=1 make evals` at phase exit. The dogfood exit criterion is a post-ship observation, not blocking.
 - **Carried past Phase 4 exit** (kickoff Q6: the inbox/bell gap → S5.0.1 and the forms security review → S5.0.2 (**done**) are now Phase 5 slices; J1 flake **fixed** 2026-09-28, see handoff; the other two stay deferred): a security review pass of S4.2.1's public form endpoint (member-name exposure on assignee questions, no `X-Forwarded-For` handling); wiring `conversational_intake` into the `momentum/ai/evals/` harness (its `EvalWorld` has no notion of a form and the harness models one-shot input → output, not a stateless multi-turn feature); a real per-turn spam counter for conversational intake (currently reuses the submission rate limiter as a coarse guard); the inbox/bell live-update gap (**fixed in S5.0.1**) and the J1 quick-entry flake (**fixed**) found at exit (both described in the Phase 4 exit handoff, now in `handoff-archive.md`).
 
-## Handoff notes (latest session: 2026-10-01, S6.5.1 Dashboards, S6.5.2 Ask for a chart, S6.5.3 Forecasts)
+## Handoff notes (latest session: 2026-10-01, S6.5.1–S6.5.3 and the Phase 6 exit)
+- **Phase 6 exit (2026-10-01):** all criteria met (details in `phase-6.md` "Phase 6 exit"); full e2e **13/13 on two consecutive runs**. Found at exit and fixed: a real rapid-entry bug (typing tasks fast lost one on screen: a refetch from our own realtime echo replaced the list without the still-saving task) and three journey-hygiene issues. **Your one live check:** `momentum evals --live --feature chart`.
 - **Shipped:** S6.5.1 Dashboards (project **Dashboard** tab with a live starter layout, workspace **Dashboards**, every mark opens its tasks) and S6.5.2 **✦ Ask for a chart** (a question → Mo picks the chart and filters → live preview → add; the numbers are always counted by the server as you; Mo's `query_metrics` tool counts the same way). Details: `phase-6.md` "As built" for both.
 - **S6.5.3 Forecasts:** every project's overview has a **Forecast** card (likely finish date, the P50–P95 range against the due date, a 0–100 risk score and why) and the timeline shows the **forecast cone**. Try it: `momentum seed --history` adds a **Delivery** team with two in-flight projects (**Customer portal**, on track; **Mobile onboarding**, due too early) and 20 finished ones; open one → Overview → Refresh. `momentum forecast-backtest`: **15/20 = 75% on or before P80 (pass 70–90%)**. Forecasts are computed nightly (`MOMENTUM_FORECASTS_ENABLED`, `MOMENTUM_FORECAST_RUNS`); Radar now reads the stored score.
 - **Try it:** `make migrate` (0036–0038 are new), `make dev`, Ravi → Website Revamp → **Dashboard**: click numbers, bars, slices; **✦ Ask for a chart** → "How many tasks are blocked?" → Add to dashboard (the card gets the amber ✦; hover it for the question). In Ask Mo: "how many open tasks does Mei have in Website Revamp, by priority?" uses `query_metrics`.
@@ -108,7 +109,7 @@ Tracked in their phase files; copy the slice list here at each phase kickoff.
 - **Baseline:** `make check` green on `8c7de80` (backend 738/738, web 334/334, lint, format, types, import contracts). A fresh container needs Postgres (the Phase 5 handoff recipe) **and** `pnpm install` in `apps/web` (no root `package.json`); without the latter, `types-check` fails with error 254.
 - **Kickoff answers (product owner, 2026-09-30):** every recommendation accepted (Q1 custom SVG timeline, Q2 split S6.1.1, Q3 capacity, Q4 backtest, Q5 visibility, Q6 J11/J12), plus a UX bar: "the WOW factor, easy for the user to view data, better than Asana" (in `phase-6.md`).
 - **Standing instruction (product owner, 2026-09-30):** do what's recommended and continue slice by slice, committing and pushing each.
-- **Next up:** the Phase 6 exit (full e2e run, exit criteria, retro).
+- **Phase 6 complete (2026-10-01).** Next: Phase 6.5 (UI/UX revamp), see Current focus.
 - **Branches (2026-09-30, product owner: "put everything in one"):** checked every remote branch: `claude/inspiring-bohr-p9xomo` already contains every commit of `main`, `claude/clever-hopper-pbv7yr`, `claude/intelligent-meitner-9ne4e8` (including the Phase 5 round-4 close) and `claude/amazing-knuth-u6v1s2`. It is now the single line of work; `main` was fast-forwarded to it. The older branches can be deleted on GitHub whenever convenient (nothing on them is missing here).
 - **Local machine note (2026-09-30):** the product owner's Windows machine has no `make`; this session ran the gate's steps directly (same commands as `make check`) and used its own databases (`momentum_bohr`, `momentum_bohr_test`) in the shared Docker Postgres so two checkouts can't collide on `momentum_test`.
 - **Backlog cleared (2026-09-30, before S6.4.2):** (1) mock-mode AI output now carries the purple *mock* marker: `/config` reports `ai_mock`, and `AICallout`, `AIBadge` and the top bar's Ask Mo button show a "MOCK" chip (`AIMockMark`); (2) migration **0035** renames the two agent unique constraints to the naming convention, so autogenerate reports no drift. Still open by agreement: the dogfood week (post-ship), the Phase 4 carry-overs listed under Current focus, and the `ai_step/draft_reply_answers_newest` judge-consistency note.
@@ -120,7 +121,7 @@ Tracked in their phase files; copy the slice list here at each phase kickoff.
 - [x] S6.3.1 Goals (2026-09-30) · [x] S6.3.2 AI for goals (2026-09-30)
 - [x] S6.4.1 Workload view (2026-09-30; estimates editable end to end, `capacity` overrides, `/workload`, Architect on the capacity model) · [x] S6.4.2 AI rebalancing (2026-09-30; greedy heuristic reassign → start later → push, one proposed action with one undo, before → after preview on the grid, Mo's `suggest_rebalance` tool; gate: backend 795/795, web 387/387; live evals 3/3)
 - [x] S6.5.1 Dashboards (2026-09-30; project Dashboard tab + workspace dashboards, `QuerySpec` v1 run as the viewer, click any mark → its tasks, Recharts lazy; gate: backend 803/803, web 398/398) · [x] S6.5.2 Ask for a chart (2026-10-01; `POST /ai/dashboards/query`, `query_metrics`, eval `chart` 15/15 mock, J11 + J12 e2e; gate: backend 808/808, web 401/401) · [x] S6.5.3 Forecasting and risk score (2026-10-01; Monte Carlo with a paired scope-growth bootstrap, risk score from Radar's signals + forecast vs due, forecast card + timeline cone, `seed --history`, backtest 15/20 = 75%; gate: backend 820/820, web 406/406)
-- [ ] Phase 6 exit
+- [x] Phase 6 exit (2026-10-01): timeline 500 tasks (S6.1.1a), backtest 15/20 = 75% by P80, chart 15/15 mock (live: product owner), J11 + J12; full e2e 13/13 twice · live check left: `momentum evals --live --feature chart`
 
 ## Plan changes log
 | Date | Change | Reason |
@@ -161,6 +162,24 @@ Tracked in their phase files; copy the slice list here at each phase kickoff.
 | 2026-09-30 | S6.4.1: a week's capacity override is set in hours ("Away all week" = 0), not PTO days; Architect keeps the open-task count as a fallback for unestimated work | Hours cover part days and short weeks with one control; without the fallback a team that doesn't estimate would never get a capacity warning |
 
 ## Phase retros
+### Phase 6 (2026-10-01)
+**Exit criteria: met** (timeline 500 tasks at 0.83 s / 60 fps; forecast backtest 15/20 = 75% by P80; ask-for-a-chart 15/15 in mock, live on the product owner's machine; J11 + J12; full e2e 13/13 twice). Thirteen slices in two days, all at the kickoff's UX bar ("easier to read than Asana").
+
+- **Went well:**
+  - "Code decides, the model writes" carried every AI feature: rebalance moves, goal check-ins, chart choices (the model picks among the spec's options in names; the server resolves, counts and asks back). Grounding checks (numbers must be in the facts) meant no hallucinated figures reached a screen.
+  - One SQL definition per dashboard group (`key_clause`) made "click a bar, get exactly its tasks" true by construction, and the test that drilled every group found a real NULL bug in the folded Other group on the first run.
+  - The backtest was honest: the first engine scored 70%, on the edge; instead of tuning, modelling the scope growth the history shows (a paired bootstrap) gave a stable 75%, and the misses stayed visible in the docs.
+  - Rendering and looking (screenshots in both themes and on a phone) caught what tests didn't: a squeezed drill panel, a crushed grid with two side panels, an average shown as 0, an off-screen forecast cone.
+- **Went less well:**
+  - A realtime handler bug (`event.type` instead of `event.event`) shipped in S6.2.1 and was copied into S6.5.1; only the type checker caught it, when a new comparison couldn't be satisfied. **Rule:** realtime handlers read `event.event`; a test should assert a handler actually fires.
+  - Adding a tab named "Dashboard" broke two journeys that clicked "Board" (accessible names match by substring). **Rule:** e2e locators for short names use `exact: true`.
+  - A new journey created data in the shared seeded project and broke later journeys. **Rule:** a journey that creates data creates its own project.
+  - The full e2e run surfaced a real rapid-entry race that had been timing-dependent since Phase 1. **Rule (Phase 3, reconfirmed):** run the full e2e suite at every phase exit on this machine, twice.
+  - Each gate run is ~40 minutes on this machine (backend tests ~30); staging the next slice in a scratch folder while a gate ran kept work moving without touching the tree under test.
+- **Watch in Phase 6.5:**
+  - The product owner finds the light theme and many details below the bar (sidebar cut off at 100% zoom, Create overlapping, pane sizing, fonts, feedback). Audit before redesigning: every screen at 1280×720, 1366×768, 1440×900, 1920×1080, tablet and phone, both themes.
+  - The light theme was chosen in ADR-0005 (amendment 2); replacing it needs the product owner's pick and an ADR amendment.
+
 ### Phase 5 (2026-09-29, live verification closed 2026-09-30)
 **Exit criteria: met** (J10 e2e against the real worker; the $0.01 budget test; a trace step for every action). **Verified end to end against the real gateway** in four live rounds: `llm-check` 10/10, backend 738/738, frontend 334/334, live evals **219/220 (99.5%), all 21 feature buckets above threshold, `RESULT: PASS`**. Deferred by agreement: the dogfood week (post-ship). Full account in `docs/roadmap/phase-5.md` "Phase 5 exit" and `docs/progress/phase-5-live-verification-findings.md`.
 

@@ -38,7 +38,10 @@ test('J9: a rule fires and delivers a notification', async ({ browser }) => {
 
   // drag the first Backlog card into Done (a freshly quick-added card isn't reliably draggable
   // the same tick it's created, so — like J4 — this moves an existing seeded card)
-  await ravi.getByRole('navigation', { name: 'Project views' }).getByRole('link', { name: 'Board' }).click();
+  await ravi
+    .getByRole('navigation', { name: 'Project views' })
+    .getByRole('link', { name: 'Board', exact: true })
+    .click();
   const backlog = ravi.getByRole('list', { name: 'Cards in Backlog' });
   const done = ravi.getByRole('list', { name: 'Cards in Done' });
   const card = backlog.getByRole('listitem').first();

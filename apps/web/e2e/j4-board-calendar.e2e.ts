@@ -9,7 +9,10 @@ test('J4: board card drag between columns, calendar drag to reschedule', async (
   await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Website Revamp' }).click();
 
   // Board: drag the first card in Backlog into In progress
-  await page.getByRole('navigation', { name: 'Project views' }).getByRole('link', { name: 'Board' }).click();
+  await page
+    .getByRole('navigation', { name: 'Project views' })
+    .getByRole('link', { name: 'Board', exact: true })
+    .click();
   const backlog = page.getByRole('list', { name: 'Cards in Backlog' });
   const inProgress = page.getByRole('list', { name: 'Cards in In progress' });
   const card = backlog.getByRole('listitem').first();

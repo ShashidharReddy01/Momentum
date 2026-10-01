@@ -58,16 +58,41 @@ const tempId = () => `tmp-${Date.now()}-${++tempSeq}`;
 
 export function useProjectTasks(projectId: string, completed = false, enabled = true) {
   const api = useApi();
+  const qc = useQueryClient();
+  const key = taskKeys.byProject(projectId, completed);
   return useQuery({
-    queryKey: taskKeys.byProject(projectId, completed),
+    queryKey: key,
     enabled,
-    queryFn: async () =>
-      (
+    queryFn: async () => {
+      const fresh = (
         await api.GET('/api/v1/projects/{project_id}/tasks', {
           params: { path: { project_id: projectId }, query: { completed } },
         })
-      ).data!.data,
+      ).data!.data;
+      // a refetch (e.g. our own realtime echo) can land while new tasks are still being saved
+      return keepPending(fresh, qc.getQueryData<Task[]>(key));
+    },
   });
+}
+
+/**
+ * Tasks created in this tab but not yet confirmed by the server (temporary ids) survive a
+ * refetch, each placed after the nearest task that was above it. Without this, typing tasks
+ * quickly lost one: the refetch triggered by an earlier task's realtime echo came back without
+ * the newest, still-saving task and replaced the list (J1, 2026-10-01).
+ */
+export function keepPending(fresh: Task[], cached: Task[] | undefined): Task[] {
+  if (!cached?.some((t) => isTemp(t.id))) return fresh;
+  let out = fresh;
+  cached.forEach((t, i) => {
+    if (!isTemp(t.id)) return;
+    const above = cached
+      .slice(0, i)
+      .reverse()
+      .find((p) => out.some((o) => o.id === p.id));
+    out = insertAfter(out, t, above?.id ?? null);
+  });
+  return out;
 }
 
 function patchTask(qc: QueryClient, projectId: string, id: string, fn: (t: Task) => Task) {
@@ -199,7 +224,10 @@ export function useTaskMutations(projectId: string) {
       });
       const real = res.data!.data;
       record('Task created', res.data!.meta);
-      qc.setQueryData<Task[]>(key, (old) => old?.map((t) => (t.id === id ? real : t)));
+      // a refetch may already have brought the real task in: replace the temporary row, once
+      qc.setQueryData<Task[]>(key, (old) =>
+        old?.filter((t) => t.id !== real.id).map((t) => (t.id === id ? real : t)),
+      );
       onCreated?.(real.id);
       return real.id;
     })();
