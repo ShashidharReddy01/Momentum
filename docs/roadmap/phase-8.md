@@ -6,7 +6,7 @@
 
 **Read first:** architecture/embedding-and-portability.md §3, architecture/configuration.md, architecture/auth-and-permissions.md §2.
 
-**Kickoff prerequisites (ask IT early, ideally during Phase 7; also: the office mail relay for S7.4.3 email notifications):** allowed region(s); App Service + PG Flexible approval; VNet/private endpoint requirements; who creates the Entra app registration and app role `Momentum.Admin`; LiteLLM endpoint, virtual key, model aliases, and network reachability from App Service; registry choice (ACR); CI system (GitHub Actions or Azure DevOps).
+**Kickoff prerequisites (ask IT early, ideally during Phase 7):** allowed region(s); App Service + PG Flexible approval; VNet/private endpoint requirements; who creates the Entra app registration and app role `Momentum.Admin`; LiteLLM endpoint, virtual key, model aliases, and network reachability from App Service; registry choice (ACR); CI system (GitHub Actions or Azure DevOps).
 
 **Exit criteria:** go-live checklist complete; the team logs in via Entra; Asana import done; backups verified; rollback tested once (slot swap back).
 
@@ -26,7 +26,7 @@
 |---|---|---|
 | S8.2.1 Bicep core | `infra/bicep/main.bicep` + modules: App Service plan (Linux), Web App for Containers (Always On, Web sockets, health check `/healthz`, staging slot, app settings with Key Vault references, managed identity), PostgreSQL Flexible Server (PG16, `azure.extensions` = `VECTOR,PG_TRGM,CITEXT`, backups, firewall/private access per policy), Storage account + container, Key Vault, Log Analytics + App Insights, ACR; parameter files `office.bicepparam` (+ `rehearsal.bicepparam`) | M |
 | S8.2.2 Easy Auth config | `authsettingsV2`: Entra ID provider (client id, tenant issuer), `unauthenticatedClientAction: Return401` with `excludedPaths` (`/healthz`, `/api/v1/config`, `/api/public/*`, `/f/*`, `/webhooks/*`, `/mcp`), token store on, allowed audiences; SPA login redirect handled by the app | S |
-| S8.2.3 Networking (optional) | VNet integration, private endpoints for PG/Storage/Key Vault, outbound to LiteLLM and the mail relay allowed (Slack's endpoints are added in Phase 9) | M |
+| S8.2.3 Networking (optional) | VNet integration, private endpoints for PG/Storage/Key Vault, outbound to LiteLLM allowed (Slack's endpoints are added in Phase 9) | M |
 
 ## E8.3 Pipeline and go-live
 
@@ -42,6 +42,5 @@
 - [ ] `momentum smoke` passes on the production URL
 - [ ] Backup PITR enabled; a restore test was done in the rehearsal environment
 - [ ] AI budget set; agents enabled deliberately (start with Pulse + Herald in confirm mode)
-- [ ] Mail relay configured; a test notification email and a daily digest received (S7.4.3)
 - [ ] Asana import verified by project owners (spot-check counts)
 - [ ] Feedback channel announced; STATUS updated with the go-live date

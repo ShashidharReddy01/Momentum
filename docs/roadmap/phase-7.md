@@ -4,11 +4,13 @@
 
 **Goal:** Momentum will serve **~150 accounts in one workspace (50–75 active at peak)**, many moving off Asana. Before go-live, everything already built (Phases 0–6.5) must be close to flawless in every scenario and edge case, UI, backend, AI and agents alike, with the good-to-haves that make it feel finished. "Perfect" is made measurable: an edge-case matrix per feature backed by tests, a severity-ranked register with zero open P0/P1 at exit, a 150-user load test within budget, an Asana parity checklist signed off by the product owner, and live AI evals at threshold.
 
+**How this phase runs (product owner, 2026-10-04):** "fix everything": every register finding is fixed, **P3 nice-to-haves included**; no deferrals. The product owner delegated the review gates (register triage, the scale ADR) to the AI and asked not to be consulted until the phase is done; every such decision is recorded in the register or STATUS for later review. Live gateway runs are approved. New dependencies approved: locust and security-audit tools (dev only). **Email notifications moved to Later** ("no need email and all, all later").
+
 **Target platform:** desktop browsers (current Chrome and Edge, laptop widths and up, the Phase 6.5 viewports). Native/PWA mobile is on the Later list.
 
 **Exit criteria:**
-- Zero open P0/P1 in the hardening register; every deferred item signed off by the product owner.
-- Journeys J1–J12 pass, plus new journeys for the full Asana import, custom-field reporting and email notifications.
+- Zero open findings in the hardening register (P0–P3).
+- Journeys J1–J12 pass, plus new journeys for the full Asana import and custom-field reporting.
 - The 150-user load test meets the E7.1 budgets.
 - axe: no serious violations on key pages (building on Phase 6.5's WCAG 2.2 AA pass).
 - Live evals: every bucket meets its threshold (incl. the new edge-case and injection cases).
@@ -24,7 +26,7 @@ For every feature in Phases 0–6.5, an **edge-case matrix**: empty / huge, two 
 
 **Outputs:** `docs/progress/hardening-register.md` (one row per finding: id, area, phase/slice, severity, scenario, expected vs actual, fix slice; **P0** broken / data loss / security or permission leak, **P1** wrong or confusing, **P2** polish, **P3** nice-to-have) and the **Asana parity checklist** (extends `docs/product/asana-vs-momentum.md`: feature → have / partial / missing → decision). Phase 6.5's audit covers visual and layout issues; this one covers behaviour.
 
-**Gate:** the product owner reviews the register and the parity checklist; every P2/P3 deferral and every "missing → later" is signed off before fix slices start.
+**Gate:** delegated (see "How this phase runs"): every finding is fixed; parity gaps are either closed in this phase or recorded with a reason (e.g. native mobile apps, integrations: product-owner decisions to do later).
 
 **Already known (feed into the register):** the dashboard chart editor dropped filters it has no control for (fixed 2026-10-01); a usage-report test failed on the 1st of every month (fixed 2026-10-01).
 
@@ -37,7 +39,7 @@ For every feature in Phases 0–6.5, an **edge-case matrix**: empty / huge, two 
 
 ## E7.2 Fix slices
 
-All P0 and P1 register findings, grouped by area into slices (P0 first, Opus); P2 unless deferred with sign-off. Each fix ships with the test that proves it. Slices are added to this file after the register review.
+Every register finding (P0 first, then P1, P2, P3), grouped by area into slices. Each fix ships with the test that proves it. Slices are added to this file once the register exists.
 
 ## E7.3 AI and agent hardening
 
@@ -52,7 +54,6 @@ All P0 and P1 register findings, grouped by area into slices (P0 first, Opus); P
 |---|---|---|---|
 | S7.4.1 Custom-field reporting (must-have) | Filter, sort and group by custom fields in list, board and calendar, across projects (My Tasks, search, portfolios), and in dashboard charts (`QuerySpec`: field filters, number/date fields) | A journey filters and charts by a custom field across two projects | L |
 | S7.4.2 Full Asana import (must-have) | Comments, attachments, custom fields, dependencies, subtasks, followers, sections, tags, milestones, approvals where mappable; a dry-run report with counts and anything unmapped; idempotent re-run (extends S2.7.1, `docs/integrations/asana-import.md`) | Round-trip on a synthetic Asana export: counts match, the report lists every skipped item | L |
-| S7.4.3 Email notifications | Immediate emails for assignments and mentions, a daily digest, per-user preferences; an email-sender interface (logged locally in dev; the office mail relay in production, a new Phase 8 prerequisite) | Preferences respected; no email for content the recipient can't see | M |
 | S7.4.4 Familiarity | Asana-compatible keyboard shortcuts where they don't conflict, Asana terms where ours differ, a "Coming from Asana?" onboarding | Shortcut sheet lists them; onboarding reachable from Home | S |
 
 ## E7.5 Production quality (was Phase 8)
@@ -71,4 +72,4 @@ Kickoff + E7.0 (Opus) → register review with the product owner → E7.1 (Opus)
 
 ## Later (no phase yet)
 
-PWA / mobile (was S8.1; product owner 2026-10-01: "future"), Outlook calendar, email-to-task, outgoing webhooks, code-host integration (the last four are in Phase 9's backlog).
+PWA / mobile (was S8.1; product owner 2026-10-01: "future"), email notifications (was S7.4.3; product owner 2026-10-04: "all later"), Outlook calendar, email-to-task, outgoing webhooks, code-host integration (the last four are in Phase 9's backlog).

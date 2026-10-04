@@ -124,10 +124,10 @@ Design work is judgment-heavy (visual systems, layout under tight sizes, interac
 | S7.1.2 Load test and fixes | **O** | E7.2 P0 fixes | **O** (security, permissions) |
 | E7.2 P1/P2 fixes | S | S7.3.1 Eval expansion | **O** (AI safety) |
 | S7.3.2 Live run | **O** | S7.4.1 Custom-field reporting | S |
-| S7.4.2 Full Asana import | **O** (data mapping) | S7.4.3 Email notifications | S |
-| S7.4.4 Familiarity | S | S7.5.1 Export / import | S |
-| S7.5.2 Security review | **O** | S7.5.3 Accessibility | S |
-| S7.5.4 Admin completeness | S | S7.5.5 Backup/restore rehearsal | S |
+| S7.4.2 Full Asana import | **O** (data mapping) | S7.4.4 Familiarity | S |
+| S7.5.1 Export / import | S | S7.5.2 Security review | **O** |
+| S7.5.3 Accessibility | S | S7.5.4 Admin completeness | S |
+| S7.5.5 Backup/restore rehearsal | S | | |
 
 ### Phase 8: Azure and go-live (was Phase 9)
 | Slice | Model | Slice | Model |

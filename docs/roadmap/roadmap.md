@@ -14,7 +14,7 @@ Local-only through Phase 7. Azure deployment and go-live in Phase 8; integration
 | 5 | Agents v1 | Runtime, agents as teammates, 8 starter agents, runs UI, budgets, autonomy | J10 | 3–4 weeks |
 | 6 | Planning and insight | Timeline, overview, portfolios, goals, workload, dashboards, forecasting | Phase-6 journeys | 3–4 weeks |
 | 6.5 | UI/UX revamp | Light theme redesign (Wayfinding), shell that fits scaled laptops, task list and pane, every screen to the Linear / Height bar (added 2026-10-01 by the product owner) | Visual audit at 5 viewports × 2 themes, axe, e2e | 1–2 weeks |
-| 7 | Hardening and Asana-ready | Audit-first edge-case register (zero open P0/P1), 150-user scale, AI/agent hardening, custom-field reporting, full Asana import, email notifications, security, a11y, export/import, admin | Register clean, 150-user load test, journeys incl. Asana import, live evals | 3–4 weeks |
+| 7 | Hardening and Asana-ready | Audit-first edge-case register (zero open P0/P1), 150-user scale, AI/agent hardening, custom-field reporting, full Asana import, security, a11y, export/import, admin | Register clean, 150-user load test, journeys incl. Asana import, live evals | 3–4 weeks |
 | 8 | Azure and go-live | Adapters, Bicep, Easy Auth, pipeline, office LiteLLM check, mail relay, import real data | Go-live checklist | 1–2 weeks |
 | 9 | Integrations (after go-live) | Slack first; then Outlook calendar, email-to-task, outgoing webhooks on demand | Slack create-task + digest | 2–3 weeks |
 
