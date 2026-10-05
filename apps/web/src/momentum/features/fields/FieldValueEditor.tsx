@@ -8,6 +8,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/Popover
 import { usePeople } from '@/features/people';
 import { formatDay } from '@/lib/dates';
 import { cn } from '@/lib/cn';
+import { tintColors } from '@/lib/tint';
 import type { Field, SelectOption } from './queries';
 
 const EMPTY = '—';
@@ -38,7 +39,7 @@ export function FieldValueChip({ field, value }: { field: Field; value: unknown 
           <span
             key={o.id}
             className="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[11px]"
-            style={{ background: `${o.color}26`, color: o.color }}
+            style={tintColors(o.color)}
           >
             {o.label}
           </span>
@@ -181,11 +182,7 @@ export function FieldValueEditor({
               opts
                 .filter((o) => selected.has(o.id))
                 .map((o) => (
-                  <span
-                    key={o.id}
-                    className="rounded-full px-1.5 text-[11px]"
-                    style={{ background: `${o.color}26`, color: o.color }}
-                  >
+                  <span key={o.id} className="rounded-full px-1.5 text-[11px]" style={tintColors(o.color)}>
                     {o.label}
                   </span>
                 ))

@@ -39,3 +39,7 @@ tools: [get_task, get_project, search_tasks, semantic_search, get_attachment_tex
 autonomy: confirm
 model_alias: default
 limits: { max_steps: 10, timeout_s: 240 }
+# Budget sized for ~150 people and ~60 active projects (Phase 7, 2026-10-05): on demand, by assignment: sized for ~150 people handing it work.
+# The token cap applies while the model has no price; admins can change both in the agent's settings.
+budget_monthly_usd: 25
+budget_monthly_tokens: 8000000

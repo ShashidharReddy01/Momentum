@@ -8,7 +8,7 @@ import {
   type DragEndEvent,
 } from '@dnd-kit/core';
 import { ChevronLeft, ChevronRight, Plus } from 'lucide-react';
-import { useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { CompleteCheck } from '@/components/common/CompleteCheck';
 import { ErrorState } from '@/components/common/States';
@@ -276,6 +276,11 @@ export function CalendarView({
                         onOpen={(id) => nav?.open(id)}
                         onToggle={(t) => m.setCompleted.mutate({ id: t.id, completed: !t.completed_at })}
                         onAdd={(title) => addOn(iso, title)}
+                        capped={mode === 'month'}
+                        onShowDay={(day) => {
+                          setMode('week');
+                          setCursor(day);
+                        }}
                       />
                     );
                   })}
@@ -310,9 +315,14 @@ function Day({
   onOpen,
   onToggle,
   onAdd,
+  capped,
+  onShowDay,
 }: {
   date: Date;
   outside: boolean;
+  /** Month view: show what fits and "+N more" (no scrolling inside a cell). */
+  capped: boolean;
+  onShowDay: (d: Date) => void;
   chips: { task: Task; part: Part }[];
   peopleById: Map<string, Person>;
   focused: string | null;
@@ -328,6 +338,17 @@ function Day({
   const [adding, setAdding] = useState(false);
   const [title, setTitle] = useState('');
   const isToday = iso === toISODate(new Date());
+  // how many chips fit in this cell (rows are equal height; a chip is 20 px plus a 2 px gap)
+  const [list, setList] = useState<HTMLDivElement | null>(null);
+  const [fit, setFit] = useState(Infinity);
+  useEffect(() => {
+    if (!capped || !list || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(() => setFit(Math.max(1, Math.floor((list.clientHeight + 2) / 22))));
+    ro.observe(list);
+    return () => ro.disconnect();
+  }, [capped, list]);
+  const over = capped && chips.length > fit;
+  const shown = over ? chips.slice(0, Math.max(0, fit - 1)) : chips;
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
@@ -364,11 +385,20 @@ function Day({
         ) : null}
       </div>
       <div
+        ref={setList}
         role="list"
         aria-label={`Tasks on ${iso}`}
-        className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto"
+        // month cells never scroll (they say "+N more"); a week column can, so it's focusable
+        // for keyboard scrolling
+        tabIndex={capped ? undefined : 0}
+        className={cn(
+          'flex min-h-0 flex-1 flex-col gap-0.5',
+          capped
+            ? 'overflow-hidden'
+            : 'overflow-y-auto outline-none focus-visible:ring-1 focus-visible:ring-focus',
+        )}
       >
-        {chips.map(({ task, part }) => (
+        {shown.map(({ task, part }) => (
           <Chip
             key={task.id}
             task={task}
@@ -382,6 +412,17 @@ function Day({
             onToggle={() => onToggle(task)}
           />
         ))}
+        {over ? (
+          <div role="listitem">
+            <button
+              type="button"
+              onClick={() => onShowDay(date)}
+              className="h-5 w-full rounded-sm px-1 text-left text-[11.5px] text-muted hover:bg-surface-2 hover:text-ink"
+            >
+              +{chips.length - shown.length} more
+            </button>
+          </div>
+        ) : null}
       </div>
       {adding ? (
         <form onSubmit={submit}>

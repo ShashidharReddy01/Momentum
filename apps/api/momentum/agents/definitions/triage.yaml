@@ -41,3 +41,7 @@ tools: [get_task, search_tasks, semantic_search, list_people, update_task, set_f
 autonomy: confirm
 model_alias: fast
 limits: { max_steps: 8, timeout_s: 120 }
+# Budget sized for ~150 people and ~60 active projects (Phase 7, 2026-10-05): one run per form submission.
+# The token cap applies while the model has no price; admins can change both in the agent's settings.
+budget_monthly_usd: 10
+budget_monthly_tokens: 4000000

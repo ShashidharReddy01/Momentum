@@ -98,12 +98,20 @@ def test_starter_definitions_load_and_encode_the_kickoff_decisions() -> None:
         "risk_watcher": "suggest",
         "teammate": "confirm",
     }
-    # kickoff Q4: Pulse $10, the rest $5, a 2M-token fallback for all
-    assert {k: str(d.budget_monthly_usd) for k, (d, _) in defs.items() if k != "daily_digest"} == {
-        k: "5" for k in STARTERS - {"daily_digest"}
+    # kickoff Q4 set Pulse $10 and the rest $5 for 10-15 people; Phase 7 sized them for ~150
+    # people and ~60 projects (each definition says how)
+    assert {
+        k: (str(d.budget_monthly_usd), d.budget_monthly_tokens) for k, (d, _) in defs.items()
+    } == {
+        "daily_digest": ("40", 12_000_000),
+        "risk_watcher": ("25", 8_000_000),
+        "teammate": ("25", 8_000_000),
+        "nudger": ("15", 5_000_000),
+        "status_reporter": ("15", 5_000_000),
+        "planner": ("10", 4_000_000),
+        "meeting_notes": ("10", 4_000_000),
+        "triage": ("10", 4_000_000),
     }
-    assert str(defs["daily_digest"][0].budget_monthly_usd) == "10"
-    assert {d.budget_monthly_tokens for d, _ in defs.values()} == {2_000_000}
     # every tool a starter names exists, and none is one agents may never use
     for d, _ in defs.values():
         assert set(d.tools) <= set(TOOLS), d.key

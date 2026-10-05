@@ -13,6 +13,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/Popover
 import { usePeople } from '@/features/people';
 import { useTagLibrary } from '@/features/tags';
 import { cn } from '@/lib/cn';
+import { tintColors } from '@/lib/tint';
 import {
   DEFAULT_VIEW,
   DUE_LABEL,
@@ -210,7 +211,7 @@ function FilterPopover({
                     'h-7 rounded-md px-2 text-xs font-medium',
                     view.tags.includes(t.id) ? 'bg-accent text-on-accent' : 'bg-surface-2',
                   )}
-                  style={view.tags.includes(t.id) ? undefined : { color: t.color }}
+                  style={view.tags.includes(t.id) ? undefined : { color: tintColors(t.color).color }}
                 >
                   {t.name}
                 </button>

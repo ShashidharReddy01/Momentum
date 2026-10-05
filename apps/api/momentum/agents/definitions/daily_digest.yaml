@@ -18,5 +18,8 @@ triggers:
 tools: []
 autonomy: auto
 model_alias: fast
-budget_monthly_usd: 10
 limits: { timeout_s: 60 }
+# Budget sized for ~150 people and ~60 active projects (Phase 7, 2026-10-05): one digest per person per weekday: ~150 people x 22 days = 3,300 runs (~3.5k tokens, ~$0.01 each).
+# The token cap applies while the model has no price; admins can change both in the agent's settings.
+budget_monthly_usd: 40
+budget_monthly_tokens: 12000000

@@ -60,7 +60,14 @@ export function Layout() {
       <div className="flex min-w-0 flex-1 flex-col">
         <TopBar />
         <div className="flex min-h-0 flex-1">
-          <main id="momentum-main" className="min-w-0 flex-1 overflow-auto">
+          {/* the page's scroll container: focusable so the keyboard can scroll any page, even one
+              with nothing else to focus (WCAG 2.1.1; axe scrollable-region-focusable) */}
+          <main
+            id="momentum-main"
+            // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- see above
+            tabIndex={0}
+            className="min-w-0 flex-1 overflow-auto outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-inset"
+          >
             <Outlet />
           </main>
           <div id="momentum-task-pane" />

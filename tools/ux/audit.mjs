@@ -143,6 +143,14 @@ async function checkControls(page) {
         const cover = hit.closest('[role=dialog], [data-radix-popper-content-wrapper], [data-state=open]');
         const pane = hit.closest('aside[aria-label="Task details"]');
         if (pane && !pane.contains(el) && W < 768) continue;
+        // a control scrolled under a sticky column or header is reachable by scrolling back
+        const sticky = (n) => {
+          for (let p = n; p && p !== document.body; p = p.parentElement)
+            if (getComputedStyle(p).position === 'sticky') return p;
+          return null;
+        };
+        const s = sticky(hit);
+        if (s && !s.contains(el) && scrollsX(el)) continue;
         if (!cover || !cover.contains(el))
           issues.push({ kind: 'covered-control', detail: `${describe(el)} under ${describe(hit)}` });
       }

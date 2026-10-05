@@ -21,3 +21,7 @@ tools: [create_project_from_plan, create_subtasks]
 autonomy: confirm
 model_alias: smart
 limits: { timeout_s: 180 }
+# Budget sized for ~150 people and ~60 active projects (Phase 7, 2026-10-05): on demand (briefs and break-downs).
+# The token cap applies while the model has no price; admins can change both in the agent's settings.
+budget_monthly_usd: 10
+budget_monthly_tokens: 4000000

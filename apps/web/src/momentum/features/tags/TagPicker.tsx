@@ -5,6 +5,7 @@ import { Link } from 'react-router';
 import { IconButton } from '@/components/ui/IconButton';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/Popover';
 import { cn } from '@/lib/cn';
+import { tintColors } from '@/lib/tint';
 import { useTagLibrary, type Tag } from './queries';
 
 const ITEM =
@@ -23,11 +24,8 @@ export function TagChip({
 }) {
   return (
     <span
-      className={cn(
-        'inline-flex h-6 items-center gap-1 rounded-md bg-surface-2 px-1.5 text-xs font-medium',
-        className,
-      )}
-      style={{ color: tag.color }}
+      className={cn('inline-flex h-6 items-center gap-1 rounded-md px-1.5 text-xs font-medium', className)}
+      style={tintColors(tag.color)}
     >
       <Link to={`/tags/${tag.id}`} className="hover:underline" onClick={(e) => e.stopPropagation()}>
         {tag.name}

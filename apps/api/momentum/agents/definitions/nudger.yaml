@@ -20,3 +20,7 @@ tools: []
 autonomy: auto
 model_alias: fast
 limits: { timeout_s: 120 }
+# Budget sized for ~150 people and ~60 active projects (Phase 7, 2026-10-05): one pass per active project per weekday; most nudges are built in code.
+# The token cap applies while the model has no price; admins can change both in the agent's settings.
+budget_monthly_usd: 15
+budget_monthly_tokens: 5000000
