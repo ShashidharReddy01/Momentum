@@ -1,8 +1,18 @@
-import { Bell, ChevronRight, Download, KeyRound, Sparkles, Users, type LucideIcon } from 'lucide-react';
+import {
+  Bell,
+  ChevronRight,
+  Download,
+  FileArchive,
+  KeyRound,
+  Sparkles,
+  Users,
+  type LucideIcon,
+} from 'lucide-react';
 import { Link } from 'react-router';
 import { Icon } from '@/components/ui/Icon';
 import { Segmented } from '@/components/ui/Tabs';
 import { useMe } from '@/features/auth';
+import { useMomentumConfig } from '@/lib/config';
 import { useUi } from '@/stores/ui';
 
 type Entry = { to: string; icon: LucideIcon; title: string; detail: string; admin?: boolean };
@@ -38,6 +48,7 @@ const ENTRIES: Entry[] = [
 /** `/settings`: every settings screen in one place (the account menu links to each too). */
 export function SettingsPage() {
   const me = useMe().data?.user;
+  const { api_base } = useMomentumConfig();
   const theme = useUi((s) => s.theme);
   const setTheme = useUi((s) => s.setTheme);
   return (
@@ -83,6 +94,39 @@ export function SettingsPage() {
           </li>
         ))}
       </ul>
+      {me?.role === 'admin' ? (
+        <section
+          aria-labelledby="export-heading"
+          className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-hairline bg-surface p-4"
+        >
+          <div className="min-w-0">
+            <h2 id="export-heading" className="text-sm font-semibold">
+              Export everything
+            </h2>
+            <p className="text-xs text-muted">
+              Every project, task, comment and setting as a .zip you can keep or load into another Momentum
+              (admins only)
+            </p>
+          </div>
+          <div className="flex gap-2">
+            {/* a plain download: the browser's own progress and save dialog */}
+            <a
+              href={`${api_base}/admin/export`}
+              download
+              className="inline-flex h-8 items-center gap-1.5 rounded-md border border-hairline px-3 text-sm hover:bg-surface-2"
+            >
+              <Icon icon={FileArchive} size={14} /> Data only
+            </a>
+            <a
+              href={`${api_base}/admin/export?files=true`}
+              download
+              className="inline-flex h-8 items-center gap-1.5 rounded-md border border-hairline px-3 text-sm hover:bg-surface-2"
+            >
+              <Icon icon={FileArchive} size={14} /> With files
+            </a>
+          </div>
+        </section>
+      ) : null}
     </div>
   );
 }

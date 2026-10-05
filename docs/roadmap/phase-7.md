@@ -79,6 +79,8 @@ Every register finding (P0 first, then P1, P2, P3), grouped by area into slices.
 | S7.5.4 Admin completeness (was S8.6) | Members (invite, role, disable, transfer ownership), teams admin, AI settings, agents policy, integrations status, background jobs panel (failed jobs, retry), audit view (activity search for admins). Essential at 150 people | Admin can do everything without DB access | M |
 | S7.5.5 Backup/restore rehearsal (was S8.7) | `pg_dump -n momentum` + files → restore into a fresh environment script; document | Restore rehearsal succeeds | S |
 
+**S7.5.1 as built (2026-10-05).** `momentum/portability.py`: `momentum export --out <dir|.zip> [--with-files]` and `momentum import <bundle>`; Settings → Export everything for admins (data only, or with files). Bundle format, load order and verification: `embedding-and-portability.md` §3. Round trip on a populated database into a freshly migrated empty schema gives byte-identical table files and checksums (`test_export_import_round_trip`); a tampered table, another migration revision or a non-empty target are refused (`test_a_changed_or_mismatched_bundle_is_refused`); the download is admin-only.
+
 ## Order and models
 
 Kickoff + E7.0 (Opus) → register review with the product owner → E7.1 (Opus) → E7.2 P0 fixes (Opus) → E7.4 (Sonnet; the importer on Opus) → E7.2 P1/P2 (Sonnet) → E7.3 (Opus) → E7.5 (mixed) → exit (Opus). Live checkpoints on the product owner's machine: after the audit, after E7.3, at exit.

@@ -83,7 +83,7 @@ import { MomentumProvider, momentumRoutes } from '@momentum/web';
 
 1. Same image, new settings (see `configuration.md`).
 2. New Entra tenant? `MOMENTUM_IDENTITY_LINK_BY_EMAIL=true` re-links users by email on first login.
-3. Data: `momentum export --out bundle.zip [--with-files]` → `momentum import bundle.zip` (versioned JSON; ids preserved) **or** `pg_dump -n momentum` / `pg_restore`.
+3. Data: `momentum export --out bundle.zip [--with-files]` → `momentum import bundle.zip` (versioned JSON; ids preserved) **or** `pg_dump -n momentum` / `pg_restore`. **As built (S7.5.1):** a bundle is `manifest.json` (format, migration revision, per-table row count and SHA-256) + `tables/<table>.jsonl` (every row in primary-key order, computed search columns left out) + `files/<storage key>` with `--with-files`. Import goes into an *empty* database at the *same* migration revision, parent tables first (the four nullable foreign keys that point forward or at their own table are filled in a second pass, keeping `updated_at`), moves sequences past the imported ids, and verifies every table's checksum before it commits; anything else is refused with the reason. Admins can also download a bundle from Settings → Export everything (`GET /api/v1/admin/export[?files=true]`). Round-trip test: `tests/test_portability.py`.
 4. Files: copy the storage container (AzCopy) or use the bundle with files.
 5. Embeddings: if the embedding model/dimension differs → `momentum reindex`.
 6. LLM: point `MOMENTUM_LLM_BASE_URL` at the new gateway; map aliases; run `momentum llm-check`.

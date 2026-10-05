@@ -43,6 +43,7 @@ def _api_router(settings: Settings) -> APIRouter:
     from momentum.ai.forms_intake_router import router as forms_intake_router
     from momentum.ai.router import router as ai_router
     from momentum.ai.templates_router import router as ai_templates_router
+    from momentum.api.export import router as export_router
     from momentum.api.undo import router as undo_router
     from momentum.domain.agents.router import router as agents_router
     from momentum.domain.attachments.router import router as attachments_router
@@ -76,6 +77,7 @@ def _api_router(settings: Settings) -> APIRouter:
 
     api = APIRouter(prefix=API_PREFIX)
     api.include_router(config_router)
+    api.include_router(export_router)
     api.include_router(users_router)
     api.include_router(workspace_router)
     api.include_router(teams_router)

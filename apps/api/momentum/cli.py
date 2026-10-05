@@ -269,6 +269,75 @@ def evals(
         raise typer.Exit(code=1)
 
 
+@cli.command("export")
+def export_cmd(
+    out: str = typer.Option(..., "--out", help="A new directory, or a path ending in .zip"),
+    files: bool = typer.Option(False, "--with-files", help="Include every attachment's file"),
+) -> None:
+    """Export the whole database to a versioned bundle (S7.5.1): every table as JSON lines with
+    counts and checksums, ids kept; with --with-files, the stored files too."""
+    import tempfile
+    from pathlib import Path
+
+    from momentum.core.db import UnitOfWork, create_engine, create_session_factory
+    from momentum.core.storage import build_storage
+    from momentum.portability import cleanup, export_to, zip_bundle
+
+    settings = Settings()
+    target = Path(out)
+
+    async def _run() -> None:
+        engine = create_engine(settings)
+        try:
+            async with UnitOfWork(create_session_factory(engine)()).transaction() as s:
+                folder = Path(tempfile.mkdtemp()) / "bundle" if target.suffix == ".zip" else target
+                manifest = await export_to(
+                    s, folder, storage=build_storage(settings) if files else None, with_files=files
+                )
+            if target.suffix == ".zip":
+                zip_bundle(folder, target)
+                cleanup(folder.parent)
+            rows = sum(t.rows for t in manifest.tables.values())
+            typer.echo(
+                f"exported {rows} rows in {len(manifest.tables)} tables"
+                f"{f' and {manifest.files} files' if files else ''} at migration "
+                f"{manifest.revision} to {target}"
+            )
+        finally:
+            await engine.dispose()
+
+    run_async(_run())
+
+
+@cli.command("import")
+def import_cmd(
+    bundle: str = typer.Argument(..., help="A bundle directory or .zip from `momentum export`"),
+) -> None:
+    """Import a bundle into this empty database (S7.5.1; same migration revision). Every table's
+    checksum is verified before anything is committed."""
+    from pathlib import Path
+
+    from momentum.core.db import UnitOfWork, create_engine, create_session_factory
+    from momentum.core.storage import build_storage
+    from momentum.portability import PortabilityError, import_from
+
+    settings = Settings()
+
+    async def _run() -> None:
+        engine = create_engine(settings)
+        try:
+            async with UnitOfWork(create_session_factory(engine)()).transaction() as s:
+                manifest = await import_from(s, Path(bundle), storage=build_storage(settings))
+            rows = sum(t.rows for t in manifest.tables.values())
+            typer.echo(f"imported {rows} rows in {len(manifest.tables)} tables, checksums verified")
+        except PortabilityError as e:
+            raise typer.BadParameter(str(e)) from e
+        finally:
+            await engine.dispose()
+
+    run_async(_run())
+
+
 @cli.command("asana-import")
 def asana_import(
     workspace: str = typer.Option(..., "--workspace", help="Asana workspace gid"),
