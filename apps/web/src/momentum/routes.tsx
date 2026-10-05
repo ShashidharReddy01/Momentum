@@ -1,27 +1,20 @@
 import type { RouteObject } from 'react-router';
-import { AgentPage, AgentRunPage, AgentsGallery, EditAgentPage, NewAgentPage } from '@/features/agents';
-import { AiActionPage, AiSettingsPage, AskPage } from '@/features/ai';
 import { AuthGate, DevLoginPage } from '@/features/auth';
-import { GoalPage, GoalsPage } from '@/features/goals';
-import { FormFillPage, PublicFormPage } from '@/features/forms';
 import { HomePage } from '@/features/home';
-import { AsanaImportPage } from '@/features/imports';
-import { MembersPage } from '@/features/members';
-import { InboxPage, NotificationSettingsPage } from '@/features/notifications';
+import { InboxPage } from '@/features/notifications';
 import { NotFoundPage } from '@/features/placeholders';
-import { PortfolioPage, PortfoliosPage } from '@/features/portfolios';
 import { ProjectPage } from '@/features/projects';
 import { MyTasksPage } from '@/features/mytasks';
-import { SearchPage } from '@/features/search';
 import { TaskPage } from '@/features/tasks';
-import { TagPage } from '@/features/tags';
-import { TeamPage } from '@/features/teams';
-import { TokensPage } from '@/features/tokens';
-import { WorkloadPage } from '@/features/workload';
 import type { RuntimeConfig } from '@/lib/config';
 import { Layout } from '@/shell/Layout';
 
-/** Route objects (docs/frontend/frontend-architecture.md §6). Hosts can mount these. */
+/** Route objects (docs/frontend/frontend-architecture.md §6). Hosts can mount these. The screens
+ * people use all day (Home, My Tasks, Inbox, projects, tasks) load with the shell; every other
+ * screen is a lazy chunk, which keeps the initial bundle inside its 300 KB gzip budget. A lazy route
+ * imports the page's own module, not the feature's index: when the shell also imports that index,
+ * a lazy import of it would pull every page it re-exports into the initial chunk. This is the one
+ * sanctioned deep import into a feature (frontend-architecture.md §6). */
 export function buildRoutes(config: RuntimeConfig): RouteObject[] {
   const devRoutes: RouteObject[] = config.auth.dev_login
     ? [{ path: '/dev/login', element: <DevLoginPage /> }]
@@ -33,7 +26,10 @@ export function buildRoutes(config: RuntimeConfig): RouteObject[] {
   return [
     ...devRoutes,
     // S4.2.1: the public form link has no session — its own route outside AuthGate/Layout.
-    { path: 'f/:token', element: <PublicFormPage /> },
+    {
+      path: 'f/:token',
+      lazy: async () => ({ Component: (await import('@/features/forms/PublicFormPage')).PublicFormPage }),
+    },
     {
       element: (
         <AuthGate>
@@ -47,19 +43,41 @@ export function buildRoutes(config: RuntimeConfig): RouteObject[] {
           element: <MyTasksPage />,
           handle: { crumb: 'My Tasks' },
         },
-        { path: 'teams/:teamId', element: <TeamPage />, handle: { crumb: 'Team' } },
+        {
+          path: 'teams/:teamId',
+          lazy: async () => ({ Component: (await import('@/features/teams/TeamPage')).TeamPage }),
+          handle: { crumb: 'Team' },
+        },
         { path: 'projects/:projectId/:view?', element: <ProjectPage />, handle: { crumb: 'Project' } },
         {
           path: 'projects/:projectId/forms/:formId',
-          element: <FormFillPage />,
+          lazy: async () => ({ Component: (await import('@/features/forms/FormFillPage')).FormFillPage }),
           handle: { crumb: 'Fill out form' },
         },
         { path: 'task/:taskId', element: <TaskPage />, handle: { crumb: 'Task' } },
-        { path: 'tags/:tagId', element: <TagPage />, handle: { crumb: 'Tag' } },
+        {
+          path: 'tags/:tagId',
+          lazy: async () => ({ Component: (await import('@/features/tags/TagPage')).TagPage }),
+          handle: { crumb: 'Tag' },
+        },
         { path: 'inbox', element: <InboxPage />, handle: { crumb: 'Inbox' } },
-        { path: 'portfolios', element: <PortfoliosPage />, handle: { crumb: 'Portfolios' } },
-        { path: 'goals', element: <GoalsPage />, handle: { crumb: 'Goals' } },
-        { path: 'workload', element: <WorkloadPage />, handle: { crumb: 'Workload' } },
+        {
+          path: 'portfolios',
+          lazy: async () => ({
+            Component: (await import('@/features/portfolios/PortfoliosPage')).PortfoliosPage,
+          }),
+          handle: { crumb: 'Portfolios' },
+        },
+        {
+          path: 'goals',
+          lazy: async () => ({ Component: (await import('@/features/goals/GoalsPage')).GoalsPage }),
+          handle: { crumb: 'Goals' },
+        },
+        {
+          path: 'workload',
+          lazy: async () => ({ Component: (await import('@/features/workload/WorkloadPage')).WorkloadPage }),
+          handle: { crumb: 'Workload' },
+        },
         {
           path: 'dashboards',
           lazy: async () => ({ Component: (await import('@/features/dashboards')).DashboardsPage }),
@@ -70,34 +88,93 @@ export function buildRoutes(config: RuntimeConfig): RouteObject[] {
           lazy: async () => ({ Component: (await import('@/features/dashboards')).DashboardPage }),
           handle: { crumb: 'Dashboard' },
         },
-        { path: 'goals/:goalId', element: <GoalPage />, handle: { crumb: 'Goal' } },
-        { path: 'portfolios/:portfolioId', element: <PortfolioPage />, handle: { crumb: 'Portfolio' } },
-        { path: 'ai/actions/:actionId', element: <AiActionPage />, handle: { crumb: 'Suggestion' } },
-        { path: 'agents', element: <AgentsGallery />, handle: { crumb: 'Agents' } },
-        { path: 'agents/new', element: <NewAgentPage />, handle: { crumb: 'New agent' } },
-        { path: 'agents/runs/:runId', element: <AgentRunPage />, handle: { crumb: 'Agent run' } },
-        { path: 'agents/:agentId/edit', element: <EditAgentPage />, handle: { crumb: 'Edit agent' } },
-        { path: 'agents/:agentId', element: <AgentPage />, handle: { crumb: 'Agent' } },
-        { path: 'search', element: <SearchPage />, handle: { crumb: 'Search' } },
+        {
+          path: 'goals/:goalId',
+          lazy: async () => ({ Component: (await import('@/features/goals/GoalPage')).GoalPage }),
+          handle: { crumb: 'Goal' },
+        },
+        {
+          path: 'portfolios/:portfolioId',
+          lazy: async () => ({
+            Component: (await import('@/features/portfolios/PortfolioPage')).PortfolioPage,
+          }),
+          handle: { crumb: 'Portfolio' },
+        },
+        {
+          path: 'ai/actions/:actionId',
+          lazy: async () => ({ Component: (await import('@/features/ai/AiActionPage')).AiActionPage }),
+          handle: { crumb: 'Suggestion' },
+        },
+        {
+          path: 'agents',
+          lazy: async () => ({ Component: (await import('@/features/agents/AgentsGallery')).AgentsGallery }),
+          handle: { crumb: 'Agents' },
+        },
+        {
+          path: 'agents/new',
+          lazy: async () => ({ Component: (await import('@/features/agents/AgentForm')).NewAgentPage }),
+          handle: { crumb: 'New agent' },
+        },
+        {
+          path: 'agents/runs/:runId',
+          lazy: async () => ({ Component: (await import('@/features/agents/AgentRunPage')).AgentRunPage }),
+          handle: { crumb: 'Agent run' },
+        },
+        {
+          path: 'agents/:agentId/edit',
+          lazy: async () => ({ Component: (await import('@/features/agents/AgentForm')).EditAgentPage }),
+          handle: { crumb: 'Edit agent' },
+        },
+        {
+          path: 'agents/:agentId',
+          lazy: async () => ({ Component: (await import('@/features/agents/AgentPage')).AgentPage }),
+          handle: { crumb: 'Agent' },
+        },
+        {
+          path: 'search',
+          lazy: async () => ({ Component: (await import('@/features/search/SearchPage')).SearchPage }),
+          handle: { crumb: 'Search' },
+        },
         {
           path: 'settings/notifications',
-          element: <NotificationSettingsPage />,
+          lazy: async () => ({
+            Component: (await import('@/features/notifications/NotificationSettingsPage'))
+              .NotificationSettingsPage,
+          }),
           handle: { crumb: 'Notification settings' },
         },
         {
           path: 'settings/import/asana',
-          element: <AsanaImportPage />,
+          lazy: async () => ({
+            Component: (await import('@/features/imports/AsanaImportPage')).AsanaImportPage,
+          }),
           handle: { crumb: 'Import from Asana' },
         },
         {
           path: 'settings/members',
-          element: <MembersPage />,
+          lazy: async () => ({ Component: (await import('@/features/members/MembersPage')).MembersPage }),
           handle: { crumb: 'Members' },
         },
-        { path: 'settings/ai', element: <AiSettingsPage />, handle: { crumb: 'AI settings' } },
-        { path: 'settings/tokens', element: <TokensPage />, handle: { crumb: 'API tokens' } },
-        { path: 'ask', element: <AskPage />, handle: { crumb: 'Ask Mo' } },
-        { path: 'ask/:conversationId', element: <AskPage />, handle: { crumb: 'Ask Mo' } },
+        {
+          path: 'settings/ai',
+          lazy: async () => ({ Component: (await import('@/features/ai/AiSettingsPage')).AiSettingsPage }),
+          handle: { crumb: 'AI settings' },
+        },
+        {
+          path: 'settings/tokens',
+          lazy: async () => ({ Component: (await import('@/features/tokens/TokensPage')).TokensPage }),
+          handle: { crumb: 'API tokens' },
+        },
+        {
+          path: 'ask',
+          lazy: async () => ({ Component: (await import('@/features/ai/AskPage')).AskPage }),
+          handle: { crumb: 'Ask Mo' },
+        },
+        {
+          path: 'ask/:conversationId',
+          lazy: async () => ({ Component: (await import('@/features/ai/AskPage')).AskPage }),
+          handle: { crumb: 'Ask Mo' },
+        },
         ...galleryRoute.map((r) => ({ ...r, path: 'dev/ui', handle: { crumb: 'Component gallery' } })),
         { path: '*', element: <NotFoundPage />, handle: { crumb: 'Not found' } },
       ],

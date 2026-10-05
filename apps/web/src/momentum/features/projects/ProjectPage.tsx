@@ -39,8 +39,6 @@ import { cn } from '@/lib/cn';
 import { useCrumbs } from '@/lib/crumbs';
 import { CsvImportDialog } from '@/features/csvImport';
 import { FieldsDialog } from '@/features/fields';
-import { FormsDialog } from '@/features/forms';
-import { RulesDialog } from '@/features/rules';
 import { SaveAsTemplateDialog, TaskTemplatesDialog } from '@/features/templates';
 import { StatusChip, type Status } from '@/features/status';
 import { useMomentumConfig } from '@/lib/config';
@@ -51,11 +49,8 @@ import {
   useUpdateProject,
   type ProjectDetail,
 } from './queries';
-import { ProjectOverview } from './ProjectOverview';
 import { ShareDialog } from './ShareDialog';
 import {
-  BoardView,
-  CalendarView,
   ProjectTasksView,
   TaskNavProvider,
   TaskPane,
@@ -65,6 +60,16 @@ import {
 } from '@/features/tasks';
 
 // Lazy: the timeline is a separate chunk, loaded only when the tab opens (frontend-architecture).
+// The list is the default view; the other tabs load when first opened. Board and Calendar are
+// imported from their own modules (not the tasks index, which the list already loads eagerly).
+const BoardView = lazy(async () => ({ default: (await import('@/features/tasks/BoardView')).BoardView }));
+const CalendarView = lazy(async () => ({
+  default: (await import('@/features/tasks/CalendarView')).CalendarView,
+}));
+const ProjectOverview = lazy(async () => ({ default: (await import('./ProjectOverview')).ProjectOverview }));
+// opened from the project menu: loaded on first open, not with every project
+const RulesDialog = lazy(async () => ({ default: (await import('@/features/rules')).RulesDialog }));
+const FormsDialog = lazy(async () => ({ default: (await import('@/features/forms')).FormsDialog }));
 const TimelineView = lazy(() => import('@/features/timeline').then((m) => ({ default: m.TimelineView })));
 // Lazy too: dashboards and their charts (Recharts) load only when the tab opens.
 const ProjectDashboard = lazy(() =>
@@ -289,8 +294,16 @@ export function ProjectPage() {
 
       <ShareDialog project={p} open={share} onOpenChange={setShare} />
       <FieldsDialog projectId={p.id} canEdit={canEdit} open={fieldsOpen} onOpenChange={setFieldsOpen} />
-      <RulesDialog projectId={p.id} canEdit={isAdmin} open={rulesOpen} onOpenChange={setRulesOpen} />
-      <FormsDialog projectId={p.id} canEdit={isAdmin} open={formsOpen} onOpenChange={setFormsOpen} />
+      {rulesOpen ? (
+        <Suspense fallback={null}>
+          <RulesDialog projectId={p.id} canEdit={isAdmin} open onOpenChange={setRulesOpen} />
+        </Suspense>
+      ) : null}
+      {formsOpen ? (
+        <Suspense fallback={null}>
+          <FormsDialog projectId={p.id} canEdit={isAdmin} open onOpenChange={setFormsOpen} />
+        </Suspense>
+      ) : null}
       <SaveAsTemplateDialog projectId={p.id} open={saveTemplateOpen} onOpenChange={setSaveTemplateOpen} />
       <TaskTemplatesDialog
         projectId={p.id}
@@ -346,9 +359,13 @@ function ProjectBody({
         {view === 'list' ? (
           <ProjectTasksView key={projectId} projectId={projectId} canEdit={canEdit} />
         ) : view === 'board' ? (
-          <BoardView key={projectId} projectId={projectId} canEdit={canEdit} color={color} />
+          <Suspense fallback={<Skeleton className="h-64" />}>
+            <BoardView key={projectId} projectId={projectId} canEdit={canEdit} color={color} />
+          </Suspense>
         ) : view === 'calendar' ? (
-          <CalendarView key={projectId} projectId={projectId} canEdit={canEdit} color={color} />
+          <Suspense fallback={<Skeleton className="h-64" />}>
+            <CalendarView key={projectId} projectId={projectId} canEdit={canEdit} color={color} />
+          </Suspense>
         ) : view === 'timeline' ? (
           <Suspense fallback={<Skeleton className="h-64" />}>
             <TimelineView
@@ -364,12 +381,14 @@ function ProjectBody({
             <ProjectDashboard key={projectId} projectId={projectId} projectName={project.name} />
           </Suspense>
         ) : view === 'overview' ? (
-          <ProjectOverview
-            key={projectId}
-            project={project}
-            canEdit={canEdit}
-            startDraft={searchParams.get('draft') === 'mo'}
-          />
+          <Suspense fallback={<Skeleton className="h-64" />}>
+            <ProjectOverview
+              key={projectId}
+              project={project}
+              canEdit={canEdit}
+              startDraft={searchParams.get('draft') === 'mo'}
+            />
+          </Suspense>
         ) : null}
       </div>
       {nav.openId ? (

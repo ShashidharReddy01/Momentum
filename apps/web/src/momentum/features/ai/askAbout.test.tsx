@@ -52,6 +52,7 @@ describe('Ask Mo about this (S3.3.2)', () => {
     await user.click(screen.getByRole('button', { name: 'Open details for Second' }));
     const pane = await screen.findByRole('complementary', { name: 'Task details' });
     await user.click(within(pane).getByRole('button', { name: 'Ask Mo about this task' }));
+    await screen.findByRole('complementary', { name: 'Ask Mo' }); // its chunk loads on first open
     expect(await within(panel()).findByLabelText(/Chat is about T-\d+ Second/)).toBeInTheDocument();
     const suggested = within(panel()).getByRole('group', { name: 'Suggested questions' });
     await user.click(within(suggested).getByRole('button', { name: 'Summarize this task' }));
@@ -71,6 +72,7 @@ describe('Ask Mo about this (S3.3.2)', () => {
   it('from the project header and from a selection', async () => {
     const { user, chat } = await boot();
     await user.click(screen.getByRole('button', { name: 'Ask Mo about this project' }));
+    await screen.findByRole('complementary', { name: 'Ask Mo' });
     expect(await within(panel()).findByLabelText('Chat is about Website Revamp')).toBeInTheDocument();
     await user.click(within(panel()).getByRole('button', { name: "What's blocking this project?" }));
     await waitFor(() => expect(chat.requests).toHaveLength(1));

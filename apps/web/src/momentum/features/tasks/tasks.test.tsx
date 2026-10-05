@@ -34,7 +34,7 @@ const titles = (section: string) =>
   within(screen.getByRole('list', { name: `Tasks in ${section}` }))
     .queryAllByRole('listitem')
     .map((li) => li.getAttribute('aria-label'))
-    .filter((x) => x !== 'New task');
+    .filter((x) => x !== null && x !== 'New task'); // not the section's "Add task" item
 
 describe('Task list', () => {
   it('creates 10 tasks rapidly with Enter, in order, keeping focus', async () => {
@@ -67,7 +67,8 @@ describe('Task list', () => {
     expect(input).toHaveFocus();
     const rows = within(backlog)
       .queryAllByRole('listitem')
-      .map((li) => li.getAttribute('aria-label'));
+      .map((li) => li.getAttribute('aria-label'))
+      .filter((x) => x !== null);
     expect(rows.indexOf('New task')).toBe(rows.indexOf('First') + 1);
     await user.keyboard('ond{Enter}{Escape}');
     expect(titles('Backlog')).toEqual(['Existing A', 'Existing B', 'First', 'Second']);

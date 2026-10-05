@@ -1,4 +1,5 @@
-import * as chrono from 'chrono-node';
+// English only: the package root bundles every locale chrono supports (~3x the size)
+import * as chrono from 'chrono-node/en';
 
 /** A due date as the API stores it: a local calendar date plus an optional exact time. */
 export interface DueValue {

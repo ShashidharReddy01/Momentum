@@ -746,7 +746,8 @@ function SectionEnd({
   });
   const dragging = useDndContext().active !== null;
   return (
-    <div ref={setNodeRef} className={cn('relative min-h-3', dragging && 'min-h-9')}>
+    // the section's last item (its "Add task" row and drop zone), so the list holds only items
+    <div role="listitem" ref={setNodeRef} className={cn('relative min-h-3', dragging && 'min-h-9')}>
       {active ? (
         <span aria-hidden className="absolute top-0 right-0 left-0 h-0.5 rounded-full bg-focus" />
       ) : null}

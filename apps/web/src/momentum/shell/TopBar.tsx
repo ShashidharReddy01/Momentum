@@ -83,7 +83,7 @@ export function TopBar() {
         {unread ? (
           <span
             aria-hidden
-            className="tabular absolute top-0.5 right-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-crit px-1 text-[10px] font-medium text-surface"
+            className="tabular pointer-events-none absolute top-0.5 right-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-crit px-1 text-[10px] font-medium text-surface"
           >
             {unread > 9 ? '9+' : unread}
           </span>

@@ -36,7 +36,8 @@ const row = (name: string) => screen.getByRole('listitem', { name });
 const titles = (section: string) =>
   within(screen.getByRole('list', { name: `Tasks in ${section}` }))
     .queryAllByRole('listitem')
-    .map((li) => li.getAttribute('aria-label'));
+    .map((li) => li.getAttribute('aria-label'))
+    .filter((x) => x !== null); // not the section's "Add task" item
 const selectedTitles = () =>
   screen
     .queryAllByRole('listitem')

@@ -195,6 +195,9 @@ export function CommentEditor({
     autofocus: focusOnMount ? 'end' : false,
     editorProps: {
       attributes: {
+        // a contenteditable needs a role for its label to count (axe: aria-prohibited-attr)
+        role: 'textbox',
+        'aria-multiline': 'true',
         'aria-label': submitLabel === 'Comment' ? 'New comment' : 'Edit comment',
         class: 'mo-prose mo-prose-compact',
       },

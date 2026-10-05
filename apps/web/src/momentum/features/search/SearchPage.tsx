@@ -106,6 +106,7 @@ function SearchPageBody() {
             ))}
           </div>
           <select
+            aria-label="Project"
             value={projectId}
             onChange={(e) => setParam('project_id', e.target.value || null)}
             className="h-7 rounded-md border border-hair bg-surface px-2 text-xs"
@@ -118,6 +119,7 @@ function SearchPageBody() {
             ))}
           </select>
           <select
+            aria-label="Assignee"
             value={assigneeId}
             onChange={(e) => setParam('assignee_id', e.target.value || null)}
             className="h-7 rounded-md border border-hair bg-surface px-2 text-xs"
@@ -130,6 +132,7 @@ function SearchPageBody() {
             ))}
           </select>
           <select
+            aria-label="Completed"
             value={completedParam ?? ''}
             onChange={(e) => setParam('completed', e.target.value || null)}
             className="h-7 rounded-md border border-hair bg-surface px-2 text-xs"

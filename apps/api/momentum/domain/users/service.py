@@ -67,7 +67,7 @@ async def list_users(
         query = query.where(
             (func.lower(User.name).like(like)) | (func.lower(User.email).like(like))
         )
-    result = await session.execute(query.order_by(func.lower(User.name)).limit(min(limit, 200)))
+    result = await session.execute(query.order_by(func.lower(User.name)).limit(min(limit, 1000)))
     return list(result.scalars())
 
 

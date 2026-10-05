@@ -35,6 +35,16 @@ const WEEK_DAY_LABEL = new Intl.DateTimeFormat(undefined, { month: 'short', day:
 const WEEKDAYS = Array.from({ length: 7 }, (_, i) =>
   new Intl.DateTimeFormat(undefined, { weekday: 'narrow' }).format(new Date(2024, 0, 1 + i)),
 );
+const WEEKDAY_NAMES = Array.from({ length: 7 }, (_, i) =>
+  new Intl.DateTimeFormat(undefined, { weekday: 'long' }).format(new Date(2024, 0, 1 + i)),
+);
+
+/** Days in rows of seven (the month grid always starts on a Monday). */
+function weeksOf(days: Date[]): Date[][] {
+  const out: Date[][] = [];
+  for (let i = 0; i < days.length; i += 7) out.push(days.slice(i, i + 7));
+  return out;
+}
 
 type Part = 'single' | 'start' | 'mid' | 'end';
 type ChipData = { kind: 'calendar-task'; task: Task };
@@ -228,38 +238,50 @@ export function CalendarView({
               ))}
             </div>
           </div>
-          <div className="grid grid-cols-7 text-center text-xs text-muted-2">
-            {WEEKDAYS.map((w, i) => (
-              <span key={i} className="pb-1">
-                {w}
-              </span>
-            ))}
-          </div>
+          {/* a real grid for assistive tech: a header row, then one row per week (display:contents,
+              so the CSS grid lays the cells out as before) */}
           <div
-            className={cn(
-              'grid min-h-0 flex-1 grid-cols-7 gap-1',
-              mode === 'month' ? 'grid-rows-6' : 'grid-rows-1',
-            )}
+            role="grid"
+            aria-label={`Calendar, ${mode === 'month' ? MONTH_LABEL.format(cursor) : `week of ${WEEK_DAY_LABEL.format(days[0]!)}`}`}
+            className="flex min-h-0 flex-1 flex-col"
           >
-            {days.map((d) => {
-              const iso = toISODate(d);
-              return (
-                <Day
-                  key={iso}
-                  date={d}
-                  outside={mode === 'month' && d.getMonth() !== cursor.getMonth()}
-                  chips={byDay.get(iso) ?? []}
-                  peopleById={peopleById}
-                  focused={focused}
-                  canEdit={canEdit && !!firstSectionId}
-                  color={color}
-                  onFocusChip={setFocused}
-                  onOpen={(id) => nav?.open(id)}
-                  onToggle={(t) => m.setCompleted.mutate({ id: t.id, completed: !t.completed_at })}
-                  onAdd={(title) => addOn(iso, title)}
-                />
-              );
-            })}
+            <div role="row" className="grid grid-cols-7 text-center text-xs text-muted">
+              {WEEKDAYS.map((w, i) => (
+                <span key={i} role="columnheader" aria-label={WEEKDAY_NAMES[i]} className="pb-1">
+                  {w}
+                </span>
+              ))}
+            </div>
+            <div
+              className={cn(
+                'grid min-h-0 flex-1 grid-cols-7 gap-1',
+                mode === 'month' ? 'grid-rows-6' : 'grid-rows-1',
+              )}
+            >
+              {weeksOf(days).map((week) => (
+                <div role="row" key={toISODate(week[0]!)} className="contents">
+                  {week.map((d) => {
+                    const iso = toISODate(d);
+                    return (
+                      <Day
+                        key={iso}
+                        date={d}
+                        outside={mode === 'month' && d.getMonth() !== cursor.getMonth()}
+                        chips={byDay.get(iso) ?? []}
+                        peopleById={peopleById}
+                        focused={focused}
+                        canEdit={canEdit && !!firstSectionId}
+                        color={color}
+                        onFocusChip={setFocused}
+                        onOpen={(id) => nav?.open(id)}
+                        onToggle={(t) => m.setCompleted.mutate({ id: t.id, completed: !t.completed_at })}
+                        onAdd={(title) => addOn(iso, title)}
+                      />
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
           </div>
         </div>
         <NoDateTray

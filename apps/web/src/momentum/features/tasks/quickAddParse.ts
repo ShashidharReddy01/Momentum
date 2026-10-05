@@ -1,4 +1,5 @@
-import * as chrono from 'chrono-node';
+// English only: the package root bundles every locale chrono supports (~3x the size)
+import * as chrono from 'chrono-node/en';
 import { toISODate, type DueValue } from '@/lib/dates';
 
 export type Priority = 'urgent' | 'high' | 'medium' | 'low';

@@ -12,10 +12,12 @@ export const memberKeys = {
   onboarding: ['onboarding'] as const,
 };
 
-export function useMembers() {
+/** The full roster, invited and disabled included (admin only: anyone else gets a 403). */
+export function useMembers(enabled = true) {
   const api = useApi();
   return useQuery({
     queryKey: memberKeys.list,
+    enabled,
     queryFn: async () => (await api.GET('/api/v1/users/members')).data!.data,
   });
 }

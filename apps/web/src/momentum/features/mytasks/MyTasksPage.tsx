@@ -363,7 +363,9 @@ function MyTasksList() {
                 {isCollapsed ? null : (
                   <div role="list" aria-label={`Tasks in ${b.name}`} className="pl-7">
                     {tasks.map((t) => (
-                      <div key={t.id}>{row(t, drop)}</div>
+                      <div key={t.id} role="none">
+                        {row(t, drop)}
+                      </div>
                     ))}
                     <BucketEnd bucket={b.id} active={drop?.bucket === b.id && !drop.anchorId}>
                       {tasks.length === 0 ? (
@@ -441,7 +443,8 @@ function BucketEnd({ bucket, active, children }: { bucket: Bucket; active: boole
   });
   const dragging = useDndContext().active !== null;
   return (
-    <div ref={setNodeRef} className={cn('relative min-h-2', dragging && 'min-h-9')}>
+    // the bucket's last item (its drop zone), so the list holds only items
+    <div role="listitem" ref={setNodeRef} className={cn('relative min-h-2', dragging && 'min-h-9')}>
       {active ? (
         <span aria-hidden className="absolute top-0 right-0 left-0 h-0.5 rounded-full bg-focus" />
       ) : null}

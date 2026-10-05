@@ -23,6 +23,7 @@ from momentum.core.db import create_engine, create_session_factory
 from momentum.core.http import (
     CsrfMiddleware,
     RequestIdMiddleware,
+    StripNulMiddleware,
     install_error_handlers,
 )
 from momentum.core.settings import Settings
@@ -223,6 +224,7 @@ def create_app(
         redoc_url=None,
     )
     app.add_middleware(CsrfMiddleware, api_prefix=API_PREFIX, exempt_prefixes=CSRF_EXEMPT)
+    app.add_middleware(StripNulMiddleware, api_prefix=API_PREFIX)
     app.add_middleware(RequestIdMiddleware)
     # Large lists (e.g. 2,000 tasks ≈ 0.9 MB of JSON) compress ~8x; App Service containers
     # don't compress for us.

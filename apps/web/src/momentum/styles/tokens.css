@@ -22,11 +22,11 @@
   --sidebar-active: #313742;
   --sidebar-line: #2a3039;
   --marker: #a3e635;
-  /* Ink (all ≥ 4.5:1 on surface and floor) */
+  /* Ink (all ≥ 4.5:1 on surface, floor, surface-2 and the lime tint; checked 2026-10-05) */
   --ink: #0e1217;
   --ink-2: #29303a;
   --muted: #56616d;
-  --muted-2: #66717e;
+  --muted-2: #5c6672;
   /* Brand accent: primary actions (a graphite signage block) */
   --accent: #1b1f25;
   --accent-hover: #2c323b;
@@ -94,7 +94,8 @@
   --sidebar-w: 240px;
   --rail-collapsed-w: 56px;
   --topbar-h: 44px;
-  --pane-w: 560px;
+  /* the task pane's default width: 38% of the window, 400–640 px (resizable; the user's width wins) */
+  --pane-w: clamp(400px, 38vw, 640px);
   --askmo-w: 420px;
   --row-h: 34px;
   color-scheme: light;
@@ -117,7 +118,8 @@
   --ink: oklch(0.95 0.004 255);
   --ink-2: oklch(0.86 0.005 255);
   --muted: oklch(0.68 0.008 255);
-  --muted-2: oklch(0.56 0.008 255);
+  /* = muted: anything darker fails 4.5:1 on surface-2 or the lime tint (2026-10-05) */
+  --muted-2: oklch(0.68 0.008 255);
   --accent: oklch(0.87 0.18 128);
   --accent-hover: oklch(0.92 0.17 128);
   --accent-tint: oklch(0.3 0.05 128);

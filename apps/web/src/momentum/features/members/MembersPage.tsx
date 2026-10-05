@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { UserPlus } from 'lucide-react';
 import { useMe } from '@/features/auth';
+import { usePeople } from '@/features/people';
 import { Avatar } from '@/components/ui/Avatar';
 import { Button } from '@/components/ui/Button';
 import { Dialog } from '@/components/ui/Dialog';
@@ -14,21 +15,31 @@ const STATUS_LABEL: Record<string, string> = {
   disabled: 'Disabled',
 };
 
-/** S2.7.3: workspace members roster. Anyone can see who's on the workspace; only an admin sees
- * the "Invite" button (the backend enforces this too — `Action.USERS_MANAGE` — this is purely a
+/** S2.7.3: workspace members roster. Anyone can see who's on the workspace (active members, from
+ * the pickers' list); an admin sees everyone, invited and disabled included, and the "Invite" button (the backend enforces this too — `Action.USERS_MANAGE` — this is purely a
  * UX nicety, not the actual guard). No email is sent: inviting just creates a placeholder member
  * (`status="invited"`) that activates itself the moment that person signs in for the first time
  * and their auth email matches (see `auth/identity.py`). */
 export function MembersPage() {
   const me = useMe();
-  const members = useMembers();
   const isAdmin = me.data?.user.role === 'admin';
+  const roster = useMembers(isAdmin);
+  const people = usePeople();
+  const members = isAdmin ? roster : people;
   const [inviteOpen, setInviteOpen] = useState(false);
 
   return (
     <div className="px-4 py-6 md:px-8">
       <div className="flex items-center justify-between">
-        <h1 className="page-title">Members</h1>
+        <div>
+          <h1 className="page-title">Members</h1>
+          {members.data ? (
+            <p className="mt-1 text-sm text-muted">
+              {members.data.length} {members.data.length === 1 ? 'person' : 'people'}
+              {isAdmin ? '' : ' in this workspace. Admins invite new members.'}
+            </p>
+          ) : null}
+        </div>
         {isAdmin ? (
           <Button size="sm" onClick={() => setInviteOpen(true)}>
             <Icon icon={UserPlus} /> Invite

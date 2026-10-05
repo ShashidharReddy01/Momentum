@@ -20,6 +20,7 @@ import { lazy, Suspense, useEffect, useRef, useState, type KeyboardEvent, type R
 import { useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router';
 import { toast } from 'sonner';
+import { useUi } from '@/stores/ui';
 import { AskMoButton } from '@/components/common/AI';
 import { DueText } from '@/components/common/DueText';
 import { ErrorState } from '@/components/common/States';
@@ -147,6 +148,9 @@ export function TaskPane({
     }
   };
 
+  const paneWidth = useUi((st) => st.paneWidth);
+  const setPaneWidth = useUi((st) => st.setPaneWidth);
+
   return (
     // Pane-level shortcuts (Esc, J/K) are delegated from its controls.
     // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions
@@ -158,10 +162,12 @@ export function TaskPane({
       className={cn(
         'flex min-h-0 flex-col bg-surface outline-none',
         mode === 'pane'
-          ? 'h-full w-[var(--pane-w)] shrink-0 border-l border-hairline shadow-[var(--shadow-pane)] max-md:fixed max-md:inset-0 max-md:z-30 max-md:w-full max-md:border-l-0'
+          ? 'relative h-full w-[var(--pane-w)] shrink-0 border-l border-hairline shadow-[var(--shadow-pane)] max-md:fixed max-md:inset-0 max-md:z-30 max-md:w-full! max-md:border-l-0'
           : 'mx-auto w-full max-w-3xl',
       )}
+      style={mode === 'pane' && paneWidth ? { width: clampPane(paneWidth) } : undefined}
     >
+      {mode === 'pane' ? <PaneResizer width={paneWidth} onChange={setPaneWidth} root={root} /> : null}
       {detail.isPending ? (
         <div className="flex flex-col gap-4 p-6" aria-busy>
           <Skeleton className="h-8 w-3/4" />
@@ -194,6 +200,67 @@ export function TaskPane({
         />
       )}
     </aside>
+  );
+}
+
+const PANE_MIN = 360;
+/** The list keeps at least this much room next to the pane. */
+const LIST_MIN = 440;
+
+function clampPane(w: number): number {
+  const max = Math.max(PANE_MIN, Math.min(900, window.innerWidth - LIST_MIN));
+  return Math.round(Math.min(max, Math.max(PANE_MIN, w)));
+}
+
+/** The pane's left edge: drag to resize (double-click resets), or focus it and use ←/→. The
+ * width is remembered per browser; the list always keeps at least LIST_MIN px. */
+function PaneResizer({
+  width,
+  onChange,
+  root,
+}: {
+  width: number | null;
+  onChange: (w: number | null) => void;
+  root: React.RefObject<HTMLElement | null>;
+}) {
+  const current = () => root.current?.getBoundingClientRect().width ?? 480;
+  const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startW = current();
+    const move = (ev: PointerEvent) => onChange(clampPane(startW + (startX - ev.clientX)));
+    const up = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      document.body.style.removeProperty('cursor');
+    };
+    document.body.style.cursor = 'col-resize';
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+  };
+  return (
+    // A focusable separator with a value is an interactive widget in ARIA (the WAI "window
+    // splitter" pattern); jsx-a11y classes every separator as static.
+    // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions
+    <div
+      role="separator"
+      aria-orientation="vertical"
+      aria-label="Resize task details"
+      aria-valuemin={PANE_MIN}
+      aria-valuemax={Math.max(PANE_MIN, window.innerWidth - LIST_MIN)}
+      aria-valuenow={Math.round(width ?? current())}
+      // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- see above
+      tabIndex={0}
+      onPointerDown={onPointerDown}
+      onDoubleClick={() => onChange(null)}
+      onKeyDown={(e) => {
+        if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+        e.preventDefault();
+        e.stopPropagation();
+        onChange(clampPane(current() + (e.key === 'ArrowLeft' ? 32 : -32)));
+      }}
+      className="absolute inset-y-0 -left-1 z-10 w-2 cursor-col-resize outline-none hover:bg-focus/30 focus-visible:bg-focus/50 max-md:hidden"
+    />
   );
 }
 

@@ -261,8 +261,20 @@ const RowBody = memo(function RowBody({
       aria-keyshortcuts="D"
       onClick={() => setPicker('due')}
     >
-      {task.due_on ? (
-        <DueText dueOn={task.due_on} dueAt={task.due_at} startOn={task.start_on} done={done} />
+      {task.due_on && task.start_on ? (
+        // a range when there's room; in a narrow list just the due date (the pane has the start)
+        <>
+          <DueText
+            dueOn={task.due_on}
+            dueAt={task.due_at}
+            startOn={task.start_on}
+            done={done}
+            className="@max-3xl:hidden"
+          />
+          <DueText dueOn={task.due_on} dueAt={task.due_at} done={done} className="hidden @max-3xl:inline" />
+        </>
+      ) : task.due_on ? (
+        <DueText dueOn={task.due_on} dueAt={task.due_at} done={done} />
       ) : (
         <Placeholder icon={CalendarDays} show={canEdit} />
       )}
@@ -340,8 +352,9 @@ const RowBody = memo(function RowBody({
         onChange={() => onToggle(task)}
         variant={task.type === 'milestone' ? 'diamond' : 'round'}
       />
-      {/* The name button fits its text: the rest of the row is a click target for the pane. */}
-      <div className="flex min-w-0 flex-1 items-center">
+      {/* The name button fits its text: the rest of the row is a click target for the pane. Its
+          box clips, so a narrow list truncates the title instead of spilling into the columns. */}
+      <div className="flex min-w-0 flex-1 items-center overflow-hidden">
         {editing ? (
           <input
             ref={input}
@@ -359,7 +372,7 @@ const RowBody = memo(function RowBody({
             disabled={!canEdit}
             onClick={() => setEditing(true)}
             className={cn(
-              'max-w-full min-w-[6rem] shrink cursor-text truncate rounded-sm px-0.5 text-left text-body hover:ring-1 hover:ring-hairline disabled:cursor-default disabled:hover:ring-0',
+              'max-w-full min-w-[3rem] shrink cursor-text truncate rounded-sm px-0.5 text-left text-body hover:ring-1 hover:ring-hairline disabled:cursor-default disabled:hover:ring-0',
               done && 'line-through decoration-muted-2',
             )}
           >
@@ -377,7 +390,7 @@ const RowBody = memo(function RowBody({
             aria-expanded={onToggleExpand ? expanded : undefined}
             aria-label={`${task.completed_subtask_count} of ${task.subtask_count} subtasks done${onToggleExpand ? (expanded ? ', hide' : ', show') : ''}`}
             onClick={() => (onToggleExpand ? onToggleExpand(task) : onOpen?.(task))}
-            className="tabular ml-2 flex h-6 shrink-0 items-center gap-0.5 rounded px-1 text-xs text-muted hover:bg-surface hover:text-ink"
+            className="tabular ml-2 flex h-6 shrink-0 items-center gap-0.5 rounded px-1 text-xs text-muted hover:bg-surface hover:text-ink @max-md:hidden"
           >
             ↳ {task.completed_subtask_count}/{task.subtask_count}
           </button>

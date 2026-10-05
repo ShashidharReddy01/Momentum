@@ -23,6 +23,9 @@ export interface UiState {
   theme: Theme;
   /** The rail shows icons only (wide windows; remembered). */
   sidebarCollapsed: boolean;
+  /** The task pane's width set by dragging its edge (px), or null for the default. */
+  paneWidth: number | null;
+  setPaneWidth: (w: number | null) => void;
   /** Below 1280px the rail starts as icons; this expands it for the session (not persisted). */
   railExpanded: boolean;
   /** Teams folded in the rail (remembered). */
@@ -92,6 +95,8 @@ export function createUiStore(storageKey = 'momentum.ui'): StoreApi<UiState> {
       (set, get) => ({
         theme: prefersDark() ? 'dark' : 'light',
         sidebarCollapsed: false,
+        paneWidth: null,
+        setPaneWidth: (paneWidth) => set({ paneWidth }),
         railExpanded: false,
         collapsedTeams: [],
         toggleTeam: (teamId) => {
@@ -140,6 +145,7 @@ export function createUiStore(storageKey = 'momentum.ui'): StoreApi<UiState> {
           theme: s.theme,
           sidebarCollapsed: s.sidebarCollapsed,
           collapsedTeams: s.collapsedTeams,
+          paneWidth: s.paneWidth,
         }),
       },
     ),

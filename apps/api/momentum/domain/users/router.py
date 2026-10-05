@@ -42,7 +42,7 @@ async def list_users(
     ctx: CtxDep,
     uow: UowDep,
     q: str | None = Query(default=None, max_length=100),
-    limit: int = Query(default=50, ge=1, le=200),
+    limit: int = Query(default=50, ge=1, le=1000),
     agents: service.AgentFilter | None = Query(
         default=None,
         description="Also list agents: the enabled ones acting on `assigned`/`mentioned`, or `all`",

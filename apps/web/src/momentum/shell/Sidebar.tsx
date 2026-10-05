@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode, type UIEvent } from 'react';
+import { lazy, Suspense, useEffect, useState, type ReactNode, type UIEvent } from 'react';
 import {
   Bell,
   Bot,
@@ -40,13 +40,7 @@ import { Icon } from '@/components/ui/Icon';
 import { IconButton } from '@/components/ui/IconButton';
 import { Tooltip } from '@/components/ui/Tooltip';
 import { useLogout, useMe } from '@/features/auth';
-import {
-  NewProjectDialog,
-  ProjectFromBriefDialog,
-  useFavorites,
-  useProjects,
-  type Project,
-} from '@/features/projects';
+import { useFavorites, useProjects, type Project } from '@/features/projects';
 import { colorVar, NewTeamDialog, useTeams } from '@/features/teams';
 import { cn } from '@/lib/cn';
 import { useNarrow } from '@/lib/media';
@@ -64,6 +58,14 @@ const NAV = [
   { to: '/dashboards', label: 'Dashboards', icon: LayoutDashboard },
   { to: '/agents', label: 'Agents', icon: Bot },
 ] as const;
+
+// Create-menu dialogs load when first opened, not with the shell (initial bundle budget).
+const NewProjectDialog = lazy(async () => ({
+  default: (await import('@/features/projects/NewProjectDialog')).NewProjectDialog,
+}));
+const ProjectFromBriefDialog = lazy(async () => ({
+  default: (await import('@/features/projects/ProjectFromBriefDialog')).ProjectFromBriefDialog,
+}));
 
 export function Sidebar() {
   const { iconsOnly } = useRail();
@@ -156,8 +158,16 @@ export function Sidebar() {
           <UserMenu iconsOnly={iconsOnly} />
         </div>
         <NewTeamDialog open={newTeam} onOpenChange={setNewTeam} />
-        <NewProjectDialog open={newProject} onOpenChange={setNewProject} />
-        <ProjectFromBriefDialog open={fromBrief} onOpenChange={setFromBrief} />
+        {newProject ? (
+          <Suspense fallback={null}>
+            <NewProjectDialog open onOpenChange={setNewProject} />
+          </Suspense>
+        ) : null}
+        {fromBrief ? (
+          <Suspense fallback={null}>
+            <ProjectFromBriefDialog open onOpenChange={setFromBrief} />
+          </Suspense>
+        ) : null}
       </nav>
     </>
   );

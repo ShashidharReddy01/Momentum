@@ -1,15 +1,42 @@
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { Outlet } from 'react-router';
 import { useLiveNotifications } from '@/features/notifications';
-import { QuickAddDialog } from '@/features/tasks';
 import { useUndoShortcut } from '@/lib/undo';
 import { useHotkey } from '@/lib/keyboard';
 import { useUi } from '@/stores/ui';
-import { AskMoPanel } from './AskMoPanel';
 import { useRail } from './rail';
-import { CommandPalette } from './CommandPalette';
 import { ShortcutSheet } from './ShortcutSheet';
 import { Sidebar } from './Sidebar';
 import { TopBar } from './TopBar';
+
+// Overlays load on first open (keeping the initial bundle inside its budget) and then stay
+// mounted, so an Ask Mo conversation or a half-typed quick add survives closing and reopening.
+const loadAskMo = () => import('./AskMoPanel');
+const loadPalette = () => import('./CommandPalette');
+const loadQuickAdd = () => import('@/features/tasks/QuickAddDialog');
+const AskMoPanel = lazy(async () => ({ default: (await loadAskMo()).AskMoPanel }));
+const CommandPalette = lazy(async () => ({ default: (await loadPalette()).CommandPalette }));
+const QuickAddDialog = lazy(async () => ({ default: (await loadQuickAdd()).QuickAddDialog }));
+
+/** Warm the overlay chunks once the page is idle, so the first ⌘K, ⌘J or Q opens instantly. */
+function usePrefetchOverlays() {
+  useEffect(() => {
+    const warm = () => void Promise.all([loadPalette(), loadQuickAdd(), loadAskMo()]).catch(() => {});
+    if (typeof window.requestIdleCallback === 'function') {
+      const id = window.requestIdleCallback(warm, { timeout: 4000 });
+      return () => window.cancelIdleCallback(id);
+    }
+    const t = window.setTimeout(warm, 2000);
+    return () => window.clearTimeout(t);
+  }, []);
+}
+
+/** True from the first time `open` is true. */
+function useOpenedOnce(open: boolean): boolean {
+  const [opened, setOpened] = useState(open);
+  if (open && !opened) setOpened(true);
+  return opened || open;
+}
 
 /** App shell: Sidebar · (TopBar + routed content) · task pane host (Phase 1) · Ask Mo panel. */
 export function Layout() {
@@ -17,11 +44,15 @@ export function Layout() {
   const rail = useRail();
   useUndoShortcut();
   useLiveNotifications(); // the inbox and the bell update on every page (S5.0.1)
+  usePrefetchOverlays();
   useHotkey('mod+k', () => ui.setPaletteOpen(!ui.paletteOpen));
   useHotkey('mod+j', () => ui.setAskMoOpen(!ui.askMoOpen));
   useHotkey('mod+\\', rail.toggle);
   useHotkey('?', () => ui.setShortcutsOpen(true));
   useHotkey('q', () => ui.setQuickAddOpen(true));
+  const mo = useOpenedOnce(ui.askMoOpen);
+  const palette = useOpenedOnce(ui.paletteOpen);
+  const quickAdd = useOpenedOnce(ui.quickAddOpen);
 
   return (
     <div className="flex h-dvh overflow-hidden">
@@ -33,12 +64,24 @@ export function Layout() {
             <Outlet />
           </main>
           <div id="momentum-task-pane" />
-          <AskMoPanel />
+          {mo ? (
+            <Suspense fallback={null}>
+              <AskMoPanel />
+            </Suspense>
+          ) : null}
         </div>
       </div>
-      <CommandPalette />
+      {palette ? (
+        <Suspense fallback={null}>
+          <CommandPalette />
+        </Suspense>
+      ) : null}
       <ShortcutSheet />
-      <QuickAddDialog open={ui.quickAddOpen} onOpenChange={ui.setQuickAddOpen} />
+      {quickAdd ? (
+        <Suspense fallback={null}>
+          <QuickAddDialog open={ui.quickAddOpen} onOpenChange={ui.setQuickAddOpen} />
+        </Suspense>
+      ) : null}
     </div>
   );
 }

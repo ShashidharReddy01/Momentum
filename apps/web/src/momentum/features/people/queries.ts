@@ -16,7 +16,8 @@ export function usePeople(q = '', agents?: AgentFilter) {
     queryFn: async () =>
       (
         await api.GET('/api/v1/users', {
-          params: { query: { ...(q ? { q, limit: 50 } : { limit: 200 }), ...(agents ? { agents } : {}) } },
+          // unfiltered: everyone (pickers filter locally); 1,000 leaves room well past ~150 people
+          params: { query: { ...(q ? { q, limit: 50 } : { limit: 1000 }), ...(agents ? { agents } : {}) } },
         })
       ).data!.data,
     staleTime: 60_000,

@@ -1,7 +1,13 @@
 import { useState } from 'react';
 import { cn } from '@/lib/cn';
 
-const PALETTE = Array.from({ length: 12 }, (_, i) => `var(--proj-${i + 1})`);
+// A light tint of the person's colour with deep text in the same hue (dark theme: the reverse),
+// so the initials pass WCAG AA on every slot: plain white or ink on the full-strength colour
+// can't (slot 10 tops out at 4.4:1). Computed minimum: 5.7:1 light, 5.5:1 dark (2026-10-05).
+const PALETTE = Array.from({ length: 12 }, (_, i) => ({
+  background: `color-mix(in oklab, var(--proj-${i + 1}) 28%, var(--surface))`,
+  color: `color-mix(in oklab, var(--proj-${i + 1}) 50%, var(--ink))`,
+}));
 
 function hash(s: string): number {
   let h = 0;
@@ -40,7 +46,7 @@ export function Avatar({
         isAgent && 'ring-2 ring-amber ring-offset-1 ring-offset-surface',
         className,
       )}
-      style={{ width: size, height: size, background: PALETTE[hash(name) % PALETTE.length] }}
+      style={{ width: size, height: size, ...PALETTE[hash(name) % PALETTE.length] }}
       title={name}
       role="img"
       aria-label={name}
@@ -48,7 +54,7 @@ export function Avatar({
       {showImage ? (
         <img src={src} alt="" className="h-full w-full object-cover" onError={() => setFailed(true)} />
       ) : (
-        <span aria-hidden className="font-medium text-surface" style={{ fontSize: Math.round(size * 0.42) }}>
+        <span aria-hidden className="font-semibold" style={{ fontSize: Math.round(size * 0.42) }}>
           {initials(name)}
         </span>
       )}

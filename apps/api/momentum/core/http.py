@@ -1,8 +1,11 @@
-"""HTTP plumbing: request ids, CSRF guard and problem+json error rendering."""
+"""HTTP plumbing: request ids, CSRF guard, NUL-free input and problem+json error rendering."""
 
 from __future__ import annotations
 
+import contextlib
+import json
 from typing import Any
+from urllib.parse import parse_qsl, urlencode
 
 import structlog
 from fastapi import FastAPI, Request
@@ -12,6 +15,7 @@ from starlette.responses import JSONResponse, Response
 
 from momentum.core.errors import CsrfFailed, DomainError
 from momentum.core.ids import new_id
+from momentum.core.text import NUL, strip_nul
 
 PROBLEM = "application/problem+json"
 SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
@@ -32,6 +36,63 @@ def problem(
     }
     body.update({k: v for k, v in extra.items() if v is not None})
     return JSONResponse(body, status_code=status, media_type=PROBLEM)
+
+
+class StripNulMiddleware:
+    """Removes NUL characters from API query strings and JSON bodies before anything reads them
+    (``core/text.py`` says why). Pure ASGI, and a no-op unless a NUL is actually present, so normal
+    requests pay one substring check."""
+
+    def __init__(self, app: Any, *, api_prefix: str) -> None:
+        self.app = app
+        self.api_prefix = api_prefix
+
+    async def __call__(self, scope: Any, receive: Any, send: Any) -> None:
+        if scope["type"] != "http" or not scope["path"].startswith(self.api_prefix):
+            await self.app(scope, receive, send)
+            return
+        qs: bytes = scope.get("query_string", b"")
+        if b"%00" in qs or NUL.encode() in qs:
+            pairs = parse_qsl(qs.decode("latin-1"), keep_blank_values=True)
+            scope = {**scope, "query_string": urlencode(strip_nul(pairs)).encode("latin-1")}
+        headers = dict(scope.get("headers") or [])
+        if b"application/json" not in headers.get(b"content-type", b""):
+            await self.app(scope, receive, send)
+            return
+        chunks: list[bytes] = []
+        more = True
+        while more:
+            message = await receive()
+            if message["type"] != "http.request":  # the client went away
+                await self.app(scope, _replay([message]), send)
+                return
+            chunks.append(message.get("body", b""))
+            more = message.get("more_body", False)
+        body = b"".join(chunks)
+        if b"\u0000" in body or NUL.encode() in body:
+            with contextlib.suppress(ValueError):  # not valid JSON: validation will say so
+                body = json.dumps(strip_nul(json.loads(body)), ensure_ascii=False).encode()
+            scope = {
+                **scope,
+                "headers": [
+                    (k, str(len(body)).encode() if k == b"content-length" else v)
+                    for k, v in scope["headers"]
+                ],
+            }
+        await self.app(
+            scope, _replay([{"type": "http.request", "body": body, "more_body": False}]), send
+        )
+
+
+def _replay(messages: list[dict[str, Any]]) -> Any:
+    queue = list(messages)
+
+    async def receive() -> dict[str, Any]:
+        if queue:
+            return queue.pop(0)
+        return {"type": "http.disconnect"}
+
+    return receive
 
 
 class RequestIdMiddleware(BaseHTTPMiddleware):

@@ -118,9 +118,11 @@ export function RichTextEditor({
   const help = useWritingHelp(editor, editable ? writingHelp : undefined);
   return (
     <div className={cn('group/editor rounded-md', className)}>
-      {editable && editor ? <Toolbar editor={editor} extra={help.menu} /> : null}
       {help.panel}
       <EditorContent editor={editor} />
+      {/* Below the text and only while editing: it takes no room when you're reading, and showing
+          it never moves the line you clicked into. */}
+      {editable && editor ? <Toolbar editor={editor} extra={help.menu} /> : null}
     </div>
   );
 }
@@ -188,10 +190,8 @@ function Toolbar({ editor, extra }: { editor: Editor; extra?: ReactNode }) {
       role="toolbar"
       aria-label="Formatting"
       className={cn(
-        'mb-1 flex flex-wrap gap-0.5 transition-opacity',
-        active.focused || linkOpen
-          ? 'opacity-100'
-          : 'opacity-0 group-focus-within/editor:opacity-100 group-hover/editor:opacity-60',
+        'mt-1 flex-wrap gap-0.5 border-t border-hair-soft pt-1',
+        active.focused || linkOpen ? 'flex' : 'hidden group-focus-within/editor:flex',
       )}
     >
       {items.map((it) => (
