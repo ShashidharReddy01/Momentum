@@ -359,6 +359,19 @@
             ],
             "default": null
           },
+          "date_field": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The date field when time_field=field"
+          },
           "due_within_days": {
             "anyOf": [
               {
@@ -383,7 +396,84 @@
               }
             ],
             "default": null,
-            "description": "The single-select field when group_by=field"
+            "description": "The field to split by when group_by=field (single- or multi-select, people, checkbox)"
+          },
+          "field_filters": {
+            "items": {
+              "additionalProperties": false,
+              "description": "One custom-field condition, in names (the server maps them to option and user ids).",
+              "properties": {
+                "at_least": {
+                  "anyOf": [
+                    {
+                      "maxLength": 20,
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "Number or YYYY-MM-DD"
+                },
+                "at_most": {
+                  "anyOf": [
+                    {
+                      "maxLength": 20,
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "Number or YYYY-MM-DD"
+                },
+                "contains": {
+                  "anyOf": [
+                    {
+                      "maxLength": 100,
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "Text fields"
+                },
+                "field": {
+                  "description": "A custom field name from the reference",
+                  "maxLength": 100,
+                  "type": "string"
+                },
+                "has_value": {
+                  "anyOf": [
+                    {
+                      "type": "boolean"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null
+                },
+                "is_any": {
+                  "description": "Option names, people's names, \"checked\", \"not checked\" or \"empty\"",
+                  "items": {
+                    "type": "string"
+                  },
+                  "maxItems": 10,
+                  "type": "array"
+                }
+              },
+              "required": [
+                "field"
+              ],
+              "type": "object"
+            },
+            "maxItems": 5,
+            "type": "array"
           },
           "group_by": {
             "anyOf": [
@@ -441,9 +531,24 @@
             "default": "count",
             "enum": [
               "count",
-              "sum_estimate"
+              "sum_estimate",
+              "sum_field",
+              "avg_field"
             ],
             "type": "string"
+          },
+          "measure_field": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The number field when measure is sum_field or avg_field"
           },
           "overdue": {
             "default": false,
@@ -522,7 +627,8 @@
             "enum": [
               "completed",
               "created",
-              "due"
+              "due",
+              "field"
             ],
             "type": "string"
           },

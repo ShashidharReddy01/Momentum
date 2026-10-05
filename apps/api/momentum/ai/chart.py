@@ -63,7 +63,7 @@ UNASSIGNED = {"none", "nobody", "unassigned", "no one", "no assignee"}
 
 
 class ChartFieldFilter(BaseModel):
-    """S7.4.1: one custom-field condition, in names (the server maps them to option/user ids)."""
+    """One custom-field condition, in names (the server maps them to option and user ids)."""
 
     model_config = ConfigDict(extra="forbid")
     field: str = Field(max_length=100, description="A custom field name from the reference")
