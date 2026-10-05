@@ -1,5 +1,14 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { ArrowRight, CheckSquare, FolderKanban, FolderPlus, Hourglass, ListChecks, X } from 'lucide-react';
+import {
+  ArrowRight,
+  CheckSquare,
+  Compass,
+  FolderKanban,
+  FolderPlus,
+  Hourglass,
+  ListChecks,
+  X,
+} from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link } from 'react-router';
 import { CompleteCheck } from '@/components/common/CompleteCheck';
@@ -92,10 +101,19 @@ function HomeContent() {
 
   return (
     <div className="@container mx-auto max-w-5xl px-4 md:px-8 py-8">
-      <h1 className="page-title">
-        {greeting(now)}
-        {first ? `, ${first}` : ''}
-      </h1>
+      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+        <h1 className="page-title">
+          {greeting(now)}
+          {first ? `, ${first}` : ''}
+        </h1>
+        {/* S7.4.4: always one click away for anyone switching over */}
+        <Link
+          to="/welcome/asana"
+          className="inline-flex items-center gap-1 text-sm text-muted underline-offset-2 hover:text-ink hover:underline"
+        >
+          <Icon icon={Compass} size={14} /> Coming from Asana?
+        </Link>
+      </div>
       <p className="mt-0.5 text-sm text-muted">
         {now.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}
         {summary ? (

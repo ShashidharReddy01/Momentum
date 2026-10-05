@@ -150,6 +150,22 @@ describe('Task pane', () => {
     await waitFor(() => expect(within(collab).queryByRole('button', { name: 'Ana Souza' })).toBeNull());
   });
 
+  it("Asana's keys without Tab: C comments and F follows, with focus still on the list (S7.4.4)", async () => {
+    const user = await boot();
+    await user.click(await screen.findByRole('button', { name: 'Open details for First' }));
+    const collab = await within(pane()).findByRole('region', { name: 'Collaborators' });
+    row('Second').focus();
+    await user.keyboard('f');
+    await waitFor(() =>
+      expect(within(collab).getByRole('button', { name: /Follow task/ })).toBeInTheDocument(),
+    );
+    await user.keyboard('c');
+    await waitFor(() => expect(document.activeElement?.closest('[aria-label="New comment"]')).not.toBeNull());
+    // typing a "c" or an "f" in the comment is just text
+    await user.keyboard('cf');
+    expect(within(collab).getByRole('button', { name: /Follow task/ })).toBeInTheDocument();
+  });
+
   it('comments: shows them, reacts, deletes with undo, and restores an unsent draft', async () => {
     const user = await boot();
     const doc = (text: string) => ({

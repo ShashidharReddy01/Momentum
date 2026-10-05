@@ -149,6 +149,13 @@ export function buildRoutes(config: RuntimeConfig): RouteObject[] {
           handle: { crumb: 'Notification settings' },
         },
         {
+          path: 'welcome/asana',
+          lazy: async () => ({
+            Component: (await import('@/features/onboarding/ComingFromAsanaPage')).ComingFromAsanaPage,
+          }),
+          handle: { crumb: 'Coming from Asana?' },
+        },
+        {
           path: 'settings/import/asana',
           lazy: async () => ({
             Component: (await import('@/features/imports/AsanaImportPage')).AsanaImportPage,

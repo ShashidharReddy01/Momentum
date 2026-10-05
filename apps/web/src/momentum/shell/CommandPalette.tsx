@@ -1,5 +1,7 @@
 import { Command } from 'cmdk';
 import {
+  BarChart3,
+  Compass,
   FolderKanban,
   Home,
   Inbox,
@@ -29,6 +31,8 @@ import { useUi } from '@/stores/ui';
 interface Action {
   id: string;
   label: string;
+  /** other words people search for it by (S7.4.4: Asana's names, say) */
+  keywords?: string;
   icon?: LucideIcon;
   shortcut?: string;
   run: () => void;
@@ -79,6 +83,20 @@ export function CommandPalette() {
         { id: 'home', label: 'Home', icon: Home, run: go('/') },
         { id: 'my-tasks', label: 'My Tasks', icon: ListChecks, run: go('/my-tasks') },
         { id: 'inbox', label: 'Inbox', icon: Inbox, run: go('/inbox') },
+        {
+          id: 'dashboards',
+          label: 'Dashboards',
+          keywords: 'reporting reports charts',
+          icon: BarChart3,
+          run: go('/dashboards'),
+        },
+        {
+          id: 'asana',
+          label: 'Coming from Asana?',
+          keywords: 'asana import switch tab shortcuts',
+          icon: Compass,
+          run: go('/welcome/asana'),
+        },
       ],
     },
     {
@@ -98,6 +116,7 @@ export function CommandPalette() {
           label: 'Keyboard shortcuts',
           icon: Keyboard,
           shortcut: '?',
+          keywords: 'hotkeys keys',
           run: () => ui.setShortcutsOpen(true),
         },
         { id: 'logout', label: 'Sign out', icon: LogOut, run: () => logout.mutate() },
@@ -114,7 +133,10 @@ export function CommandPalette() {
   const trimmed = query.trim().toLowerCase();
   const visibleStatic = trimmed
     ? staticGroups
-        .map((g) => ({ ...g, items: g.items.filter((a) => a.label.toLowerCase().includes(trimmed)) }))
+        .map((g) => ({
+          ...g,
+          items: g.items.filter((a) => `${a.label} ${a.keywords ?? ''}`.toLowerCase().includes(trimmed)),
+        }))
         .filter((g) => g.items.length > 0)
     : staticGroups;
 

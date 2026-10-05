@@ -49,6 +49,8 @@ export function Layout() {
   useHotkey('mod+j', () => ui.setAskMoOpen(!ui.askMoOpen));
   useHotkey('mod+\\', rail.toggle);
   useHotkey('?', () => ui.setShortcutsOpen(true));
+  useHotkey('mod+/', () => ui.setShortcutsOpen(true)); // Asana's
+  useHotkey('/', () => ui.setPaletteOpen(true)); // search (Asana's Tab+/)
   useHotkey('q', () => ui.setQuickAddOpen(true));
   const mo = useOpenedOnce(ui.askMoOpen);
   const palette = useOpenedOnce(ui.paletteOpen);

@@ -65,7 +65,8 @@ export const SHORTCUTS: { combo: Combo; label: string; phase?: number }[] = [
   { combo: 'mod+k', label: 'Command palette' },
   { combo: 'mod+j', label: 'Toggle Ask Mo' },
   { combo: 'mod+\\', label: 'Collapse sidebar' },
-  { combo: '?', label: 'Keyboard shortcuts' },
+  { combo: '?', label: 'Keyboard shortcuts (or ⌘/)' },
+  { combo: '/', label: 'Search' },
   { combo: 'mod+z', label: 'Undo last action' },
   { combo: 'q', label: 'Quick add task' },
   // list rows (focus a row first)
@@ -83,6 +84,9 @@ export const SHORTCUTS: { combo: Combo; label: string; phase?: number }[] = [
   { combo: 'mod+backspace', label: 'Delete selected' },
   { combo: 'tab', label: 'New row → subtask (Shift+Tab back)' },
   { combo: 'escape', label: 'Clear selection / close details' },
+  // the open task (S7.4.4: Asana's Tab+C and Tab+F, without Tab)
+  { combo: 'c', label: 'Comment on the open task' },
+  { combo: 'f', label: 'Follow or stop following the open task' },
   // timeline (focus a bar first)
   { combo: 'right', label: 'Timeline: move a day later (← earlier, ⇧ a week)' },
   { combo: 'mod+=', label: 'Timeline: zoom in (⌘- out)' },

@@ -131,6 +131,36 @@ export function TaskPane({
   const detail = useTaskDetail(taskId);
   const root = useRef<HTMLElement>(null);
 
+  // S7.4.4: Asana's Tab+C (comment) and Tab+F (follow), without Tab, wherever focus is (the list
+  // row you opened it from, say), unless you're typing or a dialog or menu is open
+  useEffect(() => {
+    const onKey = (e: globalThis.KeyboardEvent) => {
+      if (e.metaKey || e.ctrlKey || e.altKey || e.defaultPrevented) return;
+      const key = e.key.toLowerCase();
+      if (key !== 'c' && key !== 'f') return;
+      const t = e.target instanceof HTMLElement ? e.target : null;
+      if (t?.closest(EDITABLE) || t?.isContentEditable) return;
+      if (document.querySelector('[role="dialog"], [role="menu"], [role="listbox"]')) return;
+      const pane = root.current;
+      if (!pane) return;
+      if (key === 'c') {
+        const editor = pane.querySelector<HTMLElement>('[aria-label="New comment"]');
+        if (!editor) return;
+        e.preventDefault();
+        editor.focus();
+      } else {
+        const follow = [...pane.querySelectorAll<HTMLButtonElement>('button')].find((b) =>
+          /^(Follow task|Stop following)$/.test(b.textContent?.trim() ?? ''),
+        );
+        if (!follow) return;
+        e.preventDefault();
+        follow.click();
+      }
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, []);
+
   const onKeyDown = (e: KeyboardEvent<HTMLElement>) => {
     const target = e.target as HTMLElement;
     const inField = !!target.closest(EDITABLE);
