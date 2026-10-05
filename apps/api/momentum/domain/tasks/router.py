@@ -28,6 +28,7 @@ from momentum.domain.tasks.schemas import (
     FollowersOut,
     NamedRef,
     OtherPlacementOut,
+    PlacementFields,
     ProjectRef,
     RescheduleIn,
     RescheduleOut,
@@ -38,6 +39,7 @@ from momentum.domain.tasks.schemas import (
     TaskConvertIn,
     TaskCreateIn,
     TaskDetailOut,
+    TaskFields,
     TaskMoveIn,
     TaskOut,
     TaskPatchIn,
@@ -49,7 +51,9 @@ from momentum.domain.tasks.schemas import (
 router = APIRouter(tags=["tasks"])
 
 
-def task_out(t: Task, p: TaskProject | None, counts: tuple[int, int] | None = None) -> TaskOut:
+def task_out(
+    t: TaskFields, p: PlacementFields | None, counts: tuple[int, int] | None = None
+) -> TaskOut:
     """API shape of a task. Subtasks have no section; their position is among siblings."""
     sub = t.parent_id is not None
     return TaskOut(

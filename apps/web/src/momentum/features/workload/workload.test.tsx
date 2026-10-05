@@ -101,6 +101,7 @@ const WORKLOAD = {
       weekly_minutes: 0,
     },
   ),
+  any_estimate: true,
   tasks: [
     task('t1', 'Design the homepage', 'u-ana', { [W1]: 1800 }),
     task('t2', 'Legal review', 'u-ana', { [W1]: 600 }),
@@ -112,7 +113,14 @@ function boot() {
   const calls: { url: string; body: unknown }[] = [];
   server.use(...authHandlers({ loggedIn: true }).handlers, ...teamHandlers(), ...projectHandlers());
   server.use(
-    http.get('*/api/v1/workload', () => HttpResponse.json(WORKLOAD)),
+    // like the API: the grid asks for no tasks, an opened row for its person's
+    http.get('*/api/v1/workload', ({ request }) => {
+      const want = new URL(request.url).searchParams.get('tasks_for') ?? 'all';
+      const tasks = WORKLOAD.tasks.filter((t) =>
+        want === 'all' ? true : want === 'unassigned' ? t.assignee_id === null : t.assignee_id === want,
+      );
+      return HttpResponse.json({ ...WORKLOAD, tasks });
+    }),
     http.put('*/api/v1/workload/people/:uid/hours', async ({ request, params }) => {
       calls.push({ url: `hours:${params.uid as string}`, body: await request.json() });
       return HttpResponse.json({ data: { hours: 20 }, meta: { activity_id: 'a1' } });

@@ -1,5 +1,5 @@
 # ADR-0001: Modular monolith, single image, SPA served by FastAPI
-- **Status:** Accepted · **Date:** 2026-09-23
+- **Status:** Accepted · **Date:** 2026-09-23 · amended by ADR-0010 (scale to ~150 people)
 ## Context
 10–15 users, one builder, a lift-and-shift to Azure App Service, and Easy Auth protecting everything with a same-origin cookie.
 ## Decision

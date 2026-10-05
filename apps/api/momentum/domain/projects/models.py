@@ -49,7 +49,11 @@ class Project(IdMixin, TimestampMixin, SoftDeleteMixin, Base):
     due_on: Mapped[date | None] = mapped_column(Date)
     archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     is_template: Mapped[bool] = mapped_column(Boolean, default=False)
-    search_tsv: Mapped[Any] = mapped_column(TSVECTOR, Computed(SEARCH_EXPR, persisted=True))
+    # deferred: only ever used inside SQL (search), never read per row; loading it parsed a
+    # whole tsvector for every row of every list (Phase 7 load test)
+    search_tsv: Mapped[Any] = mapped_column(
+        TSVECTOR, Computed(SEARCH_EXPR, persisted=True), deferred=True
+    )
     version: Mapped[int] = mapped_column(Integer, default=1)
     created_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
     created_via: Mapped[str] = mapped_column(String(16), default="ui")

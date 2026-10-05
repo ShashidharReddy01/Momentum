@@ -16,6 +16,7 @@ from typing import Any
 from sqlalchemy import delete, select, text
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import defer
 
 from momentum.core.activity import record_activity
 from momentum.core.context import Ctx
@@ -23,7 +24,7 @@ from momentum.core.errors import NotFound, ValidationFailed
 from momentum.core.mutation import Mutation
 from momentum.core.ordering import even_keys, key_between, keys_between, needs_rebalance
 from momentum.core.undo import UndoConflict, undo_handler, undo_op
-from momentum.domain.access import task_ancestors
+from momentum.domain.access import ancestors_of
 from momentum.domain.mytasks.models import BUCKETS, MyTaskPlacement
 from momentum.domain.projects.models import Project
 from momentum.domain.tasks.models import Task, TaskProject
@@ -48,10 +49,15 @@ def target_bucket(due: date | None, today: date, current: str) -> str:
 
 async def _visible_mine(session: AsyncSession, ctx: Ctx, *, completed: bool) -> list[Task]:
     """Tasks assigned to me (assignees can always see them) whose ancestors aren't deleted."""
-    query = select(Task).where(
-        Task.workspace_id == ctx.workspace_id,
-        Task.assignee_id == ctx.actor.id,
-        Task.deleted_at.is_(None),
+    query = (
+        select(Task)
+        .where(
+            Task.workspace_id == ctx.workspace_id,
+            Task.assignee_id == ctx.actor.id,
+            Task.deleted_at.is_(None),
+        )
+        # rows and briefs never show the description; leave the documents in the database
+        .options(defer(Task.description), defer(Task.description_text))
     )
     if completed:
         query = (
@@ -68,11 +74,12 @@ async def without_hidden(session: AsyncSession, tasks: list[Task]) -> list[Task]
     """Drop tasks that are gone for now: under a deleted parent, or only in deleted projects
     (both can be restored, so callers keep any per-user state for them)."""
     roots: dict[uuid.UUID, uuid.UUID] = {}
+    chains = await ancestors_of(session, [t for t in tasks if t.parent_id is not None])
     for t in tasks:
         if t.parent_id is None:
             roots[t.id] = t.id
             continue
-        chain = await task_ancestors(session, t)
+        chain = chains[t.id]
         if not any(a.deleted_at is not None for a in chain):
             roots[t.id] = chain[-1].id if chain else t.id
     if not roots:
@@ -109,7 +116,11 @@ def _ordered(placements: dict[uuid.UUID, MyTaskPlacement], bucket: str) -> list[
     )
 
 
-async def sync_my_tasks(session: AsyncSession, ctx: Ctx) -> None:
+async def sync_my_tasks(
+    session: AsyncSession, ctx: Ctx
+) -> tuple[list[Task], dict[uuid.UUID, MyTaskPlacement]]:
+    """Bring my placements up to date; returns my open tasks and the placements, so a caller
+    that lists them doesn't load both again (Phase 7 load test)."""
     assert ctx.actor.id is not None
     me = ctx.actor.id
     open_tasks = await _visible_mine(session, ctx, completed=False)
@@ -188,20 +199,19 @@ async def sync_my_tasks(session: AsyncSession, ctx: Ctx) -> None:
             {"day": json.dumps(today.isoformat()), "uid": me},
         )
     await session.flush()
+    return open_tasks, placements
 
 
 async def list_my_tasks(
     session: AsyncSession, ctx: Ctx, *, completed: bool = False
 ) -> list[tuple[Task, MyTaskPlacement | None]]:
     """Open tasks in bucket order, or my recently completed tasks (newest first)."""
-    await sync_my_tasks(session, ctx)
+    tasks, placements = await sync_my_tasks(session, ctx)
     assert ctx.actor.id is not None
-    placements = await _placements(session, ctx.actor.id)
     if completed:
         return [
             (t, placements.get(t.id)) for t in await _visible_mine(session, ctx, completed=True)
         ]
-    tasks = await _visible_mine(session, ctx, completed=False)
     rows = [(t, placements.get(t.id)) for t in tasks]
     rows.sort(
         key=lambda r: (

@@ -55,6 +55,7 @@ class LlmCall(IdMixin, Base):
     __table_args__ = (
         CheckConstraint(f"status in {LLM_CALL_STATUSES}", name="status"),
         Index("ix_llm_calls_workspace_created", "workspace_id", "created_at"),
+        Index("ix_llm_calls_user_created", "user_id", "created_at"),
     )
 
 

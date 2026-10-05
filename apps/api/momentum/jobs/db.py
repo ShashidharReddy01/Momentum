@@ -40,6 +40,9 @@ def job_llm() -> LLM:
     llm = _llms.get(settings.database_url)
     if llm is None:
         llm = _llms[settings.database_url] = build_llm(
-            settings, DbUsageLog(_factory(settings), settings.ai_monthly_budget_usd)
+            settings,
+            DbUsageLog(
+                _factory(settings), settings.ai_monthly_budget_usd, settings.ai_user_calls_per_hour
+            ),
         )
     return llm

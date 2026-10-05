@@ -9,14 +9,14 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Protocol
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from momentum.ai.errors import AgentBudgetExceeded, AIDisabled, BudgetExceeded
+from momentum.ai.errors import AgentBudgetExceeded, AIDisabled, BudgetExceeded, UserRateLimited
 from momentum.ai.models import LlmCall
 from momentum.core.context import Ctx
 from momentum.domain.agents.models import Agent, AgentRun
@@ -71,10 +71,14 @@ def month_start(now: datetime) -> datetime:
 
 class DbUsageLog:
     def __init__(
-        self, session_factory: async_sessionmaker[AsyncSession], monthly_budget_usd: float
+        self,
+        session_factory: async_sessionmaker[AsyncSession],
+        monthly_budget_usd: float,
+        user_calls_per_hour: int = 0,
     ) -> None:
         self._sf = session_factory
         self._budget = Decimal(str(monthly_budget_usd))
+        self._per_hour = user_calls_per_hour
 
     async def month_spend(self, workspace_id: uuid.UUID, now: datetime | None = None) -> Decimal:
         since = month_start(now or datetime.now(UTC))
@@ -113,6 +117,27 @@ class DbUsageLog:
                 )
         if agent_run_id is not None:
             await self._check_agent_budget(agent_run_id, priced=priced)
+        elif self._per_hour > 0 and ctx.actor.id is not None and not ctx.actor.is_agent:
+            await self._check_user_rate(ctx.actor.id)
+
+    async def _check_user_rate(self, user_id: uuid.UUID) -> None:
+        """Phase 7 S7.1.1: a person's own calls (not agents') in the last hour, so one runaway
+        script or stuck tab can't spend the workspace's budget for 150 people."""
+        since = datetime.now(UTC) - timedelta(hours=1)
+        async with self._sf() as session:
+            used = await session.scalar(
+                select(func.count()).where(
+                    LlmCall.user_id == user_id,
+                    LlmCall.created_at >= since,
+                    LlmCall.agent_run_id.is_(None),
+                    LlmCall.status == "ok",
+                )
+            )
+        if (used or 0) >= self._per_hour:
+            raise UserRateLimited(
+                f"You've made {used} AI requests in the last hour (the limit is {self._per_hour}). "
+                "Try again in a little while."
+            )
 
     async def agent_month_usage(
         self, agent_id: uuid.UUID, now: datetime | None = None

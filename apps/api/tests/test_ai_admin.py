@@ -11,7 +11,7 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from momentum.ai.actions import ProposedCall
-from momentum.ai.errors import AIDisabled, BudgetExceeded
+from momentum.ai.errors import AIDisabled, BudgetExceeded, UserRateLimited
 from momentum.ai.loop import LoopResult, emit_proposals
 from momentum.ai.models import LlmCall
 from momentum.ai.prefs import AiPrefs, set_prefs
@@ -134,6 +134,31 @@ async def test_workspace_budget_override_is_used_instead_of_the_environment_defa
     usage = DbUsageLog(session_factory, 0)  # environment default: unlimited
     with pytest.raises(BudgetExceeded):
         await usage.check_budget(world.ravi)
+
+
+async def test_one_person_is_limited_per_hour_but_not_others_or_agents(
+    world: World, session_factory: async_sessionmaker[AsyncSession]
+) -> None:
+    def call(created_at: datetime, status: str = "ok") -> LlmCall:
+        return LlmCall(
+            workspace_id=world.ravi.workspace_id,
+            user_id=world.ravi.actor.id,
+            feature="chat",
+            alias="default",
+            model="m",
+            status=status,
+            created_at=created_at,
+        )
+
+    now = datetime.now(UTC)
+    async with session_factory() as session, session.begin():
+        session.add_all([call(now), call(now), call(now, "error"), call(now - timedelta(hours=2))])
+    usage = DbUsageLog(session_factory, 0, user_calls_per_hour=2)
+    with pytest.raises(UserRateLimited):
+        await usage.check_budget(world.ravi)  # two ok calls this hour; errors and older don't count
+    await usage.check_budget(world.ana)  # someone else is unaffected
+    await DbUsageLog(session_factory, 0, user_calls_per_hour=3).check_budget(world.ravi)
+    await DbUsageLog(session_factory, 0).check_budget(world.ravi)  # 0 = unlimited
 
 
 async def test_admin_can_switch_off_auto_apply_workspace_wide(

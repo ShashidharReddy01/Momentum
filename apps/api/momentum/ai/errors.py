@@ -29,6 +29,12 @@ class BudgetExceeded(DomainError):
     status, code, title = 429, "ai_budget_exceeded", "The monthly AI budget has been used up"
 
 
+class UserRateLimited(DomainError):
+    """Phase 7: one person made more model calls in the last hour than the workspace allows."""
+
+    status, code, title = 429, "ai_rate_limited", "Too many AI requests in the last hour"
+
+
 class AgentBudgetExceeded(BudgetExceeded):
     """S5.1.2: one agent's own monthly budget (not the workspace's) is used up."""
 

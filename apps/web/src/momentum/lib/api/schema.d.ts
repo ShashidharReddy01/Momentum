@@ -8991,6 +8991,11 @@ export interface components {
         };
         /** WorkloadOut */
         WorkloadOut: {
+            /**
+             * Any Estimate
+             * @description Any placed task has an effort estimate
+             */
+            any_estimate: boolean;
             /** Can Admin */
             can_admin: boolean;
             /** Default Minutes */
@@ -9007,7 +9012,10 @@ export interface components {
              * Format: date
              */
             start: string;
-            /** Tasks */
+            /**
+             * Tasks
+             * @description The placed tasks `tasks_for` asked for
+             */
             tasks: components["schemas"]["WorkloadTaskOut"][];
             unassigned: components["schemas"]["PersonLoadOut"];
             /** Weeks */
@@ -16558,6 +16566,8 @@ export interface operations {
                 weeks?: number;
                 /** @description Only this project's work */
                 project_id?: string | null;
+                /** @description Which placed tasks to list: "all", "none" (the grid only), "unassigned", or a person's id. The grid's numbers always cover everyone. */
+                tasks_for?: string;
             };
             header?: never;
             path?: never;

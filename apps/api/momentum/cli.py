@@ -27,20 +27,23 @@ def serve(
     host: str = "0.0.0.0",  # noqa: S104 - container entrypoint
     port: int = typer.Option(int(os.environ.get("PORT", "8000"))),
     reload: bool = False,
-    workers: int = 1,
+    workers: int | None = typer.Option(
+        None, help="Web processes (default MOMENTUM_WEB_WORKERS, 1 if unset)"
+    ),
 ) -> None:
     """Run the web app (API + SPA + embedded worker)."""
     import uvicorn
 
     # S5.0.2: trust X-Forwarded-* only when the deployment says a proxy is in front; otherwise
     # any visitor could set their own address (rate limits use ``api.deps.client_ip``)
-    behind_proxy = Settings().trusted_proxy_hops > 0
+    settings = Settings()
+    behind_proxy = settings.trusted_proxy_hops > 0
     uvicorn.run(
         "momentum.asgi:app",
         host=host,
         port=port,
         reload=reload,
-        workers=None if reload else workers,
+        workers=None if reload else (workers or settings.web_workers),
         proxy_headers=behind_proxy,
         forwarded_allow_ips="*" if behind_proxy else None,
         loop="asyncio:SelectorEventLoop" if WINDOWS else "auto",
@@ -83,6 +86,9 @@ def seed(
     showcase: bool = typer.Option(
         False, "--showcase", help="Also add a workspace that exercises every screen (UI reviews)"
     ),
+    scale: bool = typer.Option(
+        False, "--scale", help="Also add the load-test workspace (~150 people, 50k tasks)"
+    ),
 ) -> None:
     """Load the synthetic demo workspace (safe to re-run)."""
     from momentum.core.db import UnitOfWork, create_engine, create_session_factory
@@ -96,6 +102,10 @@ def seed(
         uow = UnitOfWork(create_session_factory(engine)())
         try:
             async with uow.transaction() as session:
+                if scale:
+                    from momentum.seed_scale import seed_scale
+
+                    return await seed_scale(session, settings)
                 if showcase:
                     from momentum.seed_showcase import seed_showcase
 
@@ -168,7 +178,10 @@ def reindex(
     async def _run() -> str:
         engine = create_engine(settings)
         factory = create_session_factory(engine)
-        llm = build_llm(settings, DbUsageLog(factory, settings.ai_monthly_budget_usd))
+        llm = build_llm(
+            settings,
+            DbUsageLog(factory, settings.ai_monthly_budget_usd, settings.ai_user_calls_per_hour),
+        )
         try:
             async with factory() as session, session.begin():
                 run = await run_reindex(session, llm, entity_types=kinds, since=start)  # type: ignore[arg-type]

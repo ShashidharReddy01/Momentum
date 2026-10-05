@@ -34,7 +34,7 @@ class LLM:
 - Implemented with `openai.AsyncOpenAI(base_url=settings.llm_base_url, api_key=settings.llm_api_key)`.
 - `alias` → model name via settings (`fast`, `default`, `smart`, `embed`). **No model ids in code.**
 - Every call writes an `llm_calls` row: feature, alias, model, tokens, cost estimate (price table), latency, status.
-- Budget check **before** the call (workspace monthly + agent budget) → `BudgetExceeded`.
+- Budget check **before** the call (workspace monthly + agent budget) → `BudgetExceeded`; a person's own calls per rolling hour (`MOMENTUM_AI_USER_CALLS_PER_HOUR`, Phase 7) → `UserRateLimited` (429 `ai_rate_limited`).
 - Error mapping: timeouts/5xx → retry with backoff (max `LLM_MAX_RETRIES`); 429 → retry with backoff honoring `Retry-After`; persistent failure → `AIUnavailable`.
 - **Mock mode** (`LLM_MODE=mock`): deterministic responses from `ai/evals/fixtures/mock_responses/*.yaml`, matched by feature + a hash of the key inputs, with a generic fallback per feature. `record` mode saves real responses as fixtures.
 - Embeddings (Cohere v3 via the gateway): `input_type` passed through `extra_body={"input_type": …}` (verify in `llm-check`). Batches of `LLM_EMBED_BATCH`.

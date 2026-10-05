@@ -9,13 +9,14 @@ from datetime import UTC, date, datetime, timedelta
 
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import load_only
 
 from momentum.core.activity import Activity
 from momentum.core.context import Ctx
-from momentum.domain.access import task_ancestors, visible_projects_clause
+from momentum.domain.access import ancestors_of, visible_projects_clause
 from momentum.domain.comments.models import Comment
 from momentum.domain.mytasks.models import BUCKETS, MyTaskPlacement
-from momentum.domain.mytasks.service import list_my_tasks, without_hidden
+from momentum.domain.mytasks.service import without_hidden
 from momentum.domain.projects.models import Favorite, Project
 from momentum.domain.sections.models import Section
 from momentum.domain.tasks.models import Follower, Task, TaskProject
@@ -68,12 +69,13 @@ def priority_key(
 async def _root_ids(session: AsyncSession, task_ids: set[uuid.UUID]) -> dict[uuid.UUID, uuid.UUID]:
     if not task_ids:
         return {}
-    tasks = (await session.execute(select(Task).where(Task.id.in_(task_ids)))).scalars()
+    tasks = list((await session.execute(select(Task).where(Task.id.in_(task_ids)))).scalars())
+    chains = await ancestors_of(session, tasks)  # batched: no query per subtask
     out = {}
     for t in tasks:
         if t.deleted_at is not None:
             continue
-        chain = await task_ancestors(session, t) if t.parent_id else []
+        chain = chains.get(t.id, [])
         if any(a.deleted_at is not None for a in chain):
             continue
         out[t.id] = chain[-1].id if chain else t.id
@@ -243,11 +245,49 @@ async def _waiting(session: AsyncSession, ctx: Ctx, today: date) -> tuple[list[T
     return tasks[:WAITING], len(tasks)
 
 
+async def _my_open(session: AsyncSession, ctx: Ctx) -> list[tuple[Task, MyTaskPlacement | None]]:
+    """My open, visible tasks with only the columns ranking and counting need, and their My Tasks
+    placements. Home reads; it doesn't sync My Tasks (opening My Tasks does), so a task assigned
+    a moment ago ranks without a placement until then (Phase 7 load test)."""
+    assert ctx.actor.id is not None
+    rows = await session.execute(
+        select(Task)
+        .options(load_only(Task.id, Task.parent_id, Task.due_on, Task.priority, Task.deleted_at))
+        .where(
+            Task.workspace_id == ctx.workspace_id,
+            Task.assignee_id == ctx.actor.id,
+            Task.deleted_at.is_(None),
+            Task.completed_at.is_(None),
+        )
+    )
+    tasks = await without_hidden(session, list(rows.scalars()))
+    placed = (
+        await session.execute(
+            select(MyTaskPlacement).where(
+                MyTaskPlacement.user_id == ctx.actor.id,
+                MyTaskPlacement.task_id.in_([t.id for t in tasks]),
+            )
+        )
+        if tasks
+        else None
+    )
+    placements = {p.task_id: p for p in placed.scalars()} if placed is not None else {}
+    return [(t, placements.get(t.id)) for t in tasks]
+
+
 async def home(session: AsyncSession, ctx: Ctx) -> Home:
     assert ctx.actor.id is not None
     today = today_for(ctx)
-    mine = await list_my_tasks(session, ctx)
-    ranked = sorted(mine, key=lambda r: priority_key(*r))
+    mine = await _my_open(session, ctx)
+    ranked = sorted(mine, key=lambda r: priority_key(*r))[:PRIORITIES]
+    if ranked:  # only the top few are shown: load those in full
+        full = await session.execute(
+            select(Task)
+            .where(Task.id.in_([t.id for t, _ in ranked]))
+            .execution_options(populate_existing=True)
+        )
+        by_id = {t.id: t for t in full.scalars()}
+        ranked = [(by_id[t.id], p) for t, p in ranked]
     waiting, waiting_total = await _waiting(session, ctx, today)
     recent = await _recent_projects(session, ctx, today)
     has_projects = (
@@ -258,7 +298,7 @@ async def home(session: AsyncSession, ctx: Ctx) -> Home:
         is not None
     )
     return Home(
-        priorities=ranked[:PRIORITIES],
+        priorities=ranked,
         open=len(mine),
         due_today=sum(1 for t, _ in mine if t.due_on == today),
         overdue=sum(1 for t, _ in mine if t.due_on is not None and t.due_on < today),

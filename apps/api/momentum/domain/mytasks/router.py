@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from momentum.api.deps import CtxDep, UowDep
 from momentum.api.schemas import ListOut, MutationMeta, MutationOut, OkOut
-from momentum.domain.access import task_ancestors
+from momentum.domain.access import ancestors_of
 from momentum.domain.mytasks import service
 from momentum.domain.mytasks.models import MyTaskPlacement
 from momentum.domain.mytasks.schemas import MyTaskMoveIn, MyTaskOut
@@ -28,8 +28,9 @@ async def my_task_rows(
 ) -> list[MyTaskOut]:
     # project of each task (subtasks: of their top-level task), a few queries for the whole list
     roots: dict[uuid.UUID, uuid.UUID] = {}
+    chains = await ancestors_of(s, [t for t, _ in rows if t.parent_id])  # batched
     for t, _ in rows:
-        chain = await task_ancestors(s, t) if t.parent_id else []
+        chain = chains.get(t.id, [])
         roots[t.id] = chain[-1].id if chain else t.id
     # a task's first live project (a task can be in several; deleted ones are skipped)
     placements: dict[uuid.UUID, TaskProject] = {}

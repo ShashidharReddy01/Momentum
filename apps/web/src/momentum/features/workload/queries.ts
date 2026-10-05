@@ -13,6 +13,8 @@ export const workloadKeys = {
   all: ['workload'] as const,
   view: (start: string, weeks: number, projectId: string | null) =>
     ['workload', start, weeks, projectId ?? 'all'] as const,
+  row: (start: string, weeks: number, projectId: string | null, person: string) =>
+    ['workload', start, weeks, projectId ?? 'all', 'tasks', person] as const,
 };
 
 export function useWorkload(start: string, weeks: number, projectId: string | null) {
@@ -22,10 +24,36 @@ export function useWorkload(start: string, weeks: number, projectId: string | nu
     queryFn: async () =>
       (
         await api.GET('/api/v1/workload', {
-          params: { query: { start, weeks, ...(projectId ? { project_id: projectId } : {}) } },
+          params: {
+            query: { start, weeks, tasks_for: 'none', ...(projectId ? { project_id: projectId } : {}) },
+          },
         })
       ).data!,
     placeholderData: (prev) => prev, // paging weeks keeps the grid on screen
+  });
+}
+
+/** One row's placed tasks (a person's id, or "unassigned"), loaded when a cell is opened: the grid
+ * itself carries only the numbers, since every task in a big workspace is over a megabyte. */
+export function useWorkloadRow(
+  start: string,
+  weeks: number,
+  projectId: string | null,
+  person: string | null,
+) {
+  const api = useApi();
+  return useQuery({
+    queryKey: workloadKeys.row(start, weeks, projectId, person ?? ''),
+    queryFn: async () =>
+      (
+        await api.GET('/api/v1/workload', {
+          params: {
+            query: { start, weeks, tasks_for: person!, ...(projectId ? { project_id: projectId } : {}) },
+          },
+        })
+      ).data!.tasks,
+    enabled: person !== null,
+    placeholderData: (prev) => prev,
   });
 }
 

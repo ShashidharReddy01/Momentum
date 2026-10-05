@@ -190,6 +190,33 @@ async def task_ancestors(session: AsyncSession, task: Task) -> list[Task]:
     return chain
 
 
+async def ancestors_of(session: AsyncSession, tasks: list[Task]) -> dict[uuid.UUID, list[Task]]:
+    """``task_ancestors`` for many tasks at once: one query per nesting level for the whole set
+    (at most MAX_TASK_DEPTH + 1), instead of one query per parent per task. Each list runs from
+    the parent up to the top-level task; top-level tasks map to an empty list."""
+    known: dict[uuid.UUID, Task] = {t.id: t for t in tasks}
+    wanted = {t.parent_id for t in tasks if t.parent_id is not None} - set(known)
+    for _ in range(MAX_TASK_DEPTH + 2):
+        if not wanted:
+            break
+        rows = (await session.execute(select(Task).where(Task.id.in_(wanted)))).scalars().all()
+        for row in rows:
+            known[row.id] = row
+        wanted = {r.parent_id for r in rows if r.parent_id is not None} - set(known)
+    out: dict[uuid.UUID, list[Task]] = {}
+    for t in tasks:
+        chain: list[Task] = []
+        current = t
+        while current.parent_id is not None and len(chain) <= MAX_TASK_DEPTH + 1:
+            parent = known.get(current.parent_id)
+            if parent is None:
+                break
+            chain.append(parent)
+            current = parent
+        out[t.id] = chain
+    return out
+
+
 async def get_visible_task(
     session: AsyncSession, ctx: Ctx, task_id: uuid.UUID, *, include_deleted: bool = False
 ) -> tuple[Task, TaskProject | None, str]:

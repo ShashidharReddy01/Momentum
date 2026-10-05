@@ -41,6 +41,8 @@
 - [ ] Easy Auth on; direct access without login returns 401; excluded paths behave as expected
 - [ ] `momentum smoke` passes on the production URL
 - [ ] Backup PITR enabled; a restore test was done in the rehearsal environment
+- [ ] Sized for ~150 people (ADR-0010): `MOMENTUM_WEB_WORKERS=4`, pool 5 + 5 per worker within Postgres `max_connections`, `MOMENTUM_AI_USER_CALLS_PER_HOUR` reviewed
+- [ ] Load test against staging (`tools/load/locustfile.py` on a `seed --scale` copy, 75 concurrent, and `tools/load/realtime_probe.py`) meets the per-class budgets of ADR-0010
 - [ ] AI budget set; agents enabled deliberately (start with Pulse + Herald in confirm mode)
 - [ ] Asana import verified by project owners (spot-check counts)
 - [ ] Feedback channel announced; STATUS updated with the go-live date

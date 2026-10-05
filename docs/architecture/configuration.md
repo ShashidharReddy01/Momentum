@@ -25,7 +25,7 @@ Frontend build-time variables use the `VITE_MOMENTUM_` prefix, but the SPA prefe
 |---|---|---|
 | `MOMENTUM_DATABASE_URL` | `postgresql+psycopg://momentum:momentum@localhost:5432/momentum` | Async SQLAlchemy URL |
 | `MOMENTUM_DB_SCHEMA` | `momentum` | All tables + alembic version table live here |
-| `MOMENTUM_DB_POOL_SIZE` / `_MAX_OVERFLOW` | `10` / `10` | |
+| `MOMENTUM_DB_POOL_SIZE` / `_MAX_OVERFLOW` | `10` / `10` | Per web process. Budget: `MOMENTUM_WEB_WORKERS × (pool + overflow + 2)` must stay under Postgres `max_connections` (the app warns at startup above 80%). For ~150 people: 4 workers × (5 + 5 + 2) = 48 (Phase 7 load test) |
 | `MOMENTUM_DB_AUTO_MIGRATE` | `false` (`true` local) | Run `alembic upgrade head` on startup under an advisory lock |
 
 ## Auth
@@ -51,6 +51,7 @@ Frontend build-time variables use the `VITE_MOMENTUM_` prefix, but the SPA prefe
 | Setting | Default | Description |
 |---|---|---|
 | `MOMENTUM_WORKER_MODE` | `embedded` | `embedded` · `separate` · `off` |
+| `MOMENTUM_WEB_WORKERS` | `1` | Web server processes for `momentum serve` (1–32). One handles ~20 requests/s; ~150 active people need **4** (Phase 7 load test). Realtime fans out across processes via LISTEN/NOTIFY; the job queue de-duplicates scheduled jobs, so embedded workers in each process are safe |
 | `MOMENTUM_WORKER_CONCURRENCY` | `4` | |
 | `MOMENTUM_REALTIME_ENABLED` | `true` | |
 | `MOMENTUM_RULES_ENABLED` | `true` | Kill switch for the rules executor (S4.1.1): rules stay editable but nothing fires |
@@ -95,6 +96,7 @@ Frontend build-time variables use the `VITE_MOMENTUM_` prefix, but the SPA prefe
 | `MOMENTUM_LLM_FIXTURES_DIR` | (packaged) | Mock/record fixture directory; empty = `momentum/ai/evals/fixtures/mock_responses` |
 | `MOMENTUM_EVALS_DATABASE_URL` | (empty) | S3.5.1: the throwaway database `momentum evals` drops and rebuilds on every run (migrate, seed, eval workspace, reindex). Its name must end in `_evals`. Empty = the main database's name + `_evals` on the same server (the role needs `CREATEDB`) |
 | `MOMENTUM_AI_MONTHLY_BUDGET_USD` | `0` (= unlimited) | Workspace cap on estimated cost (sum of `llm_calls.cost_usd` since 00:00 UTC on the 1st); checked before every call. Only models priced in `MOMENTUM_LLM_PRICE_TABLE` count, so an unpriced model never trips it (the usage page, `llm-check` and the startup log say so) |
+| `MOMENTUM_AI_USER_CALLS_PER_HOUR` | `200` | Phase 7: one person's own successful model calls in a rolling hour (agent runs have their own budgets); the next call answers 429 `ai_rate_limited`. A chat turn with tools makes a few calls, so 200 is ~40 busy turns an hour. `0` = unlimited |
 | `MOMENTUM_AGENTS_ENABLED` | `true` | Kill switch for agents: nothing is scheduled, triggered or run while false (agents stay editable; events meanwhile are skipped, not replayed). The AI master switch and each agent's own `enabled` apply too (S5.1.2) |
 | `MOMENTUM_AGENT_EXTENSIONS` | `""` | A host's agent extensions, `"package.module:attribute"` (an `Extensions` object or a function returning one): extra AI tools, handler agents, agent definition directories (S5.1.5, ADR-0009, INTEGRATION_GUIDE §6.7). Set it for the web app **and** the worker |
 | `MOMENTUM_AGENT_MAX_STEPS` | `15` | Ceiling on model steps per agent run (1–50). An agent's own `limits.max_steps` may be lower, never higher (S5.1.1) |

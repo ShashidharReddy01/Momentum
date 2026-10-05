@@ -6,7 +6,7 @@ import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
-from typing import Any, Literal
+from typing import Any, Literal, cast
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import ColumnElement, delete, func, or_, select, update
@@ -39,6 +39,7 @@ from momentum.domain.sections.models import Section
 from momentum.domain.sections.service import list_sections, on_section_delete, on_section_restore
 from momentum.domain.tasks.models import Follower, Task, TaskDependency, TaskProject
 from momentum.domain.tasks.recurrence import next_occurrence
+from momentum.domain.tasks.schemas import PlacementFields, TaskFields
 from momentum.domain.users.models import User
 from momentum.domain.workspace.models import Workspace
 
@@ -328,6 +329,30 @@ def due_clause(due: DueFilter, today: date) -> ColumnElement[bool] | None:
     return None
 
 
+# what the project list returns per task (task columns, then its placement's)
+LIST_COLUMNS = (
+    Task.id,
+    Task.number,
+    Task.title,
+    Task.type,
+    Task.approval_state,
+    Task.assignee_id,
+    Task.start_on,
+    Task.due_on,
+    Task.due_at,
+    Task.completed_at,
+    Task.parent_id,
+    Task.parent_position,
+    Task.priority,
+    Task.version,
+    Task.created_at,
+    Task.estimate_minutes,
+    TaskProject.project_id,
+    TaskProject.section_id,
+    TaskProject.position,
+)
+
+
 async def list_project_tasks(
     session: AsyncSession,
     ctx: Ctx,
@@ -338,15 +363,18 @@ async def list_project_tasks(
     assignees: list[str] | None = None,
     due: DueFilter = "any",
     sort: TaskSort = "manual",
-) -> list[tuple[Task, TaskProject]]:
+) -> list[tuple[TaskFields, PlacementFields]]:
     """Top-level tasks of a project. Incomplete tasks: all of them, in section order, then by
     ``sort`` within a section (manual = drag order). Completed tasks: newest first, paged by
     ``before`` (completed_at cursor); ``sort`` does not apply to them.
 
     ``assignees`` holds user ids, ``"me"`` and/or ``"none"`` (unassigned); several are OR-ed."""
     await get_visible_project(session, ctx, project_id)
+    # plain rows of just what the list shows, not ORM objects: building two objects per task (a
+    # Task and its TaskProject) was most of this endpoint's time at 500 tasks (Phase 7 load test).
+    # Each row serves as both the task and its placement (``TaskFields``, ``PlacementFields``).
     query = (
-        select(Task, TaskProject)
+        select(*LIST_COLUMNS)
         .join(TaskProject, TaskProject.task_id == Task.id)
         .join(Section, Section.id == TaskProject.section_id)
         .where(
@@ -371,14 +399,10 @@ async def list_project_tasks(
         query = query.where(Task.completed_at.is_not(None))
         if before is not None:
             query = query.where(Task.completed_at < before)
-        return [
-            (t, p)
-            for t, p in (
-                await session.execute(
-                    query.order_by(Task.completed_at.desc()).limit(COMPLETED_PAGE)
-                )
-            ).all()
-        ]
+        rows = (
+            await session.execute(query.order_by(Task.completed_at.desc()).limit(COMPLETED_PAGE))
+        ).all()
+        return [(cast(TaskFields, r), cast(PlacementFields, r)) for r in rows]
     query = query.where(Task.completed_at.is_(None))
     keys: list[Any] = [Section.position]
     if sort == "due":
@@ -391,7 +415,8 @@ async def list_project_tasks(
     elif sort == "title":
         keys += [func.lower(Task.title)]
     keys += [TaskProject.position, Task.id]
-    return [(t, p) for t, p in (await session.execute(query.order_by(*keys))).all()]
+    rows = (await session.execute(query.order_by(*keys))).all()
+    return [(cast(TaskFields, r), cast(PlacementFields, r)) for r in rows]
 
 
 async def get_task(

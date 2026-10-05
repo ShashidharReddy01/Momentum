@@ -1,6 +1,7 @@
 {
   "name": "@momentum/web",
   "private": true,
+  "packageManager": "pnpm@12.6.0",
   "version": "0.1.0",
   "type": "module",
   "sideEffects": [

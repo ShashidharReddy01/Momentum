@@ -81,6 +81,9 @@ class Settings(BaseSettings):
 
     # Worker / realtime
     worker_mode: WorkerMode = "embedded"
+    # Web server processes (`momentum serve`): one handles ~20 requests/s; ~150 active people
+    # need 3-4 (Phase 7 load test). Realtime and the job queue already work across processes.
+    web_workers: int = Field(default=1, ge=1, le=32)
     worker_concurrency: int = 4
     realtime_enabled: bool = True
     # S4.1.1: kill switch for the rules executor (rules stay editable; nothing fires)
@@ -130,6 +133,9 @@ class Settings(BaseSettings):
     # empty = the main database's name + "_evals" on the same server
     evals_database_url: str = ""
     ai_monthly_budget_usd: float = Field(default=0, ge=0)  # 0 = unlimited
+    # Phase 7 S7.1.1: one person's own model calls per rolling hour (a chat turn with tools makes
+    # a few); agent runs have their own budgets. 0 = unlimited.
+    ai_user_calls_per_hour: int = Field(default=200, ge=0)
 
     # S5.1.1: ceilings for every agent's per-run limits (ai-architecture §10). An agent's own
     # `limits` may be lower, never higher.

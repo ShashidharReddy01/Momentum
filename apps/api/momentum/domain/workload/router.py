@@ -49,6 +49,11 @@ def _person(ctx: Ctx, p: service.PersonLoad) -> PersonLoadOut:
     )
 
 
+# the grid alone, or one row's tasks (Phase 7: every task in the workspace was 1 MB+ per view)
+_HEX = "[0-9a-fA-F]"
+TASKS_FOR = rf"^(all|none|unassigned|{_HEX}{{8}}-{_HEX}{{4}}-{_HEX}{{4}}-{_HEX}{{4}}-{_HEX}{{12}})$"
+
+
 @router.get("", response_model=WorkloadOut, summary="Who is carrying what, week by week")
 async def get_workload(
     ctx: CtxDep,
@@ -56,10 +61,21 @@ async def get_workload(
     start: date | None = Query(default=None, description="A day in the first week (default today)"),
     weeks: int = Query(default=6, ge=1, le=service.MAX_WEEKS),
     project_id: uuid.UUID | None = Query(default=None, description="Only this project's work"),
+    tasks_for: str = Query(
+        default="all",
+        pattern=TASKS_FOR,
+        description='Which placed tasks to list: "all", "none" (the grid only), "unassigned", '
+        "or a person's id. The grid's numbers always cover everyone.",
+    ),
 ) -> WorkloadOut:
     async with uow.transaction() as s:
         w = await service.workload(
-            s, ctx, start or datetime.now(UTC).date(), weeks, project_id=project_id
+            s,
+            ctx,
+            start or datetime.now(UTC).date(),
+            weeks,
+            project_id=project_id,
+            tasks_for=tasks_for.lower(),
         )
         return WorkloadOut(
             start=w.start,
@@ -69,6 +85,7 @@ async def get_workload(
             can_admin=ctx.actor.is_admin and not ctx.actor.is_agent,
             people=[_person(ctx, p) for p in w.people],
             unassigned=_person(ctx, w.unassigned),
+            any_estimate=w.any_estimate,
             tasks=[
                 WorkloadTaskOut(
                     id=t.task.id,

@@ -17,12 +17,11 @@ Changing capacity is the person themselves or a workspace admin, with activity a
 from __future__ import annotations
 
 import uuid
-from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, timedelta
-from typing import Any
+from typing import Any, Protocol
 
-from sqlalchemy import func, select, text
+from sqlalchemy import Date, and_, case, cast, func, literal, not_, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from momentum.core.activity import record_activity
@@ -68,6 +67,45 @@ def spread(
     return {d: each for d in days}
 
 
+def _weekdays_between(a: date, b: date) -> int:
+    """Mon-Fri days from ``a`` to ``b`` inclusive (0 if ``b`` < ``a``), without a day loop."""
+    if b < a:
+        return 0
+    days = (b - a).days + 1
+    full, rest = divmod(days, 7)
+    count = full * 5
+    start = a.weekday()
+    count += sum(1 for i in range(rest) if (start + i) % 7 < 5)
+    return count
+
+
+def spread_weeks(
+    start_on: date | None, due_on: date, minutes: int | None, today: date
+) -> dict[date, float]:
+    """``spread`` summed per week (keyed by Monday), computed a week at a time: the same numbers,
+    without building one entry per day (a long task covers 60-90 days)."""
+    first = start_on if start_on is not None and start_on <= due_on else due_on
+    if due_on < today:
+        first = due_on = today
+    elif first < today:
+        first = today
+    week = monday(first)
+    if due_on < week + timedelta(days=7):  # within one week (every overdue task): all of it
+        return {week: float(minutes or 0)}
+    total = _weekdays_between(first, due_on)
+    weekend_only = total == 0
+    if weekend_only:
+        total = (due_on - first).days + 1
+    out: dict[date, float] = {}
+    while week <= due_on:
+        a, b = max(first, week), min(due_on, week + timedelta(days=6))
+        n = (b - a).days + 1 if weekend_only else _weekdays_between(a, b)
+        if n:
+            out[week] = (minutes or 0) * n / total
+        week += timedelta(days=7)
+    return out
+
+
 @dataclass
 class WeekLoad:
     week_start: date
@@ -88,9 +126,31 @@ class PersonLoad:
     hidden: int = 0
 
 
+class PlacedFields(Protocol):
+    """The task columns the grid and its task list read (a plain row: hydrating ~13k ORM objects
+    per view was a third of the endpoint's time in the Phase 7 load test)."""
+
+    @property
+    def id(self) -> uuid.UUID: ...
+    @property
+    def number(self) -> int: ...
+    @property
+    def title(self) -> str: ...
+    @property
+    def assignee_id(self) -> uuid.UUID | None: ...
+    @property
+    def start_on(self) -> date | None: ...
+    @property
+    def due_on(self) -> date | None: ...
+    @property
+    def estimate_minutes(self) -> int | None: ...
+    @property
+    def version(self) -> int: ...
+
+
 @dataclass
 class PlacedTask:
-    task: Task
+    task: PlacedFields
     project_id: uuid.UUID
     project_name: str
     overdue: bool
@@ -105,7 +165,8 @@ class Workload:
     default_source: str  # workspace | setting
     people: list[PersonLoad]
     unassigned: PersonLoad
-    tasks: list[PlacedTask]
+    tasks: list[PlacedTask]  # the ones ``tasks_for`` asked for
+    any_estimate: bool = False  # any placed task (listed or not) has an estimate
 
 
 # ---------- capacity ----------
@@ -171,6 +232,20 @@ async def _people(session: AsyncSession, workspace_id: uuid.UUID) -> list[User]:
 # ---------- the view ----------
 
 
+# what the workload grid and its task list read from a task
+PLACED_COLUMNS = (
+    Task.id,
+    Task.workspace_id,
+    Task.number,
+    Task.title,
+    Task.assignee_id,
+    Task.start_on,
+    Task.due_on,
+    Task.estimate_minutes,
+    Task.version,
+)
+
+
 def _open_top_level(workspace_id: uuid.UUID) -> list[Any]:
     return [
         Task.workspace_id == workspace_id,
@@ -188,6 +263,7 @@ async def workload(
     weeks: int,
     project_id: uuid.UUID | None = None,
     today: date | None = None,
+    tasks_for: str = "all",
 ) -> Workload:
     if not 1 <= weeks <= MAX_WEEKS:
         raise ValidationFailed(f"Show between 1 and {MAX_WEEKS} weeks", code="invalid_range")
@@ -216,42 +292,127 @@ async def workload(
     people = {u.id: row(u) for u in await _people(session, ctx.workspace_id)}
     unassigned = row(None)
 
-    # every open top-level task in a project you can see, due by the window's end
+    # every open top-level task in a project you can see, due by the window's end: only the
+    # columns the grid uses, filtered in SQL (Phase 7 load test: this loaded every open task
+    # with its description and dropped most of them in Python)
+    scope = [*_open_top_level(ctx.workspace_id), visible_projects_clause(ctx)]
+    if project_id is not None:
+        scope.append(Project.id == project_id)
+    # Where a task's effort lands (see ``spread_weeks``), in SQL: from its start (its due day when
+    # it has no start, today when underway) to its due day (today when overdue).
+    begins = case(
+        (and_(Task.start_on.is_not(None), Task.start_on <= Task.due_on), Task.start_on),
+        else_=Task.due_on,
+    )
+    on_plate = case((Task.due_on < today, literal(today)), else_=func.greatest(begins, today))
+    ends = func.greatest(Task.due_on, today)
+    week_of = func.date_trunc("week", on_plate)
+    one_week = week_of == func.date_trunc("week", ends)
+    visible_ids = (
+        select(TaskProject.task_id)
+        .join(Project, Project.id == TaskProject.project_id)
+        .where(visible_projects_clause(ctx), *([Project.id == project_id] if project_id else []))
+    )
+    dated = [*_open_top_level(ctx.workspace_id), Task.id.in_(visible_ids), Task.due_on <= last]
+
+    def row_of(assignee_id: uuid.UUID | None) -> PersonLoad | None:
+        return people.get(assignee_id) if assignee_id else unassigned  # None: inactive or agent
+
+    # Phase 7 load test: most tasks (every overdue one) land in a single week, so the grid sums
+    # those in SQL; only multi-week tasks are spread here, one row at a time.
+    any_estimate = False
+    single = await session.execute(
+        select(
+            Task.assignee_id,
+            cast(week_of, Date),
+            func.count(),
+            func.coalesce(func.sum(Task.estimate_minutes), 0),
+            func.count().filter(Task.estimate_minutes.is_(None)),
+        )
+        .where(*dated, one_week, on_plate >= first)
+        .group_by(Task.assignee_id, week_of)
+    )
+    for uid, week, n, minutes, unestimated in single.all():
+        person = row_of(uid)
+        if person is None or week not in person.weeks:
+            continue
+        wl = person.weeks[week]
+        wl.planned_minutes += float(minutes)
+        wl.task_count += int(n)
+        wl.unestimated += int(unestimated)
+        any_estimate = any_estimate or int(unestimated) < int(n)
+
+    def listed(assignee_id: uuid.UUID | None) -> bool:
+        if tasks_for in ("all", "none"):
+            return tasks_for == "all"
+        if tasks_for == "unassigned":
+            return assignee_id is None
+        return str(assignee_id) == tasks_for.lower()
+
+    # multi-week tasks (all of them: the grid needs them) and, for the task list, the one-week
+    # tasks of the row(s) asked for
+    wanted = [not_(one_week)]
+    if tasks_for == "all":
+        wanted = []
+    elif tasks_for == "unassigned":
+        wanted = [or_(not_(one_week), Task.assignee_id.is_(None))]
+    elif tasks_for != "none":
+        wanted = [or_(not_(one_week), Task.assignee_id == uuid.UUID(tasks_for))]
     q = (
-        select(Task, Project.id, Project.name)
+        select(
+            *PLACED_COLUMNS,
+            one_week.label("one_week"),
+            Project.id.label("project_id"),
+            Project.name.label("project_name"),
+        )
         .join(TaskProject, TaskProject.task_id == Task.id)
         .join(Project, Project.id == TaskProject.project_id)
-        .where(*_open_top_level(ctx.workspace_id), visible_projects_clause(ctx))
-        .order_by(Task.due_on.nulls_last(), Task.number)
+        .where(*scope, Task.due_on <= last, *wanted)
+        .order_by(Task.due_on, Task.number)
     )
-    if project_id is not None:
-        q = q.where(Project.id == project_id)
     seen: set[uuid.UUID] = set()
     placed: list[PlacedTask] = []
-    for task, pid, pname in (await session.execute(q)).all():
+    # open tasks with no due date: counted per person, not placed
+    undated = await session.execute(
+        select(Task.assignee_id, func.count())
+        .where(*_open_top_level(ctx.workspace_id), Task.id.in_(visible_ids), Task.due_on.is_(None))
+        .group_by(Task.assignee_id)
+    )
+    for uid, n in undated.all():
+        person = row_of(uid)
+        if person is not None:
+            person.no_date = int(n)
+    for task in (await session.execute(q)).all():
         if task.id in seen:  # multi-homed: once
             continue
         seen.add(task.id)
-        person = people.get(task.assignee_id) if task.assignee_id else unassigned
-        if person is None:  # assigned to someone inactive or an agent
+        person = row_of(task.assignee_id)
+        if person is None:
             continue
-        if task.due_on is None:
-            person.no_date += 1
-            continue
-        days = spread(task.start_on, task.due_on, task.estimate_minutes, today)
-        by_week: dict[date, float] = defaultdict(float)
-        for d, m in days.items():
-            if first <= d <= last:
-                by_week[monday(d)] += m
+        assert task.due_on is not None
+        by_week = {
+            w: m
+            for w, m in spread_weeks(
+                task.start_on, task.due_on, task.estimate_minutes, today
+            ).items()
+            if first <= w <= last
+        }
         if not by_week:
             continue
-        for w, m in by_week.items():
-            wl = person.weeks[w]
-            wl.planned_minutes += m
-            wl.task_count += 1
-            if task.estimate_minutes is None:
-                wl.unestimated += 1
-        placed.append(PlacedTask(task, pid, pname, task.due_on < today, dict(by_week)))
+        if not task.one_week:  # one-week tasks are already in the grid
+            any_estimate = any_estimate or task.estimate_minutes is not None
+            for w, m in by_week.items():
+                wl = person.weeks[w]
+                wl.planned_minutes += m
+                wl.task_count += 1
+                if task.estimate_minutes is None:
+                    wl.unestimated += 1
+        if listed(task.assignee_id):
+            placed.append(
+                PlacedTask(
+                    task, task.project_id, task.project_name, task.due_on < today, dict(by_week)
+                )
+            )
 
     if project_id is None:
         # open work in projects you can't see: counted per person, never named
@@ -279,6 +440,7 @@ async def workload(
         people=list(people.values()),
         unassigned=unassigned,
         tasks=placed,
+        any_estimate=any_estimate,
     )
 
 

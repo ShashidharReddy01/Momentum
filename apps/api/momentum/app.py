@@ -10,9 +10,10 @@ import contextlib
 from collections.abc import AsyncIterator, Sequence
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from fastapi import APIRouter, FastAPI
+from sqlalchemy import text
 from starlette.middleware.gzip import GZipMiddleware
 
 from momentum.api.runtime import MomentumRuntime, RealtimeState
@@ -114,6 +115,29 @@ def _api_router(settings: Settings) -> APIRouter:
     return api
 
 
+async def _check_connection_budget(engine: Any, settings: Settings, log: Any) -> None:
+    """Warn at startup when this deployment could open more Postgres connections than the
+    server allows (Phase 7 load test: 4 web processes with the default pools hit "too many
+    clients"). Each process can hold pool + overflow connections, plus the job worker's and
+    the realtime listener's. Never blocks startup."""
+    per_process = settings.db_pool_size + settings.db_max_overflow + 2
+    worst = settings.web_workers * per_process
+    try:
+        async with engine.connect() as conn:
+            limit = int((await conn.execute(text("show max_connections"))).scalar_one())
+    except Exception:  # an unreachable or locked-down server: nothing to compare against
+        return
+    if worst > limit * 0.8:
+        log.warning(
+            "db_connection_budget",
+            web_workers=settings.web_workers,
+            per_process=per_process,
+            worst_case=worst,
+            max_connections=limit,
+            hint="lower MOMENTUM_DB_POOL_SIZE / MOMENTUM_DB_MAX_OVERFLOW, or raise max_connections",
+        )
+
+
 def create_app(
     settings: Settings | None = None,
     *,
@@ -161,7 +185,12 @@ def create_app(
         from momentum.ai.usage import DbUsageLog
 
         llm = build_llm(
-            settings, DbUsageLog(runtime.session_factory, settings.ai_monthly_budget_usd)
+            settings,
+            DbUsageLog(
+                runtime.session_factory,
+                settings.ai_monthly_budget_usd,
+                settings.ai_user_calls_per_hour,
+            ),
         )
         runtime.llm = llm
         if settings.db_auto_migrate:
@@ -199,6 +228,7 @@ def create_app(
                     )
                 )
         log.info("momentum_started", env=settings.env, auth=settings.auth_mode, version=VERSION)
+        await _check_connection_budget(engine, settings, log)
         try:
             yield
         finally:
@@ -228,7 +258,9 @@ def create_app(
     app.add_middleware(RequestIdMiddleware)
     # Large lists (e.g. 2,000 tasks ≈ 0.9 MB of JSON) compress ~8x; App Service containers
     # don't compress for us.
-    app.add_middleware(GZipMiddleware, minimum_size=1024, compresslevel=5)
+    # level 1: half the CPU of level 5 for ~20% more bytes (a 260 KB list: 26 KB in 3.6 ms vs
+    # 21 KB in 7.4 ms; Phase 7 load test), and CPU is what runs out first under load
+    app.add_middleware(GZipMiddleware, minimum_size=1024, compresslevel=1)
     install_error_handlers(app)
     app.include_router(health_router)
     app.include_router(_api_router(settings))

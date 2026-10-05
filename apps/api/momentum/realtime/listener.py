@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from momentum.core.events import OutboxEvent
 from momentum.core.settings import Settings
-from momentum.realtime.dispatch import dispatch_pending
+from momentum.realtime.dispatch import Cursor, dispatch_pending
 from momentum.realtime.hub import Hub
 
 log = structlog.get_logger("momentum.realtime")
@@ -34,7 +34,7 @@ async def run_listener(
     settings: Settings, session_factory: async_sessionmaker[AsyncSession], hub: Hub
 ) -> None:
     """Runs until cancelled. A bad or dropped connection is retried, never left to die quietly."""
-    after_id = await _starting_cursor(session_factory)
+    cursor = Cursor(low=await _starting_cursor(session_factory))
     attempt = 0
     while True:
         try:
@@ -45,10 +45,10 @@ async def run_listener(
                 log.info("realtime_listening", channel=settings.events_channel)
                 attempt = 0
                 async with session_factory() as session:
-                    after_id = await dispatch_pending(session, hub, after_id=after_id)
+                    await dispatch_pending(session, hub, cursor)
                 async for _notify in conn.notifies():
                     async with session_factory() as session:
-                        after_id = await dispatch_pending(session, hub, after_id=after_id)
+                        await dispatch_pending(session, hub, cursor)
         except asyncio.CancelledError:
             raise
         except Exception:

@@ -6,7 +6,7 @@ tenant or auth provider re-links by email instead of orphaning data.
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert
@@ -19,6 +19,8 @@ from momentum.core.settings import Settings
 from momentum.domain.users.models import User, UserIdentity
 from momentum.domain.workspace.models import Workspace
 from momentum.domain.workspace.service import ensure_default_workspace
+
+SEEN_EVERY = timedelta(minutes=5)
 
 
 def _email_allowed(settings: Settings, principal: Principal) -> bool:
@@ -38,6 +40,40 @@ async def resolve_user(
 ) -> tuple[User, Workspace]:
     now = datetime.now(UTC)
     tenant = principal.tenant_id or ""
+    # Fast path for the common case (a known, active person): identity, user and workspace in
+    # one query instead of three on every request (Phase 7 load test). Anything unusual (first
+    # sign-in, an invited or disabled account, an admin role to sync) takes the full path below.
+    known = (
+        await session.execute(
+            select(UserIdentity, User, Workspace)
+            .join(User, User.id == UserIdentity.user_id)
+            .join(Workspace, Workspace.id == User.workspace_id)
+            .where(
+                UserIdentity.provider == principal.provider,
+                UserIdentity.tenant_id == tenant,
+                UserIdentity.subject == principal.subject,
+                Workspace.slug == settings.default_workspace_slug,
+            )
+        )
+    ).first()
+    if known is not None:
+        k_identity, k_user, k_workspace = known._tuple()
+        needs_sync = (
+            settings.sync_admin_role
+            and settings.admin_role in principal.roles
+            and k_user.role != "admin"
+        )
+        if k_user.status == "active" and not k_user.is_agent and not needs_sync:
+            touched = False
+            if k_identity.last_login_at is None or now - k_identity.last_login_at > SEEN_EVERY:
+                k_identity.last_login_at = now
+                touched = True
+            if k_user.last_seen_at is None or now - k_user.last_seen_at > SEEN_EVERY:
+                k_user.last_seen_at = now
+                touched = True
+            if touched:
+                await session.flush()
+            return k_user, k_workspace
     workspace = await ensure_default_workspace(session, settings)
 
     identity = (
@@ -129,10 +165,14 @@ async def resolve_user(
                 )
             )
         ).scalar_one()
-    identity.last_login_at = now
+    # "last seen" only needs to be roughly right: writing it on every request turned every read
+    # into two row updates (Phase 7 load test), so refresh at most every few minutes
+    if identity.last_login_at is None or now - identity.last_login_at > SEEN_EVERY:
+        identity.last_login_at = now
 
     if settings.sync_admin_role and settings.admin_role in principal.roles and user.role != "admin":
         user.role = "admin"
-    user.last_seen_at = now
+    if user.last_seen_at is None or now - user.last_seen_at > SEEN_EVERY:
+        user.last_seen_at = now
     await session.flush()
     return user, workspace

@@ -51,7 +51,8 @@ class WorkloadOut(BaseModel):
     can_admin: bool
     people: list[PersonLoadOut]
     unassigned: PersonLoadOut
-    tasks: list[WorkloadTaskOut]
+    any_estimate: bool = Field(description="Any placed task has an effort estimate")
+    tasks: list[WorkloadTaskOut] = Field(description="The placed tasks `tasks_for` asked for")
 
 
 class HoursIn(BaseModel):

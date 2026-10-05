@@ -4,7 +4,7 @@ changes by the person or an admin, with undo. Plus estimates on tasks."""
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, timedelta
 from typing import Any
 
 import httpx
@@ -104,6 +104,17 @@ async def test_weeks_add_up_and_hidden_work_is_counted(as_user: Clients) -> None
     assert _row(only_web, ana)["weeks"][0]["planned_minutes"] == 600 + 60
     assert (await mei.get("/api/v1/workload", params={"project_id": private})).status_code == 404
 
+    # the grid alone, then one row's tasks: same numbers, a much smaller payload
+    grid = await _load(ravi, tasks_for="none")
+    assert grid["tasks"] == [] and grid["people"] == body["people"] and grid["any_estimate"]
+    anas = await _load(ravi, tasks_for=ana)
+    assert anas["tasks"] and {t["assignee_id"] for t in anas["tasks"]} == {ana}
+    nobody = await _load(ravi, tasks_for="unassigned")
+    assert [t["title"] for t in nobody["tasks"] if t["title"] == "Nobody's"] == ["Nobody's"]
+    assert all(t["assignee_id"] is None for t in nobody["tasks"])
+    bad = await ravi.get("/api/v1/workload", params={"tasks_for": "everyone"})
+    assert bad.status_code == 422
+
 
 async def test_capacity_changes_by_the_person_or_an_admin(as_user: Clients) -> None:
     ana_c, mei, admin = await as_user("ana"), await as_user("mei"), await as_user("admin")
@@ -156,3 +167,84 @@ async def test_estimates_are_validated_and_undoable(as_user: Clients) -> None:
     assert (await ravi.get(f"/api/v1/tasks/{t['id']}")).json()["estimate_minutes"] == 90
     bad = await ravi.patch(f"/api/v1/tasks/{t['id']}", json={"estimate_minutes": -5})
     assert bad.status_code == 422
+
+
+def test_spread_weeks_matches_the_per_day_spread() -> None:
+    """Phase 7: the workload grid sums effort per week a week at a time; it must give exactly
+    the per-day spread's numbers (random ranges, overdue and underway tasks, weekends)."""
+    import random
+    from collections import defaultdict
+
+    from momentum.domain.workload.service import monday, spread, spread_weeks
+
+    rng = random.Random(7)
+    today = date(2026, 10, 7)  # a Wednesday
+    for _ in range(2000):
+        due = today + timedelta(days=rng.randint(-20, 120))
+        start = due - timedelta(days=rng.randint(0, 90)) if rng.random() < 0.8 else None
+        minutes = rng.choice([None, 30, 60, 480, 2400])
+        per_day: dict[date, float] = defaultdict(float)
+        for d, m in spread(start, due, minutes, today).items():
+            per_day[monday(d)] += m
+        got = spread_weeks(start, due, minutes, today)
+        assert set(got) == set(per_day), (start, due)
+        for w in got:
+            assert abs(got[w] - per_day[w]) < 1e-6, (start, due, w)
+
+
+async def test_the_grid_sums_match_the_tasks_spread_one_by_one(as_user: Clients) -> None:
+    """Phase 7: one-week tasks are summed in SQL, multi-week ones spread in Python. Whatever the
+    mix (overdue, underway, weekend-only, multi-week, unestimated, in two projects), the grid
+    must equal the listed tasks added up per person and week."""
+    ravi = await as_user("ravi")
+    ana = await _user_id(ravi, "ana")
+    web, other = await _project(ravi), await _project(ravi, "Mobile App v2")
+    today = date.today()
+    sat = today + timedelta(days=(5 - today.weekday()) % 7 or 7)
+
+    def d(days: int) -> str:
+        return (today + timedelta(days=days)).isoformat()
+
+    await _task(ravi, web, "Overdue", assignee_id=ana, due_on=d(-10), estimate_minutes=90)
+    await _task(
+        ravi, web, "Underway", assignee_id=ana, start_on=d(-3), due_on=d(9), estimate_minutes=600
+    )
+    await _task(
+        ravi, web, "Long", assignee_id=ana, start_on=d(2), due_on=d(20), estimate_minutes=900
+    )
+    await _task(ravi, web, "Unestimated long", start_on=d(1), due_on=d(15))
+    await _task(
+        ravi,
+        web,
+        "Weekend",
+        assignee_id=ana,
+        start_on=sat.isoformat(),
+        due_on=(sat + timedelta(days=1)).isoformat(),
+        estimate_minutes=120,
+    )
+    both = await _task(ravi, web, "Two projects", assignee_id=ana, due_on=d(4), estimate_minutes=60)
+    r = await ravi.post(f"/api/v1/tasks/{both['id']}/projects", json={"project_id": other})
+    assert r.status_code == 201, r.text
+
+    params = {"start": today.isoformat(), "weeks": 5}
+    grid = (await ravi.get("/api/v1/workload", params={**params, "tasks_for": "none"})).json()
+    every = (await ravi.get("/api/v1/workload", params={**params, "tasks_for": "all"})).json()
+    assert grid["people"] == every["people"] and grid["unassigned"] == every["unassigned"]
+    ids = [t["id"] for t in every["tasks"]]
+    assert len(ids) == len(set(ids)) and both["id"] in ids  # multi-homed: listed once
+    for row in [*every["people"], every["unassigned"]]:
+        mine = [t for t in every["tasks"] if t["assignee_id"] == row["user_id"]]
+        for w in row["weeks"]:
+            here = [t for t in mine if w["week_start"] in t["weeks"]]
+            assert w["task_count"] == len(here), (row["name"], w)
+            assert abs(
+                w["planned_minutes"] - sum(t["weeks"][w["week_start"]] for t in here)
+            ) <= len(here)
+            assert w["unestimated"] == sum(1 for t in here if t["estimate_minutes"] is None)
+    anas = (await ravi.get("/api/v1/workload", params={**params, "tasks_for": ana})).json()
+    assert sorted(t["id"] for t in anas["tasks"]) == sorted(
+        t["id"] for t in every["tasks"] if t["assignee_id"] == ana
+    )
+    assert {"Overdue", "Underway", "Long", "Weekend", "Two projects"} <= {
+        t["title"] for t in anas["tasks"]
+    }

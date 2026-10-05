@@ -39,7 +39,11 @@ class Comment(IdMixin, Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     edited_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    search_tsv: Mapped[Any] = mapped_column(TSVECTOR, Computed(SEARCH_EXPR, persisted=True))
+    # deferred: only ever used inside SQL (search), never read per row; loading it parsed a
+    # whole tsvector for every row of every list (Phase 7 load test)
+    search_tsv: Mapped[Any] = mapped_column(
+        TSVECTOR, Computed(SEARCH_EXPR, persisted=True), deferred=True
+    )
 
     __table_args__ = (
         Index("ix_comments_task_created", "task_id", "created_at"),

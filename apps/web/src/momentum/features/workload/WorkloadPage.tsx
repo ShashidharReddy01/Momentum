@@ -8,6 +8,7 @@ import {
   Users,
 } from 'lucide-react';
 import { Fragment, useEffect, useMemo, useRef, useState, type DragEvent, type FormEvent } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { MoMark } from '@/components/common/MoMark';
 import { EmptyState, ErrorState } from '@/components/common/States';
 import { Avatar } from '@/components/ui/Avatar';
@@ -36,6 +37,8 @@ import {
   useCapacityMutations,
   useMoveTask,
   useWorkload,
+  useWorkloadRow,
+  workloadKeys,
   type PersonLoad,
   type WeekLoad,
   type Workload,
@@ -85,6 +88,8 @@ function WorkloadBody() {
   const [modeChoice, setMode] = useState<Mode | null>(null);
   const [open, setOpen] = useState<{ person: string; week: string } | null>(null);
   const q = useWorkload(start, weeks, projectId);
+  const row = useWorkloadRow(start, weeks, projectId, open?.person ?? null);
+  const qc = useQueryClient();
   const projects = useProjects().data;
   const thisWeek = mondayOf(toISODate(new Date()));
   const aiEnabled = useMomentumConfig().ai_enabled;
@@ -98,18 +103,15 @@ function WorkloadBody() {
 
   // a team that doesn't estimate yet sees task counts, not a misleading wall of 0h
   const data = q.data;
-  const estimated = useMemo(
-    () => (data ? data.tasks.some((t) => t.estimate_minutes !== null) : true),
-    [data],
-  );
+  const estimated = useMemo(() => (data ? data.any_estimate : true), [data]);
   const mode: Mode = modeChoice ?? (estimated ? 'hours' : 'tasks');
 
   // edits made in the task pane show up in the grid when it closes
   const wasOpen = useRef(nav.openId);
   useEffect(() => {
-    if (wasOpen.current && !nav.openId) void q.refetch();
+    if (wasOpen.current && !nav.openId) void qc.invalidateQueries({ queryKey: workloadKeys.all });
     wasOpen.current = nav.openId;
-  }, [nav.openId, q]);
+  }, [nav.openId, qc]);
 
   return (
     <div className="flex h-full min-h-0">
@@ -217,6 +219,7 @@ function WorkloadBody() {
             thisWeek={thisWeek}
             open={open}
             setOpen={setOpen}
+            openTasks={row.data}
             onOpenTask={(id) => nav.open(id)}
             preview={preview}
           />
@@ -255,6 +258,7 @@ function Grid({
   thisWeek,
   open,
   setOpen,
+  openTasks,
   onOpenTask,
   preview,
 }: {
@@ -263,6 +267,7 @@ function Grid({
   thisWeek: string;
   open: { person: string; week: string } | null;
   setOpen: (v: { person: string; week: string } | null) => void;
+  openTasks: WorkloadTask[] | undefined;
   onOpenTask: (id: string) => void;
   preview: LoadPreview | null;
 }) {
@@ -272,8 +277,9 @@ function Grid({
   const rows = [...data.people, data.unassigned];
   const key = (p: PersonLoad) => p.user_id ?? 'unassigned';
 
+  // the open row's tasks load on demand (undefined while loading)
   const tasksIn = (p: PersonLoad, week: string) =>
-    data.tasks.filter((t) => (t.assignee_id ?? null) === (p.user_id ?? null) && week in t.weeks);
+    openTasks?.filter((t) => (t.assignee_id ?? null) === (p.user_id ?? null) && week in t.weeks);
 
   const moveTo = (d: Drag, person: PersonLoad, week: string) => {
     const personChanged = (person.user_id ?? null) !== d.person;
@@ -543,7 +549,7 @@ function WeekDetail({
 }: {
   person: PersonLoad;
   week: WeekLoad;
-  tasks: WorkloadTask[];
+  tasks: WorkloadTask[] | undefined;
   rows: PersonLoad[];
   onOpenTask: (id: string) => void;
   onDragStart: (t: WorkloadTask) => void;
@@ -556,7 +562,9 @@ function WeekDetail({
         <div className="mb-2 text-xs text-muted">
           {person.name} · week of {weekLabel(week.week_start)} · drag a task onto another person or week
         </div>
-        {tasks.length === 0 ? (
+        {tasks === undefined ? (
+          <Skeleton className="h-16" />
+        ) : tasks.length === 0 ? (
           <p className="text-sm text-muted">Nothing planned this week.</p>
         ) : (
           <ul

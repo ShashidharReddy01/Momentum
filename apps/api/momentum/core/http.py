@@ -69,7 +69,7 @@ class StripNulMiddleware:
             chunks.append(message.get("body", b""))
             more = message.get("more_body", False)
         body = b"".join(chunks)
-        if b"\u0000" in body or NUL.encode() in body:
+        if rb"\u0000" in body or NUL.encode() in body:  # JSON-escaped or raw NUL
             with contextlib.suppress(ValueError):  # not valid JSON: validation will say so
                 body = json.dumps(strip_nul(json.loads(body)), ensure_ascii=False).encode()
             scope = {
