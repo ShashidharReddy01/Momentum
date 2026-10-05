@@ -36,6 +36,7 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { Tooltip } from '@/components/ui/Tooltip';
 import { colorVar } from '@/features/teams';
 import { cn } from '@/lib/cn';
+import { useScrollEdges } from '@/lib/scrollEdges';
 import { useCrumbs } from '@/lib/crumbs';
 import { CsvImportDialog } from '@/features/csvImport';
 import { FieldsDialog } from '@/features/fields';
@@ -111,6 +112,7 @@ export function ProjectPage() {
   const [taskTemplatesOpen, setTaskTemplatesOpen] = useState(false);
   const [csvImportOpen, setCsvImportOpen] = useState(false);
   useCrumbs(project.data ? [project.data.team_name, project.data.name] : null);
+  const tabEdges = useScrollEdges();
 
   // On a bare `/projects/:id` (no view segment), redirect once to this user's last view for
   // this project, or the project's admin-set `default_view` for a project they've never opened.
@@ -160,7 +162,9 @@ export function ProjectPage() {
             value={p.name}
             disabled={!canEdit}
             onCommit={(name) => update.mutate({ name })}
-            className="page-title"
+            // one line, however long the name (it's in full in the editor and the tooltip)
+            className="page-title min-w-0 truncate"
+            title={p.name}
           />
           {p.privacy === 'private' ? (
             <Tooltip content="Private: only invited members can see this project">
@@ -254,31 +258,44 @@ export function ProjectPage() {
             ) : null}
           </div>
         </div>
-        <nav aria-label="Project views" className="mt-1 flex gap-1">
-          {VIEWS.map((v) =>
-            'phase' in v ? (
-              <Tooltip key={v.key} content={`Arrives in Phase ${v.phase}`}>
-                <span className="flex h-9 cursor-default items-center border-b-2 border-transparent px-2 text-body text-muted-2">
+        <div className="relative">
+          <nav
+            ref={tabEdges.ref}
+            onScroll={tabEdges.update}
+            aria-label="Project views"
+            className="mt-1 flex gap-1 overflow-x-auto [scrollbar-width:none]"
+          >
+            {VIEWS.map((v) =>
+              'phase' in v ? (
+                <Tooltip key={v.key} content={`Arrives in Phase ${v.phase}`}>
+                  <span className="flex h-9 cursor-default items-center border-b-2 border-transparent px-2 text-body text-muted-2">
+                    {v.label}
+                  </span>
+                </Tooltip>
+              ) : (
+                <Link
+                  key={v.key}
+                  to={`/projects/${p.id}/${v.key}`}
+                  aria-current={effectiveView === v.key ? 'page' : undefined}
+                  className={cn(
+                    '-mb-px flex h-9 shrink-0 items-center rounded-t-md border-b-2 px-2 text-body transition-colors duration-[var(--dur-1)]',
+                    effectiveView === v.key
+                      ? 'border-ink font-semibold text-ink'
+                      : 'border-transparent text-muted hover:bg-surface-2 hover:text-ink',
+                  )}
+                >
                   {v.label}
-                </span>
-              </Tooltip>
-            ) : (
-              <Link
-                key={v.key}
-                to={`/projects/${p.id}/${v.key}`}
-                aria-current={effectiveView === v.key ? 'page' : undefined}
-                className={cn(
-                  '-mb-px flex h-9 items-center rounded-t-md border-b-2 px-2 text-body transition-colors duration-[var(--dur-1)]',
-                  effectiveView === v.key
-                    ? 'border-ink font-semibold text-ink'
-                    : 'border-transparent text-muted hover:bg-surface-2 hover:text-ink',
-                )}
-              >
-                {v.label}
-              </Link>
-            ),
-          )}
-        </nav>
+                </Link>
+              ),
+            )}
+          </nav>
+          {tabEdges.right ? (
+            <span
+              aria-hidden
+              className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-surface"
+            />
+          ) : null}
+        </div>
       </header>
 
       {p.archived_at ? (

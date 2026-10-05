@@ -91,6 +91,15 @@ Screens move off one-off sizes (`text-[15px]`, `text-[13.5px]`) onto these utili
 
 - **Row:** 36 px height, hover `paper-2`, selected `selection`, focus ring on the keyboard-focused row, hairline bottom border. Columns: check · title (+subtask count, comment count icons) · assignee · due · fields… · (hover) quick actions.
 - **Pane:** slides in from the right (`--pane-w`, resizable 420–900 px), `--shadow-pane`, header actions (complete, like, attach, subtasks, link, more, close), body sections separated by section labels.
+- **Phase 6.5 exit / Phase 7 patterns (2026-10-05):**
+  - **Task pane width:** `--pane-w: clamp(400px, 38vw, 640px)` by default; its left edge is a `role="separator"` (drag, ←/→ in 32 px steps, double-click resets); the width is remembered per browser (`ui.paneWidth`) and always leaves the list ≥ 440 px. Below `md` the pane is full-screen.
+  - **Scroll edge fades:** a row that scrolls sideways (board columns, project view tabs) shows a fade toward `--canvas`/`--surface` on the side that has more (`lib/scrollEdges.ts`, a callback ref so it attaches once the row mounts).
+  - **Avatars:** initials on a 28% tint of the person's colour, text at 50% colour + 50% ink (AA on every palette slot in both themes); never white or ink on the full-strength colour.
+  - **Text tones:** `--muted-2` is for tertiary *text* and passes 4.5:1 on every surface, including the lime tint; in dark it equals `--muted`.
+  - **Inbox rows:** one Lucide icon per notification kind (amber-ink for agent kinds, `--crit` for overdue, `--ok` for done/unblocked); the server's sentence is the row's text; the kind is the icon's tooltip, never a text prefix.
+  - **Rich-text toolbar:** below the text, only while the editor has focus (or the link popover is open); reading takes no extra room.
+  - **Settings home (`/settings`):** a theme switch and one row per settings screen (icon, title, one-line detail, chevron).
+  - **Lists:** a section's last item is its "Add task"/drop-zone footer, so every child of a `role="list"` is a list item; an all-done section shows "N completed · Show".
 - **AI in context:** AI results appear as `AICallout` *inline where the user asked* (task pane, project header, inbox), never as modal takeovers.
 - **Undo everywhere:** every mutation toast offers Undo; `⌘Z` triggers the last undo when focus isn't in a text field.
 - **Empty project:** EmptyState with "Add task", "Import", "✦ Generate from a brief".

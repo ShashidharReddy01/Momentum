@@ -16,6 +16,7 @@ import {
   ListChecks,
   Lock,
   LogOut,
+  Settings,
   Moon,
   Plus,
   Sparkles,
@@ -384,6 +385,9 @@ function UserMenu({ iconsOnly }: { iconsOnly: boolean }) {
       >
         <DropdownMenuItem onSelect={toggleTheme}>
           <Icon icon={theme === 'dark' ? Sun : Moon} /> {theme === 'dark' ? 'Light theme' : 'Dark theme'}
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => navigate('/settings')}>
+          <Icon icon={Settings} /> All settings
         </DropdownMenuItem>
         <DropdownMenuItem onSelect={() => navigate('/settings/notifications')}>
           <Icon icon={Bell} /> Notification settings

@@ -1,3 +1,4 @@
+import { describeCron } from './cron';
 import { Plus, X } from 'lucide-react';
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
@@ -337,6 +338,7 @@ export function AgentForm({
                 )
               }
             />
+            {sc.cron.trim() ? <span className="text-xs text-ink-2">{describeCron(sc.cron)},</span> : null}
             <span className="text-xs text-muted">
               {sc.timezone === 'user'
                 ? sc.at

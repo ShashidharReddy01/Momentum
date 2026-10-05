@@ -1,5 +1,22 @@
 import { useNavigate } from 'react-router';
-import { Archive, ArchiveRestore, Bell, Inbox as InboxIcon } from 'lucide-react';
+import {
+  Archive,
+  ArchiveRestore,
+  AtSign,
+  Bell,
+  Bot,
+  CircleAlert,
+  CircleCheck,
+  Clock,
+  Inbox as InboxIcon,
+  MessageSquare,
+  Newspaper,
+  Play,
+  Stamp,
+  UserPlus,
+  Workflow,
+  type LucideIcon,
+} from 'lucide-react';
 import { useMemo, useState, type KeyboardEvent } from 'react';
 import { EmptyState } from '@/components/common/States';
 import { IconButton } from '@/components/ui/IconButton';
@@ -25,6 +42,24 @@ const KIND_LABEL: Record<Notification['kind'], string> = {
   digest: 'Digest',
   agent_alert: 'Agent alert',
   unblocked: "You're up",
+};
+
+/** One icon per kind, so a list of notifications scans by shape; the titles already say what
+ * happened in words, so the kind isn't repeated as text (it stays the icon's accessible name). */
+const KIND_ICON: Record<Notification['kind'], { icon: LucideIcon; tone: string }> = {
+  assigned: { icon: UserPlus, tone: 'text-ink-2' },
+  mentioned: { icon: AtSign, tone: 'text-info' },
+  commented: { icon: MessageSquare, tone: 'text-ink-2' },
+  completed: { icon: CircleCheck, tone: 'text-ok' },
+  due_soon: { icon: Clock, tone: 'text-warn' },
+  overdue: { icon: CircleAlert, tone: 'text-crit' },
+  rule: { icon: Workflow, tone: 'text-ink-2' },
+  approval_requested: { icon: Stamp, tone: 'text-ink-2' },
+  approval_decided: { icon: Stamp, tone: 'text-ok' },
+  agent_proposal: { icon: Bot, tone: 'text-amber-ink' },
+  digest: { icon: Newspaper, tone: 'text-amber-ink' },
+  agent_alert: { icon: Bot, tone: 'text-amber-ink' },
+  unblocked: { icon: Play, tone: 'text-ok' },
 };
 
 export function InboxPage() {
@@ -141,11 +176,14 @@ function InboxBody() {
                         ) : (
                           <span aria-hidden className="mt-1.5 h-1.5 w-1.5 shrink-0" />
                         )}
+                        <span
+                          title={KIND_LABEL[n.kind]}
+                          className={cn('mt-0.5 shrink-0', KIND_ICON[n.kind].tone)}
+                        >
+                          <Icon icon={KIND_ICON[n.kind].icon} size={14} />
+                        </span>
                         <span className="min-w-0 flex-1">
-                          <p className="truncate text-sm">
-                            <span className="text-muted-2">{KIND_LABEL[n.kind]} · </span>
-                            {n.title}
-                          </p>
+                          <p className="truncate text-sm">{n.title}</p>
                           {n.snippet ? <p className="truncate text-xs text-muted">{n.snippet}</p> : null}
                         </span>
                         <span className="shrink-0 text-xs text-muted-2">{formatRelative(n.created_at)}</span>

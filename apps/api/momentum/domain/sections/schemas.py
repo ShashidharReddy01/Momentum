@@ -12,6 +12,10 @@ class SectionOut(BaseModel):
     name: str
     position: str
     version: int
+    completed_count: int = Field(
+        default=0,
+        description="Completed top-level tasks in the section (they're hidden by default)",
+    )
 
 
 class SectionCreateIn(BaseModel):

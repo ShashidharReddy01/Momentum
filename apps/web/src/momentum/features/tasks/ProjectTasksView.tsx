@@ -619,7 +619,18 @@ export function ProjectTasksView({ projectId, canEdit }: { projectId: string; ca
               <Icon icon={Plus} /> Add task
             </Button>
           ) : null}
-          {!canEdit && tasks.length === 0 ? <p className="py-1 text-sm text-muted-2">No tasks</p> : null}
+          {!showCompleted && (section.completed_count ?? 0) > 0 ? (
+            <button
+              type="button"
+              onClick={() => setView({ ...view, show_completed: true })}
+              className="mt-0.5 ml-1.5 text-xs text-muted hover:text-ink hover:underline"
+            >
+              {section.completed_count} completed · Show
+            </button>
+          ) : null}
+          {!canEdit && tasks.length === 0 && !section.completed_count ? (
+            <p className="py-1 text-sm text-muted">No tasks</p>
+          ) : null}
         </SectionEnd>
       </div>
     );

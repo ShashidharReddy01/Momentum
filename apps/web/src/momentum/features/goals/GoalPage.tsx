@@ -17,7 +17,7 @@ import { usePortfolios } from '@/features/portfolios';
 import { useProjects } from '@/features/projects';
 import { StatusChip, STATUS_LABEL, type Status } from '@/features/status';
 import { useMomentumConfig } from '@/lib/config';
-import { formatRelative } from '@/lib/dates';
+import { formatRelative, formatPeriod } from '@/lib/dates';
 import { useChannel } from '@/lib/realtime';
 import { GoalProgress, NewGoalDialog } from './GoalsPage';
 import {
@@ -98,7 +98,7 @@ function GoalBody({ g }: { g: GoalDetail }) {
             {g.status ? <StatusChip status={g.status as Status} /> : null}
           </h1>
           <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted">
-            <span>{g.period_label ?? `${g.period_start} – ${g.period_end}`}</span>
+            <span>{g.period_label ?? formatPeriod(g.period_start, g.period_end)}</span>
             {owner ? (
               <span className="inline-flex items-center gap-1.5">
                 <Avatar name={owner.name} src={owner.avatar_url} size={18} /> {owner.name}

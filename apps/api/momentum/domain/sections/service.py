@@ -19,6 +19,7 @@ from momentum.core.ordering import key_between
 from momentum.core.undo import UndoConflict, undo_handler, undo_op
 from momentum.domain.access import forbid_agent, get_visible_project, require_project_role
 from momentum.domain.sections.models import Section
+from momentum.domain.tasks.models import Task, TaskProject
 
 # Hook for the tasks module to move or delete a section's tasks before the section is deleted
 # (registered by domain/tasks in S1.2.2; sections must not import tasks).
@@ -44,6 +45,23 @@ async def list_sections(session: AsyncSession, project_id: uuid.UUID) -> list[Se
         .order_by(Section.position, Section.id)
     )
     return list(rows.scalars())
+
+
+async def completed_counts(session: AsyncSession, project_id: uuid.UUID) -> dict[uuid.UUID, int]:
+    """Completed top-level tasks per section (the list hides them unless asked, so an all-done
+    section can still say "4 completed" instead of looking empty)."""
+    rows = await session.execute(
+        select(TaskProject.section_id, func.count())
+        .join(Task, Task.id == TaskProject.task_id)
+        .where(
+            TaskProject.project_id == project_id,
+            Task.completed_at.is_not(None),
+            Task.deleted_at.is_(None),
+            Task.parent_id.is_(None),
+        )
+        .group_by(TaskProject.section_id)
+    )
+    return {sid: int(n) for sid, n in rows.all()}
 
 
 async def _get_editable(session: AsyncSession, ctx: Ctx, section_id: uuid.UUID) -> Section:

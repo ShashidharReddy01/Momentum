@@ -373,6 +373,7 @@ function Day({
             key={task.id}
             task={task}
             part={part}
+            weekStart={date.getDay() === 1}
             color={color}
             assignee={task.assignee_id ? peopleById.get(task.assignee_id) : undefined}
             focused={focused === task.id}
@@ -410,9 +411,11 @@ function Chip({
   onFocus,
   onOpen,
   onToggle,
+  weekStart = false,
 }: {
   task: Task;
   part: Part;
+  weekStart?: boolean;
   color: string | null;
   assignee: Person | undefined;
   focused: boolean;
@@ -429,9 +432,22 @@ function Chip({
   });
 
   if (!interactive) {
-    // A visual continuation of a multi-day bar: not focusable or draggable on its own.
+    // A visual continuation of a multi-day bar: not focusable or draggable on its own (the start
+    // chip is the accessible one), but it opens the task, and at the start of each week row it
+    // says which task it is, so a long span never reads as an unlabelled stripe.
     return (
-      <div aria-hidden className={cn('h-5 shrink-0 bg-accent-tint', part === 'end' ? 'rounded-r-sm' : '')} />
+      <div
+        aria-hidden
+        onClick={onOpen}
+        title={task.title}
+        className={cn(
+          'flex h-5 shrink-0 cursor-pointer items-center truncate bg-accent-tint px-1 text-[11.5px] text-ink-2',
+          part === 'end' ? 'rounded-r-sm' : '',
+          done && 'text-muted line-through',
+        )}
+      >
+        {weekStart ? <span className="truncate">{task.title}</span> : null}
+      </div>
     );
   }
 

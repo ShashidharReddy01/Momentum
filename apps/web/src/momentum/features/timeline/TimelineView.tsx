@@ -1124,12 +1124,19 @@ const TaskRow = memo(function TaskRow({
             }}
           />
         ) : null}
+        {/* above the dependency arrows (z-10), on a soft backing, so an arrow passes behind the
+            words instead of through them */}
         <span
           className={cn(
-            'pointer-events-none absolute truncate text-xs whitespace-nowrap',
+            'pointer-events-none absolute z-[15] truncate rounded-sm bg-surface/85 px-1 text-xs whitespace-nowrap',
             done ? 'text-muted line-through' : overdue ? 'text-crit' : 'text-ink-2',
           )}
-          style={{ left: labelLeft, top: 0, lineHeight: `${ROW_HEIGHT}px`, maxWidth: 260 }}
+          style={{
+            left: labelLeft,
+            top: (ROW_HEIGHT - 18) / 2,
+            lineHeight: '18px',
+            maxWidth: 260,
+          }}
           aria-hidden
         >
           {task.title}

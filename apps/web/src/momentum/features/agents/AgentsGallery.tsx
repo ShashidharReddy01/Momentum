@@ -1,3 +1,4 @@
+import { describeCron } from './cron';
 import { Bot, Plus } from 'lucide-react';
 import { Link } from 'react-router';
 import { MoMark } from '@/components/common/MoMark';
@@ -67,7 +68,7 @@ export function AgentsGallery() {
 export function triggerSummary(triggers: AgentSummary['triggers']): string {
   const labels = triggers.map((t) => {
     const type = String(t.type);
-    if (type === 'schedule') return `Schedule (${String(t.cron)})`;
+    if (type === 'schedule') return describeCron(String(t.cron));
     if (type === 'event') return `On ${String(t.event)}`;
     return TRIGGER_LABEL[type] ?? type;
   });

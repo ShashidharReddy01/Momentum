@@ -43,6 +43,7 @@ import { usePeople, type Person } from '@/features/people';
 import { useSectionMutations, useSections, type Section } from '@/features/sections';
 import { applyRealtimeEvent, useChannel } from '@/lib/realtime';
 import { cn } from '@/lib/cn';
+import { useScrollEdges } from '@/lib/scrollEdges';
 import { useQueryClient } from '@tanstack/react-query';
 import { dropNeighbors } from './selection';
 import { useProjectTasks, useTaskMutations, type Task } from './queries';
@@ -68,6 +69,7 @@ export function BoardView({
   canEdit: boolean;
   color: string | null;
 }) {
+  const edges = useScrollEdges();
   const qc = useQueryClient();
   useChannel(`project:${projectId}`, (event) => applyRealtimeEvent(qc, event, { projectId }));
   const sections = useSections(projectId);
@@ -260,27 +262,46 @@ export function BoardView({
         }}
       >
         <SortableContext items={list.map((s) => s.id)} strategy={horizontalListSortingStrategy}>
-          <div className="flex h-full items-start gap-3 overflow-x-auto pb-3">
-            {list.map((s) => (
-              <Column
-                key={s.id}
-                section={s}
-                color={color}
-                canEdit={canEdit}
-                tasks={bySection.get(s.id) ?? []}
-                peopleById={peopleById}
-                focused={focused}
-                dropActive={drop?.sectionId === s.id && !drop.anchorId}
-                dragging={!!drag}
-                onFocusCard={setFocused}
-                onOpen={(id) => nav?.open(id)}
-                onToggle={(t) => m.setCompleted.mutate({ id: t.id, completed: !t.completed_at })}
-                onAddCard={(title) => m.create({ title, sectionId: s.id, afterId: null })}
-                onRename={(name) => renameSection.mutate({ id: s.id, name })}
-                onDelete={list.length > 1 && canEdit ? () => removeSection.mutate(s.id) : undefined}
+          <div className="relative h-full">
+            <div
+              ref={edges.ref}
+              onScroll={edges.update}
+              className="flex h-full items-start gap-3 overflow-x-auto pb-3"
+            >
+              {list.map((s) => (
+                <Column
+                  key={s.id}
+                  section={s}
+                  color={color}
+                  canEdit={canEdit}
+                  tasks={bySection.get(s.id) ?? []}
+                  peopleById={peopleById}
+                  focused={focused}
+                  dropActive={drop?.sectionId === s.id && !drop.anchorId}
+                  dragging={!!drag}
+                  onFocusCard={setFocused}
+                  onOpen={(id) => nav?.open(id)}
+                  onToggle={(t) => m.setCompleted.mutate({ id: t.id, completed: !t.completed_at })}
+                  onAddCard={(title) => m.create({ title, sectionId: s.id, afterId: null })}
+                  onRename={(name) => renameSection.mutate({ id: s.id, name })}
+                  onDelete={list.length > 1 && canEdit ? () => removeSection.mutate(s.id) : undefined}
+                />
+              ))}
+              {canEdit ? <AddColumn onAdd={(name) => createSection.mutate({ name })} /> : null}
+            </div>
+            {/* fades at the edges say there are more columns that way */}
+            {edges.left ? (
+              <span
+                aria-hidden
+                className="pointer-events-none absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-canvas"
               />
-            ))}
-            {canEdit ? <AddColumn onAdd={(name) => createSection.mutate({ name })} /> : null}
+            ) : null}
+            {edges.right ? (
+              <span
+                aria-hidden
+                className="pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-canvas"
+              />
+            ) : null}
           </div>
         </SortableContext>
         <DragOverlay dropAnimation={null}>
@@ -351,7 +372,9 @@ function Column({
       aria-label={`Column ${section.name}`}
       style={{ transform: CSS.Translate.toString(transform), transition }}
       className={cn(
-        'flex h-full w-72 shrink-0 flex-col rounded-lg bg-surface-2/60',
+        // sized to its cards (up to the board's height, then the cards scroll), so "Add card" sits
+        // right under the last card
+        'flex max-h-full w-72 shrink-0 flex-col rounded-lg bg-surface-2/60',
         isDragging && 'relative z-10 shadow-pop',
       )}
     >
@@ -392,8 +415,13 @@ function Column({
       <div
         role="list"
         aria-label={`Cards in ${section.name}`}
-        className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto px-2"
+        className="flex min-h-0 flex-col gap-1.5 overflow-y-auto px-2"
       >
+        {tasks.length === 0 ? (
+          <p role="listitem" className="px-1.5 py-2 text-xs text-muted">
+            {canEdit ? 'No cards yet. Add one, or drag cards here.' : 'No cards'}
+          </p>
+        ) : null}
         {tasks.map((t) => (
           <Card
             key={t.id}

@@ -12,6 +12,8 @@ export interface InlineTextProps {
   /** Reject empty values (restores the previous value). */
   required?: boolean;
   multiline?: boolean;
+  /** Hover text (e.g. the full value when it's truncated). */
+  title?: string;
 }
 
 /** Click-to-edit text. Enter commits, Escape cancels, blur commits. */
@@ -24,6 +26,7 @@ export function InlineText({
   placeholder,
   required = true,
   multiline,
+  title,
   ...aria
 }: InlineTextProps) {
   const [editing, setEditing] = useState(false);
@@ -58,7 +61,11 @@ export function InlineText({
   };
 
   if (disabled) {
-    return <span className={className}>{value || <span className="text-muted-2">{placeholder}</span>}</span>;
+    return (
+      <span className={className} title={title}>
+        {value || <span className="text-muted-2">{placeholder}</span>}
+      </span>
+    );
   }
   if (!editing) {
     return (
@@ -66,6 +73,7 @@ export function InlineText({
         type="button"
         aria-label={`${aria['aria-label']}: ${value || 'empty'}. Click to edit`}
         onClick={() => setEditing(true)}
+        title={title}
         className={cn('max-w-full cursor-text rounded-sm text-left hover:bg-surface-2', className)}
       >
         {value || <span className="text-muted-2">{placeholder}</span>}

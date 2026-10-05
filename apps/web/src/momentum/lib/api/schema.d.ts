@@ -3920,7 +3920,10 @@ export interface components {
         };
         /** AsanaImportIn */
         AsanaImportIn: {
-            /** Pat */
+            /**
+             * Pat
+             * @description Asana personal access token (printable ASCII, no spaces)
+             */
             pat: string;
             /** Project Gids */
             project_gids?: string[] | null;
@@ -7810,6 +7813,12 @@ export interface components {
         };
         /** SectionOut */
         SectionOut: {
+            /**
+             * Completed Count
+             * @description Completed top-level tasks in the section (they're hidden by default)
+             * @default 0
+             */
+            completed_count: number;
             /**
              * Id
              * Format: uuid

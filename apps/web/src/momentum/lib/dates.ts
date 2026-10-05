@@ -139,3 +139,14 @@ export function formatRelative(iso: string, now = new Date()): string {
   const time = formatTime(then);
   return dayDiff(then, now) <= 1 ? `${label} ${time}` : label;
 }
+
+/** A date period in words: "Sep 20 – Dec 3, 2026", or "Nov 15, 2026 – Feb 1, 2027" across years. */
+export function formatPeriod(startIso: string, endIso: string): string {
+  const a = fromISODate(startIso);
+  const b = fromISODate(endIso);
+  const day: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric' };
+  const full: Intl.DateTimeFormatOptions = { ...day, year: 'numeric' };
+  if (a.getFullYear() === b.getFullYear())
+    return `${a.toLocaleDateString(undefined, day)} – ${b.toLocaleDateString(undefined, full)}`;
+  return `${a.toLocaleDateString(undefined, full)} – ${b.toLocaleDateString(undefined, full)}`;
+}

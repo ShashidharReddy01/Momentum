@@ -63,9 +63,11 @@ export function FieldValueChip({ field, value }: { field: Field; value: unknown 
       ? (field.options as { unit?: string | null } | null)
       : null;
   const suffix = field.type === 'percent' ? '%' : opts?.unit ? ` ${opts.unit}` : '';
+  // a bare "8" says nothing in a row of chips: without a unit, the field's name says what it is
   return (
     <span className="truncate text-xs text-muted" title={field.name}>
-      {String(value)}
+      {suffix ? null : <span className="text-muted">{field.name} </span>}
+      <span className="text-ink-2">{String(value)}</span>
       {suffix}
     </span>
   );

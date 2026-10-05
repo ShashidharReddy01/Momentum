@@ -33,8 +33,14 @@ def _meta(m: Mutation[Section]) -> MutationMeta:
 async def list_sections(project_id: uuid.UUID, ctx: CtxDep, uow: UowDep) -> ListOut[SectionOut]:
     async with uow.transaction() as s:
         await get_visible_project(s, ctx, project_id)
+        done = await service.completed_counts(s, project_id)
         return ListOut(
-            data=[SectionOut.model_validate(x) for x in await service.list_sections(s, project_id)]
+            data=[
+                SectionOut.model_validate(x).model_copy(
+                    update={"completed_count": done.get(x.id, 0)}
+                )
+                for x in await service.list_sections(s, project_id)
+            ]
         )
 
 

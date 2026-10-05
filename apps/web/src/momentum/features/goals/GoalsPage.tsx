@@ -1,3 +1,4 @@
+import { formatPeriod } from '@/lib/dates';
 import { ChevronDown, ChevronRight, Plus, Target } from 'lucide-react';
 import { useMemo, useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router';
@@ -141,7 +142,7 @@ function GoalRow({
           {goal.name}
         </Link>
         <span className="hidden text-xs text-muted sm:inline">
-          {goal.period_label ?? `${goal.period_start} – ${goal.period_end}`}
+          {goal.period_label ?? formatPeriod(goal.period_start, goal.period_end)}
         </span>
         {owner ? <Avatar name={owner.name} src={owner.avatar_url ?? null} size={22} /> : null}
         <span className="hidden w-24 text-xs text-muted-2 md:inline">

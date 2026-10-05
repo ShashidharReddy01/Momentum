@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { ArrowRight, CheckSquare, FolderKanban, FolderPlus, Hourglass, Sparkles, X } from 'lucide-react';
+import { ArrowRight, CheckSquare, FolderKanban, FolderPlus, Hourglass, ListChecks, X } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link } from 'react-router';
 import { CompleteCheck } from '@/components/common/CompleteCheck';
@@ -196,7 +196,8 @@ function OnboardingChecklist({ onNewProject }: { onNewProject: () => void }) {
 
   return (
     <div className="mt-4 flex items-start gap-3 rounded-lg border border-hairline bg-surface p-3">
-      <Icon icon={Sparkles} size={16} className="mt-0.5 shrink-0 text-accent" />
+      {/* a plain checklist icon: the sparkle is reserved for AI */}
+      <Icon icon={ListChecks} size={16} className="mt-0.5 shrink-0 text-muted" />
       <ul aria-label="Getting started" className="flex min-w-0 flex-1 flex-wrap gap-x-6 gap-y-2">
         {items.map((it) => (
           <li key={it.key} className="flex items-center gap-2 text-sm">
@@ -361,16 +362,12 @@ function RecentProjects({ projects, onNew }: { projects: HomeProject[]; onNew: (
                 to={`/projects/${p.id}`}
                 className="flex items-center gap-3 rounded-lg border border-hairline px-3 py-2.5 hover:bg-surface-2"
               >
+                {/* the project's colour as everywhere else (a letter would only repeat the name) */}
                 <span
                   aria-hidden
-                  className="grid size-9 shrink-0 place-items-center rounded-md text-sm font-semibold"
-                  style={{
-                    background: `color-mix(in oklab, ${colorVar(p.color)} 20%, transparent)`,
-                    color: colorVar(p.color),
-                  }}
-                >
-                  {p.name.slice(0, 1).toUpperCase()}
-                </span>
+                  className="size-2.5 shrink-0 rounded-sm"
+                  style={{ background: colorVar(p.color) }}
+                />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-[13.5px] font-medium">{p.name}</span>
                   <span className="block truncate text-xs text-muted">

@@ -36,7 +36,8 @@ const card = (name: string) => screen.getByRole('listitem', { name });
 const cardsIn = (column: string) =>
   within(screen.getByRole('list', { name: `Cards in ${column}` }))
     .queryAllByRole('listitem')
-    .map((li) => li.getAttribute('aria-label'));
+    .map((li) => li.getAttribute('aria-label'))
+    .filter((x) => x !== null); // not an empty column's hint
 
 describe('Board view', () => {
   it('renders columns from sections, with cards grouped and counted', async () => {

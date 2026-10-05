@@ -6,10 +6,11 @@ import { Avatar } from '@/components/ui/Avatar';
 import { Icon } from '@/components/ui/Icon';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { ForecastCard, forecastKey } from '@/features/forecasts';
-import { StatusChip, StatusOverview, type Status } from '@/features/status';
+import { usePeople } from '@/features/people';
+import { StatusChip, StatusOverview, useStatusUpdates, type Status } from '@/features/status';
 import { DatePicker, useTaskNav } from '@/features/tasks';
 import { cn } from '@/lib/cn';
-import { dayDiff, fromISODate } from '@/lib/dates';
+import { dayDiff, formatRelative, fromISODate } from '@/lib/dates';
 import { useChannel } from '@/lib/realtime';
 import { projectKeys, useProjectOverview, useUpdateProject, type ProjectDetail } from './queries';
 
@@ -67,7 +68,7 @@ export function ProjectOverview({
   return (
     <div className="mx-auto max-w-6xl space-y-6">
       <section aria-label="Summary" className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <StatusTile status={(project.status ?? null) as Status | null} />
+        <StatusTile projectId={project.id} status={(project.status ?? null) as Status | null} />
         <ProgressTile overview={overview.data} />
         <DatesTile project={project} canEdit={canEdit} />
         <MilestoneTile overview={overview.data} />
@@ -111,7 +112,12 @@ function Tile({
   );
 }
 
-function StatusTile({ status }: { status: Status | null }) {
+/** The status and the latest update's headline, who posted it and when (the full update is in
+ * the Status section below; this is the one-glance version). */
+function StatusTile({ projectId, status }: { projectId: string; status: Status | null }) {
+  const latest = useStatusUpdates(projectId).data?.[0];
+  const people = usePeople().data;
+  const author = latest ? (people?.find((p) => p.id === latest.author_id)?.name ?? 'Former member') : null;
   return (
     <Tile label="Status">
       {status ? (
@@ -119,8 +125,16 @@ function StatusTile({ status }: { status: Status | null }) {
           <StatusChip status={status} />
         </div>
       ) : (
-        <span className="text-sm text-muted-2">No status posted yet</span>
+        <span className="text-sm text-muted">No status posted yet</span>
       )}
+      {latest ? (
+        <>
+          <p className="line-clamp-2 text-sm text-ink-2">{latest.title}</p>
+          <p className="text-xs text-muted">
+            {author} · {formatRelative(latest.created_at)}
+          </p>
+        </>
+      ) : null}
     </Tile>
   );
 }

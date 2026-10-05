@@ -138,8 +138,11 @@ async function checkControls(page) {
       if (box && (cx < box.left || cx > box.right)) continue;
       const hit = document.elementFromPoint(cx, cy);
       if (hit && hit !== el && !el.contains(hit) && !hit.contains(el)) {
-        // a sticky header/footer scrolling over content is normal; a dialog backdrop is too
+        // a dialog or popover covering the page is normal, and so is the task pane, which opens
+        // full-screen over the list below the md breakpoint (768 px) by design
         const cover = hit.closest('[role=dialog], [data-radix-popper-content-wrapper], [data-state=open]');
+        const pane = hit.closest('aside[aria-label="Task details"]');
+        if (pane && !pane.contains(el) && W < 768) continue;
         if (!cover || !cover.contains(el))
           issues.push({ kind: 'covered-control', detail: `${describe(el)} under ${describe(hit)}` });
       }

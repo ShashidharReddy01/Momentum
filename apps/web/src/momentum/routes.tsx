@@ -136,6 +136,11 @@ export function buildRoutes(config: RuntimeConfig): RouteObject[] {
           handle: { crumb: 'Search' },
         },
         {
+          path: 'settings',
+          lazy: async () => ({ Component: (await import('@/features/settings/SettingsPage')).SettingsPage }),
+          handle: { crumb: 'Settings' },
+        },
+        {
           path: 'settings/notifications',
           lazy: async () => ({
             Component: (await import('@/features/notifications/NotificationSettingsPage'))
