@@ -1,7 +1,8 @@
 """S4.4.2: pure date math for `tasks.recurrence` (no DB access — see `service.py` for the part
 that actually spawns the next task). The stored shape is `{freq, interval, by_weekday?,
 workdays_only?, day_of_month?, week_of_month?, mode?, text?}`, validated by
-`service._check_recurrence`."""
+`service._check_recurrence`. `day_of_month` pins a monthly or yearly series to its day (set
+automatically on the first spawn), so short months clamp without drifting."""
 
 from __future__ import annotations
 
@@ -66,12 +67,14 @@ def _next_monthly(after: date, recur: dict[str, Any], interval: int) -> date:
     return _add_months(after, interval)
 
 
-def _next_yearly(after: date, interval: int) -> date:
+def _next_yearly(after: date, interval: int, day: int | None = None) -> date:
+    """Same month, `interval` years on; `day` (the series' day, e.g. 29 for a Feb 29 task) is
+    clamped to the month's length, so Feb 29 is Feb 28 in common years and Feb 29 again in leap
+    years."""
     year = after.year + interval
-    try:
-        return date(year, after.month, after.day)
-    except ValueError:  # after.day == 29 (Feb) and `year` isn't a leap year
-        return date(year, after.month, 28)
+    last = calendar.monthrange(year, after.month)[1]
+    want = last if day == -1 else (day if day is not None and day > 0 else after.day)
+    return date(year, after.month, min(want, last))
 
 
 def next_occurrence(after: date, recur: dict[str, Any]) -> date:
@@ -86,5 +89,5 @@ def next_occurrence(after: date, recur: dict[str, Any]) -> date:
     if freq == "monthly":
         return _next_monthly(after, recur, interval)
     if freq == "yearly":
-        return _next_yearly(after, interval)
+        return _next_yearly(after, interval, recur.get("day_of_month"))
     raise ValueError(f"Unknown recurrence freq {freq!r}")

@@ -1,3 +1,4 @@
+import { useQueryClient } from '@tanstack/react-query';
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { UNAUTHENTICATED_EVENT } from '@/lib/api/client';
 import { useMomentumConfig } from '@/lib/config';
@@ -18,10 +19,14 @@ const ConnectionStateContext = createContext<ConnectionState>('closed');
  */
 export function RealtimeProvider({ children }: { children: ReactNode }) {
   const config = useMomentumConfig();
+  const qc = useQueryClient();
   const [client] = useState<RealtimeClient | null>(() =>
     config.features.realtime
-      ? new RealtimeClient(realtimeUrl(config.base_path), () =>
-          window.dispatchEvent(new CustomEvent(UNAUTHENTICATED_EVENT)),
+      ? new RealtimeClient(
+          realtimeUrl(config.base_path),
+          () => window.dispatchEvent(new CustomEvent(UNAUTHENTICATED_EVENT)),
+          // access changed under us: refetch what's on screen (it may now be "not found")
+          () => void qc.invalidateQueries(),
         )
       : null,
   );

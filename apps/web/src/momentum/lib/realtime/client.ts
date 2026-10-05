@@ -34,6 +34,10 @@ export class RealtimeClient {
     /** Called on an unrecoverable auth failure (close code 4401): the app should treat this
      * like any other expired-session signal. */
     private readonly onUnauthenticated: () => void,
+    /** Called when the server withdraws a channel because access changed (removed from a
+     * project, project made private, task deleted): the app refetches, so the screen shows
+     * what the person may see now instead of stale data. */
+    private readonly onRevoked: (channel: string) => void = () => {},
   ) {}
 
   connect(): void {
@@ -67,7 +71,8 @@ export class RealtimeClient {
     };
     ws.onclose = (e) => {
       this.ws = null;
-      if (e.code === 4401) {
+      if (e.code === 4401 || e.code === 4403) {
+        // 4403: the account was disabled while connected; either way the session is over
         this.onUnauthenticated();
         return; // don't reconnect into a dead session
       }
@@ -138,6 +143,13 @@ export class RealtimeClient {
         // channel we're watching might have a gap, so drop every cursor (same remedy as
         // resync, just for all channels at once)
         for (const ch of this.channels.values()) ch.lastEventId = null;
+        return;
+      case 'revoked':
+        if (msg.channel) {
+          const ch = this.channels.get(msg.channel);
+          if (ch) ch.lastEventId = null;
+          this.onRevoked(msg.channel);
+        }
         return;
       case 'hello':
       case 'subscribed':

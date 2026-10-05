@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import dataclasses
 import time
 import uuid
 from typing import Any, cast
@@ -21,15 +22,31 @@ from momentum.core.context import Actor, Ctx
 from momentum.core.errors import DomainError
 from momentum.core.events import ConsumerOffset, OutboxEvent
 from momentum.domain.access import get_visible_project, get_visible_task, get_visible_team
+from momentum.domain.users.models import User
 from momentum.realtime.dispatch import to_message
 from momentum.realtime.hub import Connection
 
 router = APIRouter()
+
+
+class AccessRevoked(Exception):
+    """The connection's user was disabled or removed: close it."""
+
+
+def revoked(tasks: list[asyncio.Task[None]]) -> bool:
+    return any(
+        t.done() and not t.cancelled() and isinstance(t.exception(), AccessRevoked) for t in tasks
+    )
+
+
 log = structlog.get_logger("momentum.realtime")
 
 PING_INTERVAL = 25.0
 PONG_TIMEOUT = 70.0
 REPLAY_LIMIT = 500
+# How often an open connection re-checks that its user is still active and may still see each
+# subscribed channel (sooner after an access-changing event; dispatch.ACCESS_EVENTS)
+REAUTH_INTERVAL = 30.0
 
 
 async def authorize_channel(session: AsyncSession, ctx: Ctx, channel: str) -> None:
@@ -157,6 +174,8 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
         return
 
     await websocket.accept()
+    # the connection's current view of its user (the guard refreshes it as access changes)
+    live_ctx: Ctx = ctx
     structlog.contextvars.bind_contextvars(user_id=str(ctx.actor.id))
     conn = Connection(user_id=ctx.actor.id)
     hub = rt.realtime.hub
@@ -181,7 +200,7 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
                 continue
             async with rt.session_factory() as session, session.begin():
                 try:
-                    await authorize_channel(session, ctx, channel)
+                    await authorize_channel(session, live_ctx, channel)
                 except DomainError as e:
                     await websocket.send_json(
                         {"type": "denied", "channel": channel, "reason": e.code}
@@ -192,7 +211,7 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
                 # device): omitting `since` entirely means "just start live" instead.
                 backlog: list[dict[str, Any]] | None = []
                 if isinstance(since, int) and since >= 0:
-                    backlog = await replay(session, ctx, channel, since)
+                    backlog = await replay(session, live_ctx, channel, since)
             hub.subscribe(channel, conn)
             if backlog is None:
                 await websocket.send_json({"type": "resync", "channel": channel})
@@ -209,6 +228,28 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
             if message.get("type") == "event":
                 state["max_seen"] = max(state["max_seen"], cast(int, message["id"]))
 
+    async def guard() -> None:
+        """Access can change while a tab stays open (removed from a project, project made
+        private, account disabled, role changed): re-check periodically and right after an
+        access-changing event, and stop delivering what the user may no longer see."""
+        nonlocal live_ctx
+        while True:
+            with contextlib.suppress(TimeoutError):
+                await asyncio.wait_for(conn.recheck.wait(), timeout=REAUTH_INTERVAL)
+            conn.recheck.clear()
+            async with rt.session_factory() as session, session.begin():
+                user = await session.get(User, live_ctx.actor.id)
+                if user is None or user.status == "disabled":
+                    await websocket.send_json({"type": "revoked", "reason": "account"})
+                    raise AccessRevoked
+                live_ctx = live_ctx.with_(actor=dataclasses.replace(live_ctx.actor, role=user.role))
+                for channel in list(conn.channels):
+                    try:
+                        await authorize_channel(session, live_ctx, channel)
+                    except DomainError:
+                        hub.unsubscribe(channel, conn)
+                        await websocket.send_json({"type": "revoked", "channel": channel})
+
     async def pinger() -> None:
         while True:
             await asyncio.sleep(PING_INTERVAL)
@@ -216,12 +257,14 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
                 raise TimeoutError("no pong from client")
             await websocket.send_json({"type": "ping"})
 
-    tasks = [asyncio.create_task(t()) for t in (reader, writer, pinger)]
+    tasks = [asyncio.create_task(t()) for t in (reader, writer, pinger, guard)]
     try:
         done, _pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
         for t in done:
             exc = t.exception()
-            if exc is not None and not isinstance(exc, (WebSocketDisconnect, TimeoutError)):
+            if exc is not None and not isinstance(
+                exc, (WebSocketDisconnect, TimeoutError, AccessRevoked)
+            ):
                 log.warning("realtime_connection_error", exc_info=exc)
     except Exception:
         log.exception("realtime_connection_crash")
@@ -236,5 +279,5 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
             with contextlib.suppress(Exception):
                 await _save_offset(rt, ctx.actor.id, cast(int, state["max_seen"]))
         with contextlib.suppress(Exception):
-            await websocket.close()
+            await websocket.close(code=4403 if revoked(tasks) else 1000)
         log.info("realtime_disconnected", connection_id=conn.id)

@@ -23,6 +23,8 @@ export type ServerMessage =
   | { type: 'hello'; connection_id: string }
   | { type: 'subscribed'; channel: string }
   | { type: 'denied'; channel: string; reason: string }
+  /** Access changed while connected: lost one channel, or (no channel) the whole account. */
+  | { type: 'revoked'; channel?: string; reason?: string }
   | { type: 'resync'; channel: string }
   | { type: 'overflow' }
   | { type: 'ping' }

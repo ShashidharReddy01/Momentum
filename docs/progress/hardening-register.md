@@ -41,3 +41,10 @@ How findings are found:
 | H27 | P2 | List | A section whose tasks are all completed shows only "Add task", no "N completed" hint (Phase 6.5 audit #15, still open). | UI audit (screenshot) | fixed: `SectionOut.completed_count`; an all-done section says "4 completed · Show" |
 | H28 | P2 | Scale | People pickers and the members directory listed at most 200 people unfiltered: a hard ceiling not far above the planned ~150. | Code review (H14) | fixed: up to 1,000 (API and pickers) |
 | H29 | P2 | Test infrastructure | The robustness sweep runs as admin and as a member; it now builds 17+ entity kinds so handlers past their 404 get exercised. | Robustness sweep | fixed |
+| H30 | **P0** | Realtime (permissions) | Channel access was checked only when subscribing, and the connection's identity was frozen at connect: someone removed from a private project, or disabled, kept receiving its live events for as long as the tab stayed open. | Edge-case review (permissions over time) | fixed: re-check every 30 s and right after any access-changing event; revoked channels are unsubscribed (`revoked`), a disabled account's socket closes (4403); tests `test_losing_access_stops_live_events`, `test_a_disabled_account_is_disconnected`, client test |
+| H31 | P1 | Recurring tasks | A monthly series due on the 31st (or 29th/30th) slid to the 28th after February and stayed there; a yearly Feb 29 task stayed on Feb 28 in every later leap year. | Edge-case review (date math) | fixed: the first spawn pins the series to its day (`day_of_month`, now allowed on yearly rules too); short months clamp without drifting; tests |
+
+## Reviewed, no change needed
+
+- **Concurrent field edits** (two people change the same task at once): edits send only the changed field, so different fields never clobber each other; the same field is last-write-wins and everyone sees the result live (Asana behaves the same). The description, the one long-form field, already detects conflicts and offers Keep mine / Use theirs / Copy.
+- **Recurrence and daylight saving**: occurrences are pure dates, so DST changes can't move them.

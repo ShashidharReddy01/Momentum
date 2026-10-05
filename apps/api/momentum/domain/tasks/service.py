@@ -245,9 +245,13 @@ def _check_recurrence(value: Any) -> dict[str, Any] | None:
     if value.get("workdays_only"):
         out["workdays_only"] = True
     day_of_month, week_of_month = value.get("day_of_month"), value.get("week_of_month")
-    if (day_of_month is not None or week_of_month is not None) and freq != "monthly":
+    if day_of_month is not None and freq not in ("monthly", "yearly"):
         raise ValidationFailed(
-            "day_of_month/week_of_month only apply to a monthly rule", code="invalid_recurrence"
+            "day_of_month only applies to a monthly or yearly rule", code="invalid_recurrence"
+        )
+    if week_of_month is not None and freq != "monthly":
+        raise ValidationFailed(
+            "week_of_month only applies to a monthly rule", code="invalid_recurrence"
         )
     if day_of_month is not None and week_of_month is not None:
         raise ValidationFailed(
@@ -936,6 +940,14 @@ async def spawn_next_occurrence(
         return None
     if await _has_child_occurrence(session, task.id):
         return None
+    if (
+        recur.get("freq") in ("monthly", "yearly")
+        and recur.get("day_of_month") is None
+        and recur.get("week_of_month") is None
+    ):
+        # pin the series to its day: without this, a task due on the 31st became the 28th after
+        # February and stayed there (and Feb 29 stayed Feb 28 in every later leap year)
+        recur = {**recur, "day_of_month": task.due_on.day}
     try:
         next_due = next_occurrence(task.due_on, recur)
     except ValueError:

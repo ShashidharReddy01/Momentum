@@ -383,3 +383,48 @@ async def test_patching_a_task_can_set_and_clear_its_recurrence(as_user: Clients
     cleared = await ravi.patch(f"/api/v1/tasks/{task_id}", json={"recurrence": None})
     assert cleared.status_code == 200, cleared.text
     assert cleared.json()["data"]["recurrence"] is None
+
+
+# ---------------- no drift (Phase 7, H31) ----------------
+
+
+def test_a_series_pinned_to_its_day_clamps_without_drifting() -> None:
+    monthly_31 = {"freq": "monthly", "interval": 1, "day_of_month": 31}
+    d, seen = date(2026, 1, 31), []
+    for _ in range(4):
+        d = next_occurrence(d, monthly_31)
+        seen.append(d)
+    assert seen == [date(2026, 2, 28), date(2026, 3, 31), date(2026, 4, 30), date(2026, 5, 31)]
+    leap = {"freq": "yearly", "interval": 1, "day_of_month": 29}
+    d, seen = date(2028, 2, 29), []
+    for _ in range(4):
+        d = next_occurrence(d, leap)
+        seen.append(d)
+    assert seen == [date(2029, 2, 28), date(2030, 2, 28), date(2031, 2, 28), date(2032, 2, 29)]
+
+
+async def test_spawning_pins_a_monthly_series_to_its_day(uow: UnitOfWork, world: World) -> None:
+    async with uow.transaction() as s:
+        task = (
+            await tasks.create_task(
+                s,
+                world.ravi,
+                world.project.id,
+                "Month-end close",
+                due_on=date(2026, 1, 31),
+                recurrence={"freq": "monthly", "interval": 1},
+            )
+        ).entity[0]
+        task_id = task.id
+    due: list[date] = []
+    for _ in range(3):
+        async with uow.transaction() as s:
+            await tasks.set_completed(s, world.ravi, task_id, True)
+        async with uow.transaction() as s:
+            child = (
+                await s.execute(select(Task).where(Task.recurrence_parent_id == task_id))
+            ).scalar_one()
+            due.append(child.due_on)  # type: ignore[arg-type]
+            task_id = child.id
+            assert (child.recurrence or {}).get("day_of_month") == 31
+    assert due == [date(2026, 2, 28), date(2026, 3, 31), date(2026, 4, 30)]

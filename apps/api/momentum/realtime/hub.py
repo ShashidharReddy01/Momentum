@@ -20,6 +20,9 @@ class Connection:
         default_factory=lambda: asyncio.Queue(maxsize=1000)
     )
     channels: set[str] = field(default_factory=set)
+    # set when someone's access may have changed: the connection re-checks its channels now
+    # instead of at its next periodic check (router.py ``guard``)
+    recheck: asyncio.Event = field(default_factory=asyncio.Event)
 
     def send(self, message: dict[str, Any]) -> None:
         if self.queue.full():
@@ -55,6 +58,13 @@ class Hub:
     def drop(self, conn: Connection) -> None:
         for channel in list(conn.channels):
             self.unsubscribe(channel, conn)
+
+    def recheck_all(self) -> None:
+        """Ask every connection to re-authorize its channels (membership, privacy, deletion
+        or role changed somewhere). Cheap: it only sets a flag per connection."""
+        for conns in self._channels.values():
+            for conn in conns:
+                conn.recheck.set()
 
     def publish(self, channel: str, message: dict[str, Any]) -> int:
         """Fan a message out to every connection on this channel. Returns how many got it."""

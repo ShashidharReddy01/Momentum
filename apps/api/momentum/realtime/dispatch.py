@@ -18,6 +18,24 @@ from momentum.core.events import OutboxEvent
 from momentum.realtime.hub import Hub
 
 BATCH = 500
+# events after which someone may no longer be allowed on a channel they're subscribed to:
+# every connection re-authorizes its channels straight away (router.py ``guard``)
+ACCESS_EVENTS = frozenset(
+    {
+        "project.updated",  # privacy, team
+        "project.archived",
+        "project.deleted",
+        "project.member_removed",
+        "project.member_updated",
+        "team.deleted",
+        "team.member_removed",
+        "team.member_updated",
+        "task.deleted",
+        "task.removed_from_project",
+        "task.follower_removed",
+        "task.updated",  # assignee changes move personal access
+    }
+)
 
 
 def to_message(row: OutboxEvent, channel: str) -> dict[str, Any]:
@@ -60,10 +78,14 @@ async def dispatch_pending(session: AsyncSession, hub: Hub, *, after_id: int) ->
     if not rows:
         return after_id
     last_id = after_id
+    access_changed = False
     for row in rows:
         for channel in row.payload.get("channels") or ():
             hub.publish(channel, to_message(row, channel))
         last_id = row.id
+        access_changed = access_changed or row.type in ACCESS_EVENTS
+    if access_changed:
+        hub.recheck_all()
     await session.execute(
         update(OutboxEvent)
         .where(OutboxEvent.id.in_([r.id for r in rows]), OutboxEvent.dispatched_at.is_(None))

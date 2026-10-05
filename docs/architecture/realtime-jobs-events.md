@@ -109,6 +109,7 @@ test it; what shipped:
   - `{"op":"subscribe","channel":"project:<id>","since":<id>|omitted}`. The server checks
     the same visibility rules as the REST API (`momentum.domain.access`) before
     subscribing. Denied: `{"type":"denied","channel":"…","reason":"<error code>"}`.
+  - **Access re-checks (Phase 7, 2026-10-05):** an open connection re-loads its user and re-authorizes every subscribed channel every 30 s (`REAUTH_INTERVAL`), and immediately after an access-changing event (`dispatch.ACCESS_EVENTS`: membership, privacy, archive/delete, assignee/follower changes). A channel the user may no longer see is unsubscribed with `{"type":"revoked","channel":"…"}` (the client refetches what's on screen); a disabled or deleted account gets `{"type":"revoked","reason":"account"}` and the socket closes with **4403** (the client treats it as signed out and doesn't reconnect).
     `since=0` means "everything you have" (first-ever subscribe on this device);
     omitting `since` means "just start live" (no backlog).
   - `{"op":"unsubscribe","channel":"…"}`

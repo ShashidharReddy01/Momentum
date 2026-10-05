@@ -289,3 +289,97 @@ async def test_replay_delivers_backlog_in_order_on_reconnect(
     assert renamed and renamed[-1]["data"]["changes"]["title"][1] == "One (renamed)"
     completed = [e for e in events if e["entity_id"] == t2["id"] and e["event"] == "task.completed"]
     assert completed
+
+
+async def test_losing_access_stops_live_events(app_factory: AppFactory, as_user: Clients) -> None:
+    """Phase 7 (H30): removed from a private project while a tab stays open, the channel is
+    revoked straight away (an access-changing event triggers a re-check) and nothing more from
+    that project arrives."""
+    ravi = await as_user("ravi")
+    pid = (await ravi.get("/api/v1/projects")).json()["data"][0]["id"]
+    team = (await ravi.get(f"/api/v1/projects/{pid}")).json()["team_id"]
+    private = (
+        await ravi.post(
+            "/api/v1/projects", json={"team_id": team, "name": "Secret", "privacy": "private"}
+        )
+    ).json()["data"]
+    users = (await ravi.get("/api/v1/dev/users")).json()
+    tom = next(u["id"] for u in users if u["email"] == "tom@acme-demo.test")
+    r = await ravi.post(f"/api/v1/projects/{private['id']}/members", json={"user_id": tom})
+    assert r.status_code < 300, r.text
+    app = await _realtime_app(app_factory)
+    subscribed = threading.Event()
+    removed = threading.Event()
+    channel = f"project:{private['id']}"
+
+    def run() -> list[dict[str, Any]]:
+        with TestClient(app) as client:
+            _login(client, tom)
+            with client.websocket_connect("/ws") as ws:
+                ws.receive_json()  # hello
+                ws.send_json({"op": "subscribe", "channel": channel})
+                _drain(ws, until=lambda m: m["type"] == "subscribed")
+                subscribed.set()
+                revoked = _drain(ws, until=lambda m: m["type"] == "revoked", timeout=10)
+                removed.wait(10)
+                # anything still arriving for the channel within 2 s would be a leak
+                seen: list[dict[str, Any]] = [revoked]
+                deadline = time.monotonic() + 2
+                ws.send_json({"op": "pong"})
+                while time.monotonic() < deadline:
+                    ws.send_json({"op": "pong"})
+                    time.sleep(0.2)
+                ws.send_json({"op": "subscribe", "channel": f"user:{tom}"})
+                for _ in range(20):
+                    m = ws.receive_json()
+                    seen.append(m)
+                    if m["type"] == "subscribed":
+                        break
+                return seen
+
+    async def act() -> None:
+        await asyncio.to_thread(subscribed.wait, 10)
+        r = await ravi.delete(f"/api/v1/projects/{private['id']}/members/{tom}")
+        assert r.status_code < 300, r.text
+        await ravi.post(f"/api/v1/projects/{private['id']}/tasks", json={"title": "After removal"})
+        removed.set()
+
+    seen, _ = await asyncio.gather(in_thread(run), act())
+    assert seen[0] == {"type": "revoked", "channel": channel}
+    leaked = [m for m in seen[1:] if m.get("channel") == channel and m["type"] == "event"]
+    assert leaked == []
+
+
+async def test_a_disabled_account_is_disconnected(
+    app_factory: AppFactory, as_user: Clients, uow: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Phase 7 (H30): an account disabled while its tab is open loses the connection at the
+    next periodic check (30 s in production; shortened here)."""
+    from sqlalchemy import update
+
+    from momentum.domain.users.models import User
+    from momentum.realtime import router as realtime_router
+
+    monkeypatch.setattr(realtime_router, "REAUTH_INTERVAL", 0.3)
+    await as_user("ravi")  # seeds the users
+    app = await _realtime_app(app_factory)
+    connected = threading.Event()
+
+    def run() -> dict[str, Any]:
+        with TestClient(app) as client:
+            tom = _user_id(client, "tom")
+            _login(client, tom)
+            with client.websocket_connect("/ws") as ws:
+                ws.receive_json()  # hello
+                connected.set()
+                return _drain(ws, until=lambda m: m["type"] == "revoked", timeout=10)
+
+    async def disable() -> None:
+        await asyncio.to_thread(connected.wait, 10)
+        async with uow.transaction() as s:
+            await s.execute(
+                update(User).where(User.email == "tom@acme-demo.test").values(status="disabled")
+            )
+
+    revoked, _ = await asyncio.gather(in_thread(run), disable())
+    assert revoked == {"type": "revoked", "reason": "account"}

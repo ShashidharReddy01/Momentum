@@ -189,4 +189,25 @@ describe('RealtimeClient', () => {
     const sub = MockWebSocket.latest().sent.find((m) => (m as { op?: string }).op === 'subscribe');
     expect(sub).toEqual({ op: 'subscribe', channel: 'project:1', since: undefined });
   });
+
+  it('refetches when a channel is revoked, and stops reconnecting when the account is (4403)', () => {
+    vi.useFakeTimers();
+    const revoked: string[] = [];
+    let signedOut = 0;
+    const client = new RealtimeClient(
+      'ws://test/ws',
+      () => (signedOut += 1),
+      (ch) => revoked.push(ch),
+    );
+    client.connect();
+    MockWebSocket.latest().open();
+    client.subscribe('project:1', () => {});
+    MockWebSocket.latest().push({ type: 'revoked', channel: 'project:1' });
+    expect(revoked).toEqual(['project:1']);
+
+    MockWebSocket.latest().close(4403);
+    expect(signedOut).toBe(1);
+    vi.runOnlyPendingTimers();
+    expect(MockWebSocket.instances).toHaveLength(1); // no reconnect into a disabled account
+  });
 });
