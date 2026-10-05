@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useMemo, useRef, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, type ReactNode } from 'react';
 import { useSearchParams } from 'react-router';
 
 /**
@@ -53,6 +53,22 @@ export function TaskNavProvider({ children }: { children: ReactNode }) {
     },
     [open, openId],
   );
+  // Escape closes the open task from anywhere on the page (Phase 6.5 keyboard pass: after opening
+  // a task with Space, focus stays on the list). Fields, dialogs and menus keep their own Escape,
+  // and anything that already handled it (the pane, a list clearing its selection) wins.
+  useEffect(() => {
+    if (!openId) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || e.defaultPrevented) return;
+      const t = e.target instanceof Element ? e.target : null;
+      if (t?.closest('input, textarea, select, [contenteditable="true"]')) return;
+      if (document.querySelector('[role="dialog"], [role="menu"], [role="listbox"]')) return;
+      e.preventDefault();
+      close();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [openId, close]);
   const value = useMemo(
     () => ({ openId, open, close, setOrder, step }),
     [openId, open, close, setOrder, step],

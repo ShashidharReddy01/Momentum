@@ -379,6 +379,8 @@ export function ProjectTasksView({ projectId, canEdit }: { projectId: string; ca
       if (canEdit && manual) nudge(k === 'ArrowDown' ? 1 : -1);
     } else if (k === 'ArrowDown' || (k === 'j' && !mod)) next = step(selection, 1, e.shiftKey, order);
     else if (k === 'ArrowUp' || (k === 'k' && !mod)) next = step(selection, -1, e.shiftKey, order);
+    // Escape closes the open task first (focus stays on the list, as after Space), then clears
+    else if (k === 'Escape' && nav?.openId) nav.close();
     else if (k === 'Escape' && selection.selected.size) next = { ...selection, selected: new Set() };
     else if (mod && k.toLowerCase() === 'a') {
       const sid = selection.focus ? taskById.get(selection.focus)?.section_id : null;

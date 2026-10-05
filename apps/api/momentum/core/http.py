@@ -64,7 +64,7 @@ class StripNulMiddleware:
         while more:
             message = await receive()
             if message["type"] != "http.request":  # the client went away
-                await self.app(scope, _replay([message]), send)
+                await self.app(scope, _replay([message], receive), send)
                 return
             chunks.append(message.get("body", b""))
             more = message.get("more_body", False)
@@ -80,17 +80,21 @@ class StripNulMiddleware:
                 ],
             }
         await self.app(
-            scope, _replay([{"type": "http.request", "body": body, "more_body": False}]), send
+            scope,
+            _replay([{"type": "http.request", "body": body, "more_body": False}], receive),
+            send,
         )
 
 
-def _replay(messages: list[dict[str, Any]]) -> Any:
+def _replay(messages: list[dict[str, Any]], downstream: Any) -> Any:
+    """The body we already read, then the real channel: a streaming response (SSE) waits on it
+    for the client's disconnect, so answering "disconnected" here would end every stream at once."""
     queue = list(messages)
 
     async def receive() -> dict[str, Any]:
         if queue:
             return queue.pop(0)
-        return {"type": "http.disconnect"}
+        return await downstream()  # type: ignore[no-any-return]
 
     return receive
 

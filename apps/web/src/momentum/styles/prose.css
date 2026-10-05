@@ -7,6 +7,12 @@
   color: var(--ink);
   overflow-wrap: anywhere;
 }
+/* Phase 6.5 keyboard pass: an editable editor shows where focus is, like any text field */
+.momentum-root .mo-prose[contenteditable='true']:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 4px;
+  border-radius: var(--r-sm);
+}
 .momentum-root .mo-prose > * + * {
   margin-top: 0.5em;
 }

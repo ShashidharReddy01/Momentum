@@ -17,6 +17,7 @@ import {
   Strikethrough,
 } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useUntilRelease } from './useUntilRelease';
 import { Icon } from '@/components/ui/Icon';
 import { Popover, PopoverAnchor, PopoverContent } from '@/components/ui/Popover';
 import { cn } from '@/lib/cn';
@@ -145,6 +146,7 @@ function Toolbar({ editor, extra }: { editor: Editor; extra?: ReactNode }) {
     }),
   });
   const [linkOpen, setLinkOpen] = useState(false);
+  const shown = useUntilRelease(active.focused || linkOpen);
   const [href, setHref] = useState('');
   const chain = () => editor.chain().focus();
   const items = [
@@ -191,7 +193,7 @@ function Toolbar({ editor, extra }: { editor: Editor; extra?: ReactNode }) {
       aria-label="Formatting"
       className={cn(
         'mt-1 flex-wrap gap-0.5 border-t border-hair-soft pt-1',
-        active.focused || linkOpen ? 'flex' : 'hidden group-focus-within/editor:flex',
+        shown ? 'flex' : 'hidden group-focus-within/editor:flex',
       )}
     >
       {items.map((it) => (

@@ -80,3 +80,12 @@ Ask Mo, agent gallery and runs, settings pages, the ⌘K palette, quick add, dia
 
 ### UX8: Phase 6.5 exit
 Full audit rerun at every viewport and theme (committed screenshot set), axe + keyboard pass, detector, e2e, bundle size, and the product owner's sign-off on their own laptop.
+
+**As built (2026-10-05).**
+- **Audit:** `tools/ux/audit.mjs` on the showcase workspace (`tools/ux/serve.sh`), as admin and as a member, at 5 viewports × 2 themes. It checks page overflow, clipped, covered and unnamed controls, axe WCAG 2.2 A/AA serious and critical, and console errors. Findings went 696 → 62 → **0 across 188 screens**; screenshots and report are in `docs/progress/ux-audit/2026-10-05/`.
+- **Keyboard pass:** `tools/ux/keyboard.mjs` tabs through 12 key screens (focus visible, indicator, no traps), opens and closes ⌘K and quick add from the keyboard, and opens and closes the task pane with Space and Escape: **0 findings** (`docs/progress/ux-audit/keyboard/`). It found H43 (Escape on the list didn't close the pane) and H44 (editors had no focus indicator).
+- **Detector:** `impeccable detect` on the 34 changed UI files raised 2 findings, both reviewed as the standard pattern (the hardening register's "Reviewed" section).
+- **e2e:** 13/13, twice. The first run found H41: the NUL-stripping middleware ended every Ask Mo stream (P0, a regression from H1). It also found H42: the editor toolbar hid at mousedown and swallowed clicks below it.
+- **Bundle:** initial JS **294 KB gzip** (budget 300; `tools/perf/bundle-budget.mjs`).
+- **Gate:** `make check`'s steps run at Phase 7 exit, after this. Every finding is in `docs/progress/hardening-register.md` (H1–H44).
+- **Left for the product owner:** sign off on the light theme on your own laptop (not blocking Phase 7).

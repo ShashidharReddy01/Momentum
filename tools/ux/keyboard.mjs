@@ -50,8 +50,12 @@ async function tabPass(label) {
   let repeats = 0;
   for (let i = 0; i < 80; i++) {
     await page.keyboard.press('Tab');
-    const f = await focusInfo();
+    let f = await focusInfo();
     if (!f) continue;
+    if (!f.visible || !f.ring) {
+      await page.waitForTimeout(250); // let a fade-in or ring transition finish before judging
+      f = (await focusInfo()) ?? f;
+    }
     if (!f.visible) findings.push({ screen: label, kind: 'focus-on-invisible', detail: f.name });
     else if (!f.ring) findings.push({ screen: label, kind: 'no-focus-indicator', detail: f.name });
     if (seen.has(f.id)) repeats++;
