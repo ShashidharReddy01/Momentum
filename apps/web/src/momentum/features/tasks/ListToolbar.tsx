@@ -10,6 +10,8 @@ import {
 } from '@/components/ui/DropdownMenu';
 import { Icon } from '@/components/ui/Icon';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/Popover';
+import { FieldFilterChips, FieldFilterSection, type Field } from '@/features/fields';
+import { LIST_GROUPABLE } from '@/features/fields';
 import { usePeople } from '@/features/people';
 import { useTagLibrary } from '@/features/tags';
 import { cn } from '@/lib/cn';
@@ -27,54 +29,89 @@ import {
   type SortKey,
 } from './view';
 
-/** Filter / Sort / Group / Show completed for the list; every change goes through `onChange`. */
-export function ListToolbar({ view, onChange }: { view: ListView; onChange: (v: ListView) => void }) {
+/** Filter / Sort / Group / Show completed for the list; every change goes through `onChange`.
+ * `fields` (S7.4.1) are the project's custom fields: filter, sort and group by them too. */
+export function ListToolbar({
+  view,
+  onChange,
+  fields = [],
+  filtersOnly = false,
+}: {
+  view: ListView;
+  onChange: (v: ListView) => void;
+  fields?: readonly Field[];
+  /** Board and calendar: filters only (sort, group and completed are the list's). */
+  filtersOnly?: boolean;
+}) {
   const n = filterCount(view);
+  const sortLabels = {
+    ...SORT_LABEL,
+    ...Object.fromEntries(fields.map((f) => [`field:${f.id}`, f.name])),
+  } as Record<SortKey, string>;
+  const groupLabels = {
+    ...GROUP_LABEL,
+    ...Object.fromEntries(
+      fields.filter((f) => LIST_GROUPABLE.includes(f.type)).map((f) => [`field:${f.id}`, f.name]),
+    ),
+  } as Record<GroupKey, string>;
   return (
-    <div role="toolbar" aria-label="List view options" className="mb-3 flex flex-wrap items-center gap-1">
-      <FilterPopover view={view} onChange={onChange}>
-        <Button size="sm" variant={n ? 'ghost' : 'text'} className={cn(n > 0 && 'text-ink')}>
-          <Icon icon={ListFilter} /> Filter
-          {n ? (
-            <span className="tabular rounded-full bg-accent px-1.5 text-[11px] text-on-accent">{n}</span>
-          ) : null}
-        </Button>
-      </FilterPopover>
-      <Choice
-        icon={ArrowUpDown}
-        label="Sort"
-        value={view.sort}
-        labels={SORT_LABEL}
-        isDefault={view.sort === 'manual'}
-        onPick={(sort: SortKey) => onChange({ ...view, sort })}
-      />
-      <Choice
-        icon={Rows3}
-        label="Group"
-        value={view.group}
-        labels={GROUP_LABEL}
-        isDefault={view.group === 'section'}
-        onPick={(group: GroupKey) => onChange({ ...view, group })}
-      />
-      {!isDefaultView({ ...view, show_completed: false }) ? (
+    <>
+      <div role="toolbar" aria-label="List view options" className="mb-3 flex flex-wrap items-center gap-1">
+        <FilterPopover view={view} onChange={onChange} fields={fields}>
+          <Button size="sm" variant={n ? 'ghost' : 'text'} className={cn(n > 0 && 'text-ink')}>
+            <Icon icon={ListFilter} /> Filter
+            {n ? (
+              <span className="tabular rounded-full bg-accent px-1.5 text-[11px] text-on-accent">{n}</span>
+            ) : null}
+          </Button>
+        </FilterPopover>
+        <Choice
+          icon={ArrowUpDown}
+          label="Sort"
+          value={view.sort}
+          labels={sortLabels}
+          isDefault={view.sort === 'manual'}
+          onPick={(sort: SortKey) => onChange({ ...view, sort })}
+        />
+        <Choice
+          icon={Rows3}
+          label="Group"
+          value={view.group}
+          labels={groupLabels}
+          isDefault={view.group === 'section'}
+          onPick={(group: GroupKey) => onChange({ ...view, group })}
+        />
+        {(filtersOnly ? filterCount(view) > 0 : !isDefaultView({ ...view, show_completed: false })) ? (
+          <Button
+            size="sm"
+            variant="text"
+            onClick={() =>
+              onChange(
+                filtersOnly
+                  ? { ...view, assignees: [], tags: [], due: 'any', fields: [] }
+                  : { ...DEFAULT_VIEW, show_completed: view.show_completed },
+              )
+            }
+          >
+            <Icon icon={X} /> Clear
+          </Button>
+        ) : null}
+        <span className="flex-1" />
         <Button
           size="sm"
           variant="text"
-          onClick={() => onChange({ ...DEFAULT_VIEW, show_completed: view.show_completed })}
+          aria-pressed={view.show_completed}
+          onClick={() => onChange({ ...view, show_completed: !view.show_completed })}
         >
-          <Icon icon={X} /> Clear
+          <Icon icon={CheckCircle2} /> {view.show_completed ? 'Hide completed' : 'Show completed'}
         </Button>
-      ) : null}
-      <span className="flex-1" />
-      <Button
-        size="sm"
-        variant="text"
-        aria-pressed={view.show_completed}
-        onClick={() => onChange({ ...view, show_completed: !view.show_completed })}
-      >
-        <Icon icon={CheckCircle2} /> {view.show_completed ? 'Hide completed' : 'Show completed'}
-      </Button>
-    </div>
+      </div>
+      <FieldFilterChips
+        fields={fields}
+        value={view.fields}
+        onChange={(f) => onChange({ ...view, fields: f })}
+      />
+    </>
   );
 }
 
@@ -97,7 +134,7 @@ function Choice<K extends string>({
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button size="sm" variant={isDefault ? 'text' : 'ghost'} className={cn(!isDefault && 'text-ink')}>
-          <Icon icon={icon} /> {isDefault ? label : `${label}: ${labels[value]}`}
+          <Icon icon={icon} /> {isDefault ? label : `${label}: ${labels[value] ?? 'a removed field'}`}
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start">
@@ -119,10 +156,12 @@ function Choice<K extends string>({
 function FilterPopover({
   view,
   onChange,
+  fields,
   children,
 }: {
   view: ListView;
   onChange: (v: ListView) => void;
+  fields: readonly Field[];
   children: ReactNode;
 }) {
   const [q, setQ] = useState('');
@@ -160,7 +199,7 @@ function FilterPopover({
   return (
     <Popover onOpenChange={(o) => !o && setQ('')}>
       <PopoverTrigger asChild>{children}</PopoverTrigger>
-      <PopoverContent className="w-72 p-2">
+      <PopoverContent className="max-h-[min(80vh,640px)] w-80 overflow-auto p-2">
         <fieldset>
           <legend className="section-label px-2 pb-1">Assignee</legend>
           {check('me', 'Just my tasks')}
@@ -219,6 +258,11 @@ function FilterPopover({
             </div>
           </fieldset>
         ) : null}
+        <FieldFilterSection
+          fields={fields}
+          value={view.fields}
+          onChange={(f) => onChange({ ...view, fields: f })}
+        />
       </PopoverContent>
     </Popover>
   );

@@ -2,7 +2,15 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useSearchParams } from 'react-router';
 import { useApi } from '@/providers/api';
-import { DEFAULT_VIEW, isDefaultView, viewFromParams, viewToParams, type ListView } from './view';
+import {
+  DEFAULT_VIEW,
+  isDefaultView,
+  isGroupKey,
+  isSortKey,
+  viewFromParams,
+  viewToParams,
+  type ListView,
+} from './view';
 import { viewPrefsKey, type StoredViewPrefs } from './viewPrefs';
 
 const SAVE_DELAY_MS = 600;
@@ -18,8 +26,10 @@ const asListView = (v: StoredViewPrefs | undefined): ListView | undefined =>
     tags: v.tags ?? DEFAULT_VIEW.tags,
     due: v.due ?? DEFAULT_VIEW.due,
     show_completed: v.show_completed ?? DEFAULT_VIEW.show_completed,
-    sort: v.sort ?? DEFAULT_VIEW.sort,
-    group: v.group ?? DEFAULT_VIEW.group,
+    // the API checks sort/group (`field:<id>` included) and field filters; anything else falls back
+    sort: isSortKey(v.sort) ? v.sort : DEFAULT_VIEW.sort,
+    group: isGroupKey(v.group) ? v.group : DEFAULT_VIEW.group,
+    fields: v.fields ?? DEFAULT_VIEW.fields,
   };
 
 /**

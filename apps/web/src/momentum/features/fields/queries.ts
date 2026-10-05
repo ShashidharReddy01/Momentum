@@ -211,7 +211,30 @@ export function useSetFieldValue(taskId: string) {
       // query (`useProjectFieldValues`) — realtime is off in some environments/tests, and even
       // when it's on, the actor's own edit is exactly the kind of echo it suppresses, so *this*
       // tab needs its own path to pick the change up.
-      void qc.invalidateQueries({ predicate: (q) => q.queryKey[2] === 'field-values' });
+      void qc.invalidateQueries({
+        predicate: (q) => q.queryKey[2] === 'field-values' || q.queryKey[0] === 'field-values',
+      });
+    },
+  });
+}
+
+/** S7.4.1: field values for tasks from anywhere (My Tasks spans projects), by task then field. */
+export function useFieldValuesLookup(taskIds: readonly string[], enabled = true) {
+  const api = useApi();
+  const ids = [...taskIds].sort().slice(0, 2000);
+  return useQuery({
+    queryKey: ['field-values', 'lookup', ids],
+    enabled: enabled && ids.length > 0,
+    queryFn: async () =>
+      (await api.POST('/api/v1/field-values/lookup', { body: { task_ids: ids } })).data!.data,
+    select: (rows) => {
+      const byTask = new Map<string, Map<string, unknown>>();
+      for (const r of rows) {
+        let forTask = byTask.get(r.task_id);
+        if (!forTask) byTask.set(r.task_id, (forTask = new Map()));
+        forTask.set(r.field_id, r.value);
+      }
+      return byTask;
     },
   });
 }

@@ -15,7 +15,7 @@ import uuid
 from datetime import UTC, date, datetime
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from momentum.core.activity import record_activity
@@ -25,7 +25,12 @@ from momentum.core.events import emit
 from momentum.core.mutation import Mutation
 from momentum.core.ordering import key_between
 from momentum.core.undo import UndoConflict, undo_handler, undo_op
-from momentum.domain.access import get_visible_project, get_visible_task, require_project_role
+from momentum.domain.access import (
+    get_visible_project,
+    get_visible_task,
+    require_project_role,
+    visible_projects_clause,
+)
 from momentum.domain.fields.models import FieldDef, FieldValue, ProjectField
 from momentum.domain.fields.schemas import (
     FieldCreateIn,
@@ -33,7 +38,8 @@ from momentum.domain.fields.schemas import (
     NumberOptions,
     SelectOptionIn,
 )
-from momentum.domain.tasks.models import TaskProject
+from momentum.domain.projects.models import Project
+from momentum.domain.tasks.models import Follower, Task, TaskProject
 
 SELECT_TYPES = ("single_select", "multi_select")
 NUMERIC_TYPES = ("number", "currency", "percent")
@@ -445,6 +451,38 @@ async def list_project_field_values(
         select(FieldValue)
         .join(TaskProject, TaskProject.task_id == FieldValue.task_id)
         .where(TaskProject.project_id == project_id)
+    )
+    return list(rows.scalars())
+
+
+async def lookup_field_values(
+    session: AsyncSession, ctx: Ctx, task_ids: list[uuid.UUID]
+) -> list[FieldValue]:
+    """S7.4.1: field values for tasks from anywhere (My Tasks, search results), in one query, for
+    the ones the viewer can see: through a project, or as the assignee or a follower."""
+    if not task_ids:
+        return []
+    me = ctx.actor.id
+    visible = or_(
+        FieldValue.task_id.in_(
+            select(TaskProject.task_id)
+            .join(Project, Project.id == TaskProject.project_id)
+            .where(visible_projects_clause(ctx))
+        ),
+        FieldValue.task_id.in_(select(Task.id).where(Task.assignee_id == me)),
+        FieldValue.task_id.in_(select(Follower.task_id).where(Follower.user_id == me)),
+    )
+    rows = await session.execute(
+        select(FieldValue)
+        .join(FieldDef, FieldDef.id == FieldValue.field_id)
+        .join(Task, Task.id == FieldValue.task_id)
+        .where(
+            FieldValue.task_id.in_(task_ids),
+            FieldDef.workspace_id == ctx.workspace_id,
+            FieldDef.deleted_at.is_(None),
+            Task.deleted_at.is_(None),
+            visible,
+        )
     )
     return list(rows.scalars())
 

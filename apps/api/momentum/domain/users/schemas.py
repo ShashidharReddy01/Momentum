@@ -4,7 +4,10 @@ import uuid
 from datetime import datetime
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator
+
+from momentum.core.errors import ValidationFailed
+from momentum.domain.fields.filters import parse_field_filter
 
 
 class UserOut(BaseModel):
@@ -53,6 +56,8 @@ class OnboardingPatchIn(BaseModel):
 
 _UUID = r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"
 ASSIGNEE_FILTER = rf"^(me|none|{_UUID})$"
+SORT_PREF = rf"^(manual|due|assignee|created|title|field:{_UUID})$"
+GROUP_PREF = rf"^(section|assignee|due|field:{_UUID})$"
 
 
 class ProjectViewPrefs(BaseModel):
@@ -63,13 +68,29 @@ class ProjectViewPrefs(BaseModel):
         default_factory=list, max_length=50
     )
     # S2.3.3: tag ids to filter by (OR-ed, like assignees).
-    tags: list[Annotated[str, StringConstraints(pattern=_UUID)]] = Field(
+    tags: list[Annotated[str, StringConstraints(pattern=rf"^{_UUID}$")]] = Field(
         default_factory=list, max_length=50
     )
     due: Literal["any", "overdue", "today", "this_week", "next_week", "no_date"] = "any"
     show_completed: bool = False
-    sort: Literal["manual", "due", "assignee", "created", "title"] = "manual"
-    group: Literal["section", "assignee", "due"] = "section"
+    # S7.4.1: also "field:<field id>" (sort by, or group by, a custom field)
+    sort: Annotated[str, StringConstraints(pattern=SORT_PREF)] = "manual"
+    group: Annotated[str, StringConstraints(pattern=GROUP_PREF)] = "section"
+    # S7.4.1: custom-field filters, "<field id>:<op>[:<arg>]" (domain/fields/filters.py)
+    fields: list[Annotated[str, StringConstraints(max_length=300)]] = Field(
+        default_factory=list, max_length=10
+    )
+
+    @field_validator("fields")
+    @classmethod
+    def _fields(cls, v: list[str]) -> list[str]:
+        for text in v:
+            try:
+                parse_field_filter(text)
+            except ValidationFailed as e:
+                raise ValueError(e.detail) from None
+        return v
+
     # S2.2.3: the tab this user last had open (list-view filter/sort/group above are unrelated
     # to *which* view is showing). None = never chosen here yet: fall back to the project's
     # default_view, distinct from explicitly picking "list".

@@ -17,13 +17,16 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
+from dataclasses import field as dc_field
 from datetime import UTC, date, datetime, timedelta
 from typing import Any
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import (
     ColumnElement,
+    Date,
     DateTime,
+    Numeric,
     Select,
     String,
     and_,
@@ -45,6 +48,7 @@ from momentum.core.errors import ValidationFailed
 from momentum.core.ids import task_key
 from momentum.domain.access import get_visible_project, visible_projects_clause
 from momentum.domain.dashboards.schemas import (
+    FIELD_MEASURES,
     NONE_KEY,
     OTHER_KEY,
     STATUS_KEYS,
@@ -57,6 +61,13 @@ from momentum.domain.dashboards.schemas import (
     QuerySpec,
     TaskRowOut,
     WidgetKind,
+)
+from momentum.domain.fields.filters import (
+    NUMERIC,
+    FieldFilter,
+    field_conditions,
+    is_checked,
+    scalar_text,
 )
 from momentum.domain.fields.models import FieldDef, FieldValue
 from momentum.domain.projects.models import Project
@@ -122,6 +133,20 @@ def _next(d: date, bucket: str) -> date:
     return d + timedelta(days=1)
 
 
+GROUPABLE_FIELDS = ("single_select", "multi_select", "people", "checkbox")
+LIST_FIELDS = ("multi_select", "people")  # a task can be in several of their groups
+
+
+@dataclass
+class SpecFields:
+    """The custom fields a spec names, checked (S7.4.1), and its field filters as SQL."""
+
+    group: FieldDef | None = None
+    measure: FieldDef | None = None
+    time: FieldDef | None = None
+    where: list[ColumnElement[bool]] = dc_field(default_factory=list)
+
+
 @dataclass
 class _Group:
     key: str
@@ -131,11 +156,17 @@ class _Group:
 
 class _Run:
     def __init__(
-        self, session: AsyncSession, ctx: Ctx, spec: QuerySpec, project_id: uuid.UUID | None
+        self,
+        session: AsyncSession,
+        ctx: Ctx,
+        spec: QuerySpec,
+        project_id: uuid.UUID | None,
+        fields: SpecFields | None = None,
     ) -> None:
         self.session = session
         self.ctx = ctx
         self.spec = spec
+        self.fields = fields or SpecFields()
         self.project_id = project_id
         self.today = today_for(ctx)
         try:
@@ -167,7 +198,7 @@ class _Run:
             .where(Tag.deleted_at.is_(None))
             .subquery("live_tags")
         )
-        self.where = self._conditions()
+        self.where = [*self._conditions(), *self.fields.where]
 
     # ---------- which tasks ----------
 
@@ -227,22 +258,41 @@ class _Run:
             )
         return out
 
+    def _value(self) -> Any:
+        """What a task adds to the measure: its estimate, or (S7.4.1) its number in a field."""
+        if self.spec.measure in FIELD_MEASURES:
+            fv = aliased(FieldValue)  # the grouped query may join field_values itself
+            return (
+                select(cast(scalar_text(fv.value), Numeric))
+                .where(
+                    fv.task_id == Task.id,
+                    fv.field_id == self.spec.measure_field_id,
+                    func.jsonb_typeof(fv.value) == "number",
+                )
+                .scalar_subquery()
+            )
+        return Task.estimate_minutes
+
     def _measure_of(self, est: Any, ident: Any) -> Any:
-        if self.spec.measure == "sum_estimate":
+        if self.spec.measure in ("sum_estimate", "sum_field"):
             return func.coalesce(func.sum(est), 0)
+        if self.spec.measure == "avg_field":
+            return func.coalesce(func.avg(est), 0)
         return func.count(distinct(ident))
 
+    def _measure(self) -> Any:
+        """The measure over matched tasks directly (no grouping subquery)."""
+        if self.spec.measure == "count":
+            return func.count()
+        agg = func.avg if self.spec.measure == "avg_field" else func.sum
+        return func.coalesce(agg(self._value()), 0)
+
     async def totals(self) -> tuple[float, int, int]:
-        """(measure over everything matched, tasks matched, of which unestimated)."""
-        measure = (
-            func.coalesce(func.sum(Task.estimate_minutes), 0)
-            if self.spec.measure == "sum_estimate"
-            else func.count()
-        )
+        """(measure over everything matched, tasks matched, of which have no value to measure)."""
         value, n, unestimated = (
             await self.session.execute(
                 select(
-                    measure, func.count(), func.count().filter(Task.estimate_minutes.is_(None))
+                    self._measure(), func.count(), func.count().filter(self._value().is_(None))
                 ).where(*self.where)
             )
         ).one()
@@ -272,7 +322,7 @@ class _Run:
         grouping by the key's *column* keeps its bind parameters out of GROUP BY."""
         g = self.spec.group_by
         key: ColumnElement[Any]
-        base = select(Task.id.label("id"), Task.estimate_minutes.label("est")).select_from(Task)
+        base = select(Task.id.label("id"), self._value().label("est")).select_from(Task)
         if g == "assignee":
             key = func.coalesce(cast(Task.assignee_id, String), NONE_KEY)
         elif g == "priority":
@@ -286,12 +336,30 @@ class _Run:
         elif g == "tag":
             key = func.coalesce(cast(self.live_tags.c.tag_id, String), NONE_KEY)
             base = base.outerjoin(self.live_tags, self.live_tags.c.task_id == Task.id)
-        else:  # field
-            key = func.coalesce(self._option_expr(), NONE_KEY)
-            base = base.outerjoin(
-                FieldValue,
-                and_(FieldValue.task_id == Task.id, FieldValue.field_id == self.spec.field_id),
+        elif self._group_type() in LIST_FIELDS:  # one group per option / person it holds
+            elems = (
+                select(
+                    FieldValue.task_id.label("task_id"),
+                    func.jsonb_array_elements_text(FieldValue.value).label("v"),
+                )
+                .where(
+                    FieldValue.field_id == self.spec.field_id,
+                    func.jsonb_typeof(FieldValue.value) == "array",
+                )
+                .subquery("fv")
             )
+            key = func.coalesce(elems.c.v, NONE_KEY)
+            base = base.outerjoin(elems, elems.c.task_id == Task.id)
+        else:  # single-select or checkbox
+            on = and_(FieldValue.task_id == Task.id, FieldValue.field_id == self.spec.field_id)
+            if self._group_type() == "checkbox":
+                key = case(
+                    (is_checked(FieldValue.value), literal("true")),
+                    else_=literal(NONE_KEY),
+                )
+            else:
+                key = func.coalesce(self._option_expr(), NONE_KEY)
+            base = base.outerjoin(FieldValue, on)
         keyed = base.add_columns(key.label("k")).where(*self.where).subquery("keyed")
         return select(
             keyed.c.k, self._measure_of(keyed.c.est, keyed.c.id), func.count(distinct(keyed.c.id))
@@ -323,9 +391,24 @@ class _Run:
             return Task.id.in_(tagged.where(self.live_tags.c.tag_id == uid)) if uid else false()
         # field
         valued = select(FieldValue.task_id).where(FieldValue.field_id == self.spec.field_id)
+        t = self._group_type()
+        if t in LIST_FIELDS:
+            listed = valued.where(func.jsonb_typeof(FieldValue.value) == "array")
+            if key == NONE_KEY:
+                held = listed.where(func.jsonb_array_length(FieldValue.value) > 0)
+                return not_(Task.id.in_(held))
+            return Task.id.in_(listed.where(FieldValue.value.op("?")(key)))
+        if t == "checkbox":
+            checked = Task.id.in_(valued.where(is_checked(FieldValue.value)))
+            if key == "true":
+                return checked
+            return not_(checked) if key == NONE_KEY else false()
         if key == NONE_KEY:
             return not_(Task.id.in_(valued.where(self._option_expr().is_not(None))))
         return Task.id.in_(valued.where(self._option_expr() == key))
+
+    def _group_type(self) -> str:
+        return self.fields.group.type if self.fields.group is not None else "single_select"
 
     async def groups(self) -> list[_Group]:
         """Groups in display order, the ones past ``limit`` folded into Other (counted once)."""
@@ -357,14 +440,9 @@ class _Run:
         return not_(func.coalesce(or_(*[self.key_clause(k) for k in top]), false()))
 
     async def _other(self, top: list[str]) -> tuple[float, int]:
-        measure = (
-            func.coalesce(func.sum(Task.estimate_minutes), 0)
-            if self.spec.measure == "sum_estimate"
-            else func.count()
-        )
         value, n = (
             await self.session.execute(
-                select(measure, func.count()).where(*self.where, self.other_clause(top))
+                select(self._measure(), func.count()).where(*self.where, self.other_clause(top))
             )
         ).one()
         return float(value), int(n)
@@ -411,8 +489,20 @@ class _Run:
                 )
             ).all():
                 out[str(tid)] = (name, color)
+        elif g == "field" and self._group_type() == "checkbox":
+            out.update({"true": ("Checked", None), NONE_KEY: ("Not checked", None)})
+        elif g == "field" and self._group_type() == "people":
+            if ids:
+                for uid, name in (
+                    await self.session.execute(
+                        select(User.id, User.name).where(
+                            User.id.in_(ids), User.workspace_id == self.ctx.workspace_id
+                        )
+                    )
+                ).all():
+                    out[str(uid)] = (name, None)
         elif g == "field":
-            field = await self.session.get(FieldDef, self.spec.field_id)
+            field = self.fields.group or await self.session.get(FieldDef, self.spec.field_id)
             for o in (field.options if field else None) or []:
                 out[str(o["id"])] = (str(o.get("label") or "Option"), o.get("color"))
         out[OTHER_KEY] = ("Other", None)
@@ -429,6 +519,21 @@ class _Run:
             first, last = _floor(self.today, bucket), _floor(self.today + span, bucket)
             expr = func.date_trunc(bucket, cast(Task.due_on, DateTime))
             return expr, [Task.due_on.is_not(None)], first, last
+        if spec.time_field == "field":  # S7.4.1: a custom date, either side of today
+            half = timedelta(days=spec.window_days // 2)
+            first, last = _floor(self.today - half, bucket), _floor(self.today + half, bucket)
+            fv = aliased(FieldValue)
+            day = (
+                select(cast(scalar_text(fv.value), Date))
+                .where(
+                    fv.task_id == Task.id,
+                    fv.field_id == spec.time_field_id,
+                    func.jsonb_typeof(fv.value) == "string",
+                )
+                .scalar_subquery()
+            )
+            expr = func.date_trunc(bucket, cast(day, DateTime))
+            return expr, [day.is_not(None)], first, last
         col = Task.completed_at if spec.time_field == "completed" else Task.created_at
         first, last = _floor(self.today - span, bucket), _floor(self.today, bucket)
         expr = func.date_trunc(bucket, func.timezone(self.tz, col))
@@ -444,7 +549,7 @@ class _Run:
         lo = datetime.combine(first, datetime.min.time())
         hi = datetime.combine(last, datetime.min.time())
         keyed = (
-            select(Task.id.label("id"), Task.estimate_minutes.label("est"), expr.label("b"))
+            select(Task.id.label("id"), self._value().label("est"), expr.label("b"))
             .where(*self.where, *extra, expr >= lo, expr <= hi)
             .subquery("bucketed")
         )
@@ -539,7 +644,9 @@ class _Run:
 # ---------- description ----------
 
 
-def describe(spec: QuerySpec, field_name: str | None = None) -> str:
+def describe(
+    spec: QuerySpec, fields: SpecFields | None = None, field_filters: list[str] | None = None
+) -> str:
     """One plain line saying what a widget counts ("Open tasks due in the next 14 days · by
     assignee"), built from the spec, so every chart says what it shows."""
     f = spec.filters
@@ -548,8 +655,13 @@ def describe(spec: QuerySpec, field_name: str | None = None) -> str:
         what = f"{' and '.join(states).capitalize()} tasks"
     else:
         what = {"open": "Open tasks", "completed": "Completed tasks", "all": "All tasks"}[f.status]
+    measured = fields.measure.name if fields and fields.measure else "the measured field"
     if spec.measure == "sum_estimate":
         what = f"Estimated hours of {what[0].lower()}{what[1:]}"
+    elif spec.measure == "sum_field":
+        what = f"Total {measured} of {what[0].lower()}{what[1:]}"
+    elif spec.measure == "avg_field":
+        what = f"Average {measured} of {what[0].lower()}{what[1:]}"
     parts = [what]
     if f.due_within_days is not None:
         parts.append(
@@ -580,11 +692,19 @@ def describe(spec: QuerySpec, field_name: str | None = None) -> str:
     if f.project_ids:
         n = len(f.project_ids)
         parts.append("in 1 project" if n == 1 else f"in {n} projects")
+    if field_filters:
+        parts.append("where " + "; ".join(field_filters))
+    elif f.fields:
+        parts.append("matching custom-field conditions")
     line = " ".join(parts)
     if spec.group_by == "field":
-        line += f" · by {field_name or 'custom field'}"
+        group = fields.group.name if fields and fields.group else "custom field"
+        line += f" · by {group}"
     elif spec.group_by:
         line += f" · by {GROUP_WORDS[spec.group_by]}"
+    elif spec.time_bucket and spec.time_field == "field":
+        dated = fields.time.name if fields and fields.time else "a date field"
+        line += f" · by {dated} per {spec.time_bucket}, {spec.window_days} days around today"
     elif spec.time_bucket:
         verb = {"completed": "completed", "created": "created", "due": "due"}[spec.time_field]
         when = "next" if spec.time_field == "due" else "last"
@@ -666,32 +786,49 @@ async def filter_names(session: AsyncSession, ctx: Ctx, spec: QuerySpec) -> list
     out += [
         FilterNameOut(filter="priorities", key=p, label=PRIORITY_LABELS[p]) for p in f.priorities
     ]
+    out += await _field_filter_names(session, ctx, f.fields)
     return out
 
 
 # ---------- entry points ----------
 
 
-async def check_spec(session: AsyncSession, ctx: Ctx, spec: QuerySpec) -> str | None:
-    """What the model can't check alone: a grouped-by custom field exists here and is a
-    single-select. Returns the field's name (for the description)."""
-    if spec.field_id is None:
-        return None
-    field = await session.get(FieldDef, spec.field_id)
-    if field is None or field.workspace_id != ctx.workspace_id or field.deleted_at is not None:
-        raise ValidationFailed("That custom field doesn't exist")
-    if field.type != "single_select":
-        raise ValidationFailed("Charts can group by single-select fields only")
-    return field.name
+async def check_spec(session: AsyncSession, ctx: Ctx, spec: QuerySpec) -> SpecFields:
+    """What the model can't check alone: every custom field the spec names exists here and
+    suits its use (split by, summed, dated, filtered). Returns them, with the filters as SQL."""
+
+    async def get(field_id: uuid.UUID, allowed: tuple[str, ...], use: str) -> FieldDef:
+        field = await session.get(FieldDef, field_id)
+        if field is None or field.workspace_id != ctx.workspace_id or field.deleted_at is not None:
+            raise ValidationFailed("That custom field doesn't exist")
+        if field.type not in allowed:
+            raise ValidationFailed(use)
+        return field
+
+    out = SpecFields()
+    if spec.field_id is not None:
+        out.group = await get(
+            spec.field_id,
+            GROUPABLE_FIELDS,
+            "Charts can split by single- or multi-select, people or checkbox fields",
+        )
+    if spec.measure_field_id is not None:
+        out.measure = await get(
+            spec.measure_field_id, NUMERIC, "Only number, currency or percent fields add up"
+        )
+    if spec.time_field_id is not None:
+        out.time = await get(spec.time_field_id, ("date",), "A time series needs a date field")
+    out.where = await field_conditions(session, ctx, spec.filters.fields)
+    return out
 
 
 async def _prepare(
     session: AsyncSession, ctx: Ctx, spec: QuerySpec, project_id: uuid.UUID | None
-) -> tuple[_Run, str | None]:
+) -> tuple[_Run, SpecFields]:
     if project_id is not None:
         await get_visible_project(session, ctx, project_id)  # NotFound when not visible
-    field_name = await check_spec(session, ctx, spec)
-    return _Run(session, ctx, spec, project_id), field_name
+    fields = await check_spec(session, ctx, spec)
+    return _Run(session, ctx, spec, project_id, fields), fields
 
 
 async def run(
@@ -703,17 +840,19 @@ async def run(
     project_id: uuid.UUID | None = None,
 ) -> QueryResultOut:
     """One widget's numbers for this viewer."""
-    r, field_name = await _prepare(session, ctx, spec, project_id)
+    r, fields = await _prepare(session, ctx, spec, project_id)
     total, n, unestimated = await r.totals()
+    names = await filter_names(session, ctx, spec)
     out = QueryResultOut(
         kind=kind,
         measure=spec.measure,
-        description=describe(spec, field_name),
+        description=describe(spec, fields, [x.label for x in names if x.filter == "fields"]),
         total=total,
         tasks_total=n,
-        unestimated=unestimated if spec.measure == "sum_estimate" else 0,
-        filter_names=await filter_names(session, ctx, spec),
-        field_name=field_name,
+        unestimated=unestimated if spec.measure != "count" else 0,
+        filter_names=names,
+        field_name=fields.group.name if fields.group else None,
+        measure_field_name=fields.measure.name if fields.measure else None,
         computed_at=datetime.now(UTC),
     )
     if kind == "count":
@@ -765,3 +904,67 @@ async def drill(session: AsyncSession, ctx: Ctx, body: DrillIn) -> DrillOut:
         )
     tasks, total = await r.task_rows(extra, body.limit)
     return DrillOut(label=label, tasks=tasks, total=total)
+
+
+WORDS = {NONE_KEY: "No value", "true": "Checked", "false": "Not checked"}
+
+
+async def _field_filter_names(
+    session: AsyncSession, ctx: Ctx, filters: list[FieldFilter]
+) -> list[FilterNameOut]:
+    """ "Stage: Ship, Plan", "Points ≥ 3", "Note contains "legal"": one per field filter, with
+    option labels and people's names (never anything from outside the workspace)."""
+    if not filters:
+        return []
+    defs = {
+        d.id: d
+        for d in (
+            await session.execute(
+                select(FieldDef).where(
+                    FieldDef.id.in_({x.field_id for x in filters}),
+                    FieldDef.workspace_id == ctx.workspace_id,
+                )
+            )
+        ).scalars()
+    }
+    people_ids = [
+        u
+        for x in filters
+        if x.op == "any" and (d := defs.get(x.field_id)) is not None and d.type == "people"
+        for u in (_uuid(v) for v in x.values)
+        if u is not None
+    ]
+    names: dict[str, str] = (
+        {
+            str(i): n
+            for i, n in await session.execute(
+                select(User.id, User.name).where(
+                    User.id.in_(people_ids), User.workspace_id == ctx.workspace_id
+                )
+            )
+        }
+        if people_ids
+        else {}
+    )
+    out = []
+    for x in filters:
+        d = defs.get(x.field_id)
+        name = d.name if d is not None and d.deleted_at is None else "A deleted field"
+        options = (
+            {str(o["id"]): str(o.get("label") or "Option") for o in (d.options or [])}
+            if (d is not None and isinstance(d.options, list))
+            else {}
+        )
+        if x.op == "any":
+            said = [options.get(v) or names.get(v) or WORDS.get(v) or "Unknown" for v in x.values]
+            label = f"{name}: {', '.join(said)}"
+        elif x.op == "min":
+            label = f"{name} \u2265 {x.value}"
+        elif x.op == "max":
+            label = f"{name} \u2264 {x.value}"
+        elif x.op == "has":
+            label = f'{name} contains "{x.value}"'
+        else:
+            label = f"{name} is {'set' if x.op == 'set' else 'empty'}"
+        out.append(FilterNameOut(filter="fields", key=x.to_text(), label=label))
+    return out

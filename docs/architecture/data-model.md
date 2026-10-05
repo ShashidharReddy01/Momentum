@@ -42,7 +42,7 @@ All tables live in the Postgres schema configured by `MOMENTUM_DB_SCHEMA` (defau
 | is_agent | bool not null default false | Agent accounts (S5.1.1: one per agent, email `<key>@agents.momentum.invalid`, never signs in, never a team member or project admin) |
 | agent_id | uuid null fk agents | Set when `is_agent` |
 | timezone | text not null default 'UTC' | IANA |
-| prefs | jsonb not null default '{}' | Notification prefs, default views, shortcuts |
+| prefs | jsonb not null default '{}' | Notification prefs, default views, shortcuts. Per-project list views (`ProjectViewPrefs`): assignees, tags, due, show_completed, sort and group (S7.4.1: also `field:<field id>`), `fields` (up to 10 custom-field filters, `<field id>:<op>[:<arg>]`, `domain/fields/filters.py`), and the last tab |
 | last_seen_at | timestamptz null | |
 | Unique | (workspace_id, email) | |
 

@@ -112,3 +112,50 @@ async def test_query_metrics_counts_like_a_chart(uow: UnitOfWork, world: World) 
     hidden = await call(uow, world.ravi, "query_metrics", {"projects": ["Secret Plans"]})
     assert not hidden.ok
     assert "Draft pricing secret" not in str(hidden.result.to_json())
+
+
+async def test_charts_by_custom_fields_resolve_names_to_ids(as_user: Clients) -> None:
+    """S7.4.1: Mo can total a number field, split by a multi-select and filter by an option, all
+    in names; an option that doesn't exist is asked back with the real ones."""
+    ravi = await as_user("ravi")
+    pid = await _project(ravi)
+
+    async def field(**body: Any) -> dict[str, Any]:
+        r = await ravi.post(f"{B}/projects/{pid}/fields", json=body)
+        assert r.status_code == 201, r.text
+        return r.json()["data"]  # type: ignore[no-any-return]
+
+    stage = await field(
+        name="Stage", type="single_select", options=[{"label": "Plan"}, {"label": "Ship"}]
+    )
+    areas = await field(
+        name="Areas", type="multi_select", options=[{"label": "UI"}, {"label": "API"}]
+    )
+    points = await field(name="Points", type="number")
+    ship = stage["options"][1]["id"]
+    for title, pts, opt in (
+        ("Shipping A", 3, ship),
+        ("Shipping B", 5, ship),
+        ("Planning", 8, None),
+    ):
+        t = (await ravi.post(f"{B}/projects/{pid}/tasks", json={"title": title})).json()["data"]
+        await ravi.put(f"{B}/tasks/{t['id']}/fields/{points['id']}", json={"value": pts})
+        if opt:
+            await ravi.put(f"{B}/tasks/{t['id']}/fields/{stage['id']}", json={"value": opt})
+        await ravi.put(
+            f"{B}/tasks/{t['id']}/fields/{areas['id']}", json={"value": [areas["options"][0]["id"]]}
+        )
+
+    out = await _ask(ravi, "What are the total points of tasks in the Ship stage?", pid)
+    assert out["question"] is None, out["question"]
+    spec = out["query_spec"]
+    assert spec["measure"] == "sum_field" and spec["measure_field_id"] == points["id"]
+    assert spec["filters"]["fields"][0]["values"] == [ship]
+    assert out["result"]["value"] == 8
+
+    bars = await _ask(ravi, "Show open tasks by area", pid)
+    assert bars["query_spec"]["field_id"] == areas["id"]
+    assert any(g["label"] == "UI" and g["tasks"] >= 3 for g in bars["result"]["groups"])
+
+    asked = await _ask(ravi, "How many tasks in the Launched stage?", pid)
+    assert asked["question"] and "Plan" in asked["question"] and "Ship" in asked["question"]

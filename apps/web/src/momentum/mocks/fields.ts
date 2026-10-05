@@ -82,7 +82,7 @@ export function fieldHandlers(base = '') {
         is_library?: boolean;
       };
       const f: F = {
-        id: `field-${++n}`,
+        id: `00000000-0000-4000-8000-${String(++n).padStart(12, '0')}`, // uuid-shaped, like the API
         name: b.name,
         type: b.type,
         options: normalizeOptions(b.type, b.options),

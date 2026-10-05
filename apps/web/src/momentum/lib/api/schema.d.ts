@@ -1072,6 +1072,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/field-values/lookup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Field values for tasks from anywhere you can see them (My Tasks, search) */
+        post: operations["lookup_field_values_api_v1_field_values_lookup_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/fields": {
         parameters: {
             query?: never;
@@ -4711,6 +4728,32 @@ export interface components {
              */
             type: "text" | "number" | "single_select" | "multi_select" | "date" | "people" | "checkbox" | "url" | "currency" | "percent";
         };
+        /**
+         * FieldFilter
+         * @description One condition on one custom field (see the module doc for what each ``op`` takes).
+         */
+        FieldFilter: {
+            /**
+             * Field Id
+             * Format: uuid
+             */
+            field_id: string;
+            /**
+             * Op
+             * @enum {string}
+             */
+            op: "any" | "min" | "max" | "has" | "set" | "empty";
+            /**
+             * Value
+             * @description For "min"/"max": a number or YYYY-MM-DD; for "has": the text to look for
+             */
+            value?: string | null;
+            /**
+             * Values
+             * @description For "any": option ids, user ids, "true"/"false", or "none" (no value)
+             */
+            values?: string[];
+        };
         /** FieldOut */
         FieldOut: {
             /** Created By */
@@ -4762,6 +4805,11 @@ export interface components {
             /** Value */
             value: unknown | null;
         };
+        /** FieldValuesLookupIn */
+        FieldValuesLookupIn: {
+            /** Task Ids */
+            task_ids: string[];
+        };
         /**
          * FilterNameOut
          * @description A readable name for one value of a list filter (a project, section, person, tag or
@@ -4773,7 +4821,7 @@ export interface components {
              * Filter
              * @enum {string}
              */
-            filter: "project_ids" | "section_ids" | "assignees" | "tag_ids" | "priorities";
+            filter: "project_ids" | "section_ids" | "assignees" | "tag_ids" | "priorities" | "fields";
             /** Key */
             key: string;
             /** Label */
@@ -6768,12 +6816,13 @@ export interface components {
              * @enum {string}
              */
             due: "any" | "overdue" | "today" | "this_week" | "next_week" | "no_date";
+            /** Fields */
+            fields?: string[];
             /**
              * Group
              * @default section
-             * @enum {string}
              */
-            group: "section" | "assignee" | "due";
+            group: string;
             /**
              * Show Completed
              * @default false
@@ -6782,9 +6831,8 @@ export interface components {
             /**
              * Sort
              * @default manual
-             * @enum {string}
              */
-            sort: "manual" | "due" | "assignee" | "created" | "title";
+            sort: string;
             /** Tags */
             tags?: string[];
             /** View */
@@ -6860,6 +6908,11 @@ export interface components {
              */
             due_within_days?: number | null;
             /**
+             * Fields
+             * @description Custom-field conditions, all of which must hold (S7.4.1)
+             */
+            fields?: components["schemas"]["FieldFilter"][];
+            /**
              * Overdue
              * @description Open tasks due before today
              * @default false
@@ -6887,8 +6940,8 @@ export interface components {
          * QueryResultOut
          * @description One widget's numbers, computed as the viewer. ``value`` for a count, ``groups`` for a bar
          *     or donut, ``series`` for a line, ``tasks`` for a list; ``total`` and ``tasks_total`` cover
-         *     everything matched; ``unestimated`` counts matched tasks with no estimate when the measure
-         *     is ``sum_estimate``.
+         *     everything matched; ``unestimated`` counts matched tasks with no estimate (``sum_estimate``)
+         *     or no value in the measured field (``sum_field`` / ``avg_field``).
          */
         QueryResultOut: {
             /**
@@ -6913,7 +6966,9 @@ export interface components {
              * Measure
              * @enum {string}
              */
-            measure: "count" | "sum_estimate";
+            measure: "count" | "sum_estimate" | "sum_field" | "avg_field";
+            /** Measure Field Name */
+            measure_field_name?: string | null;
             /**
              * More
              * @default 0
@@ -6949,7 +7004,7 @@ export interface components {
             entity: "tasks";
             /**
              * Field Id
-             * @description The single-select custom field when group_by is 'field'
+             * @description The custom field to split by when group_by is 'field' (single- or multi-select, people, checkbox)
              */
             field_id?: string | null;
             filters?: components["schemas"]["QueryFilters"];
@@ -6966,7 +7021,12 @@ export interface components {
              * @default count
              * @enum {string}
              */
-            measure: "count" | "sum_estimate";
+            measure: "count" | "sum_estimate" | "sum_field" | "avg_field";
+            /**
+             * Measure Field Id
+             * @description The number, currency or percent field summed or averaged (measure 'sum_field' / 'avg_field')
+             */
+            measure_field_id?: string | null;
             /** Time Bucket */
             time_bucket?: ("day" | "week" | "month") | null;
             /**
@@ -6975,7 +7035,12 @@ export interface components {
              * @default completed
              * @enum {string}
              */
-            time_field: "completed" | "created" | "due";
+            time_field: "completed" | "created" | "due" | "field";
+            /**
+             * Time Field Id
+             * @description The custom date field when time_field is 'field'
+             */
+            time_field_id?: string | null;
             /**
              * Version
              * @default 1
@@ -11462,6 +11527,39 @@ export interface operations {
             };
         };
     };
+    lookup_field_values_api_v1_field_values_lookup_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FieldValuesLookupIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListOut_TaskFieldValueOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_fields_api_v1_fields_get: {
         parameters: {
             query?: never;
@@ -14578,6 +14676,8 @@ export interface operations {
                 project_id?: string | null;
                 assignee_id?: string | null;
                 completed?: boolean | null;
+                /** @description Custom-field filters on tasks, `<field id>:<op>[:<arg>]` (S7.4.1: any, min, max, has, set, empty); with these, an empty `q` lists the matching tasks */
+                field?: string[];
                 limit?: number;
             };
             header?: never;

@@ -13,6 +13,8 @@ export interface SearchFilters {
   project_id?: string;
   assignee_id?: string;
   completed?: boolean;
+  /** S7.4.1: custom-field filters (`<field id>:<op>[:<arg>]`); with these, no words are needed */
+  field?: string[];
   limit?: number;
 }
 
@@ -30,7 +32,7 @@ export function useSearch(q: string, filters: SearchFilters = {}) {
           params: { query: { q: clean, ...filters } },
         })
       ).data!,
-    enabled: clean.length >= 2,
+    enabled: clean.length >= 2 || !!filters.field?.length,
     staleTime: 10_000,
   });
 }

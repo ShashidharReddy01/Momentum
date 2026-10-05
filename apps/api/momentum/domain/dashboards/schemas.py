@@ -14,11 +14,14 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from momentum.domain.fields.filters import FieldFilter
+
 WidgetKind = Literal["count", "bar", "line", "donut", "list"]
 GroupBy = Literal["assignee", "section", "project", "status", "priority", "tag", "field"]
-Measure = Literal["count", "sum_estimate"]
+Measure = Literal["count", "sum_estimate", "sum_field", "avg_field"]
+FIELD_MEASURES = ("sum_field", "avg_field")
 TimeBucket = Literal["day", "week", "month"]
-TimeField = Literal["completed", "created", "due"]
+TimeField = Literal["completed", "created", "due", "field"]
 TaskStatus = Literal["open", "completed", "all"]
 Priority = Literal["urgent", "high", "medium", "low", "none"]
 WidgetSize = Literal["sm", "md", "lg"]
@@ -55,6 +58,11 @@ class QueryFilters(BaseModel):
     )
     due_from: date | None = None
     due_to: date | None = None
+    fields: list[FieldFilter] = Field(
+        default_factory=list,
+        max_length=10,
+        description="Custom-field conditions, all of which must hold (S7.4.1)",
+    )
 
     @field_validator("assignees")
     @classmethod
@@ -90,12 +98,22 @@ class QuerySpec(BaseModel):
     filters: QueryFilters = Field(default_factory=QueryFilters)
     group_by: GroupBy | None = None
     field_id: uuid.UUID | None = Field(
-        default=None, description="The single-select custom field when group_by is 'field'"
+        default=None,
+        description="The custom field to split by when group_by is 'field' (single- or "
+        "multi-select, people, checkbox)",
     )
     measure: Measure = "count"
+    measure_field_id: uuid.UUID | None = Field(
+        default=None,
+        description="The number, currency or percent field summed or averaged (measure "
+        "'sum_field' / 'avg_field')",
+    )
     time_bucket: TimeBucket | None = None
     time_field: TimeField = Field(
         default="completed", description="Which date places a task in a time bucket"
+    )
+    time_field_id: uuid.UUID | None = Field(
+        default=None, description="The custom date field when time_field is 'field'"
     )
     window_days: int = Field(
         default=84, ge=7, le=366, description="How far back (or ahead, for due) a series goes"
@@ -108,6 +126,10 @@ class QuerySpec(BaseModel):
     def _consistent(self) -> QuerySpec:
         if (self.group_by == "field") != (self.field_id is not None):
             raise ValueError("field_id goes with group_by 'field' (and only with it)")
+        if (self.measure in FIELD_MEASURES) != (self.measure_field_id is not None):
+            raise ValueError("measure_field_id goes with measure sum_field/avg_field (only)")
+        if (self.time_field == "field") != (self.time_field_id is not None):
+            raise ValueError("time_field_id goes with time_field 'field' (and only with it)")
         if self.group_by is not None and self.time_bucket is not None:
             raise ValueError("Pick one dimension: group_by or time_bucket")
         if (
@@ -299,7 +321,7 @@ class FilterNameOut(BaseModel):
     priority), so a chart can say what it is narrowed to and the editor can show it. A value the
     viewer can't see is named generically, never by its real name."""
 
-    filter: Literal["project_ids", "section_ids", "assignees", "tag_ids", "priorities"]
+    filter: Literal["project_ids", "section_ids", "assignees", "tag_ids", "priorities", "fields"]
     key: str
     label: str
 
@@ -307,8 +329,8 @@ class FilterNameOut(BaseModel):
 class QueryResultOut(BaseModel):
     """One widget's numbers, computed as the viewer. ``value`` for a count, ``groups`` for a bar
     or donut, ``series`` for a line, ``tasks`` for a list; ``total`` and ``tasks_total`` cover
-    everything matched; ``unestimated`` counts matched tasks with no estimate when the measure
-    is ``sum_estimate``."""
+    everything matched; ``unestimated`` counts matched tasks with no estimate (``sum_estimate``)
+    or no value in the measured field (``sum_field`` / ``avg_field``)."""
 
     kind: WidgetKind
     measure: Measure
@@ -323,6 +345,7 @@ class QueryResultOut(BaseModel):
     more: int = 0  # list rows past the limit
     filter_names: list[FilterNameOut] = Field(default_factory=list)
     field_name: str | None = None  # the custom field a group_by 'field' chart splits by
+    measure_field_name: str | None = None  # the number field a sum_field/avg_field adds up
     computed_at: datetime
 
 

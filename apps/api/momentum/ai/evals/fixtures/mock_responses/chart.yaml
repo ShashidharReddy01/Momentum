@@ -49,6 +49,17 @@ responses:
     tool_calls: [{name: submit_result, arguments: {kind: count, group_by: assignee}}]
   - match: {contains: "in secret plans"}
     tool_calls: [{name: submit_result, arguments: {kind: count, projects: ["Secret Plans"]}}]
+  # S7.4.1: custom fields (tests/test_ai_chart.py creates Stage, Areas and Points)
+  - match: {contains: "total points of tasks in the ship stage"}
+    tool_calls:
+      - name: submit_result
+        arguments: {kind: count, measure: sum_field, measure_field: "Points", field_filters: [{field: "Stage", is_any: ["Ship"]}], title: "Points shipping"}
+  - match: {contains: "open tasks by area"}
+    tool_calls: [{name: submit_result, arguments: {kind: bar, group_by: field, field: "Areas", title: "Open tasks by area"}}]
+  - match: {contains: "tasks in the launched stage"}
+    tool_calls:
+      - name: submit_result
+        arguments: {kind: count, field_filters: [{field: "Stage", is_any: ["Launched"]}], title: "Launched"}
 default:
   tool_calls:
     - name: submit_result

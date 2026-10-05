@@ -9,7 +9,9 @@ import {
   sortTasks,
   viewFromParams,
   viewToParams,
+  type FieldContext,
 } from './view';
+import type { Field } from '@/features/fields';
 
 // Wednesday 23 Sep 2026 (local)
 const TODAY = new Date(2026, 8, 23);
@@ -47,9 +49,10 @@ describe('URL params', () => {
       show_completed: true,
       sort: 'due',
       group: 'assignee',
+      fields: [`${UUID}:any:a,b`, `${UUID}:min:3`],
     } as const;
     const params = viewToParams(
-      { ...view, assignees: [...view.assignees], tags: [...view.tags] },
+      { ...view, assignees: [...view.assignees], tags: [...view.tags], fields: [...view.fields] },
       new URLSearchParams('task=abc'),
     );
     expect(params.get('task')).toBe('abc');
@@ -149,5 +152,56 @@ describe('sort and group', () => {
       'Next week',
       'No due date',
     ]);
+  });
+});
+
+describe('custom fields in the list (S7.4.1)', () => {
+  const FID = '01a10bbc-85b8-7013-815b-71c5b6893e6a';
+  const stage = {
+    id: FID,
+    name: 'Stage',
+    type: 'single_select',
+    options: [
+      { id: 'plan', label: 'Plan', color: 'proj-1', archived: false },
+      { id: 'ship', label: 'Ship', color: 'proj-2', archived: false },
+    ],
+    description: null,
+    is_library: true,
+  } as unknown as Field;
+  const vals: Record<string, string> = { a: 'ship', b: 'plan' };
+  const ctx: FieldContext = {
+    fields: new Map([[FID, stage]]),
+    valuesOf: (id) => (vals[id] ? new Map([[FID, vals[id]]]) : undefined),
+  };
+  const tasks = [task('a'), task('b'), task('c')];
+
+  it('filters, sorts by option order (no value last) and groups by option', () => {
+    const view = { ...DEFAULT_VIEW, fields: [`${FID}:any:ship,none`] };
+    expect(tasks.filter((t) => matches(t, view, undefined, TODAY, undefined, ctx)).map((t) => t.id)).toEqual([
+      'a',
+      'c',
+    ]);
+    expect(sortTasks(tasks, `field:${FID}`, () => undefined, ctx).map((t) => t.id)).toEqual(['b', 'a', 'c']);
+    const groups = groupTasks(tasks, `field:${FID}`, () => undefined, undefined, TODAY, ctx);
+    expect(groups.map((g) => [g.name, g.tasks.map((t) => t.id)])).toEqual([
+      ['Plan', ['b']],
+      ['Ship', ['a']],
+      ['No value', ['c']],
+    ]);
+  });
+
+  it('keeps field filters, sort and group in the URL and drops malformed ones', () => {
+    const view = {
+      ...DEFAULT_VIEW,
+      sort: `field:${FID}` as const,
+      group: `field:${FID}` as const,
+      fields: [`${FID}:set`],
+    };
+    const params = viewToParams(view, new URLSearchParams());
+    expect(viewFromParams(params)).toEqual(view);
+    const bad = viewFromParams(new URLSearchParams(`field=${FID}:like:x&sort=field:nope`))!;
+    expect(bad.fields).toEqual([]);
+    expect(bad.sort).toBe('manual');
+    expect(isDefaultView(view)).toBe(false);
   });
 });

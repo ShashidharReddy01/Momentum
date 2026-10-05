@@ -108,6 +108,7 @@ async def test_view_prefs_roundtrip_and_isolation(as_user: Clients) -> None:
         "show_completed": False,
         "sort": "manual",
         "group": "section",
+        "fields": [],
         "view": None,  # S2.2.3: the last tab (list/board/…) this user had open here; unset
     }
     view = {
@@ -117,6 +118,7 @@ async def test_view_prefs_roundtrip_and_isolation(as_user: Clients) -> None:
         "show_completed": True,
         "sort": "due",
         "group": "assignee",
+        "fields": [],
         "view": "board",
     }
     assert (await ravi.put(url, json=view)).status_code == 200
@@ -131,5 +133,13 @@ async def test_view_prefs_roundtrip_and_isolation(as_user: Clients) -> None:
     assert (await ravi.put(url, json={**view, "assignees": ["x' OR 1=1"]})).status_code == 422
     assert (await ravi.put(url, json={**view, "extra": 1})).status_code == 422
     assert (await ravi.put(url, json={**view, "view": "gantt"})).status_code == 422
+    # S7.4.1: sort and group by a custom field, and remember field filters
+    fid = "01a0ccaf-8f68-77d2-a888-584ea1e80ea8"
+    by_field = {**view, "sort": f"field:{fid}", "group": f"field:{fid}", "fields": [f"{fid}:set"]}
+    assert (await ravi.put(url, json=by_field)).status_code == 200
+    assert (await ravi.get(url)).json() == by_field
+    assert (await ravi.put(url, json={**view, "sort": "field:nope"})).status_code == 422
+    assert (await ravi.put(url, json={**view, "fields": [f"{fid}:like:x"]})).status_code == 422
+    assert (await ravi.put(url, json={**view, "tags": [f"x{fid}"]})).status_code == 422
     tom = await as_user("tom")
     assert (await tom.put(f"{BASE}/me/prefs/views/{other}", json=view)).status_code == 404

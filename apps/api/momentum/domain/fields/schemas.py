@@ -125,6 +125,11 @@ class FieldValueOut(BaseModel):
     value: Any | None
 
 
+class FieldValuesLookupIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    task_ids: list[uuid.UUID] = Field(max_length=2000)
+
+
 class TaskFieldValueOut(BaseModel):
     """One task's value for one field — the shape `list_project_field_values` returns in bulk."""
 

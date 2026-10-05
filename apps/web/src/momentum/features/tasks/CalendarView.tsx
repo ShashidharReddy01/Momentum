@@ -22,7 +22,9 @@ import { useSections } from '@/features/sections';
 import { addDays, dayDiff, fromISODate, toISODate } from '@/lib/dates';
 import { applyRealtimeEvent, useChannel } from '@/lib/realtime';
 import { cn } from '@/lib/cn';
+import { ListToolbar } from './ListToolbar';
 import { useProjectTasks, useTaskMutations, type Task } from './queries';
+import { useTaskFilter } from './useTaskFilter';
 import { useTaskNav } from './pane/nav';
 
 const INTERACTIVE = 'button, input, textarea, a, [role="checkbox"]';
@@ -91,6 +93,8 @@ export function CalendarView({
   const qc = useQueryClient();
   useChannel(`project:${projectId}`, (event) => applyRealtimeEvent(qc, event, { projectId }));
   const open = useProjectTasks(projectId);
+  const filter = useTaskFilter(projectId);
+  const { keep } = filter;
   const sections = useSections(projectId);
   const people = usePeople('', 'all').data;
   const m = useTaskMutations(projectId);
@@ -105,6 +109,7 @@ export function CalendarView({
   const byDay = useMemo(() => {
     const map = new Map<string, { task: Task; part: Part }[]>();
     for (const t of open.data ?? []) {
+      if (!keep(t)) continue;
       const span = spanOf(t);
       if (!span) continue;
       span.forEach((iso, i) => {
@@ -118,7 +123,7 @@ export function CalendarView({
     for (const list of map.values())
       list.sort((a, b) => ((a.task.due_on ?? '') < (b.task.due_on ?? '') ? -1 : 1));
     return map;
-  }, [open.data]);
+  }, [open.data, keep]);
   const noDate = useMemo(() => (open.data ?? []).filter((t) => !t.due_on), [open.data]);
 
   const monthStart = new Date(cursor.getFullYear(), cursor.getMonth(), 1);
@@ -200,6 +205,7 @@ export function CalendarView({
     <div ref={containerRef} className="flex h-full min-h-0 gap-4" onKeyDown={onKeyDown}>
       <DndContext sensors={sensors} onDragEnd={onDragEnd}>
         <div className="flex min-w-0 flex-1 flex-col">
+          <ListToolbar view={filter.view} onChange={filter.setView} fields={filter.fields} filtersOnly />
           <div className="mb-3 flex items-center gap-2">
             <IconButton
               icon={ChevronLeft}

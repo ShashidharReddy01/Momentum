@@ -46,7 +46,9 @@ import { cn } from '@/lib/cn';
 import { useScrollEdges } from '@/lib/scrollEdges';
 import { useQueryClient } from '@tanstack/react-query';
 import { dropNeighbors } from './selection';
+import { ListToolbar } from './ListToolbar';
 import { useProjectTasks, useTaskMutations, type Task } from './queries';
+import { useTaskFilter } from './useTaskFilter';
 import { useTaskNav } from './pane/nav';
 
 type CardDrag = { kind: 'card'; task: Task; sectionId: string | null };
@@ -74,6 +76,8 @@ export function BoardView({
   useChannel(`project:${projectId}`, (event) => applyRealtimeEvent(qc, event, { projectId }));
   const sections = useSections(projectId);
   const open = useProjectTasks(projectId);
+  const filter = useTaskFilter(projectId);
+  const { keep } = filter;
   const people = usePeople('', 'all').data;
   const {
     move: moveSection,
@@ -100,13 +104,14 @@ export function BoardView({
   const bySection = useMemo(() => {
     const map = new Map<string, Task[]>();
     for (const t of open.data ?? []) {
+      if (!keep(t)) continue;
       const list = map.get(t.section_id ?? '');
       if (list) list.push(t);
       else map.set(t.section_id ?? '', [t]);
     }
     for (const list of map.values()) list.sort((a, b) => ((a.position ?? '') < (b.position ?? '') ? -1 : 1));
     return map;
-  }, [open.data]);
+  }, [open.data, keep]);
   // flat visual order for arrow-key navigation: column by column, top to bottom
   const flatOrder = useMemo(
     () => (sections.data ?? []).flatMap((s) => (bySection.get(s.id) ?? []).map((t) => t.id)),
@@ -218,7 +223,8 @@ export function BoardView({
   return (
     // Keyboard handling delegated from focusable cards.
     // eslint-disable-next-line jsx-a11y/no-static-element-interactions
-    <div ref={containerRef} className="h-full" onKeyDown={onKeyDown}>
+    <div ref={containerRef} className="flex h-full min-h-0 flex-col" onKeyDown={onKeyDown}>
+      <ListToolbar view={filter.view} onChange={filter.setView} fields={filter.fields} filtersOnly />
       <DndContext
         sensors={sensors}
         collisionDetection={collisions}

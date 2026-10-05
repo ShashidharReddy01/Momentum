@@ -12,15 +12,26 @@ import {
   type DragMoveEvent,
   type DragStartEvent,
 } from '@dnd-kit/core';
-import { CheckCircle2, ChevronDown, ChevronRight, ListChecks } from 'lucide-react';
+import { CheckCircle2, ChevronDown, ChevronRight, ListChecks, ListFilter } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { useSearchParams } from 'react-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { EmptyState, ErrorState } from '@/components/common/States';
 import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/Popover';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { PlanMyDayButton } from '@/features/ai';
 import { useMe } from '@/features/auth';
+import {
+  FieldFilterChips,
+  FieldFilterSection,
+  matchesFieldFilters,
+  parseFieldFilter,
+  useFieldLibrary,
+  useFieldValuesLookup,
+  type FieldFilter,
+} from '@/features/fields';
 import {
   dropNeighbors,
   emptySelection,
@@ -105,14 +116,37 @@ function MyTasksList() {
   const dropRef = useRef<Drop | null>(null);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
 
+  // S7.4.1: filter my tasks, across projects, by the workspace's custom fields (?field=… in the URL)
+  const [params, setParams] = useSearchParams();
+  const fieldTexts = useMemo(
+    () => params.getAll('field').filter((f) => parseFieldFilter(f) !== null),
+    [params],
+  );
+  const fieldFilters = useMemo(
+    () => fieldTexts.map(parseFieldFilter).filter((f): f is FieldFilter => f !== null),
+    [fieldTexts],
+  );
+  const setFieldTexts = (next: string[]) => {
+    const p = new URLSearchParams(params);
+    p.delete('field');
+    next.forEach((f) => p.append('field', f));
+    setParams(p, { replace: true });
+  };
+  const library = useFieldLibrary().data;
+  const libraryById = useMemo(() => new Map((library ?? []).map((f) => [f.id, f])), [library]);
+  const openIds = useMemo(() => (open.data ?? []).map((t) => t.id), [open.data]);
+  const values = useFieldValuesLookup(openIds, fieldFilters.length > 0).data;
+
   const byBucket = useMemo(() => {
     const map = new Map<Bucket, MyTask[]>(BUCKETS.map((b) => [b.id, []]));
     for (const t of open.data ?? []) {
       if (t.completed_at && !fading.has(t.id)) continue;
+      if (fieldFilters.length && values && !matchesFieldFilters(fieldFilters, libraryById, values.get(t.id)))
+        continue;
       map.get(t.bucket ?? 'later')?.push(t);
     }
     return map;
-  }, [open.data, fading]);
+  }, [open.data, fading, fieldFilters, values, libraryById]);
   const order = useMemo(
     () =>
       BUCKETS.filter((b) => !collapsed.has(b.id)).flatMap((b) => (byBucket.get(b.id) ?? []).map((t) => t.id)),
@@ -267,10 +301,27 @@ function MyTasksList() {
     // Keyboard handling is delegated from the rows (each row is focusable).
     // eslint-disable-next-line jsx-a11y/no-static-element-interactions
     <div ref={container} className="@container" onKeyDown={onKeyDown}>
-      <div className="mb-3 flex items-center justify-between">
-        <p className="text-sm text-muted">
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <p className="min-w-0 flex-1 text-sm text-muted">
           {total ? `${total} open task${total === 1 ? '' : 's'} assigned to you` : null}
         </p>
+        {library?.length ? (
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button size="sm" variant={fieldTexts.length ? 'ghost' : 'text'}>
+                <Icon icon={ListFilter} /> Custom fields
+                {fieldTexts.length ? (
+                  <span className="tabular rounded-full bg-accent px-1.5 text-[11px] text-on-accent">
+                    {fieldTexts.length}
+                  </span>
+                ) : null}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="max-h-[min(80vh,560px)] w-80 overflow-auto p-2">
+              <FieldFilterSection fields={library} value={fieldTexts} onChange={setFieldTexts} />
+            </PopoverContent>
+          </Popover>
+        ) : null}
         <Button
           size="sm"
           variant="text"
@@ -280,6 +331,7 @@ function MyTasksList() {
           <Icon icon={CheckCircle2} /> {showCompleted ? 'Hide completed' : 'Show completed'}
         </Button>
       </div>
+      <FieldFilterChips fields={library ?? []} value={fieldTexts} onChange={setFieldTexts} />
       {total === 0 && !showCompleted ? (
         <EmptyState icon={ListChecks} title="Nothing assigned to you">
           Tasks people assign to you show up here, sorted by when they're due.

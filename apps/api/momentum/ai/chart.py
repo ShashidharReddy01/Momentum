@@ -33,6 +33,7 @@ from momentum.core.context import Ctx
 from momentum.core.errors import ValidationFailed
 from momentum.domain.access import get_visible_project, visible_projects_clause
 from momentum.domain.dashboards import query
+from momentum.domain.dashboards.query import GROUPABLE_FIELDS
 from momentum.domain.dashboards.schemas import (
     NONE_KEY,
     GroupBy,
@@ -47,7 +48,8 @@ from momentum.domain.dashboards.schemas import (
     WidgetKind,
     check_kind,
 )
-from momentum.domain.fields.models import FieldDef
+from momentum.domain.fields.filters import NUMERIC, FieldFilter
+from momentum.domain.fields.models import FIELD_TYPES, FieldDef
 from momentum.domain.fields.service import list_project_fields
 from momentum.domain.projects.models import Project
 from momentum.domain.sections.service import list_sections
@@ -58,6 +60,22 @@ MAX_TEXT = 300
 LISTED_PROJECTS = 40  # named in the prompt; naming one that isn't listed still resolves
 LISTED_PEOPLE = 60
 UNASSIGNED = {"none", "nobody", "unassigned", "no one", "no assignee"}
+
+
+class ChartFieldFilter(BaseModel):
+    """S7.4.1: one custom-field condition, in names (the server maps them to option/user ids)."""
+
+    model_config = ConfigDict(extra="forbid")
+    field: str = Field(max_length=100, description="A custom field name from the reference")
+    is_any: list[str] = Field(
+        default_factory=list,
+        max_length=10,
+        description='Option names, people\'s names, "checked", "not checked" or "empty"',
+    )
+    at_least: str | None = Field(default=None, max_length=20, description="Number or YYYY-MM-DD")
+    at_most: str | None = Field(default=None, max_length=20, description="Number or YYYY-MM-DD")
+    contains: str | None = Field(default=None, max_length=100, description="Text fields")
+    has_value: bool | None = None
 
 
 class ChartFilters(BaseModel):
@@ -81,12 +99,24 @@ class ChartFilters(BaseModel):
     completed_within_days: int | None = Field(default=None, ge=1, le=366)
     group_by: GroupBy | None = None
     field: str | None = Field(
-        default=None, max_length=100, description="The single-select field when group_by=field"
+        default=None,
+        max_length=100,
+        description="The field to split by when group_by=field (single- or multi-select, "
+        "people, checkbox)",
     )
+    field_filters: list[ChartFieldFilter] = Field(default_factory=list, max_length=5)
     time_bucket: TimeBucket | None = None
     time_field: TimeField = "completed"
+    date_field: str | None = Field(
+        default=None, max_length=100, description="The date field when time_field=field"
+    )
     window_days: int | None = Field(default=None, ge=7, le=366)
     measure: Measure = "count"
+    measure_field: str | None = Field(
+        default=None,
+        max_length=100,
+        description="The number field when measure is sum_field or avg_field",
+    )
     limit: int | None = Field(default=None, ge=1, le=50)
 
 
@@ -206,22 +236,53 @@ async def resolve(
                 tag_ids.append(tag.id)
             named["tags"] = [library[t.strip().lower()].name for t in d.tags]
 
-        # the grouped-by field
+        # custom fields (S7.4.1): split by, add up, date by, filter by
+        fields = await _fields(session, ctx, project_id)
+
+        def pick(name: str | None, types: tuple[str, ...], use: str, kinds: str) -> FieldDef:
+            if not name:
+                raise Ask(f"Which custom field should the chart {use}?")
+            match = fields.get(name.strip().lower())
+            if match is None or match.type not in types:
+                listed = (
+                    ", ".join(sorted(f.name for f in fields.values() if f.type in types))
+                    or "none here"
+                )
+                raise Ask(
+                    f'I can {use} {kinds}, and "{name.strip()}" isn\'t one here '
+                    f"(those fields: {listed}). Which should I use?"
+                )
+            return match
+
         field_id: uuid.UUID | None = None
         group_by = d.group_by if kind in ("bar", "donut") else None
         if group_by == "field":
-            if not d.field:
-                raise Ask("Which custom field should the chart split by?")
-            fields = await _select_fields(session, ctx, project_id)
-            match = fields.get(d.field.strip().lower())
-            if match is None:
-                listed = ", ".join(sorted(f.name for f in fields.values())) or "none here"
-                raise Ask(
-                    f'I can split by a single-select field, and "{d.field.strip()}" isn\'t one '
-                    f"(single-select fields: {listed}). Which should I use?"
-                )
-            field_id = match.id
-            named["field"] = match.name
+            g = pick(
+                d.field,
+                GROUPABLE_FIELDS,
+                "split by",
+                "single-select, multi-select, people or checkbox fields",
+            )
+            field_id = g.id
+            named["field"] = g.name
+        measure_field_id: uuid.UUID | None = None
+        if d.measure in ("sum_field", "avg_field") and kind != "list":
+            m = pick(d.measure_field, NUMERIC, "add up", "number fields")
+            measure_field_id = m.id
+            named["measure_field"] = m.name
+        time_field_id: uuid.UUID | None = None
+        if kind == "line" and d.time_field == "field":
+            dated = pick(d.date_field, ("date",), "count by", "date fields")
+            time_field_id = dated.id
+            named["date_field"] = dated.name
+        field_filters = []
+        for ff in d.field_filters:
+            target = pick(ff.field, FIELD_TYPES, "filter by", "custom fields")
+            field_filters += await _field_filters(tc, target, ff)
+        if d.field_filters:
+            named["field_filters"] = [
+                ff.model_dump(exclude_defaults=True) for ff in d.field_filters
+            ]
     except ToolError as e:
         raise Ask(e.message) from None
 
@@ -236,16 +297,21 @@ async def resolve(
         priorities=d.priorities,
         due_within_days=None if d.overdue else d.due_within_days,
         completed_within_days=d.completed_within_days if status != "open" else None,
+        fields=field_filters,
     )
     spec_args: dict[str, Any] = {"filters": filters, "measure": d.measure}
     if kind == "list":
         spec_args["measure"] = "count"
+    elif measure_field_id is not None:
+        spec_args["measure_field_id"] = measure_field_id
     if group_by is not None:
         spec_args["group_by"] = group_by
         spec_args["field_id"] = field_id
     if kind == "line":
         spec_args["time_bucket"] = d.time_bucket or "week"
         spec_args["time_field"] = d.time_field
+        if time_field_id is not None:
+            spec_args["time_field_id"] = time_field_id
         if d.window_days is not None:
             spec_args["window_days"] = d.window_days
     if d.limit is not None and kind in ("bar", "donut", "list"):
@@ -268,10 +334,66 @@ async def resolve(
     return Resolved(kind=kind, spec=spec, named=named)
 
 
+async def _field_filters(
+    tc: ToolContext, field: FieldDef, ff: ChartFieldFilter
+) -> list[FieldFilter]:
+    """One named condition → the spec's filters: option and people names to ids."""
+    out: list[FieldFilter] = []
+    if ff.is_any:
+        values: list[str] = []
+        labels = [
+            (str(o.get("label", "")), str(o["id"]))
+            for o in (field.options if isinstance(field.options, list) else [])
+        ]
+        options = {label.lower(): oid for label, oid in labels}
+        for word in ff.is_any:
+            w = word.strip().lower()
+            if w in ("empty", "none", "no value"):
+                values.append("none")
+            elif field.type == "checkbox" and w in ("checked", "yes", "true", "not checked", "no"):
+                values.append("true" if w in ("checked", "yes", "true") else "false")
+            elif field.type == "people":
+                values.append(str((await resolve_person(tc, word.strip())).id))
+            elif w in options:
+                values.append(options[w])
+            else:
+                listed = ", ".join(label for label, _ in labels if label) or "none"
+                raise Ask(
+                    f'"{field.name}" has no option "{word.strip()}" (options: {listed}). '
+                    "Which did you mean?"
+                )
+        out.append(FieldFilter(field_id=field.id, op="any", values=values))
+    for op, raw in (("min", ff.at_least), ("max", ff.at_most), ("has", ff.contains)):
+        if raw is not None and raw.strip():
+            out.append(FieldFilter(field_id=field.id, op=op, value=raw.strip()))
+    if ff.has_value is not None:
+        out.append(FieldFilter(field_id=field.id, op="set" if ff.has_value else "empty"))
+    if not out:
+        raise Ask(f'What should "{field.name}" be for the tasks counted?')
+    return out
+
+
+async def _fields(
+    session: AsyncSession, ctx: Ctx, project_id: uuid.UUID | None
+) -> dict[str, FieldDef]:
+    """Every custom field by lowercase name: the project's own, or the workspace's."""
+    return await _all_fields(session, ctx, project_id)
+
+
 async def _select_fields(
     session: AsyncSession, ctx: Ctx, project_id: uuid.UUID | None
 ) -> dict[str, FieldDef]:
-    """Single-select fields by lowercase name: the project's own, or the workspace's."""
+    """Fields a chart can split by, by lowercase name: the project's own, or the workspace's."""
+    return {
+        k: f
+        for k, f in (await _all_fields(session, ctx, project_id)).items()
+        if f.type in GROUPABLE_FIELDS
+    }
+
+
+async def _all_fields(
+    session: AsyncSession, ctx: Ctx, project_id: uuid.UUID | None
+) -> dict[str, FieldDef]:
     if project_id is not None:
         defs = [f for _pf, f in await list_project_fields(session, ctx, project_id)]
     else:
@@ -284,7 +406,7 @@ async def _select_fields(
                 )
             ).scalars()
         )
-    return {f.name.lower(): f for f in defs if f.type == "single_select"}
+    return {f.name.lower(): f for f in defs}
 
 
 async def _reference(session: AsyncSession, ctx: Ctx, project_id: uuid.UUID | None) -> str:
@@ -310,11 +432,16 @@ async def _reference(session: AsyncSession, ctx: Ctx, project_id: uuid.UUID | No
     lines.append("People: " + (", ".join(people) or "none"))
     tags = [safe(t.name) for t in await list_tags(session, ctx)]
     lines.append("Tags: " + (", ".join(tags) or "none"))
-    fields = await _select_fields(session, ctx, project_id)
-    lines.append(
-        "Single-select fields: "
-        + (", ".join(sorted(safe(f.name) for f in fields.values())) or "none")
-    )
+    described = []
+    for f in sorted(
+        (await _fields(session, ctx, project_id)).values(), key=lambda f: f.name.lower()
+    ):
+        options = [o.get("label", "") for o in (f.options if isinstance(f.options, list) else [])]
+        kind_word = f.type.replace("_", "-")
+        if options:
+            kind_word += ": " + ", ".join(safe(str(o)) for o in options[:12])
+        described.append(f"{safe(f.name)} ({kind_word})")
+    lines.append("Custom fields: " + ("; ".join(described[:40]) or "none"))
     return '<data source="workspace">\n' + "\n".join(lines) + "\n</data>"
 
 
@@ -379,8 +506,14 @@ def canonical(a: ChartAnswer) -> dict[str, Any] | None:
     }
     if s.group_by == "field":
         out["field"] = a.named.get("field")
+    if a.named.get("measure_field"):
+        out["measure_field"] = a.named["measure_field"]
+    if a.named.get("field_filters"):
+        out["field_filters"] = a.named["field_filters"]
     if s.time_bucket is not None:
         out["time_bucket"] = s.time_bucket
         out["time_field"] = s.time_field
+        if a.named.get("date_field"):
+            out["date_field"] = a.named["date_field"]
         out["window_days"] = s.window_days
     return out

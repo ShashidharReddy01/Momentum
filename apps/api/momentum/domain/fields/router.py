@@ -14,6 +14,7 @@ from momentum.domain.fields.schemas import (
     FieldPatchIn,
     FieldValueIn,
     FieldValueOut,
+    FieldValuesLookupIn,
     ProjectFieldMoveIn,
     ProjectFieldOut,
     ProjectFieldVisibilityIn,
@@ -60,6 +61,19 @@ async def list_project_field_values(
 ) -> ListOut[TaskFieldValueOut]:
     async with uow.transaction() as s:
         values = await service.list_project_field_values(s, ctx, project_id)
+        return ListOut(data=[TaskFieldValueOut.model_validate(v) for v in values])
+
+
+@router.post(
+    "/field-values/lookup",
+    response_model=ListOut[TaskFieldValueOut],
+    summary="Field values for tasks from anywhere you can see them (My Tasks, search)",
+)
+async def lookup_field_values(
+    body: FieldValuesLookupIn, ctx: CtxDep, uow: UowDep
+) -> ListOut[TaskFieldValueOut]:
+    async with uow.transaction() as s:
+        values = await service.lookup_field_values(s, ctx, body.task_ids)
         return ListOut(data=[TaskFieldValueOut.model_validate(v) for v in values])
 
 

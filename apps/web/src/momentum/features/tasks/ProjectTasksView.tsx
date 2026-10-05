@@ -55,6 +55,8 @@ import {
   matches,
   sortTasks,
   todayLocal,
+  usesFields,
+  type FieldContext,
   type ListView,
 } from './view';
 
@@ -77,7 +79,19 @@ export function ProjectTasksView({ projectId, canEdit }: { projectId: string; ca
   const sections = useSections(projectId).data;
   const projectFields = useProjectFields(projectId).data;
   const visibleFields = useMemo(() => (projectFields ?? []).filter((f) => f.is_visible), [projectFields]);
-  const fieldValuesByTask = useProjectFieldValues(projectId, !!visibleFields.length).data;
+  const fieldValuesByTask = useProjectFieldValues(projectId, !!visibleFields.length || usesFields(view)).data;
+  // S7.4.1: filter, sort and group by any of the project's fields (shown in the list or not)
+  const fieldList = useMemo(() => (projectFields ?? []).map((pf) => pf.field), [projectFields]);
+  const fieldCtx = useMemo<FieldContext | undefined>(
+    () =>
+      projectFields && (fieldValuesByTask || !usesFields(view))
+        ? {
+            fields: new Map(projectFields.map((pf) => [pf.field.id, pf.field])),
+            valuesOf: (id) => fieldValuesByTask?.get(id),
+          }
+        : undefined,
+    [projectFields, fieldValuesByTask, view],
+  );
   const tagsByTask = useProjectTaskTags(projectId).data;
   const otherPlacementsByTask = useOtherPlacements(projectId).data;
   const blockedTaskIds = useBlockedTasks(projectId).data;
@@ -137,7 +151,7 @@ export function ProjectTasksView({ projectId, canEdit }: { projectId: string; ca
   const bySection = useMemo(() => {
     const today = todayLocal();
     const shown = (t: Task) =>
-      isTemp(t.id) || sticky.has(t.id) || matches(t, view, meId, today, tagIdsByTask?.get(t.id));
+      isTemp(t.id) || sticky.has(t.id) || matches(t, view, meId, today, tagIdsByTask?.get(t.id), fieldCtx);
     const map = new Map<string, Task[]>();
     const visible = (open.data ?? []).filter(
       (t) => (!t.completed_at || fading.has(t.id) || showCompleted) && shown(t),
@@ -157,16 +171,24 @@ export function ProjectTasksView({ projectId, canEdit }: { projectId: string; ca
         map.set(t.section_id, i < 0 ? [...list, t] : [...list.slice(0, i), t, ...list.slice(i)]);
       }
     }
-    if (view.sort !== 'manual') for (const [k, list] of map) map.set(k, sortTasks(list, view.sort, nameOf));
+    if (view.sort !== 'manual')
+      for (const [k, list] of map) map.set(k, sortTasks(list, view.sort, nameOf, fieldCtx));
     return map;
-  }, [open.data, done.data, fading, showCompleted, view, meId, sticky, nameOf, tagIdsByTask]);
+  }, [open.data, done.data, fading, showCompleted, view, meId, sticky, nameOf, tagIdsByTask, fieldCtx]);
 
   // Non-section groupings (assignee / due) regroup the same filtered, sorted rows.
   const groups = useMemo(() => {
     if (view.group === 'section') return null;
     const all = (sections ?? []).flatMap((s) => bySection.get(s.id) ?? []);
-    return groupTasks(sortTasks(all, view.sort, nameOf), view.group, nameOf, meId, todayLocal());
-  }, [view.group, view.sort, sections, bySection, nameOf, meId]);
+    return groupTasks(
+      sortTasks(all, view.sort, nameOf, fieldCtx),
+      view.group,
+      nameOf,
+      meId,
+      todayLocal(),
+      fieldCtx,
+    );
+  }, [view.group, view.sort, sections, bySection, nameOf, meId, fieldCtx]);
 
   // Visible rows in display order (collapsed sections excluded): the basis for ranges and arrows.
   const order = useMemo(
@@ -643,7 +665,7 @@ export function ProjectTasksView({ projectId, canEdit }: { projectId: string; ca
     // Keyboard handling is delegated from the rows (each row is focusable).
     // eslint-disable-next-line jsx-a11y/no-static-element-interactions
     <div ref={container} className="@container" onKeyDownCapture={onKeyDownCapture} onKeyDown={onKeyDown}>
-      <ListToolbar view={view} onChange={setView} />
+      <ListToolbar view={view} onChange={setView} fields={fieldList} />
       {!manual && canEdit ? (
         <p className="mb-2 text-xs text-muted">
           Drag to reorder is off while the list is sorted or grouped.{' '}

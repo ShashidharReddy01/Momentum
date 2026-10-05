@@ -14,12 +14,13 @@ actually possible without re-deriving `get_visible_task`'s ancestor-walk as a SQ
 
 from __future__ import annotations
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import ColumnElement, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from momentum.core.context import Ctx
 from momentum.domain.access import visible_projects_clause
 from momentum.domain.comments.models import Comment
+from momentum.domain.fields.filters import FieldFilter, field_conditions
 from momentum.domain.projects.models import Project
 from momentum.domain.search.schemas import (
     ALL_TYPES,
@@ -53,6 +54,7 @@ async def _search_tasks(
     assignee_id: str | None,
     completed: bool | None,
     limit: int,
+    field_where: list[ColumnElement[bool]] | None = None,
 ) -> list[TaskHit]:
     tsquery = func.plainto_tsquery("simple", q)
     rank = func.ts_rank(Task.search_tsv, tsquery)
@@ -61,8 +63,10 @@ async def _search_tasks(
         Task.deleted_at.is_(None),
         Task.parent_id.is_(None),
         _task_visible_clause(ctx),
-        or_(Task.search_tsv.op("@@")(tsquery), Task.title.op("%")(q)),
+        *(field_where or []),
     )
+    if q:
+        query = query.where(or_(Task.search_tsv.op("@@")(tsquery), Task.title.op("%")(q)))
     if project_id:
         query = query.where(
             Task.id.in_(select(TaskProject.task_id).where(TaskProject.project_id == project_id))
@@ -73,7 +77,8 @@ async def _search_tasks(
         query = query.where(
             Task.completed_at.is_not(None) if completed else Task.completed_at.is_(None)
         )
-    rows = (await session.execute(query.order_by(rank.desc(), Task.title).limit(limit))).all()
+    order = [rank.desc(), Task.title] if q else [Task.due_on.asc().nulls_last(), Task.number.desc()]
+    rows = (await session.execute(query.order_by(*order).limit(limit))).all()
     tasks = [r[0] for r in rows]
     if not tasks:
         return []
@@ -164,11 +169,13 @@ async def search(
     project_id: str | None = None,
     assignee_id: str | None = None,
     completed: bool | None = None,
+    fields: list[FieldFilter] | None = None,
     limit: int = 8,
 ) -> SearchResultsOut:
     clean = q.strip()
-    if not clean or ctx.actor.id is None:
+    if (not clean and not fields) or ctx.actor.id is None:
         return SearchResultsOut(tasks=[], projects=[], people=[], comments=[])
+    field_where = await field_conditions(session, ctx, fields or [])
     tasks = (
         await _search_tasks(
             session,
@@ -177,11 +184,14 @@ async def search(
             project_id=project_id,
             assignee_id=assignee_id,
             completed=completed,
+            field_where=field_where,
             limit=limit,
         )
         if "task" in types
         else []
     )
+    if not clean:  # S7.4.1: filters alone find tasks, not projects, people or comments
+        return SearchResultsOut(tasks=tasks, projects=[], people=[], comments=[])
     projects = (
         await _search_projects(session, ctx, clean, limit=limit) if "project" in types else []
     )

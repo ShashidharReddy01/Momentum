@@ -1,9 +1,19 @@
-import { FolderKanban, ListChecks, MessageSquare, Search as SearchIcon, User } from 'lucide-react';
+import {
+  FolderKanban,
+  ListChecks,
+  ListFilter,
+  MessageSquare,
+  Search as SearchIcon,
+  User,
+} from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { EmptyState } from '@/components/common/States';
+import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/Popover';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { FieldFilterChips, FieldFilterSection, parseFieldFilter, useFieldLibrary } from '@/features/fields';
 import { usePeople } from '@/features/people';
 import { useProjects } from '@/features/projects';
 import { TaskNavProvider, TaskPane, useTaskNav } from '@/features/tasks';
@@ -39,12 +49,16 @@ function SearchPageBody() {
   const projectId = params.get('project_id') ?? '';
   const assigneeId = params.get('assignee_id') ?? '';
   const completedParam = params.get('completed');
+  const fieldFilters = params.getAll('field').filter((f) => parseFieldFilter(f) !== null);
+  const library = useFieldLibrary().data ?? [];
+  const searching = q.trim().length >= 2 || fieldFilters.length > 0;
 
   const filters: SearchFilters = {
     type: activeTypes.length < TYPES.length ? activeTypes.join(',') : undefined,
     project_id: projectId || undefined,
     assignee_id: assigneeId || undefined,
     completed: completedParam === null ? undefined : completedParam === 'true',
+    field: fieldFilters.length ? fieldFilters : undefined,
     limit: 30,
   };
   const results = useSearch(q, filters);
@@ -54,6 +68,13 @@ function SearchPageBody() {
     if (value) next.set(key, value);
     else next.delete(key);
     setParams(next, { replace: true });
+  };
+
+  const setFields = (next: string[]) => {
+    const p = new URLSearchParams(params);
+    p.delete('field');
+    next.forEach((f) => p.append('field', f));
+    setParams(p, { replace: true });
   };
 
   const toggleType = (t: string) => {
@@ -141,10 +162,30 @@ function SearchPageBody() {
             <option value="false">Not completed</option>
             <option value="true">Completed</option>
           </select>
+          {library.length ? (
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button size="sm" variant={fieldFilters.length ? 'ghost' : 'text'}>
+                  <Icon icon={ListFilter} /> Custom fields
+                  {fieldFilters.length ? (
+                    <span className="tabular rounded-full bg-accent px-1.5 text-[11px] text-on-accent">
+                      {fieldFilters.length}
+                    </span>
+                  ) : null}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="max-h-[min(80vh,560px)] w-80 overflow-auto p-2">
+                <FieldFilterSection fields={library} value={fieldFilters} onChange={setFields} />
+              </PopoverContent>
+            </Popover>
+          ) : null}
         </div>
+        <FieldFilterChips fields={library} value={fieldFilters} onChange={setFields} />
 
-        {q.trim().length < 2 ? (
-          <p className="text-sm text-muted">Type at least 2 characters to search.</p>
+        {!searching ? (
+          <p className="text-sm text-muted">
+            Type at least 2 characters to search, or filter tasks by a custom field.
+          </p>
         ) : results.isPending ? (
           <div className="flex flex-col gap-2" aria-busy>
             {Array.from({ length: 5 }, (_, i) => (

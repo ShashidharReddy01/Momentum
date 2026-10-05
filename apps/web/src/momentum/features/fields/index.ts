@@ -4,6 +4,7 @@ export {
   fieldKeys,
   useFieldLibrary,
   useFieldMutations,
+  useFieldValuesLookup,
   useProjectFields,
   useProjectFieldValues,
   useSetFieldValue,
@@ -17,3 +18,20 @@ export {
   type SelectOption,
   type TaskFieldValue,
 } from './queries';
+export {
+  describeFieldFilter,
+  fieldFilterText,
+  fieldGroupKeys,
+  fieldMatches,
+  fieldSortValue,
+  GROUPABLE,
+  LIST_GROUPABLE,
+  LISTED,
+  matchesFieldFilters,
+  MAX_FIELD_FILTERS,
+  NUMERIC,
+  parseFieldFilter,
+  type FieldFilter,
+  type FieldOp,
+} from './filters';
+export { FieldFilterChips, FieldFilterSection } from './FieldFilters';

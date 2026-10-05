@@ -5,7 +5,7 @@ import { Dialog } from '@/components/ui/Dialog';
 import { Icon } from '@/components/ui/Icon';
 import { Input } from '@/components/ui/Input';
 import { Segmented } from '@/components/ui/Tabs';
-import { useFieldLibrary, useProjectFields } from '@/features/fields';
+import { FieldFilterSection, GROUPABLE, NUMERIC, useFieldLibrary, useProjectFields } from '@/features/fields';
 import { cn } from '@/lib/cn';
 import {
   autoTitle,
@@ -102,10 +102,14 @@ function EditorBody({
   const set = (patch: Partial<Draft>) => setD((x) => ({ ...x, ...patch }));
   const projectFields = useProjectFields(projectId ?? '', projectId !== null);
   const library = useFieldLibrary(projectId === null);
-  const selectFields = useMemo(() => {
-    const all = projectId ? (projectFields.data ?? []).map((pf) => pf.field) : (library.data ?? []);
-    return all.filter((f) => f.type === 'single_select');
-  }, [projectId, projectFields.data, library.data]);
+  // S7.4.1: any field the project (or, on a workspace dashboard, the workspace) has
+  const allFields = useMemo(
+    () => (projectId ? (projectFields.data ?? []).map((pf) => pf.field) : (library.data ?? [])),
+    [projectId, projectFields.data, library.data],
+  );
+  const selectFields = useMemo(() => allFields.filter((f) => GROUPABLE.includes(f.type)), [allFields]);
+  const numberFields = useMemo(() => allFields.filter((f) => NUMERIC.includes(f.type)), [allFields]);
+  const dateFields = useMemo(() => allFields.filter((f) => f.type === 'date'), [allFields]);
   const spec = useMemo(() => specOf(d), [d]);
   // the preview's own query (shared cache with the card below): names for the narrowing chips,
   // and the field's name when a chart (say, one Mo drafted) splits by a field this list lacks
@@ -114,7 +118,10 @@ function EditorBody({
   const fieldName = listed?.name ?? (d.fieldId ? (previewData?.field_name ?? null) : null);
   const fieldOptions: [string, string][] = selectFields.map((f) => [f.id, f.name]);
   if (d.fieldId && !listed) fieldOptions.push([d.fieldId, fieldName ?? 'Custom field']);
-  const title = d.titleTouched ? d.title : autoTitle(d, fieldName);
+  const measureName =
+    numberFields.find((f) => f.id === d.measureFieldId)?.name ?? previewData?.measure_field_name ?? null;
+  const timeName = dateFields.find((f) => f.id === d.timeFieldId)?.name ?? null;
+  const title = d.titleTouched ? d.title : autoTitle(d, fieldName, { measure: measureName, time: timeName });
   const problem = draftProblem({ ...d, title });
   const preview: WidgetItem = { id: null, kind: d.kind, title, spec, size: d.size, version: 0 };
   const grouped = d.kind === 'bar' || d.kind === 'donut';
@@ -214,6 +221,11 @@ function EditorBody({
             </Chip>
           </div>
           <NarrowChips draft={d} names={previewData?.filter_names ?? []} onRemove={setD} />
+          <FieldFilterSection
+            fields={allFields}
+            value={d.fieldFilters}
+            onChange={(fieldFilters) => set({ fieldFilters })}
+          />
           {d.status !== 'completed' && !d.overdue ? (
             <Choice
               label="Due"
@@ -285,8 +297,20 @@ function EditorBody({
                 ['completed', 'The day they were completed'],
                 ['created', 'The day they were created'],
                 ['due', 'Their due date (upcoming)'],
+                ...(dateFields.length ? [['field', 'A custom date field'] as [string, string]] : []),
               ]}
             />
+            {d.timeField === 'field' ? (
+              <Choice
+                label="Date field"
+                value={d.timeFieldId ?? ''}
+                onChange={(v) => set({ timeFieldId: v || null })}
+                options={[
+                  ['', 'Choose a field…'],
+                  ...dateFields.map((f) => [f.id, f.name] as [string, string]),
+                ]}
+              />
+            ) : null}
             <Segmented
               label="Per"
               value={d.bucket}
@@ -327,8 +351,25 @@ function EditorBody({
               options={[
                 { value: 'count', label: 'Tasks' },
                 { value: 'sum_estimate', label: 'Estimated hours' },
+                ...(numberFields.length
+                  ? [
+                      { value: 'sum_field' as const, label: 'Total of a field' },
+                      { value: 'avg_field' as const, label: 'Average of a field' },
+                    ]
+                  : []),
               ]}
             />
+            {d.measure === 'sum_field' || d.measure === 'avg_field' ? (
+              <Choice
+                label="Number field"
+                value={d.measureFieldId ?? ''}
+                onChange={(v) => set({ measureFieldId: v || null })}
+                options={[
+                  ['', 'Choose a field…'],
+                  ...numberFields.map((f) => [f.id, f.name] as [string, string]),
+                ]}
+              />
+            ) : null}
           </div>
         )}
         <div className="flex flex-wrap items-center gap-3">
@@ -437,6 +478,7 @@ const NARROW_WORDS: Record<FilterName['filter'], string> = {
   assignees: 'Assignee',
   tag_ids: 'Tag',
   priorities: 'Priority',
+  fields: 'Field',
 };
 
 function shortDate(iso: string): string {

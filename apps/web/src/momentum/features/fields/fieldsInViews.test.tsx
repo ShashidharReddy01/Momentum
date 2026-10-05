@@ -24,7 +24,7 @@ async function boot() {
     ...teamHandlers(),
     ...projectHandlers('', undefined, [{ name: 'Website Revamp', my_role: 'admin' }]),
     ...sectionHandlers('', { 'seed-1': ['Backlog'] }),
-    ...taskHandlers('', { 'seed-1': { 'sec-1': ['First'] } }),
+    ...taskHandlers('', { 'seed-1': { 'sec-1': ['First', 'Second'] } }),
     ...fieldHandlers(),
   );
   window.history.replaceState(null, '', '/projects/seed-1');
@@ -114,5 +114,29 @@ describe('Fields in views (S2.3.2)', () => {
 
     const row = screen.getByRole('listitem', { name: 'First' });
     await waitFor(() => expect(within(row).getByText('High')).toBeInTheDocument());
+  });
+
+  it('filters the list by a custom field option, with a removable chip (S7.4.1)', async () => {
+    const user = await boot();
+    await addField(user, 'Priority', 'single_select', ['High', 'Low']);
+    await user.click(screen.getByRole('button', { name: 'Open details for First' }));
+    const pane = await screen.findByRole('complementary', { name: 'Task details' });
+    await user.click(within(pane).getByRole('button', { name: 'Priority' }));
+    await user.click(await screen.findByRole('option', { name: 'High' }));
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('complementary', { name: 'Task details' })).toBeNull());
+
+    await user.click(screen.getByRole('button', { name: /^Filter/ }));
+    await user.click(await screen.findByText('Priority', { selector: 'summary' }));
+    await user.click(
+      within(screen.getByRole('group', { name: 'Filter by Priority' })).getByRole('button', { name: 'High' }),
+    );
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('listitem', { name: 'Second' })).toBeNull());
+    expect(screen.getByRole('listitem', { name: 'First' })).toBeInTheDocument();
+
+    const chips = screen.getByRole('list', { name: 'Custom field filters' });
+    await user.click(within(chips).getByRole('button', { name: 'Remove filter: Priority: High' }));
+    expect(await screen.findByRole('listitem', { name: 'Second' })).toBeInTheDocument();
   });
 });

@@ -5,6 +5,7 @@ import uuid
 from fastapi import APIRouter, Query
 
 from momentum.api.deps import CtxDep, UowDep
+from momentum.domain.fields.filters import parse_field_filters
 from momentum.domain.search import service
 from momentum.domain.search.schemas import ALL_TYPES, SearchResultsOut, SearchType
 
@@ -26,6 +27,12 @@ async def global_search(
     project_id: uuid.UUID | None = Query(default=None),
     assignee_id: uuid.UUID | None = Query(default=None),
     completed: bool | None = Query(default=None),
+    field: list[str] = Query(
+        default=[],
+        max_length=10,
+        description="Custom-field filters on tasks, `<field id>:<op>[:<arg>]` (S7.4.1: any, "
+        "min, max, has, set, empty); with these, an empty `q` lists the matching tasks",
+    ),
     limit: int = Query(default=8, ge=1, le=50),
 ) -> SearchResultsOut:
     types: tuple[SearchType, ...] = ALL_TYPES
@@ -41,5 +48,6 @@ async def global_search(
             project_id=str(project_id) if project_id else None,
             assignee_id=str(assignee_id) if assignee_id else None,
             completed=completed,
+            fields=parse_field_filters(field),
             limit=limit,
         )

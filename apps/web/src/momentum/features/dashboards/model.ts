@@ -1,3 +1,4 @@
+import { fieldFilterText, parseFieldFilter, type FieldFilter } from '@/features/fields';
 import type { GroupRow, QueryResult, QuerySpec, SeriesPoint, WidgetKind } from './queries';
 
 /**
@@ -50,12 +51,15 @@ export function colorOf(
   return index < SLOTS ? `var(--chart-${index + 1})` : OTHER_COLOR;
 }
 
-/** Minutes as hours ("12.5h"), counts as whole numbers with separators. */
+/** Minutes as hours ("12.5h"), counts as whole numbers with separators, a field's numbers with up
+ * to two decimals (S7.4.1: totals and averages of number fields). */
 export function formatValue(result: Pick<QueryResult, 'measure'>, value: number): string {
   if (result.measure === 'sum_estimate') {
     const h = value / 60;
     return `${h >= 100 ? Math.round(h).toLocaleString() : Math.round(h * 10) / 10}h`;
   }
+  if (result.measure === 'sum_field' || result.measure === 'avg_field')
+    return value.toLocaleString(undefined, { maximumFractionDigits: 2 });
   return Math.round(value).toLocaleString();
 }
 
@@ -65,8 +69,13 @@ export function formatAverage(result: Pick<QueryResult, 'measure'>, value: numbe
   return (Math.round(value * 10) / 10).toLocaleString();
 }
 
-export function unitOf(result: Pick<QueryResult, 'measure'>, value: number): string {
+export function unitOf(
+  result: Pick<QueryResult, 'measure'> & { measure_field_name?: string | null },
+  value: number,
+): string {
   if (result.measure === 'sum_estimate') return 'estimated';
+  if (result.measure === 'sum_field') return `total ${result.measure_field_name ?? ''}`.trim();
+  if (result.measure === 'avg_field') return `average ${result.measure_field_name ?? ''}`.trim();
   return value === 1 ? 'task' : 'tasks';
 }
 
@@ -173,7 +182,12 @@ export interface Draft {
   timeField: TimeField;
   bucket: Bucket;
   windowDays: number;
-  measure: 'count' | 'sum_estimate';
+  measure: QuerySpec['measure'];
+  /** S7.4.1: the number field a sum/average adds up, the date field a line counts by, and
+   * custom-field filters (`<field id>:<op>[:<arg>]`, as the lists keep them) */
+  measureFieldId: string | null;
+  timeFieldId: string | null;
+  fieldFilters: string[];
   limit: number;
   size: 'sm' | 'md' | 'lg';
   narrow: Narrow;
@@ -204,6 +218,9 @@ export function newDraft(kind: WidgetKind = 'bar'): Draft {
     bucket: 'week',
     windowDays: 84,
     measure: 'count',
+    measureFieldId: null,
+    timeFieldId: null,
+    fieldFilters: [],
     limit: kind === 'list' ? 10 : 8,
     size: DEFAULT_SIZE[kind],
     narrow: {},
@@ -260,6 +277,11 @@ export function draftOf(item: {
     bucket: s.time_bucket ?? 'week',
     windowDays: s.window_days ?? 84,
     measure: s.measure ?? 'count',
+    measureFieldId: s.measure_field_id ?? null,
+    timeFieldId: s.time_field_id ?? null,
+    fieldFilters: (f.fields ?? []).map((x) =>
+      fieldFilterText({ fieldId: x.field_id, op: x.op, values: x.values ?? [], value: x.value ?? null }),
+    ),
     limit: s.limit ?? (item.kind === 'list' ? 10 : 8),
     size: item.size,
     narrow: narrowOf(f),
@@ -285,14 +307,26 @@ export function specOf(d: Draft): QuerySpec {
   else if (n.assignees?.length) filters.assignees = n.assignees;
   if (d.dueWithin !== null && !d.overdue) filters.due_within_days = d.dueWithin;
   if (d.completedWithin !== null && status !== 'open') filters.completed_within_days = d.completedWithin;
-  const spec = fullSpec({ filters, measure: d.kind === 'list' ? 'count' : d.measure });
+  const parsed = d.fieldFilters.map(parseFieldFilter).filter((x): x is FieldFilter => x !== null);
+  if (parsed.length)
+    filters.fields = parsed.map((x) => ({
+      field_id: x.fieldId,
+      op: x.op,
+      values: x.values,
+      value: x.value,
+    }));
+  const fieldMeasure = d.measure === 'sum_field' || d.measure === 'avg_field';
+  const measure = d.kind === 'list' || (fieldMeasure && !d.measureFieldId) ? 'count' : d.measure;
+  const spec = fullSpec({ filters, measure });
+  if (measure === 'sum_field' || measure === 'avg_field') spec.measure_field_id = d.measureFieldId;
   if (d.kind === 'bar' || d.kind === 'donut') {
     spec.group_by = d.groupBy;
     if (d.groupBy === 'field') spec.field_id = d.fieldId;
     spec.limit = d.limit;
   } else if (d.kind === 'line') {
     spec.time_bucket = d.bucket;
-    spec.time_field = d.timeField;
+    spec.time_field = d.timeField === 'field' && !d.timeFieldId ? 'completed' : d.timeField;
+    if (spec.time_field === 'field') spec.time_field_id = d.timeFieldId;
     spec.window_days = d.windowDays;
   } else if (d.kind === 'list') {
     spec.limit = d.limit;
@@ -304,12 +338,20 @@ export function specOf(d: Draft): QuerySpec {
 export function draftProblem(d: Draft): string | null {
   if ((d.kind === 'bar' || d.kind === 'donut') && d.groupBy === 'field' && !d.fieldId)
     return 'Pick a custom field to group by.';
+  if (d.kind !== 'list' && (d.measure === 'sum_field' || d.measure === 'avg_field') && !d.measureFieldId)
+    return 'Pick the number field to add up.';
+  if (d.kind === 'line' && d.timeField === 'field' && !d.timeFieldId)
+    return 'Pick the date field to count by.';
   if (!(d.titleTouched ? d.title : autoTitle(d)).trim()) return 'Give the chart a title.';
   return null;
 }
 
 /** A readable default title from the choices ("Open tasks by assignee"). */
-export function autoTitle(d: Draft, fieldName?: string | null): string {
+export function autoTitle(
+  d: Draft,
+  fieldName?: string | null,
+  names: { measure?: string | null; time?: string | null } = {},
+): string {
   const s = specOf(d);
   const f = s.filters!;
   let what = f.overdue
@@ -318,9 +360,16 @@ export function autoTitle(d: Draft, fieldName?: string | null): string {
       ? 'Blocked tasks'
       : { open: 'Open tasks', completed: 'Completed tasks', all: 'Tasks' }[f.status ?? 'open'];
   if (s.measure === 'sum_estimate') what = `Estimated hours (${what.toLowerCase()})`;
+  if (s.measure === 'sum_field') what = `Total ${names.measure ?? 'value'} (${what.toLowerCase()})`;
+  if (s.measure === 'avg_field') what = `Average ${names.measure ?? 'value'} (${what.toLowerCase()})`;
   if (d.mine) what = `My ${what.toLowerCase()}`;
   if (d.kind === 'line') {
-    const verb = { completed: 'Completed', created: 'Created', due: 'Due' }[d.timeField];
+    const verb = {
+      completed: 'Completed',
+      created: 'Created',
+      due: 'Due',
+      field: `By ${names.time ?? 'date field'}`,
+    }[d.timeField];
     return `${verb} per ${d.bucket}`;
   }
   if (d.kind === 'bar' || d.kind === 'donut') {
