@@ -1300,6 +1300,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/integrations/asana/discover": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Browse Asana: workspaces, then a workspace's teams, then a team's projects */
+        post: operations["discover_api_v1_integrations_asana_discover_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/integrations/asana/import": {
         parameters: {
             query?: never;
@@ -1309,8 +1326,60 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Import a team's projects/tasks from Asana (synchronous; the PAT is never stored) */
+        /** Import a team in one request (small imports; larger ones use /imports + steps) */
         post: operations["import_from_asana_api_v1_integrations_asana_import_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/integrations/asana/imports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Recent Asana imports (yours; every one for an admin) */
+        get: operations["list_imports_api_v1_integrations_asana_imports_get"];
+        put?: never;
+        /** Plan an import (or a dry run); then call its step endpoint until it's done */
+        post: operations["create_import_api_v1_integrations_asana_imports_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/integrations/asana/imports/{job_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** An import */
+        get: operations["get_import_api_v1_integrations_asana_imports__job_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/integrations/asana/imports/{job_id}/step": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Run the import for up to ~40 s (send the token each time; it's never stored) */
+        post: operations["step_import_api_v1_integrations_asana_imports__job_id__step_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3935,6 +4004,30 @@ export interface components {
              */
             decision: "approved" | "changes_requested" | "rejected";
         };
+        /**
+         * AsanaDiscoverIn
+         * @description S7.4.2: browse Asana with a token: its workspaces, a workspace's teams, a team's projects.
+         */
+        AsanaDiscoverIn: {
+            /**
+             * Pat
+             * @description Asana personal access token: used for this call only, never stored
+             */
+            pat: string;
+            /** Team Gid */
+            team_gid?: string | null;
+            /** Workspace Gid */
+            workspace_gid?: string | null;
+        };
+        /** AsanaDiscoverOut */
+        AsanaDiscoverOut: {
+            /** Projects */
+            projects: components["schemas"]["AsanaThing"][];
+            /** Teams */
+            teams: components["schemas"]["AsanaThing"][];
+            /** Workspaces */
+            workspaces: components["schemas"]["AsanaThing"][];
+        };
         /** AsanaImportIn */
         AsanaImportIn: {
             /**
@@ -3950,6 +4043,52 @@ export interface components {
             team_name: string;
             /** Workspace Gid */
             workspace_gid: string;
+        };
+        /**
+         * AsanaJobIn
+         * @description S7.4.2: what to import. No token here: each step sends it (``AsanaStepIn``).
+         */
+        AsanaJobIn: {
+            /**
+             * Dry Run
+             * @description Count and report only; write nothing
+             * @default false
+             */
+            dry_run: boolean;
+            /**
+             * Invite Unmatched
+             * @description Asana people with no Momentum account join as invited (matched by email when they first sign in), so their tasks keep their assignee
+             * @default true
+             */
+            invite_unmatched: boolean;
+            /** Project Gids */
+            project_gids?: string[] | null;
+            /** Team Gid */
+            team_gid: string;
+            /** Team Name */
+            team_name: string;
+            /** Workspace Gid */
+            workspace_gid: string;
+        };
+        /** AsanaStepIn */
+        AsanaStepIn: {
+            /**
+             * Pat
+             * @description Asana personal access token: used for this call only, never stored
+             */
+            pat: string;
+        };
+        /** AsanaThing */
+        AsanaThing: {
+            /**
+             * Archived
+             * @default false
+             */
+            archived: boolean;
+            /** Gid */
+            gid: string;
+            /** Name */
+            name: string;
         };
         /** AttachmentOut */
         AttachmentOut: {
@@ -5398,6 +5537,11 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+            /**
+             * Dry Run
+             * @default false
+             */
+            dry_run: boolean;
             /** Finished At */
             finished_at: string | null;
             /**
@@ -5405,10 +5549,12 @@ export interface components {
              * Format: uuid
              */
             id: string;
-            /** Log */
-            log: {
-                [key: string]: unknown;
-            } | null;
+            /**
+             * Remaining
+             * @description Work items left (0 when finished)
+             * @default 0
+             */
+            remaining: number;
             /**
              * Source
              * @enum {string}
@@ -5554,6 +5700,13 @@ export interface components {
         ListOut_GoalOut_: {
             /** Data */
             data: components["schemas"]["GoalOut"][];
+            /** @default {} */
+            meta: components["schemas"]["ListMeta"];
+        };
+        /** ListOut[ImportJobOut] */
+        ListOut_ImportJobOut_: {
+            /** Data */
+            data: components["schemas"]["ImportJobOut"][];
             /** @default {} */
             meta: components["schemas"]["ListMeta"];
         };
@@ -12150,6 +12303,39 @@ export interface operations {
             };
         };
     };
+    discover_api_v1_integrations_asana_discover_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AsanaDiscoverIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AsanaDiscoverOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     import_from_asana_api_v1_integrations_asana_import_post: {
         parameters: {
             query?: never;
@@ -12160,6 +12346,125 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["AsanaImportIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportJobOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_imports_api_v1_integrations_asana_imports_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListOut_ImportJobOut_"];
+                };
+            };
+        };
+    };
+    create_import_api_v1_integrations_asana_imports_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AsanaJobIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportJobOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_import_api_v1_integrations_asana_imports__job_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportJobOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    step_import_api_v1_integrations_asana_imports__job_id__step_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AsanaStepIn"];
             };
         };
         responses: {

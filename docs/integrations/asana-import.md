@@ -90,6 +90,56 @@ Asana's library/global fields become `field_defs.is_library=true`.
 
 Each pass checkpoints progress in `import_jobs.log`, so a failed import resumes from the last completed page.
 
+## 5a. As built (S7.4.2, 2026-10-05)
+
+The importer is `integrations/asana_import/engine.py`: an import is an `import_jobs` row whose
+`log` holds a queue of small work items (`start` → each `project` → its `section`s → their tasks'
+`subtasks`, `stories`, `attachments`, the project's `status` updates → `deps` → `finish`) plus the
+maps it builds (people by email, tags, custom fields and their options). **Each step** runs for up
+to ~40 s inside one transaction and saves the queue with its work, so a step that fails or is cut
+off changes nothing, and the next step resumes exactly there. **The token is never stored:** the
+browser (or the CLI) keeps it in memory and sends it with every step.
+
+| How | When |
+|---|---|
+| Settings → Import from Asana (a wizard: token → workspace → team → projects → dry run → import, with progress) | Up to a few teams; the page drives the steps |
+| `momentum asana-import --workspace <gid> --team <gid> --team-name <name> --as <admin email> [--project <gid>…] [--dry-run] [--no-invite] [--resume <job id>]` with `ASANA_PAT` set | Large teams, go-live (S8.3.3): runs every step in a loop, prints progress and the report |
+| `POST /integrations/asana/import` | One request for a small team (tests, scripts) |
+
+API: `POST /integrations/asana/discover {pat, workspace_gid?, team_gid?}` (browse), `POST
+/integrations/asana/imports {workspace_gid, team_gid, team_name, project_gids?, dry_run,
+invite_unmatched}` (a job; no token), `POST /integrations/asana/imports/{id}/step {pat}`, `GET
+/integrations/asana/imports[/{id}]` (yours, or every one for an admin). A job's `stats` is the
+report: counts per type (`teams, projects, sections, tasks, subtasks, milestones, approvals,
+placements, custom_fields, field_values, tags, tag_links, followers, likes, comments,
+attachments, attachment_links, status_updates, dependencies, users_matched, users_invited,
+users_unmatched`), `skipped_items` (each with its reason; the first 500), `unmapped` (what was
+imported differently, e.g. formula fields as text snapshots) and `remaining` work items.
+
+**What is kept:** archived projects (archived); project notes as the brief, colour, privacy,
+owner, default view, dates, status updates (the newest sets the project status); sections in
+order; tasks with rich-text descriptions (`richtext.py`: bold, italic, underline, strike, code,
+links, lists, headings, quotes, code blocks, line breaks), type (milestones, approvals with their
+state), assignee, dates, completion, creator and created date, tags, followers, likes (👍),
+custom-field values, subtasks at any depth, a task in several projects as one task with several
+placements, dependencies between imported tasks; comments with their author and date (an author
+whose email the token can't see keeps their name in the comment); Asana-hosted files up to
+`MOMENTUM_MAX_UPLOAD_MB` (larger files, and files on Drive, Dropbox and the like, become a comment
+with the link). **People:** matched by email; anyone else with an email joins as an *invited*
+member (`--no-invite` to skip), so their tasks keep their assignee and they are the same user when
+they first sign in. **Custom fields:** one Momentum field per Asana field, attached to every
+project that uses it; options keep their names, colours and disabled state (an option's id is
+derived from its Asana id, so re-runs find it and add options created since); formula, ID and
+time-tracking fields come in as text holding the value Asana showed.
+
+**Not imported** (listed in the report or here): system history ("assigned to…", "changed the due
+date"), rules, forms, portfolios and goals (recreate them; Momentum's rule builder and forms take
+plain words), My Tasks sections, project permissions beyond the team's.
+
+**Writes** go straight to the tables, not through the domain services: an import is history, not
+new activity (services would notify every assignee and run rules and agents). Every row says
+`created_via="import"`; one `import.finished` activity and event close the import.
+
 ## 6. Validation after import
 
 - Count reconciliation per project: tasks (open/completed), subtasks, comments, attachments.

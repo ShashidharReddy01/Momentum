@@ -269,6 +269,108 @@ def evals(
         raise typer.Exit(code=1)
 
 
+@cli.command("asana-import")
+def asana_import(
+    workspace: str = typer.Option(..., "--workspace", help="Asana workspace gid"),
+    team: str = typer.Option(..., "--team", help="Asana team gid"),
+    team_name: str = typer.Option(..., "--team-name", help="The team's name in Momentum"),
+    acting_as: str = typer.Option(..., "--as", help="Email of the Momentum admin importing"),
+    project: list[str] = typer.Option([], "--project", help="Only these project gids"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Report only; write nothing"),
+    no_invite: bool = typer.Option(
+        False, "--no-invite", help="Don't invite Asana people who have no account yet"
+    ),
+    resume: str | None = typer.Option(None, "--resume", help="Continue this import job id"),
+) -> None:
+    """Import an Asana team (S7.4.2): projects, sections, tasks and subtasks, custom fields and
+    values, comments, files, followers, likes, dependencies and status updates. The token is read
+    from the ASANA_PAT environment variable (or asked for) and never stored. Safe to re-run; an
+    interrupted import continues with --resume <job id>."""
+    import os
+    import uuid as _uuid
+
+    from sqlalchemy import func, select
+
+    from momentum.core.context import Actor, Ctx
+    from momentum.core.db import UnitOfWork, create_engine, create_session_factory
+    from momentum.core.storage import build_storage
+    from momentum.domain.users.models import User
+    from momentum.integrations.asana_import import service
+    from momentum.integrations.asana_import.client import AsanaClient
+    from momentum.integrations.asana_import.engine import run_step
+
+    settings = Settings()
+    pat = os.environ.get("ASANA_PAT") or typer.prompt(
+        "Asana personal access token", hide_input=True
+    )
+
+    async def _run() -> None:
+        engine = create_engine(settings)
+        factory = create_session_factory(engine)
+        client = AsanaClient(pat, base_url=settings.asana_base_url)
+        try:
+            async with UnitOfWork(factory()).transaction() as s:
+                user = (
+                    await s.execute(select(User).where(func.lower(User.email) == acting_as.lower()))
+                ).scalar_one_or_none()
+                if user is None or user.role != "admin":
+                    raise typer.BadParameter(f"{acting_as} isn't an admin in this workspace")
+                ctx = Ctx(
+                    actor=Actor(
+                        id=user.id,
+                        workspace_id=user.workspace_id,
+                        role=user.role,
+                        email=user.email,
+                        name=user.name,
+                    ),
+                    settings=settings,
+                    via="import",
+                )
+                if resume:
+                    job = await service.get_job(s, ctx, _uuid.UUID(resume))
+                else:
+                    job = await service.start_import(
+                        s,
+                        ctx,
+                        workspace_gid=workspace,
+                        team_gid=team,
+                        team_name=team_name,
+                        project_gids=project or None,
+                        dry_run=dry_run,
+                        invite_unmatched=not no_invite,
+                    )
+                job_id = job.id
+            typer.echo(f"import {job_id} ({'dry run' if dry_run else 'import'})")
+            while True:
+                async with UnitOfWork(factory()).transaction() as s:
+                    job = await service.get_job(s, ctx, job_id, lock=True)
+                    await run_step(
+                        s,
+                        ctx,
+                        client,
+                        job,
+                        storage=build_storage(settings),
+                        max_upload_bytes=settings.max_upload_mb * 1024 * 1024,
+                    )
+                    stats, status = dict(job.stats or {}), job.status
+                typer.echo(
+                    f"  {status}: {stats.get('projects', 0)} projects, {stats.get('tasks', 0)} "
+                    f"tasks, {stats.get('comments', 0)} comments, {stats.get('remaining', 0)} left"
+                )
+                if status in ("done", "failed"):
+                    break
+            for key, value in sorted(stats.items()):
+                if key not in ("skipped_items", "remaining", "steps_done"):
+                    typer.echo(f"{key:>20}: {value}")
+            for reason in stats.get("skipped_items", []):
+                typer.echo(f"  skipped: {reason}")
+        finally:
+            await client.aclose()
+            await engine.dispose()
+
+    run_async(_run())
+
+
 agents_cli = typer.Typer(no_args_is_help=True, help="Agents: install and inspect (Phase 5)")
 cli.add_typer(agents_cli, name="agents")
 

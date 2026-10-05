@@ -57,6 +57,9 @@ def make_settings(**overrides: object) -> Settings:
         "allowed_email_domains": "acme-demo.test",
         "bootstrap_admin_emails": "admin@acme-demo.test",
         "storage_local_dir": tempfile.mkdtemp(prefix="momentum-test-attachments-"),
+        # no test talks to the real Asana: a closed local port fails fast (importer tests use
+        # FakeAsana; the e2e run uses tools/e2e/asana_fixture_server.py)
+        "asana_base_url": "http://127.0.0.1:9",
         "_env_file": None,
     }
     base.update(overrides)

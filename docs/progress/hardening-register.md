@@ -56,6 +56,8 @@ How findings are found:
 | H42 | P1 | Task pane / editor | Clicking "Add subtask" (or anything below a description) right after typing in it often did nothing: the formatting toolbar hid at mousedown, everything below moved up, and the click landed on whatever slid under the pointer. | Full e2e (J2) at UX8 | fixed: the toolbar stays until the press is released (`useUntilRelease`), then hides; test |
 | H43 | P2 | Keyboard | After opening a task with Space, Escape didn't close the pane (focus stays on the list; only the pane listened). | Keyboard pass (`tools/ux/keyboard.mjs`) | fixed: Escape closes the open task from anywhere on the page unless a field, dialog or menu handles it; in a list it closes the pane before clearing the selection; test |
 | H44 | P2 | Accessibility | Rich-text editors (description, project brief, status) showed no focus indicator. | Keyboard pass | fixed: an editable editor shows the standard focus outline |
+| H45 | P3 | Configuration docs | `configuration.md` listed `MOMENTUM_ASANA_IMPORT_ENABLED`, which doesn't exist, and missed `MOMENTUM_ASANA_BASE_URL`, which does. | S7.4.2 review | fixed: the real setting documented (and in `.env.example`) |
+| H46 | P2 | Asana import | The importer's link lookup didn't filter by workspace, a team was imported only from its own members (assignees outside the team lost their assignee), and archived projects were skipped. | S7.4.2 review | fixed in the rebuilt engine: links per workspace, people from the whole Asana workspace, archived projects imported archived |
 
 ## Reviewed, no change needed
 

@@ -26,16 +26,3 @@ def map_task_type(resource_subtype: str | None) -> str | None:
 
 def map_approval_state(approval_status: str | None) -> str | None:
     return approval_status if approval_status in TASK_APPROVAL_STATES else None
-
-
-def html_to_plain(html_or_notes: str | None) -> str:
-    """A deliberately plain fallback, not the spec's full HTML → Tiptap converter (disclosed in
-    STATUS.md as this slice's biggest scope cut): strips Asana's `<body>`/`<p>` wrapper tags it
-    always emits and returns the inner text as-is. Rich formatting (bold, links, lists, mentions)
-    is lost; the text itself is not."""
-    import re
-
-    text = html_or_notes or ""
-    text = re.sub(r"</p>\s*<p>", "\n\n", text)
-    text = re.sub(r"<[^>]+>", "", text)
-    return text.strip()

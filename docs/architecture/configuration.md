@@ -120,7 +120,7 @@ Frontend build-time variables use the `VITE_MOMENTUM_` prefix, but the SPA prefe
 | `MOMENTUM_GRAPH_ENABLED`, `_GRAPH_TENANT_ID`, `_GRAPH_CLIENT_ID`, `_GRAPH_CLIENT_SECRET` | Outlook calendar |
 | `MOMENTUM_EMAIL_IN_ENABLED`, `_EMAIL_IN_DOMAIN` | Email-to-task |
 | `MOMENTUM_EMAIL_OUT_BACKEND` (`none`,`smtp`,`acs`) + SMTP settings | Outbound email |
-| `MOMENTUM_ASANA_IMPORT_ENABLED` | Importer UI (token entered at import time, never stored) |
+| `MOMENTUM_ASANA_BASE_URL` | Asana's API (`https://app.asana.com/api/1.0`); the e2e run points it at `tools/e2e/asana_fixture_server.py`. The importer is always available to admins and members who can create teams; its token is entered per import and never stored (the CLI `momentum asana-import` reads it from `ASANA_PAT`, an environment variable of that one command, not a setting) |
 
 ## Observability
 

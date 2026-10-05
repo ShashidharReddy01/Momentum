@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { setupServer } from 'msw/node';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
@@ -18,15 +18,16 @@ afterEach(() => {
 });
 afterAll(() => server.close());
 
-describe('Asana import (S2.7.1)', () => {
-  it('submits the form and shows the resulting counts', async () => {
+describe('Asana import wizard (S7.4.2)', () => {
+  it('connects, picks a team and projects, dry-runs, then imports in steps with the token each time', async () => {
+    const asana = asanaImportHandlers();
     server.use(
       ...authHandlers({ loggedIn: true }).handlers,
       ...teamHandlers(),
       ...projectHandlers(),
       ...notificationHandlers(),
       ...searchHandlers(),
-      ...asanaImportHandlers(),
+      ...asana,
     );
     window.history.replaceState(null, '', '/settings/import/asana');
     render(<MomentumApp />);
@@ -34,13 +35,29 @@ describe('Asana import (S2.7.1)', () => {
 
     await screen.findByRole('heading', { name: 'Import from Asana' });
     await user.type(screen.getByLabelText('Personal Access Token'), '1/abc');
-    await user.type(screen.getByLabelText('Asana workspace gid'), 'ws1');
-    await user.type(screen.getByLabelText('Asana team gid'), 'team1');
-    await user.click(screen.getByRole('button', { name: 'Run import' }));
+    await user.click(screen.getByRole('button', { name: 'Connect' }));
+    // one workspace: chosen for you; then the team
+    await user.selectOptions(await screen.findByLabelText('Asana team'), 'team1');
+    const projects = await screen.findByRole('group', { name: /Projects \(2 of 2\)/ });
+    expect(within(projects).getByText('archived')).toBeInTheDocument();
+    await user.click(within(projects).getByRole('checkbox', { name: /Old site/ }));
+    expect(screen.getByLabelText('Team name in Momentum')).toHaveValue('Product');
 
+    await user.click(screen.getByRole('button', { name: 'Dry run' }));
+    expect(await screen.findByText('Dry run finished: nothing was changed')).toBeInTheDocument();
+    const would = screen.getByLabelText('Would import');
+    expect(within(would).getByText('Tasks').nextSibling).toHaveTextContent('5');
+    expect(screen.getByText(/formula fields imported as a text snapshot/)).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Import' }));
     expect(await screen.findByText('Import finished')).toBeInTheDocument();
-    expect(screen.getByText('teams: 1')).toBeInTheDocument();
-    expect(screen.getByText('projects: 2')).toBeInTheDocument();
-    expect(screen.getByText('tasks: 5')).toBeInTheDocument();
+    expect(within(screen.getByLabelText('Imported')).getByText('Comments').nextSibling).toHaveTextContent(
+      '3',
+    );
+    await user.click(screen.getByText('1 not imported'));
+    expect(screen.getByText('task t3: a legacy section row, not a task')).toBeInTheDocument();
+    // two steps per run, the token sent with every one
+    expect(asana.steps).toHaveLength(4);
+    expect(asana.steps.every((s) => s.pat === '1/abc')).toBe(true);
   });
 });
