@@ -1,0 +1,298 @@
+"""PDF primitives: zip unpacking + dedup, boundary-aware splitting of a
+multi-invoice PDF into single invoices, text extraction, and page-image
+rendering. Deterministic — no model calls anywhere in this module.
+
+Boundary detection and the "PAGE N OF M" continuation guard are a direct port
+of Keel's `core/adapters/pdf.py::detect_invoice_boundaries` — read in full
+during planning: a same-invoice continuation page repeating letterhead
+keywords (BILL TO, INVOICE DATE) on every page would otherwise be wrongly
+split into a headless fragment missing the one printed grand total.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import io
+import zipfile
+from dataclasses import dataclass, field
+from typing import Optional
+
+import fitz  # PyMuPDF
+import pdfplumber
+
+MAX_ARCHIVE_ENTRIES = 500
+MAX_ENTRY_BYTES = 25 * 1024 * 1024  # 25MB per entry — well over any real invoice
+ALLOWED_ENTRY_EXTENSIONS = (".pdf",)
+
+_BOUNDARY_KEYWORDS = (
+    "INVOICE", "TAX INVOICE", "INVOICE NUMBER", "INV-", "BILL TO", "INVOICE DATE",
+)
+
+
+@dataclass
+class Document:
+    """One invoice candidate — either a whole uploaded PDF, or one split-out
+    range of a multi-invoice PDF. `pdf_bytes` is held in memory only for the
+    lifetime of one job run; nothing here is ever persisted as-is."""
+
+    doc_id: str
+    filename: str
+    sha256: str
+    pdf_bytes: bytes
+    page_count: int
+    parent_filename: Optional[str] = None
+    # The archive entry's immediate containing folder, slugified (e.g. an
+    # entry at "Bloomberg/invoice.pdf" -> "bloomberg") -- a deterministic,
+    # zero-cost vendor signal when the archive is organised by vendor
+    # folder, which the pipeline prefers over an LLM guess when present.
+    vendor_hint: Optional[str] = None
+    # populated by later pipeline stages
+    vendor_id: str = "unknown"
+    vendor_name_as_printed: Optional[str] = None
+    is_scanned: bool = False
+    text: str = ""
+    used_ocr: bool = False
+    text_confidence: float = 0.0
+    rendered_images: list[bytes] = field(default_factory=list)
+    extracted_invoice: Optional[dict] = None
+    mismatches: list[dict] = field(default_factory=list)
+    self_check_attempts: int = 0
+    status: str = "pending"  # pending | clean | needs_human_review | excluded
+    exclude_reason: Optional[str] = None
+
+
+class InvoiceArchiveError(ValueError):
+    """The uploaded archive/PDF could not be safely unpacked."""
+
+
+def compute_sha256(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
+def _as_zip_bytes(filename: str, data: bytes) -> bytes:
+    """A single PDF upload becomes a one-entry in-memory zip, so
+    `ingest_zip` handles both shapes without a branch."""
+    if filename.lower().endswith(".zip"):
+        return data
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as zf:
+        zf.writestr(filename, data)
+    return buffer.getvalue()
+
+
+def get_page_count(pdf_bytes: bytes) -> int:
+    try:
+        with fitz.open(stream=pdf_bytes, filetype="pdf") as doc:
+            return doc.page_count
+    except Exception:
+        with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
+            return len(pdf.pages)
+
+
+def get_page_texts(pdf_bytes: bytes) -> list[str]:
+    with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
+        return [(page.extract_text() or "") for page in pdf.pages]
+
+
+def extract_text_from_bytes(pdf_bytes: bytes) -> str:
+    with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
+        return "\n".join((page.extract_text() or "") for page in pdf.pages)
+
+
+def render_page_images(pdf_bytes: bytes, page_indices: list[int], *, dpi: int = 150) -> list[bytes]:
+    """Render pages as PNG bytes for vision extraction / OCR input."""
+    zoom = dpi / 72.0
+    matrix = fitz.Matrix(zoom, zoom)
+    with fitz.open(stream=pdf_bytes, filetype="pdf") as doc:
+        return [doc[i].get_pixmap(matrix=matrix).tobytes("png") for i in page_indices]
+
+
+def _extract_invoice_number(text: str) -> Optional[str]:
+    """Best-effort invoice-number extraction from a page's text, used ONLY to
+    decide whether a later page starts a genuinely different invoice (never
+    used for the real extraction — that's `extract.extract_structured`'s
+    job). Looks for a label ("Invoice Number", "Invoice No", "INV-") followed
+    by an alphanumeric id."""
+    import re
+
+    for pattern in (
+        r"invoice\s*(?:number|no\.?|#)\s*[:\-]?\s*([A-Z0-9][A-Z0-9\-]{2,19})",
+        r"\b(INV-[A-Z0-9\-]{2,19})\b",
+    ):
+        match = re.search(pattern, text, re.IGNORECASE)
+        if match:
+            return match.group(1).upper()
+    return None
+
+
+def detect_invoice_boundaries(page_texts: list[str]) -> list[int]:
+    """Return the 0-based indices of pages that start a NEW invoice. Page 0
+    is always a boundary.
+
+    A real multi-page invoice routinely repeats "Invoice", "Invoice Number",
+    "Invoice Date" on every page's letterhead — splitting on keyword
+    presence ALONE (an earlier version of this function) wrongly fragmented
+    a single 2-page invoice into two "invoices" with mismatched totals on a
+    real live vendor sweep (Dun & Bradstreet: page 2 repeats the same
+    invoice number as page 1, purely a continuation of "details of products
+    and services", yet the naive keyword check flagged it as a boundary).
+
+    The fix: only treat a keyword-matching page as a boundary if a
+    genuinely DIFFERENT invoice number can be extracted from it than the
+    one carried from the prior page. When no invoice number is extractable
+    on either side, err on NOT splitting — an under-split multi-invoice
+    PDF still gets caught safely by `reconcile_math`'s total mismatch and
+    routed to human review, which is a far cheaper failure mode than a
+    silent false split producing two bogus part1/part2 "invoices"."""
+    import re
+
+    page_of_re = re.compile(r"PAGE\s+(\d+)\s+OF\s+(\d+)")
+    boundaries = [0]
+    current_invoice_number = _extract_invoice_number((page_texts[0] or "")[:800])
+    for i in range(1, len(page_texts)):
+        head = (page_texts[i] or "")[:400].upper()
+        match = page_of_re.search(head)
+        if match and int(match.group(1)) > 1:
+            continue
+        if not any(keyword in head for keyword in _BOUNDARY_KEYWORDS):
+            continue
+        page_invoice_number = _extract_invoice_number((page_texts[i] or "")[:800])
+        if current_invoice_number is None:
+            # No invoice number has been established yet (e.g. page 0 was a
+            # mailing/cover page with no invoice number of its own) -- this
+            # page's number, if any, is simply the first chance to learn
+            # it for the invoice already in progress, never a new boundary.
+            current_invoice_number = page_invoice_number
+        elif page_invoice_number and page_invoice_number != current_invoice_number:
+            boundaries.append(i)
+            current_invoice_number = page_invoice_number
+        # else: same invoice number (or unextractable on this page) -- a
+        # continuation page, not a boundary.
+    return boundaries
+
+
+def split_pdf_into_ranges(pdf_bytes: bytes, ranges: list[tuple[int, int]]) -> list[bytes]:
+    """`ranges` are inclusive 0-based (start, end) page ranges."""
+    out: list[bytes] = []
+    with fitz.open(stream=pdf_bytes, filetype="pdf") as src:
+        for start, end in ranges:
+            dst = fitz.open()
+            dst.insert_pdf(src, from_page=start, to_page=end)
+            out.append(dst.tobytes())
+            dst.close()
+    return out
+
+
+def split_multi_invoice_pdf(filename: str, pdf_bytes: bytes) -> list[tuple[str, bytes]]:
+    """Split a PDF that may contain more than one invoice into
+    `[(filename, bytes), ...]`. A single-invoice PDF (or a PDF whose
+    boundary detection finds nothing to split) returns `[(filename, pdf_bytes)]`
+    unchanged."""
+    page_count = get_page_count(pdf_bytes)
+    if page_count <= 1:
+        return [(filename, pdf_bytes)]
+
+    page_texts = get_page_texts(pdf_bytes)
+    boundaries = detect_invoice_boundaries(page_texts)
+    if len(boundaries) <= 1:
+        return [(filename, pdf_bytes)]
+
+    ranges = [
+        (boundaries[i], (boundaries[i + 1] - 1 if i + 1 < len(boundaries) else page_count - 1))
+        for i in range(len(boundaries))
+    ]
+    stem = filename.rsplit(".", 1)[0]
+    parts = split_pdf_into_ranges(pdf_bytes, ranges)
+    return [(f"{stem}__part{i + 1}.pdf", part) for i, part in enumerate(parts)]
+
+
+_SAFE_PUNCTUATION = set(".,:;()/%$€£¥&'\"-+#@")
+
+
+def compute_text_confidence(text: str, page_count: int) -> float:
+    """Heuristic 0-1 confidence that `text` is a genuine text layer rather
+    than OCR noise / a scanned page with no text layer at all. Ported from
+    Keel's `core/nodes/extract.py::_compute_text_confidence` (2026-08-13
+    revision — the original alnum-only punctuation set scored real, clean
+    invoices 0.62-0.66 purely because normal invoice punctuation counted as
+    "noise"; widening the safe-punctuation set fixed that without lowering
+    the bar for genuinely garbled OCR text, which still scores <0.1)."""
+    if not text.strip() or page_count <= 0:
+        return 0.0
+    density = min(1.0, len(text) / (500 * page_count))
+    non_ws = [c for c in text if not c.isspace()]
+    if not non_ws:
+        return 0.0
+    clean_ratio = sum(1 for c in non_ws if c.isalnum() or c in _SAFE_PUNCTUATION) / len(non_ws)
+    return round(density * clean_ratio, 4)
+
+
+def ingest_zip(filename: str, data: bytes, *, known_sha256s: Optional[set[str]] = None) -> list[Document]:
+    """Unzip (or wrap a single PDF), split any multi-invoice PDFs, dedup by
+    sha256, and return a `Document` per resulting single invoice.
+
+    Raises `InvoiceArchiveError` for an unreadable/oversized/too-large-entry-
+    count archive — checked BEFORE any entry is extracted (Rule 9: never
+    silently truncate, never expand an unbounded archive)."""
+    known = set(known_sha256s or ())
+    zip_bytes = _as_zip_bytes(filename, data)
+
+    try:
+        zf = zipfile.ZipFile(io.BytesIO(zip_bytes))
+    except zipfile.BadZipFile as exc:
+        raise InvoiceArchiveError(f"{filename!r} is not a readable zip/PDF archive: {exc}") from exc
+
+    infos = [i for i in zf.infolist() if not i.is_dir()]
+    if len(infos) > MAX_ARCHIVE_ENTRIES:
+        raise InvoiceArchiveError(
+            f"archive holds {len(infos)} entries; ceiling is {MAX_ARCHIVE_ENTRIES}"
+        )
+
+    documents: list[Document] = []
+    for info in infos:
+        entry_name = info.filename
+        if not entry_name.lower().endswith(ALLOWED_ENTRY_EXTENSIONS):
+            continue  # non-PDF entries (README, images, etc.) are silently skipped, not an error
+        if info.file_size > MAX_ENTRY_BYTES:
+            raise InvoiceArchiveError(
+                f"entry {entry_name!r} is {info.file_size} bytes, exceeds MAX_ENTRY_BYTES={MAX_ENTRY_BYTES}"
+            )
+        raw = zf.read(info)
+        if len(raw) > MAX_ENTRY_BYTES:
+            raise InvoiceArchiveError(
+                f"entry {entry_name!r} exceeds MAX_ENTRY_BYTES after extraction"
+            )
+
+        vendor_hint = _slugify_folder(entry_name)
+
+        for split_name, split_bytes in split_multi_invoice_pdf(entry_name, raw):
+            sha = compute_sha256(split_bytes)
+            if sha in known:
+                continue
+            known.add(sha)
+            documents.append(
+                Document(
+                    doc_id=sha[:16],
+                    filename=split_name,
+                    sha256=sha,
+                    pdf_bytes=split_bytes,
+                    page_count=get_page_count(split_bytes),
+                    parent_filename=entry_name if split_name != entry_name else None,
+                    vendor_hint=vendor_hint,
+                )
+            )
+    return documents
+
+
+def _slugify_folder(entry_name: str) -> Optional[str]:
+    """The immediate containing folder of a zip entry, slugified to the
+    same `[a-z0-9_]` shape `skills.py` requires for a vendor_id -- e.g.
+    "Cboe Global Markets/invoice.pdf" -> "cboe_global_markets". `None` for
+    an entry with no folder (a flat archive, or a single-PDF upload)."""
+    import re as _re
+
+    parts = entry_name.replace("\\", "/").split("/")
+    if len(parts) < 2 or not parts[-2].strip():
+        return None
+    slug = _re.sub(r"[^a-z0-9]+", "_", parts[-2].strip().lower()).strip("_")
+    return slug or None

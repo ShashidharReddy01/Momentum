@@ -1,0 +1,82 @@
+"""Shared `response_format=json_object` call helper with a bounded retry on
+empty/invalid content.
+
+Observed live against the real Portkey gateway during Phase 2 verification,
+two distinct failure modes despite `response_format={"type":"json_object"}`:
+
+  1. Intermittent empty `content` (~1 in 3 calls on a short prompt, no
+     discernible pattern, no `tool_calls`/`refusal` set either) — a
+     transient gateway/model hiccup; the identical call succeeds on retry.
+  2. On longer/more complex prompts (real multi-page invoices), the model
+     sometimes wraps its JSON in a markdown code fence (```json ... ```), or
+     prepends a line of prose before the fence ("Here is the extracted
+     data:\n```json\n{...}```") despite json_object mode supposedly
+     forbidding prose — `json.loads` on the raw content then fails on
+     whatever precedes the JSON as "Expecting value: line 1 column 1",
+     which looked identical to failure mode 1 until traced back to a real,
+     reproducible response shape rather than a transient blip.
+
+A real production document (a 6-page MSCI invoice, otherwise clean, high
+text-confidence) hit 3 failed attempts in a row at the old MAX_RETRIES=2 and
+was wrongly `excluded` from the whole run instead of reaching reconciliation
+— re-running the identical call standalone succeeded first try, confirming
+this was transient flakiness, not a document the model can't handle.
+MAX_RETRIES raised accordingly, and `_strip_code_fence` widened to find a
+fenced block or a bare `{...}` object ANYWHERE in the content, not only when
+it is the entire trimmed string.
+"""
+
+from __future__ import annotations
+
+import json
+import re
+from typing import Any
+
+MAX_RETRIES = 4
+
+_CODE_FENCE_RE = re.compile(r"```(?:json)?\s*\n?(.*?)\n?```", re.DOTALL)
+
+
+class EmptyCompletionError(RuntimeError):
+    """The gateway returned no usable content after all retries."""
+
+
+def _strip_code_fence(content: str) -> str:
+    """Best-effort extraction of the JSON object from `content`, tolerating
+    a fenced block anywhere in the text (not just spanning the whole
+    trimmed string) and, failing that, the first balanced `{...}` span —
+    covers a stray preamble sentence before the fence or before a bare
+    object, either of which otherwise fails `json.loads` at char 0."""
+    stripped = content.strip()
+    match = _CODE_FENCE_RE.search(stripped)
+    if match:
+        return match.group(1)
+    start = stripped.find("{")
+    end = stripped.rfind("}")
+    if start != -1 and end != -1 and end > start:
+        return stripped[start : end + 1]
+    return stripped
+
+
+def complete_json(client: Any, *, model: str, messages: list, max_tokens: int) -> dict:
+    last_error: Exception | None = None
+    for attempt in range(MAX_RETRIES + 1):
+        msg = None
+        try:
+            from app import llm as LLM
+
+            msg = LLM.complete_turn(
+                client, model=model, messages=messages,
+                response_format={"type": "json_object"}, max_tokens=max_tokens,
+            )
+            if not msg.content:
+                raise EmptyCompletionError(
+                    f"gateway returned empty content on attempt {attempt + 1}"
+                )
+            return json.loads(_strip_code_fence(msg.content))
+        except (EmptyCompletionError, json.JSONDecodeError) as exc:
+            last_error = exc
+            continue
+    raise EmptyCompletionError(
+        f"gateway returned no usable JSON after {MAX_RETRIES + 1} attempts: {last_error}"
+    )

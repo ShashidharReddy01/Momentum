@@ -1,0 +1,142 @@
+"""Per-vendor hint packs — "this vendor prints its invoice date under the
+remittance block, not the letterhead" style corrections that make the NEXT
+invoice from the same vendor extract cleanly.
+
+Stored as YAML files under `coap/skills/vendors/<vendor_id>.yaml`. Demo-scope
+simplification of Keel's pending-diff-then-human-approval split
+(`core/memory/skills.py` + `core/nodes/learn.py`, read in full during
+planning): here a human-resolved correction (`resolve_invoice_line`, in
+`app/tools_invoice.py`) writes the hint directly — there is no separate
+"approve this learned skill" step. Flagged in the Phase 2 plan as a
+deliberate scope cut, not an oversight.
+"""
+
+from __future__ import annotations
+
+import re
+from pathlib import Path
+from typing import Any, Optional
+
+import yaml
+
+from app.invoice.llm_json import complete_json
+
+_VENDOR_ID_RE = re.compile(r"^[a-z0-9_\-]+$")
+
+_HINT_SYSTEM_PROMPT = """A human just corrected one field of an invoice extraction for this
+vendor. Write a SHORT hint that will help the extractor read this field
+correctly on the vendor's NEXT invoice.
+
+Rules:
+- Describe HOW to read the field: its position on the page, the label it
+  sits under, a formatting quirk, or which of several similar-looking
+  figures is the right one -- never a fixed value. The hint must still be
+  useful on a different invoice with different numbers.
+- NEVER quote the actual original or corrected value, and never include any
+  customer name, account number, address, or other personal/identifying
+  data that might appear in the surrounding text -- describe the pattern,
+  not the specific figures.
+- One or two sentences. If you cannot identify a real, generalizable
+  pattern from what's given (e.g. the correction looks like a one-off
+  typo), say so honestly in "generalizes": false.
+
+Respond with ONLY a JSON object matching this exact shape:
+{
+  "hint": "<string, position/pattern description>",
+  "reason": "<string, one sentence on what was wrong before>",
+  "generalizes": <true/false>
+}
+"""
+
+
+def generate_hint(
+    client: Any, *, model: str, field: str, document_text: str,
+) -> Optional[tuple[str, str]]:
+    """Ask the model to describe HOW to read `field` correctly next time,
+    from the (already-corrected) document context — never told the actual
+    old/new values, so it cannot simply echo them back into the hint.
+    Returns `(hint, reason)`, or `None` if the model judged the correction a
+    one-off (`generalizes: false`) rather than a real pattern worth
+    learning.
+    """
+    user_content = (
+        f"field that was corrected: {field}\n\n"
+        f"<untrusted_document>\n{document_text}\n</untrusted_document>"
+    )
+    data = complete_json(
+        client,
+        model=model,
+        messages=[
+            {"role": "system", "content": _HINT_SYSTEM_PROMPT},
+            {"role": "user", "content": user_content},
+        ],
+        max_tokens=400,
+    )
+    if not data.get("generalizes", True):
+        return None
+    hint = (data.get("hint") or "").strip()
+    reason = (data.get("reason") or "").strip()
+    if not hint:
+        return None
+    return hint, reason
+
+_GENERIC_TEMPLATE: dict[str, Any] = {"skill": "generic", "version": 0, "hints": []}
+
+
+def _vendors_dir() -> Path:
+    # app/invoice/skills.py -> app/invoice -> app -> <repo>/skills/vendors
+    return Path(__file__).resolve().parents[2] / "skills" / "vendors"
+
+
+def list_known_vendors() -> list[str]:
+    vendors_dir = _vendors_dir()
+    if not vendors_dir.is_dir():
+        return []
+    return sorted(p.stem for p in vendors_dir.glob("*.yaml"))
+
+
+def load_vendor_skill(vendor_id: str) -> dict[str, Any]:
+    """Load a vendor's hint pack, or the generic fallback if none exists yet
+    (a cold-start vendor is never a failure — see the diagram's "Other 100s
+    -> generic mode" branch)."""
+    if not vendor_id or vendor_id == "unknown" or not _VENDOR_ID_RE.match(vendor_id):
+        return dict(_GENERIC_TEMPLATE)
+
+    vendors_dir = _vendors_dir()
+    candidate = (vendors_dir / f"{vendor_id}.yaml").resolve()
+    if vendors_dir.resolve() not in candidate.parents:
+        return dict(_GENERIC_TEMPLATE)  # path-traversal guard, never a failure
+    if not candidate.is_file():
+        return dict(_GENERIC_TEMPLATE)
+
+    data = yaml.safe_load(candidate.read_text(encoding="utf-8")) or {}
+    data.setdefault("skill", vendor_id)
+    data.setdefault("version", 0)
+    data.setdefault("hints", [])
+    return data
+
+
+def learn_hint(vendor_id: str, *, field: str, hint: str, reason: str) -> dict[str, Any]:
+    """Append one hint to a vendor's skill file (creating it if this is the
+    vendor's first learned correction) and write it back — auto-applied, per
+    this module's docstring scope note. `field`/`hint`/`reason` must describe
+    HOW to read the field (layout/wording/position), never quote the actual
+    masked value, mirroring Keel's `prompts/skill_learner.md` guidance."""
+    if not vendor_id or vendor_id == "unknown" or not _VENDOR_ID_RE.match(vendor_id):
+        raise ValueError(f"cannot learn a hint for an unresolved vendor_id={vendor_id!r}")
+
+    vendors_dir = _vendors_dir()
+    vendors_dir.mkdir(parents=True, exist_ok=True)
+    path = (vendors_dir / f"{vendor_id}.yaml").resolve()
+    if vendors_dir.resolve() not in path.parents:
+        raise ValueError(f"refusing cross-directory vendor_id={vendor_id!r}")
+
+    data = load_vendor_skill(vendor_id)
+    if data.get("skill") == "generic":
+        data = {"skill": vendor_id, "version": 1, "hints": []}
+    else:
+        data["version"] = int(data.get("version", 0)) + 1
+
+    data["hints"].append({"field": field, "hint": hint, "reason": reason})
+    path.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
+    return data

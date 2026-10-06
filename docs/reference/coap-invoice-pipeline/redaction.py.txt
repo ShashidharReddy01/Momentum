@@ -1,0 +1,88 @@
+"""S3.5.2 seam, S3.7 real implementation — PII redaction for traces (Rule 21).
+
+`redact()` walks a value (str, or an arbitrary nesting of dict/list containing
+strings) and replaces any PII Presidio's analyzer detects with an
+`<ENTITY_TYPE>` placeholder, via a single lazily-constructed, process-wide
+`AnalyzerEngine`/`AnonymizerEngine` pair (model load is the expensive part —
+built once, reused for the life of the process, same posture as
+`app.llm`'s Portkey client).
+
+The NLP engine is pinned to `en_core_web_sm` explicitly (`_build_analyzer`) —
+Presidio's own default config reaches for `en_core_web_lg` (a ~560MB model
+this repo does not ship/require), so leaving it unconfigured would either
+fail to load or silently pull a much larger dependency. `en_core_web_sm`'s
+regex/checksum-based recognizers (email, phone, SSN, credit card, IP, URL,
+etc.) are unaffected by model size — only free-text NER (PERSON/ORG/LOCATION)
+loses some recall with the small model, an explicit, accepted tradeoff for
+deploy footprint on Azure App Service.
+
+Applied to `trace`/`trace_event` fields only, never to `message.content` —
+the conversation itself is the user's own record, not a third-party log.
+
+Fail-loud posture (Rule 9): if the analyzer/anonymizer themselves raise (a
+genuine library/model fault, not "no PII found"), `redact()` re-raises rather
+than silently returning the raw, unredacted value — a redaction failure must
+never look like a successful redaction. `app.tracing.SupabaseTracer`'s
+existing trace-write-failure isolation (S3.5.2) means a raised exception here
+fails that one trace write loudly rather than ever storing raw PII.
+"""
+
+from __future__ import annotations
+
+from typing import Any
+
+_analyzer = None
+_anonymizer = None
+
+
+def _build_analyzer():
+    from presidio_analyzer import AnalyzerEngine
+    from presidio_analyzer.nlp_engine import NlpEngineProvider
+
+    provider = NlpEngineProvider(
+        nlp_configuration={
+            "nlp_engine_name": "spacy",
+            "models": [{"lang_code": "en", "model_name": "en_core_web_sm"}],
+        }
+    )
+    return AnalyzerEngine(nlp_engine=provider.create_engine())
+
+
+def _get_engines():
+    global _analyzer, _anonymizer
+    if _analyzer is None:
+        from presidio_anonymizer import AnonymizerEngine
+
+        _analyzer = _build_analyzer()
+        _anonymizer = AnonymizerEngine()
+    return _analyzer, _anonymizer
+
+
+def _redact_text(text: str) -> str:
+    if not text:
+        return text
+    analyzer, anonymizer = _get_engines()
+    results = analyzer.analyze(text=text, language="en")
+    if not results:
+        return text
+    return anonymizer.anonymize(text=text, analyzer_results=results).text
+
+
+def redact(value: Any) -> Any:
+    """Redact PII from a trace field before it is persisted.
+
+    Recurses through dict/list nesting (a `trace_event`'s `input`/`output`
+    is typically a dict of tool-call arguments/results, not a bare string);
+    every string leaf is passed through Presidio. Non-string, non-container
+    values (int/float/bool/None/UUID/etc.) pass through unchanged — there is
+    nothing to redact and no reason to stringify them.
+    """
+    if isinstance(value, str):
+        return _redact_text(value)
+    if isinstance(value, dict):
+        return {k: redact(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [redact(v) for v in value]
+    if isinstance(value, tuple):
+        return tuple(redact(v) for v in value)
+    return value

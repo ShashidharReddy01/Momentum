@@ -1,0 +1,413 @@
+"""End-to-end orchestration for one uploaded archive/PDF — the pure-logic
+core the worker job handler (`app/tools_invoice.py`) calls. All Storage/DB
+IO lives in the handler; this module only does LLM calls + deterministic
+checks, so it's testable without a live DB or blob account.
+
+Stage sequence (mirrors the diagram in the Phase 2 plan):
+
+  ingest_zip -> per document: classify_vendor -> load_skill -> extract_text
+    (+ OCR fallback) -> maybe render_pages (vision) -> extract_structured
+    -> reconcile_math -> [fail] self_check loop (<=3 attempts) -> [still
+    failing] needs_human_review
+  -> build_catalogue_csv across the whole batch
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Any, Optional
+
+from app import redaction as REDACT
+from app.governance import policy as POLICY
+from app.invoice import catalogue as CAT
+from app.invoice import classify as CLS
+from app.invoice import extract as EXT
+from app.invoice import ocr as OCR
+from app.invoice import pdf_utils as PDF
+from app.invoice import reconcile as REC
+from app.invoice import self_check as SC
+from app.invoice import skills as SK
+
+# Text handed to the vendor-classification preview call.
+CLASSIFY_PREVIEW_CHARS = 1500
+
+# How much of a document's text is kept in the job result for later
+# human-review re-reconciliation (`resolve_invoice_line`) — the raw PDF
+# bytes are never retained past this job run.
+RETAINED_TEXT_CHARS = 20_000
+
+# Above this page count, extract in page-range chunks (EXT.extract_structured_chunked)
+# instead of one call over the whole document — a real 19-page/396-line-item
+# invoice self-truncated to 13 line items in a single pass even at
+# max_tokens=32000 (see docs/HARNESS_FINDINGS.md). Only applies to the
+# text-first path: a scanned document already goes through per-page vision
+# images, a different cost/quality tradeoff not addressed here.
+LARGE_INVOICE_PAGE_THRESHOLD = 8
+
+
+@dataclass
+class DocumentOutcome:
+    doc_id: str
+    filename: str
+    vendor_id: str
+    status: str  # clean | needs_human_review | excluded
+    exclude_reason: Optional[str]
+    extracted_invoice: Optional[dict]
+    mismatches: list[dict]
+    self_check_attempts: int
+    text_confidence: float
+    used_ocr: bool
+    retained_text: str
+    masking_verified: bool = False
+    policy_decision: Optional[dict] = None
+
+
+def _verify_masking(text: str) -> bool:
+    """`app.redaction.redact()` is fail-loud by design (Rule 9/10): it
+    raises on a genuine analyzer/anonymizer fault rather than ever risk
+    returning unredacted text disguised as clean. Caught here ONLY to turn
+    that into a policy signal (`masking_verified=False`) — the failure is
+    never swallowed, `policy.evaluate_invoice` denies outright on it."""
+    if not text.strip():
+        return True  # nothing to mask, e.g. a scanned doc with no text layer
+    try:
+        REDACT.redact(text)
+        return True
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def _process_one_document(
+    client: Any, *, model: str, doc: PDF.Document, known_vendors: list[str]
+) -> DocumentOutcome:
+    text = PDF.extract_text_from_bytes(doc.pdf_bytes)
+
+    if doc.vendor_hint:
+        # The archive is organised by vendor folder -- a deterministic,
+        # zero-cost, more-reliable signal than an LLM guess from letterhead
+        # text, so skip classify_vendor entirely (see pdf_utils.Document's
+        # vendor_hint docstring).
+        doc.vendor_id = doc.vendor_hint
+        doc.is_scanned = not text.strip()
+    else:
+        preview = text[:CLASSIFY_PREVIEW_CHARS] if text else PDF.extract_text_from_bytes(doc.pdf_bytes)[:CLASSIFY_PREVIEW_CHARS]
+        try:
+            classification = CLS.classify_vendor(
+                client, model=model, document_text_preview=preview, known_vendors=known_vendors
+            )
+            doc.vendor_id = classification.vendor_id
+            doc.vendor_name_as_printed = classification.vendor_name_as_printed
+            doc.is_scanned = classification.is_scanned
+        except Exception:  # noqa: BLE001 -- classification failure falls back to
+            # the cold-start "unknown vendor, generic template" path, never a
+            # batch-crashing exception over one unclassifiable document.
+            doc.vendor_id = "unknown"
+            doc.is_scanned = not text.strip()
+
+    vendor_skill = SK.load_vendor_skill(doc.vendor_id)
+
+    used_ocr = False
+    if doc.is_scanned or not text.strip():
+        try:
+            text = OCR.extract_text_via_ocr(doc.pdf_bytes)
+            used_ocr = True
+        except OCR.OcrError as exc:
+            return DocumentOutcome(
+                doc_id=doc.doc_id, filename=doc.filename, vendor_id=doc.vendor_id,
+                status="excluded", exclude_reason=f"OCR failed: {exc}",
+                extracted_invoice=None, mismatches=[], self_check_attempts=0,
+                text_confidence=0.0, used_ocr=True, retained_text="",
+            )
+
+    confidence = PDF.compute_text_confidence(text, doc.page_count)
+
+    page_images = None
+    if EXT.needs_vision(is_scanned=doc.is_scanned, text_confidence=confidence):
+        page_images = PDF.render_page_images(doc.pdf_bytes, list(range(doc.page_count)))
+
+    try:
+        if not page_images and doc.page_count > LARGE_INVOICE_PAGE_THRESHOLD:
+            page_texts = PDF.get_page_texts(doc.pdf_bytes)
+            invoice = EXT.extract_structured_chunked(
+                client, model=model, page_texts=page_texts, vendor_skill=vendor_skill,
+            )
+        else:
+            invoice = EXT.extract_structured(
+                client, model=model, document_text=text, page_images=page_images,
+                vendor_skill=vendor_skill,
+            )
+    except Exception as exc:  # noqa: BLE001 -- a bad extraction is excluded, not a job crash
+        return DocumentOutcome(
+            doc_id=doc.doc_id, filename=doc.filename, vendor_id=doc.vendor_id,
+            status="excluded", exclude_reason=f"extraction failed: {exc}",
+            extracted_invoice=None, mismatches=[], self_check_attempts=0,
+            text_confidence=confidence, used_ocr=used_ocr, retained_text=text[:RETAINED_TEXT_CHARS],
+        )
+
+    mismatches = REC.reconcile_math(invoice, text)
+    attempts = 0
+    while mismatches and attempts < SC.MAX_ATTEMPTS:
+        attempts += 1
+        try:
+            corrected = SC.attempt_correction(
+                client, model=model, invoice=invoice, mismatches=mismatches,
+                attempt_number=attempts, document_text=text, vendor_skill=vendor_skill,
+            )
+        except Exception:  # noqa: BLE001 -- a failed critic call still counts as
+            # an attempt and falls through to human review, exactly like a
+            # critic that honestly gave up (SC.attempt_correction returning
+            # None) -- it must never crash the whole batch over one document.
+            corrected = None
+        if corrected is None:
+            break  # critic gave up, errored, or produced an invalid correction -- stop early
+        invoice = corrected
+        mismatches = REC.reconcile_math(invoice, text)
+
+    status = "clean" if not mismatches else "needs_human_review"
+    masking_verified = _verify_masking(text)
+    policy_decision = POLICY.evaluate_invoice(
+        status=status, stated_total=invoice.stated_total,
+        confidence=invoice.confidence, masking_verified=masking_verified,
+    )
+    return DocumentOutcome(
+        doc_id=doc.doc_id, filename=doc.filename, vendor_id=doc.vendor_id,
+        status=status, exclude_reason=None,
+        extracted_invoice=invoice.model_dump(), mismatches=REC.mismatches_as_dicts(mismatches),
+        self_check_attempts=attempts, text_confidence=confidence, used_ocr=used_ocr,
+        retained_text=text[:RETAINED_TEXT_CHARS],
+        masking_verified=masking_verified,
+        policy_decision={
+            "decision": policy_decision.decision, "rule_id": policy_decision.rule_id,
+            "reason": policy_decision.reason,
+        },
+    )
+
+
+def run_invoice_batch(
+    client: Any, *, model: str, filename: str, archive_bytes: bytes,
+    progress_callback: Optional[Any] = None,
+) -> dict:
+    """Process one uploaded archive/PDF end to end. Returns a plain dict
+    (job-result shaped): `{documents: [...], catalogue_csv, excluded}`.
+
+    `progress_callback`, if given, is called as `progress_callback(index,
+    total, outcome)` after each document — optional, purely for a caller
+    that wants to observe a long batch running (e.g. a CLI progress line);
+    never required for correctness."""
+    try:
+        documents = PDF.ingest_zip(filename, archive_bytes)
+    except PDF.InvoiceArchiveError as exc:
+        return {"documents": [], "catalogue_csv": "", "excluded": [], "error": str(exc)}
+
+    if not documents:
+        return {
+            "documents": [], "catalogue_csv": "", "excluded": [],
+            "error": f"{filename!r} contained no PDF documents to process",
+        }
+
+    known_vendors = SK.list_known_vendors()
+    outcomes: list[DocumentOutcome] = []
+    for i, doc in enumerate(documents, start=1):
+        outcome = _process_one_document(client, model=model, doc=doc, known_vendors=known_vendors)
+        outcomes.append(outcome)
+        doc.status = outcome.status
+        doc.exclude_reason = outcome.exclude_reason
+        doc.extracted_invoice = outcome.extracted_invoice
+        if progress_callback is not None:
+            progress_callback(i, len(documents), outcome)
+
+    csv_text, excluded = CAT.build_catalogue_csv(documents)
+
+    return {
+        "documents": [
+            {
+                "doc_id": o.doc_id, "filename": o.filename, "vendor_id": o.vendor_id,
+                "status": o.status, "exclude_reason": o.exclude_reason,
+                "extracted_invoice": o.extracted_invoice, "mismatches": o.mismatches,
+                "self_check_attempts": o.self_check_attempts,
+                "text_confidence": o.text_confidence, "used_ocr": o.used_ocr,
+                "retained_text": o.retained_text,
+                "masking_verified": o.masking_verified, "policy_decision": o.policy_decision,
+            }
+            for o in outcomes
+        ],
+        "catalogue_csv": csv_text,
+        "excluded": excluded,
+    }
+
+
+# A human's correction to a flagged document can take genuinely different
+# shapes -- a misread top-level total, a misread line amount, a missed line
+# item the extractor never saw, a duplicate/erroneous line, or (some real
+# vendors, e.g. MSCI license invoices) no per-line pricing printed AT ALL.
+# `resolve_document` below exposes one small, COMPOSABLE, deterministic
+# primitive per shape rather than a single hardcoded "split it evenly"
+# special case -- money math stays Python throughout (§25 #4), and any
+# combination of these can be applied in one correction.
+
+
+def _distribute_evenly(line_items: list[dict], total: float) -> list[dict]:
+    """Deterministic even split, remainder cent on the LAST line so the sum
+    is always exact -- for a vendor that genuinely prints no per-line
+    pricing, not a default for every reconciliation failure."""
+    from decimal import ROUND_HALF_UP, Decimal
+
+    n = len(line_items)
+    if n == 0:
+        return line_items
+    total_dec = Decimal(str(total))
+    share = (total_dec / n).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    allocated_before_last = share * (n - 1)
+    last_share = (total_dec - allocated_before_last).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    for i, item in enumerate(line_items):
+        item["amount"] = float(last_share) if i == n - 1 else float(share)
+    return line_items
+
+
+def resolve_document(
+    client: Any,
+    *,
+    model: str,
+    document_result: dict,
+    field_corrections: Optional[dict[str, Any]] = None,
+    line_item_patches: Optional[list[dict[str, Any]]] = None,
+    add_line_items: Optional[list[dict[str, Any]]] = None,
+    remove_line_numbers: Optional[list[int]] = None,
+    distribute_total_across_line_items: Optional[float] = None,
+) -> dict:
+    """Apply a human's correction to one previously-processed document (from
+    a stored job result), re-reconcile, and (if it now reconciles cleanly)
+    learn a vendor skill hint per DISTINCT kind of correction actually
+    applied. Returns the updated document result dict. Raises `ValueError`
+    if the document has no prior extraction to correct, or if a patch/removal
+    names a `line_number` that doesn't exist.
+
+    Composable correction primitives — combine any subset in one call:
+      - `field_corrections`: top-level fields the human corrected directly
+        (stated_total, tax_amount, subtotal, currency, invoice_date, ...).
+        Never accepts `line_items` itself — that goes through the primitives
+        below so line-item edits stay auditable per-operation.
+      - `line_item_patches`: `[{"line_number": N, <field>: <value>, ...}]` —
+        patches ONLY the given fields on the existing line `N`; a misread
+        amount, description, or date on a line the extractor DID find.
+      - `add_line_items`: full `LineItem`-shaped dicts (line_number ignored,
+        renumbered) for lines the extractor missed entirely.
+      - `remove_line_numbers`: existing line numbers to drop — a duplicate
+        or a row that was never really a line item.
+      - `distribute_total_across_line_items`: for the real, recurring case
+        of a vendor whose invoice prints ONE bundled total across dozens of
+        products with zero individual pricing (not a general "give up and
+        split" fallback) — evenly divides this amount across every line
+        remaining after the other primitives ran, and (only for this one
+        primitive) skips the transcription-provenance check, since these
+        amounts are an intentional allocation, not a claimed transcription.
+    """
+    if document_result.get("extracted_invoice") is None:
+        raise ValueError(
+            f"document {document_result.get('filename')!r} has no extraction to correct "
+            f"(status={document_result.get('status')!r})"
+        )
+    field_corrections = dict(field_corrections or {})
+    if "line_items" in field_corrections:
+        raise ValueError(
+            "line_items must be corrected via line_item_patches/add_line_items/"
+            "remove_line_numbers/distribute_total_across_line_items, not field_corrections."
+        )
+    line_item_patches = line_item_patches or []
+    add_line_items = add_line_items or []
+    remove_line_numbers = set(remove_line_numbers or [])
+
+    invoice = EXT.ExtractedInvoice.model_validate(document_result["extracted_invoice"])
+    merged = invoice.model_dump()
+    line_items: list[dict[str, Any]] = merged.get("line_items") or []
+
+    if remove_line_numbers:
+        missing = remove_line_numbers - {li["line_number"] for li in line_items}
+        if missing:
+            raise ValueError(f"remove_line_numbers references non-existent line(s): {sorted(missing)}")
+        line_items = [li for li in line_items if li["line_number"] not in remove_line_numbers]
+
+    if line_item_patches:
+        by_number = {li["line_number"]: li for li in line_items}
+        for patch in line_item_patches:
+            line_number = patch.get("line_number")
+            if line_number not in by_number:
+                raise ValueError(f"line_item_patches references non-existent line: {line_number!r}")
+            for key, value in patch.items():
+                if key != "line_number":
+                    by_number[line_number][key] = value
+
+    for new_item in add_line_items:
+        item = dict(new_item)
+        item["line_number"] = 0  # placeholder -- renumbered below
+        line_items.append(item)
+
+    for i, li in enumerate(line_items, start=1):
+        li["line_number"] = i
+    merged["line_items"] = line_items
+
+    for key, value in field_corrections.items():
+        merged[key] = value
+
+    if distribute_total_across_line_items is not None:
+        merged["line_items"] = _distribute_evenly(
+            merged["line_items"], float(distribute_total_across_line_items)
+        )
+
+    corrected_invoice = EXT.ExtractedInvoice.model_validate(merged)
+
+    text = document_result.get("retained_text", "")
+    mismatches = REC.reconcile_math(
+        corrected_invoice, text,
+        skip_unsourced_value=distribute_total_across_line_items is not None,
+    )
+
+    updated = dict(document_result)
+    updated["extracted_invoice"] = corrected_invoice.model_dump()
+    updated["mismatches"] = REC.mismatches_as_dicts(mismatches)
+    updated["status"] = "clean" if not mismatches else "needs_human_review"
+
+    # A correction can change stated_total/confidence/status, all of which the
+    # policy decision depends on -- re-evaluate rather than leave the ORIGINAL
+    # (pre-correction) decision stale on the updated document.
+    masking_verified = document_result.get("masking_verified", _verify_masking(text))
+    new_policy_decision = POLICY.evaluate_invoice(
+        status=updated["status"], stated_total=corrected_invoice.stated_total,
+        confidence=corrected_invoice.confidence, masking_verified=masking_verified,
+    )
+    updated["masking_verified"] = masking_verified
+    updated["policy_decision"] = {
+        "decision": new_policy_decision.decision, "rule_id": new_policy_decision.rule_id,
+        "reason": new_policy_decision.reason,
+    }
+
+    if not mismatches and document_result.get("vendor_id", "unknown") != "unknown":
+        # Teach the vendor's skill pack a REAL, LLM-written hint per DISTINCT
+        # kind of correction actually applied (position/pattern-based — see
+        # skills.generate_hint), so the next invoice from this vendor
+        # extracts cleanly the first time. Never told the actual old/new
+        # values, so it cannot just echo them.
+        hint_fields = list(field_corrections.keys())
+        if add_line_items:
+            hint_fields.append("line_item_completeness")
+        if line_item_patches:
+            hint_fields.append("line_item_values")
+        if remove_line_numbers:
+            hint_fields.append("line_item_duplicates")
+        if distribute_total_across_line_items is not None:
+            hint_fields.append("line_item_pricing_absent")
+        for field_name in hint_fields:
+            try:
+                learned = SK.generate_hint(
+                    client, model=model, field=field_name, document_text=text,
+                )
+            except Exception:  # noqa: BLE001 -- a failed hint-write must not fail resolution
+                learned = None
+            if learned is None:
+                continue
+            hint, reason = learned
+            SK.learn_hint(
+                document_result["vendor_id"], field=field_name, hint=hint, reason=reason,
+            )
+
+    return updated

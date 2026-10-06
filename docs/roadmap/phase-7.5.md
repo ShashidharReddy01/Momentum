@@ -353,7 +353,7 @@ Prompts: `portfolio_brief/v1`, `dashboard_draft/v1`, `explain_chart/v1`, `handof
 - **Performance:** run the portfolio rows, dashboard and report timings on the onboarding seed and write the numbers in the as-built note.
 - **Docs:**
   - this file's exit table;
-  - STATUS (Phase 7.5 complete, next Phase 8; handoff);
+  - STATUS (Phase 7.5 complete, next Phase 7.6 (`phase-7.6.md`); handoff);
   - INTEGRATION_GUIDE change log (migrations 0042–0044, new routes and events, settings, dependencies, the reports/files packages, guest rules unchanged);
   - `asana-vs-momentum.md` (portfolios / dashboards / reports / files rows);
   - `testing-strategy.md` (J15–J19);

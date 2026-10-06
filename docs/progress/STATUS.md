@@ -172,6 +172,26 @@ Decisions D1–D8 in the spec. Built in a browser session in mock mode; live ver
 - D75-40 (S75-06): the seven role dashboards pinned to the personas' Home are added to this seed by S75-08, which builds those dashboards.
 - D75-21 (S75-03): the four file eval features run through the real chat loop with file chips (fixtures live in `mock_responses/chat.yaml`); `momentum evals` and the eval test build `onboarding_v1` beside `launch_v1`.
 
+### Phase 7.6: The agent platform, and Bernie the invoice agent
+Plan: `docs/roadmap/phase-7.6.md`; spec `docs/superpowers/specs/2026-10-06-phase-7-6-agent-platform-bernie-design.md`; ported code `docs/reference/coap-invoice-pipeline/`. **Starts only after Phase 7.5 is complete.** Built like 7.5: a browser session, mock AI, then live verification here. Build prompt at the end of `phase-7.6.md`.
+- [ ] S76-00 Kickoff and foundations (ADR-0012/0013, settings, `packs/` plumbing, `momentum.sdk`, import contracts)
+- [ ] S76-01 Packs: manifest, loader, install, setup
+- [ ] S76-02 Durable jobs (replay, waiting, children, budgets, undo everything)
+- [ ] S76-03 Asks and conversation
+- [ ] S76-04 Records (types, ops, versions, provenance, query, export, AP dashboard, Mo tools)
+- [ ] S76-05 Entities, skills, pack settings
+- [ ] S76-06 Governance and health
+- [ ] S76-07 Web: directory, agent page, jobs, asks (e2e)
+- [ ] S76-08 Web: review kit, Records tab, entities, skills admin (e2e)
+- [ ] S76-09 Bernie 1: ingest and reading
+- [ ] S76-10 Bernie 2: checking, asking, deciding, outputs
+- [ ] S76-11 Bernie 3: learning, conversation, profiles, Mo
+- [ ] S76-12 Coordination: directory cards, plans, consult (e2e)
+- [ ] S76-13 Builder kit and docs
+- [ ] S76-14 Exit (e2e)
+
+**Decisions (Phase 7.6, delegated):** (the build session records its own calls here)
+
 ### Phase 7: Hardening and Asana-ready
 - [x] E7.0 audit register started (`hardening-register.md`; H1–H44 so far, all fixed)
 - [x] S7.1.1 Scale ADR (ADR-0010, 2026-10-05) · [x] S7.1.2 Load test and fixes (2026-10-05; 75 concurrent on 50k tasks: aggregate p95 190 ms, every endpoint class within budget, realtime 400/400 at p95 193 ms; H35–H40, including lost live events, H39)
@@ -203,6 +223,7 @@ Decisions D1–D8 in the spec. Built in a browser session in mock mode; live ver
 ## Plan changes log
 | Date | Change | Reason |
 |---|---|---|
+| 2026-10-06 | **Phase 7.6 added** after Phase 7.5, before Phase 8: an agent platform for 50–100+ agents (packs, durable jobs that ask people and resume, records, entities and skills, governance, Mo-drafted plans across agents, builder kit) and **Bernie**, the invoice agent, as the only shipped pack (ported from the product owner's COAP invoice pipeline) | Product owner: wants many agents (Python and AI extraction) that people hand work to and talk with; Bernie first. Built in a browser session without a gateway, like 7.5 |
 | 2026-10-06 | S75-01: `file_parses` and `ai_conversation_files` moved into migration 0042 (D75-5); the event catalog now names the real `attachment.created` (it said `attachment.added`) | Migration order; doc matched to code |
 | 2026-10-06 | **Phase 7.5 build started** (S75-00): ADR-0011, new dependencies and settings, `files`/`reports` packages | Phase 7.5 kickoff per `phase-7.5.md` |
 | 2026-10-06 | **Phase 7.5 added** between Phase 7 and Phase 8: files (project Files tab, Mo reads every common file type on request), reports from work data (Word/Excel/PDF), lifecycle portfolios and dashboards v2 with role templates, catch-me-up, plain-English filters, smart task creation, close-out | Product owner: AI focus before go-live; dashboards and portfolios were too basic for the onboarding lifecycle (pre-sales → go-live); built in a browser session without a gateway |

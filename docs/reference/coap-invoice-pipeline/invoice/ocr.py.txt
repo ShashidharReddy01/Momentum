@@ -1,0 +1,30 @@
+"""Local Tesseract OCR fallback for scanned invoices.
+
+Local-only, deliberately: OCR is what *produces* the text in the first
+place, so there is nothing upstream to mask before this call — a cloud OCR
+call would leak unmasked document content across a process boundary for no
+benefit over the Tesseract binary already installed on this machine.
+"""
+
+from __future__ import annotations
+
+import io
+
+import pytesseract
+from PIL import Image
+
+from app.invoice import pdf_utils
+
+
+class OcrError(RuntimeError):
+    """Tesseract failed to process a rendered page image."""
+
+
+def extract_text_via_ocr(pdf_bytes: bytes) -> str:
+    page_count = pdf_utils.get_page_count(pdf_bytes)
+    try:
+        images = pdf_utils.render_page_images(pdf_bytes, list(range(page_count)))
+        parts = [pytesseract.image_to_string(Image.open(io.BytesIO(img))) for img in images]
+    except Exception as exc:
+        raise OcrError(f"OCR failed: {exc}") from exc
+    return "\n".join(parts)

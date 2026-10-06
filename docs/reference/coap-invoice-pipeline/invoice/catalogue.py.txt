@@ -1,0 +1,65 @@
+"""Terminal, deterministic CSV assembly across a whole processed batch.
+Every column is a transcribed field, never computed. Excluded documents are
+listed with a reason -- never silently dropped (Rule 9's "no silent
+failures" applies just as much to a document that never produced clean
+line items as to a hard error)."""
+
+from __future__ import annotations
+
+import csv
+import io
+
+from app.invoice.pdf_utils import Document
+
+_CSV_COLUMNS = [
+    "document", "vendor_id", "status", "document_type", "line_number", "description",
+    "quantity", "unit_price", "amount", "period_start", "period_end", "currency",
+    "vendor_name", "invoice_number", "invoice_date", "subtotal", "tax_amount",
+    "stated_total", "confidence",
+]
+
+
+def build_catalogue_csv(documents: list[Document]) -> tuple[str, list[dict]]:
+    """Returns (csv_text, excluded) where `excluded` is
+    `[{"document": filename, "reason": ...}, ...]` for every document that
+    contributed no clean line items to the catalogue."""
+    buffer = io.StringIO()
+    writer = csv.DictWriter(buffer, fieldnames=_CSV_COLUMNS)
+    writer.writeheader()
+
+    excluded: list[dict] = []
+    for doc in documents:
+        if doc.status == "excluded" or doc.extracted_invoice is None:
+            excluded.append({
+                "document": doc.filename,
+                "reason": doc.exclude_reason or "no extraction was produced",
+            })
+            continue
+        invoice = doc.extracted_invoice
+        if not invoice.get("line_items"):
+            excluded.append({"document": doc.filename, "reason": "extraction had no line items"})
+            continue
+        for li in invoice["line_items"]:
+            writer.writerow({
+                "document": doc.filename,
+                "vendor_id": doc.vendor_id,
+                "status": doc.status,
+                "document_type": invoice.get("document_type"),
+                "line_number": li.get("line_number"),
+                "description": li.get("description"),
+                "quantity": li.get("quantity"),
+                "unit_price": li.get("unit_price"),
+                "amount": li.get("amount"),
+                "period_start": li.get("period_start"),
+                "period_end": li.get("period_end"),
+                "currency": invoice.get("currency"),
+                "vendor_name": invoice.get("vendor_name"),
+                "invoice_number": invoice.get("invoice_number"),
+                "invoice_date": invoice.get("invoice_date"),
+                "subtotal": invoice.get("subtotal"),
+                "tax_amount": invoice.get("tax_amount"),
+                "stated_total": invoice.get("stated_total"),
+                "confidence": invoice.get("confidence"),
+            })
+
+    return buffer.getvalue(), excluded

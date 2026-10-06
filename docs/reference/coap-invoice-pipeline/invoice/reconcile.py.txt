@@ -1,0 +1,243 @@
+"""Deterministic reconciliation checks — ZERO model calls, ever, enforced by
+convention here the same way Keel enforces it by unit test on
+`core/nodes/reconcile.py`. Money arithmetic is never trusted to an LLM.
+
+Ported from Keel's `core/nodes/reconcile.py` (read in full during planning),
+simplified per the Phase 2 plan's explicit scope cut: the pack-configured
+`silent_default`/full transcription-provenance machinery is reduced to the
+core "does this amount appear on its own printed row" check.
+"""
+
+from __future__ import annotations
+
+import re
+from dataclasses import asdict, dataclass
+from datetime import date
+from decimal import Decimal, InvalidOperation
+from typing import Any, Optional
+
+from app.invoice.extract import ExtractedInvoice
+
+DEFAULT_VARIANCE_PCT = Decimal("0")
+DEFAULT_VARIANCE_AMOUNT = Decimal("0")
+
+_ALNUM_RE = re.compile(r"[^a-z0-9]+")
+
+
+@dataclass
+class MismatchRecord:
+    check_id: str
+    field: str
+    expected: Any
+    observed: Any
+    delta: Optional[str]
+    detail: str
+    failure_class: str = "inaccurate"  # missing | incomplete | inaccurate
+
+
+def _dec(value: Any) -> Optional[Decimal]:
+    if value is None:
+        return None
+    try:
+        return Decimal(str(value))
+    except InvalidOperation:
+        return None
+
+
+def _check_total(
+    invoice: ExtractedInvoice, *, variance_pct: Decimal, variance_amount: Decimal
+) -> list[MismatchRecord]:
+    stated = _dec(invoice.stated_total)
+    if stated is None:
+        return [
+            MismatchRecord(
+                check_id="total", field="stated_total", expected="a printed total",
+                observed=None, delta=None,
+                detail="No stated_total was extracted -- cannot reconcile without a printed grand total.",
+                failure_class="missing",
+            )
+        ]
+    line_sum = sum((_dec(li.amount) or Decimal("0")) for li in invoice.line_items)
+    tax = _dec(invoice.tax_amount) or Decimal("0")
+    computed = line_sum + tax
+    delta = computed - stated
+    tolerance = min(abs(stated) * variance_pct, variance_amount) if variance_amount else (
+        abs(stated) * variance_pct
+    )
+    if abs(delta) > tolerance:
+        return [
+            MismatchRecord(
+                check_id="total", field="stated_total", expected=str(computed), observed=str(stated),
+                delta=str(delta),
+                detail=(
+                    f"line_items sum ({line_sum}) + tax_amount ({tax}) = {computed}, but "
+                    f"stated_total is {stated} (delta {delta}). If tax was folded into "
+                    "line_items as its own row, remove it from line_items and put the "
+                    "printed tax figure into tax_amount unchanged."
+                ),
+            )
+        ]
+    return []
+
+
+def _check_date(invoice: ExtractedInvoice) -> list[MismatchRecord]:
+    mismatches: list[MismatchRecord] = []
+    if invoice.invoice_date:
+        try:
+            date.fromisoformat(invoice.invoice_date)
+        except ValueError:
+            mismatches.append(
+                MismatchRecord(
+                    check_id="date", field="invoice_date", expected="ISO 8601 date",
+                    observed=invoice.invoice_date, delta=None,
+                    detail=f"invoice_date {invoice.invoice_date!r} does not parse as ISO 8601.",
+                )
+            )
+    for li in invoice.line_items:
+        if li.period_start and li.period_end:
+            try:
+                start = date.fromisoformat(li.period_start)
+                end = date.fromisoformat(li.period_end)
+            except ValueError:
+                mismatches.append(
+                    MismatchRecord(
+                        check_id="date", field=f"line_items[{li.line_number}].period",
+                        expected="ISO 8601 dates", observed=f"{li.period_start}..{li.period_end}",
+                        delta=None, detail="period_start/period_end do not both parse as ISO 8601.",
+                    )
+                )
+                continue
+            if start > end:
+                mismatches.append(
+                    MismatchRecord(
+                        check_id="date", field=f"line_items[{li.line_number}].period",
+                        expected="period_start <= period_end",
+                        observed=f"{li.period_start}..{li.period_end}", delta=None,
+                        detail="period_start is after period_end.",
+                    )
+                )
+    return mismatches
+
+
+def _check_currency(invoice: ExtractedInvoice) -> list[MismatchRecord]:
+    if not invoice.currency or not re.match(r"^[A-Z]{3}$", invoice.currency):
+        return [
+            MismatchRecord(
+                check_id="currency", field="currency", expected="ISO 4217 3-letter code",
+                observed=invoice.currency, delta=None,
+                detail=f"currency {invoice.currency!r} is not a 3-letter ISO code (symbol or locale code?).",
+            )
+        ]
+    return []
+
+
+def _check_line_count(invoice: ExtractedInvoice) -> list[MismatchRecord]:
+    expected = list(range(1, len(invoice.line_items) + 1))
+    observed = [li.line_number for li in invoice.line_items]
+    if observed != expected:
+        return [
+            MismatchRecord(
+                check_id="line_count", field="line_items[*].line_number",
+                expected=str(expected), observed=str(observed), delta=None,
+                detail="line_number values are not a clean 1..N sequence -- a line may be duplicated, missing, or out of order.",
+            )
+        ]
+    return []
+
+
+def _squash(text: str) -> str:
+    return _ALNUM_RE.sub("", text.lower())
+
+
+def _find_row(description: str, rows: list[str]) -> Optional[str]:
+    needle = _squash(description)
+    if len(needle) < 4:
+        return None
+    hits = [r for r in rows if needle in _squash(r)]
+    return hits[0] if len(hits) == 1 else None
+
+
+def _row_numbers(row: str) -> list[Decimal]:
+    out = []
+    for match in re.finditer(r"\d[\d,]*(?:\.\d+)?", row):
+        try:
+            out.append(abs(Decimal(match.group(0).replace(",", ""))))
+        except InvalidOperation:
+            continue
+    return out
+
+
+def _check_unsourced_value(invoice: ExtractedInvoice, document_text: str) -> list[MismatchRecord]:
+    """Simplified port of Keel's transcription-provenance check: an `amount`
+    must actually appear, printed, on its own invoice row -- catches a model
+    silently deriving amount = quantity x unit_price rather than transcribing
+    what's printed. Skipped for vision-only extractions (no `document_text`
+    to check against) -- flagging every scanned invoice would be all false
+    positives."""
+    if not document_text.strip():
+        return []
+    rows = [r for r in document_text.splitlines() if r.strip()]
+    mismatches: list[MismatchRecord] = []
+    for li in invoice.line_items:
+        if li.amount is None:
+            continue
+        value = abs(_dec(li.amount) or Decimal("0"))
+        row = _find_row(li.description, rows)
+        if row is None:
+            continue  # can't locate the row -- no evidence either way, skip
+        available = _row_numbers(row)
+        for other in (li.quantity, li.unit_price):
+            if other is None:
+                continue
+            other_dec = abs(_dec(other) or Decimal("0"))
+            if other_dec in available:
+                available.remove(other_dec)
+        if value not in available:
+            mismatches.append(
+                MismatchRecord(
+                    check_id="unsourced_value", field=f"line_items[{li.line_number}].amount",
+                    expected="a number printed on this line's own row", observed=str(value),
+                    delta=None,
+                    detail=(
+                        f"amount {value} for line {li.line_number} ({li.description!r}) is not "
+                        "printed on its own row -- it may have been computed (qty x unit_price) "
+                        "rather than transcribed."
+                    ),
+                    failure_class="incomplete",
+                )
+            )
+    return mismatches
+
+
+def reconcile_math(
+    invoice: ExtractedInvoice,
+    document_text: str,
+    *,
+    variance_pct: Decimal = DEFAULT_VARIANCE_PCT,
+    variance_amount: Decimal = DEFAULT_VARIANCE_AMOUNT,
+    skip_unsourced_value: bool = False,
+) -> list[MismatchRecord]:
+    """Run ALL checks every time (never short-circuits) and return every
+    mismatch found. An empty list means the invoice reconciles cleanly.
+
+    `skip_unsourced_value`: the transcription-provenance check assumes every
+    `amount` is a CLAIM that the model read it off the page -- correct for
+    normal extraction, wrong for a human-directed correction that deliberately
+    computes amounts (e.g. `pipeline.resolve_document`'s even-split across
+    line items for a vendor that prints no per-line pricing at all). That
+    correction is an authorized override, not a hallucination, so the check
+    it would otherwise trip is skipped only for that one resolution path --
+    never for a normal extraction, where it must still catch a model quietly
+    computing qty x unit_price instead of transcribing what's printed."""
+    mismatches: list[MismatchRecord] = []
+    mismatches += _check_total(invoice, variance_pct=variance_pct, variance_amount=variance_amount)
+    mismatches += _check_date(invoice)
+    mismatches += _check_currency(invoice)
+    mismatches += _check_line_count(invoice)
+    if not skip_unsourced_value:
+        mismatches += _check_unsourced_value(invoice, document_text)
+    return mismatches
+
+
+def mismatches_as_dicts(mismatches: list[MismatchRecord]) -> list[dict]:
+    return [asdict(m) for m in mismatches]

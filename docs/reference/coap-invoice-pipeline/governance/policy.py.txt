@@ -1,0 +1,86 @@
+"""Deny-by-default policy engine — invoice pipeline (Phase 3).
+
+Keel's design routes every tool call/routing decision through one choke
+point, `policy.check(ctx) -> Decision`. This is a scoped port of that same
+posture applied at the one place THIS build actually makes a business-risk
+call: after reconciliation, before an invoice document is reported clean or
+escalated to a human.
+
+Deterministic, pure Python, zero LLM calls and zero DB round-trips — a
+policy decision must never be the thing that slows invoice processing down.
+Reconciliation (`reconcile.py`) answers "is the math internally consistent";
+this module answers a DIFFERENT question: "should a human sign off anyway,
+given business risk (amount, confidence, masking)" — a perfectly-reconciled
+invoice can still require a human if the dollar amount is material.
+
+Thresholds are plain constants (one pack, not multi-tenant yet) rather than
+pack YAML — tuning is a one-line change here, same effective flexibility for
+this build's actual scope.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Optional
+
+# USD. Mirrors Keel's demo materiality threshold (packs/*/policies/policy.yaml
+# `material_invoice_requires_human`) — a line/invoice at or above this always
+# gets a human, regardless of how cleanly it reconciled.
+MATERIALITY_THRESHOLD_USD = 5000.0
+
+# Below this self-reported extraction confidence, auto-approval is refused
+# even if the math happens to reconcile — a low-confidence "clean" result is
+# exactly the kind of thing that should not slip through unwatched.
+CONFIDENCE_FLOOR = 0.80
+
+
+@dataclass(frozen=True)
+class PolicyDecision:
+    decision: str  # "allow" | "require_human" | "deny"
+    rule_id: str
+    reason: str
+
+
+def evaluate_invoice(
+    *,
+    status: str,
+    stated_total: Optional[float],
+    confidence: float,
+    masking_verified: bool,
+) -> PolicyDecision:
+    """Deny-by-default: auto-approval requires every rule below to agree.
+    Any rule that doesn't fire falls through to the next; the LAST rule is
+    the only path to "allow" — everything else is require_human or deny."""
+    if not masking_verified:
+        return PolicyDecision(
+            "deny", "block_unmasked_pii",
+            "PII/PPI/SPII masking could not be verified for this document's text — "
+            "never auto-approved, and never held for human sign-off unmasked either.",
+        )
+    if status != "clean":
+        return PolicyDecision(
+            "require_human", "reconciliation_failed",
+            f"Deterministic reconciliation found a mismatch (status={status!r}).",
+        )
+    if stated_total is None:
+        return PolicyDecision(
+            "require_human", "amount_unknown",
+            "No stated_total was extracted — materiality cannot be assessed, so this "
+            "can never auto-approve.",
+        )
+    if stated_total >= MATERIALITY_THRESHOLD_USD:
+        return PolicyDecision(
+            "require_human", "material_invoice_requires_human",
+            f"stated_total {stated_total} >= materiality threshold {MATERIALITY_THRESHOLD_USD} — "
+            "a clean reconciliation is not sufficient for a material invoice.",
+        )
+    if confidence < CONFIDENCE_FLOOR:
+        return PolicyDecision(
+            "require_human", "low_confidence_requires_human",
+            f"extraction confidence {confidence} is below the floor {CONFIDENCE_FLOOR}.",
+        )
+    return PolicyDecision(
+        "allow", "auto_approve_low_value_clean",
+        f"Reconciled clean, stated_total {stated_total} < {MATERIALITY_THRESHOLD_USD}, "
+        f"confidence {confidence} >= {CONFIDENCE_FLOOR}.",
+    )
