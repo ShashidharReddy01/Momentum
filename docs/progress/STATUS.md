@@ -115,7 +115,7 @@ Tracked in their phase files; copy the slice list here at each phase kickoff.
 Decisions D1–D8 in the spec. Built in a browser session in mock mode; live verification after the pull.
 - [x] S75-00 Kickoff and foundations (2026-10-06; ADR-0011; 11 runtime dependencies locked, pip-audit clean; 9 settings; `files`/`reports` packages and import contracts, a deliberate bad import fails lint-imports)
 - [x] S75-01 Files: data model, inventory, project uploads, versions (J15 part 1) (2026-10-06; migration 0042; project Files tab, versions, search files group; H64 upload 500 fixed; J15 part 1 green)
-- [ ] S75-02 File parsing: DocumentModel, parsers, cache, safety (no AI)
+- [x] S75-02 File parsing: DocumentModel, parsers, cache, safety (no AI) (2026-10-06; every spec §4.2 format parsed or warned; bombs, encryption, timeout, EXIF, no execution tested; 5,000-row workbook parses in ~1.2 s)
 - [ ] S75-03 Mo reads files: tools, table queries, vision, conversation files (J15)
 - [ ] S75-04 Project fields, template lineage, field history, rules action
 - [ ] S75-05 Portfolio v2 backend: rules, stage, columns, views, gates, snapshots
@@ -128,7 +128,7 @@ Decisions D1–D8 in the spec. Built in a browser session in mock mode; live ver
 - [ ] S75-12 Smart task creation and project close-out (J19 part 3)
 - [ ] S75-13 Exit (J14 extended, UI audit, live verification list, docs)
 
-**Next up:** S75-02 File parsing: DocumentModel, parsers, cache, safety (no AI).
+**Next up:** S75-03 Mo reads files: tools, table queries, vision, conversation files (J15).
 
 **Decisions (Phase 7.5, delegated):** (the build session records its own calls here)
 - D75-1 (S75-00): `momentum.files` may import only `core`; `momentum.reports` may import `core`, `files` and `domain`, never `ai`/`agents`/`integrations`. Enforced by two new import-linter contracts.
@@ -141,6 +141,11 @@ Decisions D1–D8 in the spec. Built in a browser session in mock mode; live ver
 - D75-8 (S75-01): files on a task still announce on the task's channel only; the Files tab refreshes when opened, after its own changes and on undo, not live for other people's task uploads (low value, avoids fanning every task attachment out to the project channel).
 - D75-9 (S75-01): the search `files` group covers project files, files on top-level tasks placed in visible projects and their comments (subtask files aren't searched, consistent with task search); the Files tab covers every depth.
 - D75-10 (S75-01): the inventory cursor is an offset (stable for a given filter; a file added mid-browse can shift a page, acceptable for a 50-row listing).
+- D75-11 (S75-02): the sample-file builder lives in the package (`momentum/files/samples/`), not only under `tests/`, because the eval workspace and `seed --onboarding` run from the installed package; `tests/fixtures/files/build.py` re-exports it.
+- D75-12 (S75-02): no committed binary templates at all (the spec allowed base64 templates for macro, .xls and .msg samples and two PNGs): an OLE writer, an MS-OVBA writer, a BIFF8 writer and Pillow generate them. The encrypted .xlsx sample uses `msoffcrypto` (already installed with oletools; samples only).
+- D75-13 (S75-02): deleting a file deletes its parse in the same transaction (the parse holds the file's content); undo restores the file and it is parsed again on demand.
+- D75-14 (S75-02): sheet rows are stored typed (numbers, booleans) or as text, with dates as ISO text; a column's number locale and date order are decided once per column. A header is the first substantial row of the first 10 when it's mostly text and has data below; otherwise columns are named by letter.
+- D75-15 (S75-02): the 2 MB text cap counts extracted text blocks; sheet rows are capped separately by rows and columns.
 
 ### Phase 7: Hardening and Asana-ready
 - [x] E7.0 audit register started (`hardening-register.md`; H1–H44 so far, all fixed)

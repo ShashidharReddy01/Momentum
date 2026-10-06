@@ -79,7 +79,7 @@ plugins = ["pydantic.mypy"]
 packages = ["momentum"]
 
 [[tool.mypy.overrides]]
-module = ["procrastinate.*", "uuid_utils.*", "filetype.*", "docx.*", "pypdf.*", "croniter.*", "pptx.*", "pdfplumber.*", "pypdfium2.*", "oletools.*", "extract_msg.*", "striprtf.*", "defusedxml.*", "reportlab.*", "xlrd.*", "openpyxl.*", "olefile.*"]
+module = ["procrastinate.*", "uuid_utils.*", "filetype.*", "docx.*", "pypdf.*", "croniter.*", "pptx.*", "pdfplumber.*", "pypdfium2.*", "oletools.*", "extract_msg.*", "striprtf.*", "defusedxml.*", "reportlab.*", "xlrd.*", "openpyxl.*", "olefile.*", "msoffcrypto.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
