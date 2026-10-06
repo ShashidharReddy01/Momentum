@@ -502,3 +502,86 @@ async def test_workload_restricted_to_a_portfolio(as_user: Clients) -> None:
     assert "In the portfolio" in titles and "Outside it" not in titles
     everything = (await ravi.get(f"{B}/workload")).json()
     assert {"In the portfolio", "Outside it"} <= {t["title"] for t in everything["tasks"]}
+
+
+# ---------------- S75-07 additions: bulk set, CSV, list summary, row edit rights ----------------
+
+
+async def test_bulk_set_is_one_undo_and_skips_what_you_cant_edit(as_user: Clients) -> None:
+    ravi = await as_user("ravi")
+    ids = await _ids(ravi)
+    value_id = await _value_field(ravi)
+    a, b = ids["Website Revamp"], ids["Vendor Onboarding"]
+    folio = await _portfolio(ravi, "Bulk", a, b)
+    kim = await as_user("kim")  # Operations team: editor on Vendor Onboarding only
+    rows = {r["id"]: r for r in (await _rows(kim, folio))["rows"]}
+    assert rows[b]["can_edit"] is True and a not in rows  # kim can't see Website Revamp
+    assert {r["id"]: r["can_edit"] for r in (await _rows(ravi, folio))["rows"]} == {
+        a: True,
+        b: True,
+    }
+
+    r = await ravi.post(
+        f"{B}/portfolios/{folio}/bulk-set-field",
+        json={"project_ids": [a, b], "field_id": value_id, "value": 5000},
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["data"] == {"updated": 2, "skipped": 0}
+    batch = r.json()["meta"]["batch_id"]
+    assert all(x["fields"][value_id] == 5000 for x in (await _rows(ravi, folio))["rows"])
+    undo = await ravi.post(f"{B}/undo", json={"batch_id": batch})
+    assert undo.status_code == 200 and len(undo.json()["undone"]) == 2
+    assert all(value_id not in x["fields"] for x in (await _rows(ravi, folio))["rows"])
+    r = await kim.post(
+        f"{B}/portfolios/{folio}/bulk-set-field",
+        json={"project_ids": [a, b], "field_id": value_id, "value": 7},
+    )
+    assert r.json()["data"] == {"updated": 1, "skipped": 1}
+
+
+async def test_csv_export_of_the_view(as_user: Clients) -> None:
+    ravi = await as_user("ravi")
+    ids = await _ids(ravi)
+    stage_id, stages = await _stage(ravi)
+    acct = (
+        await ravi.post(f"{B}/project-fields", json={"name": "Account", "type": "text"})
+    ).json()["data"]["id"]
+    a = ids["Website Revamp"]
+    folio = await _portfolio(ravi, "Export", a, ids["Vendor Onboarding"])
+    await ravi.patch(
+        f"{B}/portfolios/{folio}/settings",
+        json={
+            "stage_field_id": stage_id,
+            "columns": [{"key": "name"}, {"key": "stage"}, {"key": f"field:{acct}"}],
+        },
+    )
+    await _set(ravi, a, stage_id, stages["Discovery"])
+    await _set(ravi, a, acct, "=HYPERLINK(1)")
+    r = await ravi.get(f"{B}/portfolios/{folio}/export/csv", params={"sort": "name:asc"})
+    assert r.status_code == 200 and r.headers["content-type"].startswith("text/csv")
+    lines = r.text.lstrip("﻿").strip().splitlines()
+    assert lines[0] == "Project,Stage,Account"
+    assert lines[1].startswith("Vendor Onboarding,")
+    assert lines[2] == "Website Revamp,Discovery,'=HYPERLINK(1)"  # a formula can't run
+
+
+async def test_list_summaries_count_stages_and_total_value(as_user: Clients) -> None:
+    ravi = await as_user("ravi")
+    ids = await _ids(ravi)
+    stage_id, stages = await _stage(ravi)
+    value_id = await _value_field(ravi)
+    a, b = ids["Website Revamp"], ids["Vendor Onboarding"]
+    folio = await _portfolio(ravi, "Summary", a, b)
+    await ravi.patch(f"{B}/portfolios/{folio}/settings", json={"stage_field_id": stage_id})
+    await _set(ravi, a, stage_id, stages["Discovery"])
+    await _set(ravi, b, stage_id, stages["Discovery"])
+    await _set(ravi, a, value_id, 100)
+    await _set(ravi, b, value_id, 250)
+    plain = (await ravi.get(f"{B}/portfolios")).json()["data"]
+    assert all(p["summary"] is None for p in plain)
+    listed = {p["id"]: p for p in (await ravi.get(f"{B}/portfolios?summaries=true")).json()["data"]}
+    summary = listed[folio]["summary"]
+    counts = {s["label"]: s["count"] for s in summary["stages"]}
+    assert counts["Discovery"] == 2 and counts["Pre-sales"] == 0
+    assert [s["label"] for s in summary["stages"]] == STAGES
+    assert summary["value_field"] == "Contract value" and summary["total_value"] == 350

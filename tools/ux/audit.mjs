@@ -32,7 +32,22 @@ const VIEWPORTS = {
   '1024x768': { width: 1024, height: 768 },
   '390x844': { width: 390, height: 844 },
 };
-const KEY = new Set(['home', 'mytasks', 'inbox', 'atlas-list', 'atlas-board', 'atlas-pane', 'atlas-timeline']);
+const KEY = new Set([
+  'home',
+  'mytasks',
+  'inbox',
+  'atlas-list',
+  'atlas-board',
+  'atlas-pane',
+  'atlas-timeline',
+  // Phase 7.5: the new screens, at every viewport
+  'atlas-files',
+  'portfolios',
+  'onboarding-table',
+  'onboarding-board',
+  'onboarding-timeline',
+  'onboarding-workload',
+]);
 mkdirSync(out, { recursive: true });
 
 const findings = [];
@@ -65,7 +80,7 @@ async function screens(page) {
     ['settings-ai', '/settings/ai'],
   ];
   if (atlas) {
-    for (const v of ['list', 'board', 'calendar', 'timeline', 'overview', 'dashboard'])
+    for (const v of ['list', 'board', 'calendar', 'timeline', 'overview', 'files', 'dashboard'])
       list.push([`atlas-${v}`, `/projects/${atlas}/${v}`]);
     const tasks = await page.evaluate(
       async (id) => (await (await fetch(`/api/v1/projects/${id}/tasks?completed=false`)).json()).data,
@@ -74,6 +89,11 @@ async function screens(page) {
     const rich = tasks.find((t) => (t.subtask_count ?? 0) > 0) ?? tasks[0];
     if (rich) list.push(['atlas-pane', `/projects/${atlas}/list?task=${rich.id}`]);
   }
+  const folios = await page.evaluate(async () => (await (await fetch('/api/v1/portfolios')).json()).data);
+  const onboarding = folios.find((f) => f.name === 'Customer onboarding')?.id;
+  if (onboarding)
+    for (const v of ['table', 'board', 'timeline', 'workload', 'overview'])
+      list.push([`onboarding-${v}`, `/portfolios/${onboarding}/${v}`]);
   return list;
 }
 

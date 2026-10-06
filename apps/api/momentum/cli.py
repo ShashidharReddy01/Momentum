@@ -94,6 +94,9 @@ def seed(
         "--onboarding",
         help="Also add the customer lifecycle demo (template, 40 customers, portfolio; P7.5)",
     ),
+    small: bool = typer.Option(
+        False, "--small", help="With --onboarding: 12 customers, 30 days of snapshots (e2e, evals)"
+    ),
 ) -> None:
     """Load the synthetic demo workspace (safe to re-run)."""
     from momentum.core.db import UnitOfWork, create_engine, create_session_factory
@@ -108,8 +111,12 @@ def seed(
         try:
             async with uow.transaction() as session:
                 if onboarding:
-                    from momentum.seed_onboarding import seed_onboarding
+                    from momentum.seed_onboarding import SMALL_DISTRIBUTION, seed_onboarding
 
+                    if small:
+                        return await seed_onboarding(
+                            session, settings, distribution=SMALL_DISTRIBUTION, backfill_days=30
+                        )
                     return await seed_onboarding(session, settings)
                 if scale:
                     from momentum.seed_scale import seed_scale

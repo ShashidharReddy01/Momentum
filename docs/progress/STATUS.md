@@ -120,7 +120,7 @@ Decisions D1–D8 in the spec. Built in a browser session in mock mode; live ver
 - [x] S75-04 Project fields, template lineage, field history, rules action (2026-10-06; migration 0043 (all lifecycle tables); project fields API, Details card, "Applies to"; rule action `set_project_field` + title/type conditions, gate-aware; Mo tool `set_project_field`; `nl_rule/v6`; 11 backend tests)
 - [x] S75-05 Portfolio v2 backend: rules, stage, columns, views, gates, snapshots (2026-10-06; rows with every built-in column in 13 queries (40 projects: ~30 ms); views, members, settings, manual ↔ rule, readiness, stage moves with gate override; snapshots job + backfill CLI; workload by portfolio; portfolio permission matrix)
 - [x] S75-06 Customer onboarding template, `seed --onboarding`, eval workspace (2026-10-06; template with milestones, RAID, task and project fields, 5 stage rules; 40 customers in the spec's stage counts with ~6 months of history, gates consistent; rule portfolio with targets, gates, columns; 12-customer eval draw; fresh DB → portfolio rows in 30–60 ms; re-run adds nothing)
-- [ ] S75-07 Portfolio v2 web (J16)
+- [x] S75-07 Portfolio v2 web (J16) (2026-10-06; portfolio tabs Table, Board, Timeline, Workload, Overview; settings dialog; list cards with stage bars; J16 green, J14 extended (portfolio table/board/timeline, Files tab, board from the keyboard); e2e 21/21; UI audit 308 screens 0 findings; keyboard pass 0 findings)
 - [ ] S75-08 Dashboards v2: query, widgets, filters, role templates (J17)
 - [ ] S75-09 Reports engine (J18)
 - [ ] S75-10 Mo on portfolios and dashboards
@@ -128,7 +128,7 @@ Decisions D1–D8 in the spec. Built in a browser session in mock mode; live ver
 - [ ] S75-12 Smart task creation and project close-out (J19 part 3)
 - [ ] S75-13 Exit (J14 extended, UI audit, live verification list, docs)
 
-**Next up:** S75-07 Portfolio v2 web (J16).
+**Next up:** S75-08 Dashboards v2: query, widgets, filters, role templates (J17).
 
 **Decisions (Phase 7.5, delegated):** (the build session records its own calls here)
 - D75-1 (S75-00): `momentum.files` may import only `core`; `momentum.reports` may import `core`, `files` and `domain`, never `ai`/`agents`/`integrations`. Enforced by two new import-linter contracts.
@@ -170,6 +170,11 @@ Decisions D1–D8 in the spec. Built in a browser session in mock mode; live ver
 - D75-38 (S75-06): the seed backdates directly (project and task creation, completions, stage history) and then moves the template rules' `created_at` past the seeded history, so the rules executor never replays the seed; it runs `ANALYZE` on the tables it filled (before that, the portfolio rows took ~4 s instead of ~30 ms on a fresh database). Forecasts are computed for real (`forecasts.store`) from the seeded work, not invented.
 - D75-39 (S75-06): the eval workspace draws 12 customers from the same generator (`SMALL_DISTRIBUTION`) and keeps Lena out of them (`quiet`), because the launch cases expect her inbox and digest to be empty. Installing only the template into a live workspace (without the demo) isn't built: the template ships with the demo seed and then appears in New project → From template; a standalone installer goes on the Later list.
 - D75-40 (S75-06): the seven role dashboards pinned to the personas' Home are added to this seed by S75-08, which builds those dashboards.
+- D75-41 (S75-07): the portfolio page has the tabs Table (default), Board, Timeline, Workload and **Overview** (S6.2.2's status mix, Mo's one-line read per project and check-ins, kept as they were); Dashboard and Reports tabs arrive with S75-08 and S75-09, which build them (no empty placeholder tabs). URL `/portfolios/:id/:tab?`.
+- D75-42 (S75-07): rows carry `can_edit` (the viewer's project role, batched by `access.project_roles`, two queries); inline edits and bulk set use it; the board lets anyone who can edit the card's project drag it. Bulk "Set field…" is `POST /portfolios/{id}/bulk-set-field` (one batch: the toast's Undo undoes all), skipping rows the viewer can't edit (counted). Bulk set doesn't check gates (the board is where gates apply).
+- D75-43 (S75-07): column choices (show, hide, order, width) are saved for everyone by editors; others can resize for themselves while the page is open. Saved views remember filters, grouping and sort. CSV export is server-side (`GET /portfolios/{id}/export/csv`, the view's visible columns as shown, the project export's formula guard).
+- D75-44 (S75-07): the list page asks `GET /portfolios?summaries=true` (count per stage and the total of the portfolio's first visible currency column, as the viewer sees it; two queries per lifecycle portfolio). Board cards drag with the pointer only; from the keyboard each card has a "Move to stage…" menu (dnd-kit's own keyboard dragging would have made the card a button around that menu's button).
+- D75-45 (S75-07): the e2e and UI-audit servers also run `momentum seed --onboarding --small` (12 customers), so J16, J14 and the audit have a lifecycle portfolio.
 - D75-21 (S75-03): the four file eval features run through the real chat loop with file chips (fixtures live in `mock_responses/chat.yaml`); `momentum evals` and the eval test build `onboarding_v1` beside `launch_v1`.
 
 ### Phase 7.6: The agent platform, and Bernie the invoice agent

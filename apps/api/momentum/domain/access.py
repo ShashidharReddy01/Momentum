@@ -109,6 +109,52 @@ async def _own_project_role(session: AsyncSession, ctx: Ctx, project: Project) -
     return None
 
 
+async def project_roles(
+    session: AsyncSession, ctx: Ctx, projects: list[Project]
+) -> dict[uuid.UUID, str | None]:
+    """``project_role`` for many projects in two queries (Phase 7.5: a portfolio's rows say which
+    projects the viewer may edit). Same rules, including ``acting_for``."""
+
+    async def own(c: Ctx) -> dict[uuid.UUID, str | None]:
+        if c.actor.id is None:
+            return {p.id: None for p in projects}
+        ids = [p.id for p in projects]
+        rows = await session.execute(
+            select(ProjectMember.project_id, ProjectMember.role).where(
+                ProjectMember.project_id.in_(ids), ProjectMember.user_id == c.actor.id
+            )
+        )
+        explicit = {pid: role for pid, role in rows.tuples()}
+        teams = set(
+            (
+                await session.execute(
+                    select(TeamMember.team_id).where(TeamMember.user_id == c.actor.id)
+                )
+            ).scalars()
+        )
+        out: dict[uuid.UUID, str | None] = {}
+        for p in projects:
+            if p.id in explicit:
+                out[p.id] = explicit[p.id]
+            elif _explicit_only(c) or p.privacy != "team":
+                out[p.id] = None
+            elif c.actor.is_admin:
+                out[p.id] = "admin"
+            else:
+                out[p.id] = "editor" if p.team_id in teams else None
+        return out
+
+    mine = await own(ctx)
+    other = _for(ctx)
+    if other is None:
+        return mine
+    theirs = await own(other)
+    return {
+        pid: None if r is None or theirs.get(pid) is None else _lower(r, theirs[pid])  # type: ignore[arg-type]
+        for pid, r in mine.items()
+    }
+
+
 def visible_projects_clause(ctx: Ctx) -> ColumnElement[bool]:
     """SQL predicate for projects the caller can see (use in every project listing). With
     ``ctx.acting_for``, only projects both can see."""

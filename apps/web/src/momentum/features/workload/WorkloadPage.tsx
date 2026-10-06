@@ -72,23 +72,25 @@ const weekLabel = (iso: string) =>
  * person, one column per week; each cell is tinted by how full the week is. Open a cell to see its
  * tasks; drag a task to another person or week to rebalance (one undo each).
  */
-export function WorkloadPage() {
+export function WorkloadPage({ portfolioId }: { portfolioId?: string } = {}) {
   return (
     <TaskNavProvider>
-      <WorkloadBody />
+      <WorkloadBody portfolioId={portfolioId ?? null} />
     </TaskNavProvider>
   );
 }
 
-function WorkloadBody() {
+/** With `portfolioId` (Phase 7.5, a portfolio's Workload tab): only that portfolio's projects,
+ * no project picker and no rebalance suggestion (it works per project or workspace). */
+function WorkloadBody({ portfolioId }: { portfolioId: string | null }) {
   const nav = useTaskNav()!;
   const [start, setStart] = useState(() => mondayOf(toISODate(new Date())));
   const [weeks, setWeeks] = useState<number>(6);
   const [projectId, setProjectId] = useState<string | null>(null);
   const [modeChoice, setMode] = useState<Mode | null>(null);
   const [open, setOpen] = useState<{ person: string; week: string } | null>(null);
-  const q = useWorkload(start, weeks, projectId);
-  const row = useWorkloadRow(start, weeks, projectId, open?.person ?? null);
+  const q = useWorkload(start, weeks, projectId, portfolioId);
+  const row = useWorkloadRow(start, weeks, projectId, open?.person ?? null, portfolioId);
   const qc = useQueryClient();
   const projects = useProjects().data;
   const thisWeek = mondayOf(toISODate(new Date()));
@@ -117,23 +119,31 @@ function WorkloadBody() {
     <div className="flex h-full min-h-0">
       <div className="min-w-0 flex-1 overflow-auto px-4 py-6 md:px-8">
         <header className="mb-4 flex flex-wrap items-center gap-2">
-          <h1 className="mr-auto page-title">Workload</h1>
-          <label className="sr-only" htmlFor="workload-project">
-            Project
-          </label>
-          <select
-            id="workload-project"
-            value={projectId ?? ''}
-            onChange={(e) => setProjectId(e.target.value || null)}
-            className="h-8 max-w-48 rounded-md border border-hairline bg-surface px-2 text-sm"
-          >
-            <option value="">All projects</option>
-            {(projects ?? []).map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
+          {portfolioId ? (
+            <h2 className="mr-auto text-[15px] font-semibold">Workload of this portfolio’s projects</h2>
+          ) : (
+            <h1 className="mr-auto page-title">Workload</h1>
+          )}
+          {portfolioId ? null : (
+            <>
+              <label className="sr-only" htmlFor="workload-project">
+                Project
+              </label>
+              <select
+                id="workload-project"
+                value={projectId ?? ''}
+                onChange={(e) => setProjectId(e.target.value || null)}
+                className="h-8 max-w-48 rounded-md border border-hairline bg-surface px-2 text-sm"
+              >
+                <option value="">All projects</option>
+                {(projects ?? []).map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+            </>
+          )}
           <div className="flex rounded-md bg-surface-2 p-0.5 text-sm" role="group" aria-label="Show">
             {(['hours', 'tasks'] as const).map((k) => (
               <button
@@ -183,7 +193,7 @@ function WorkloadBody() {
             ))}
           </select>
           {data?.can_admin ? <DefaultHours data={data} /> : null}
-          {aiEnabled && data?.people.length ? (
+          {aiEnabled && !portfolioId && data?.people.length ? (
             <Button variant="ai" size="sm" loading={rebalance.isPending} onClick={suggest}>
               <MoMark size={13} /> Suggest rebalance
             </Button>

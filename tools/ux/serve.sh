@@ -13,4 +13,6 @@ cd "$ROOT/apps/api"
 uv run python "$ROOT/tools/e2e/reset_db.py"
 uv run momentum migrate
 uv run momentum seed --showcase
+# Phase 7.5: the lifecycle portfolio (template, 12 customers) for its table, board and timeline
+uv run momentum seed --onboarding --small
 uv run momentum serve --port "${UX_PORT:-8140}"

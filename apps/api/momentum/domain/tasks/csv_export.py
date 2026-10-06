@@ -210,3 +210,8 @@ def _field_text(field: FieldDef, value: Any, people: dict[uuid.UUID, str]) -> st
     if field.type == "checkbox":
         return "Yes" if value else "No"
     return str(value)
+
+
+# Phase 7.5: the portfolio view's CSV export uses the same cell rules
+safe_cell = _safe
+field_text = _field_text

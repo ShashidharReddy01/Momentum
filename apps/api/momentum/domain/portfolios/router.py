@@ -4,7 +4,7 @@ import json
 import uuid
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Query, status
+from fastapi import APIRouter, Query, Response, status
 from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -13,6 +13,7 @@ from momentum.api.schemas import ListOut, MutationMeta, MutationOut, OkOut
 from momentum.core.context import Ctx
 from momentum.core.errors import ValidationFailed
 from momentum.core.mutation import Mutation
+from momentum.domain.attachments.router import content_disposition
 from momentum.domain.fields.schemas import FieldValueOut
 from momentum.domain.portfolios import lifecycle, service
 from momentum.domain.portfolios.gates import Readiness
@@ -20,6 +21,8 @@ from momentum.domain.portfolios.models import Portfolio, PortfolioView
 from momentum.domain.portfolios.rows import ViewSpec
 from momentum.domain.portfolios.rows import portfolio_rows_v2 as rows_v2
 from momentum.domain.portfolios.schemas import (
+    BulkSetFieldIn,
+    BulkSetFieldOut,
     ColumnOut,
     ConvertIn,
     GateItemOut,
@@ -36,6 +39,7 @@ from momentum.domain.portfolios.schemas import (
     PortfolioRowOut,
     PortfolioRowsOut,
     PortfolioStatusDraftOut,
+    PortfolioSummaryOut,
     PortfolioViewIn,
     PortfolioViewOut,
     PortfolioViewPatchIn,
@@ -97,11 +101,23 @@ def _meta(m: Mutation[Portfolio]) -> MutationMeta:
 
 
 @router.get("", response_model=ListOut[PortfolioOut], summary="Portfolios in this workspace")
-async def list_portfolios(ctx: CtxDep, uow: UowDep) -> ListOut[PortfolioOut]:
+async def list_portfolios(
+    ctx: CtxDep,
+    uow: UowDep,
+    summaries: Annotated[
+        bool, Query(description="Add each one's count per stage and total value (list page)")
+    ] = False,
+) -> ListOut[PortfolioOut]:
     async with uow.transaction() as s:
-        return ListOut(
-            data=[await _out(s, ctx, p, n) for p, n in await service.list_portfolios(s, ctx)]
-        )
+        rows = await service.list_portfolios(s, ctx)
+        extra = await lifecycle.summaries(s, ctx, [p for p, _n in rows]) if summaries else {}
+        out = []
+        for p, n in rows:
+            item = await _out(s, ctx, p, n)
+            if p.id in extra:
+                item.summary = PortfolioSummaryOut(portfolio_id=p.id, **extra[p.id])
+            out.append(item)
+        return ListOut(data=out)
 
 
 @router.post(
@@ -462,3 +478,68 @@ async def move_stage(
             data=FieldValueOut(field_id=p.stage_field_id, value=body.to),
             meta=MutationMeta(activity_id=m.activity_id),
         )
+
+
+def _spec(
+    filters: str | None, group_by: str | None, sort: str | None, base: ViewSpec | None = None
+) -> ViewSpec:
+    spec = base or ViewSpec()
+    if filters is not None:
+        try:
+            parsed = ViewFiltersIn.model_validate(json.loads(filters))
+        except (ValueError, ValidationError) as e:
+            raise ValidationFailed("filters must be a JSON object of view filters") from e
+        spec.filters = parsed.model_dump(mode="json", exclude_defaults=True)
+    if group_by is not None:
+        spec.group_by = group_by or None
+    if sort is not None:
+        spec.sort = _sort_param(sort)
+    return spec
+
+
+@router.post(
+    "/{portfolio_id}/bulk-set-field",
+    response_model=MutationOut[BulkSetFieldOut],
+    summary="Set one project field on many rows (one undo: the batch)",
+)
+async def bulk_set_field(
+    portfolio_id: uuid.UUID, body: BulkSetFieldIn, ctx: CtxDep, uow: UowDep
+) -> MutationOut[BulkSetFieldOut]:
+    async with uow.transaction() as s:
+        batch, updated, skipped = await lifecycle.bulk_set_field(
+            s, ctx, portfolio_id, body.project_ids, body.field_id, body.value
+        )
+        return MutationOut(
+            data=BulkSetFieldOut(updated=updated, skipped=skipped),
+            meta=MutationMeta(batch_id=batch if updated else None),
+        )
+
+
+@router.get(
+    "/{portfolio_id}/export/csv",
+    response_class=Response,
+    responses={200: {"content": {"text/csv": {}}}},
+    summary="The view as CSV (visible columns, as the table shows them)",
+)
+async def export_csv(
+    portfolio_id: uuid.UUID,
+    ctx: CtxDep,
+    uow: UowDep,
+    view_id: uuid.UUID | None = None,
+    filters: Annotated[str | None, Query(max_length=4000)] = None,
+    group_by: Annotated[str | None, Query(max_length=80)] = None,
+    sort: Annotated[str | None, Query(max_length=400)] = None,
+) -> Response:
+    async with uow.transaction() as s:
+        p = await service.get_portfolio(s, ctx, portfolio_id)
+        base = None
+        if view_id is not None:
+            v = await lifecycle.get_view(s, ctx, p, view_id)
+            base = ViewSpec(dict(v.filters or {}), v.group_by, list(v.sort or []))
+        text = await lifecycle.rows_csv(s, ctx, p, _spec(filters, group_by, sort, base))
+        name = p.name
+    return Response(
+        content="\ufeff" + text,  # a BOM so Excel reads UTF-8
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": content_disposition("attachment", f"{name}.csv")},
+    )

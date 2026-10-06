@@ -74,9 +74,15 @@ const screens = [
   ['settings', '/settings'],
 ];
 if (atlas) {
-  for (const v of ['list', 'board', 'calendar', 'timeline', 'overview', 'dashboard'])
+  for (const v of ['list', 'board', 'calendar', 'timeline', 'overview', 'files', 'dashboard'])
     screens.push([`atlas-${v}`, `/projects/${atlas}/${v}`]);
 }
+// Phase 7.5: the lifecycle portfolio's views
+const folios = await page.evaluate(async () => (await (await fetch('/api/v1/portfolios')).json()).data);
+const onboarding = folios.find((f) => f.name === 'Customer onboarding')?.id;
+if (onboarding)
+  for (const v of ['table', 'board', 'timeline'])
+    screens.push([`onboarding-${v}`, `/portfolios/${onboarding}/${v}`]);
 for (const [label, path] of screens) {
   await page.goto(base + path);
   await page.waitForLoadState('networkidle').catch(() => {});

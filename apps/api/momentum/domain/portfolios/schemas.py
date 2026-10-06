@@ -44,6 +44,7 @@ class PortfolioOut(BaseModel):
     stage_gates: dict[str, Any] = Field(default_factory=dict)
     columns: list[dict[str, Any]] = Field(default_factory=list)
     my_role: str | None = None
+    summary: PortfolioSummaryOut | None = None  # only with ?summaries=true (the list page)
 
 
 class PortfolioProjectRow(BaseModel):
@@ -157,6 +158,36 @@ class ViewFiltersIn(BaseModel):
 ViewLayout = Literal["table", "board", "timeline", "workload"]
 
 
+class BulkSetFieldIn(BaseModel):
+    """Phase 7.5 (spec §5.4): "Set field…" on the selected rows, one undo for all of them."""
+
+    model_config = ConfigDict(extra="forbid")
+    project_ids: list[uuid.UUID] = Field(min_length=1, max_length=500)
+    field_id: uuid.UUID
+    value: Any = None
+
+
+class BulkSetFieldOut(BaseModel):
+    updated: int
+    skipped: int  # projects the viewer can't edit, or not in the portfolio
+
+
+class StageCount(BaseModel):
+    option_id: str
+    label: str
+    count: int
+
+
+class PortfolioSummaryOut(BaseModel):
+    """The list page's card: count per stage (lifecycle order) and the total of the first
+    currency column, as the viewer sees it."""
+
+    portfolio_id: uuid.UUID
+    stages: list[StageCount]
+    value_field: str | None
+    total_value: float | None
+
+
 class PortfolioViewIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
     name: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=120)]
@@ -268,6 +299,7 @@ class PortfolioRowOut(BaseModel):
     slip_days: int | None
     latest_update: LatestUpdate | None
     fields: dict[str, Any]
+    can_edit: bool = False  # the viewer may change this project's fields (project editor)
 
 
 class PortfolioGroupOut(BaseModel):
@@ -290,3 +322,7 @@ class PortfolioRowsOut(BaseModel):
     groups: list[PortfolioGroupOut] | None
     hidden_projects: int
     view_id: uuid.UUID | None
+
+
+PortfolioOut.model_rebuild()
+PortfolioDetailOut.model_rebuild()

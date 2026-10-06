@@ -13,6 +13,8 @@ cd "$ROOT/apps/api"
 uv run python "$ROOT/tools/e2e/reset_db.py"
 uv run momentum migrate
 uv run momentum seed
+# J16 (Phase 7.5): the onboarding template, 12 customers and the lifecycle portfolio
+uv run momentum seed --onboarding --small
 
 # J6's recorded-fixture Asana API (see asana_fixture_server.py's own docstring). Runs alongside
 # the app for the lifetime of this script; killed on exit since it's a throwaway per-run process.

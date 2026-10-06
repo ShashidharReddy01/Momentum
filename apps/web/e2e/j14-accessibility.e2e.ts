@@ -44,6 +44,20 @@ for (const scheme of ['light', 'dark'] as const) {
       await page.goto(path);
       found.push(...(await serious(page)).map((v) => `${name}: ${v}`));
     }
+    // Phase 7.5: the lifecycle portfolio's table, board and timeline, and a project's Files tab
+    const folios = (await (await page.request.get('/api/v1/portfolios')).json()).data as {
+      id: string;
+      name: string;
+    }[];
+    const folio = folios.find((f) => f.name === 'Customer onboarding')!.id;
+    for (const tab of ['table', 'board', 'timeline']) {
+      await page.goto(`/portfolios/${folio}/${tab}`);
+      await expect(
+        page.getByRole('tab', { name: tab[0]!.toUpperCase() + tab.slice(1), selected: true }),
+      ).toBeVisible();
+      found.push(...(await serious(page)).map((v) => `Portfolio ${tab}: ${v}`));
+    }
+
     await page.goto('/');
     await page
       .getByRole('navigation', { name: 'Main' })
@@ -58,6 +72,19 @@ for (const scheme of ['light', 'dark'] as const) {
       .click();
     await expect(page.getByRole('complementary', { name: 'Task details' })).toBeVisible();
     found.push(...(await serious(page)).map((v) => `Task pane: ${v}`));
+    // last: opening Files makes the project remember that view
+    const projects = (await (await page.request.get('/api/v1/projects')).json()).data as {
+      id: string;
+      name: string;
+    }[];
+    const revamp = projects.find((p) => p.name === 'Website Revamp')!.id;
+    await page.goto(`/projects/${revamp}/files`);
+    await expect(page.getByRole('toolbar', { name: 'Files' })).toBeVisible();
+    found.push(...(await serious(page)).map((v) => `Project files: ${v}`));
+    // back to the list, so the next run (and journey) opens the project on its list
+    await page.goto(`/projects/${revamp}/list`);
+    await expect(page.getByRole('list', { name: 'Tasks in Review' })).toBeVisible();
+    await page.waitForLoadState('networkidle');
     expect(found).toEqual([]);
   });
 }
@@ -83,4 +110,24 @@ test('J14: list → pane → back to the row, from the keyboard', async ({ page 
   await page.keyboard.press('Escape');
   await expect(pane).toBeHidden();
   await expect(taskRow).toBeFocused();
+});
+
+test('J14: a portfolio board card moves to another stage from the keyboard', async ({ page }) => {
+  await login(page);
+  const folios = (await (await page.request.get('/api/v1/portfolios')).json()).data as {
+    id: string;
+    name: string;
+  }[];
+  await page.goto(`/portfolios/${folios.find((f) => f.name === 'Customer onboarding')!.id}/board`);
+  const presales = page.getByRole('listitem', { name: /^Pre-sales:/ });
+  const card = presales.getByRole('list').getByRole('listitem').first();
+  const name = (await card.getByRole('link').first().textContent())!.trim();
+  const menu = presales.getByRole('button', { name: `Move ${name} to stage…` });
+  await menu.focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('menu')).toBeVisible();
+  // the first enabled stage has focus (Pre-sales, where the card is, is disabled)
+  await expect(page.getByRole('menuitem', { name: 'Discovery' })).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('listitem', { name: /^Discovery:/ }).getByRole('link', { name })).toBeVisible();
 });

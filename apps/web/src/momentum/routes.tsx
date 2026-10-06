@@ -94,7 +94,7 @@ export function buildRoutes(config: RuntimeConfig): RouteObject[] {
           handle: { crumb: 'Goal' },
         },
         {
-          path: 'portfolios/:portfolioId',
+          path: 'portfolios/:portfolioId/:tab?',
           lazy: async () => ({
             Component: (await import('@/features/portfolios/PortfolioPage')).PortfolioPage,
           }),

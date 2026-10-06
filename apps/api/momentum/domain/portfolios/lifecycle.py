@@ -23,7 +23,7 @@ from momentum.core.events import emit
 from momentum.core.mutation import Mutation
 from momentum.core.ordering import key_between
 from momentum.core.undo import UndoConflict, undo_handler, undo_op
-from momentum.domain.access import get_visible_project
+from momentum.domain.access import get_visible_project, visible_projects_clause
 from momentum.domain.fields.models import FieldDef
 from momentum.domain.fields.project_values import set_project_field_value
 from momentum.domain.portfolios import service
@@ -35,7 +35,13 @@ from momentum.domain.portfolios.models import (
     PortfolioMember,
     PortfolioView,
 )
-from momentum.domain.portfolios.rows import BUILTIN_COLUMNS, COLUMN_LABELS, column_key_ok
+from momentum.domain.portfolios.rows import (
+    BUILTIN_COLUMNS,
+    COLUMN_LABELS,
+    ViewSpec,
+    column_key_ok,
+    portfolio_rows_v2,
+)
 from momentum.domain.portfolios.schemas import (
     ConvertIn,
     PortfolioConfigIn,
@@ -661,3 +667,175 @@ async def move_stage(
             raise GateNotMet(r)
         note = {"gate_override": f"moved to {r.stage_label} without {missing_words(r)}"}
     return await set_project_field_value(session, ctx, project_id, p.stage_field_id, to, note=note)
+
+
+# ---------------- bulk set, CSV, list summary ----------------
+
+
+async def bulk_set_field(
+    session: AsyncSession,
+    ctx: Ctx,
+    portfolio_id: uuid.UUID,
+    project_ids: list[uuid.UUID],
+    field_id: uuid.UUID,
+    value: Any,
+) -> tuple[uuid.UUID, int, int]:
+    """Set one project field on many rows as one batch (one undo). Rows the viewer can't edit,
+    or that aren't in the portfolio, are skipped and counted. Stage moves made this way are
+    still project field changes (no gate checks: the board is where gates are enforced)."""
+    p = await service.get_portfolio(session, ctx, portfolio_id)
+    members = set(
+        (
+            await session.execute(
+                select(Project.id).where(
+                    members_clause(p),
+                    Project.id.in_(project_ids),
+                    visible_projects_clause(ctx),
+                )
+            )
+        ).scalars()
+    )
+    batch = uuid.uuid4()
+    updated = skipped = 0
+    for pid in dict.fromkeys(project_ids):
+        if pid not in members:
+            skipped += 1
+            continue
+        try:
+            async with session.begin_nested():
+                m = await set_project_field_value(
+                    session, ctx, pid, field_id, value, batch_id=batch
+                )
+        except Forbidden:
+            skipped += 1
+            continue
+        if m.activity_id is not None:
+            updated += 1
+    return batch, updated, skipped
+
+
+async def rows_csv(session: AsyncSession, ctx: Ctx, p: Portfolio, spec: ViewSpec) -> str:
+    """The view as CSV: the visible columns in order, values as the table shows them, every cell
+    guarded against spreadsheet formulas (the project export's rules)."""
+    import csv
+    import io
+
+    from momentum.domain.tasks.csv_export import field_text, safe_cell
+
+    out = await portfolio_rows_v2(session, ctx, p, spec)
+    fields = {f.id: f for f in out.fields}
+    columns = [c for c in effective_columns(p, fields) if c["visible"]]
+    people = {
+        u.id: u.name
+        for u in (
+            await session.execute(select(User).where(User.workspace_id == ctx.workspace_id))
+        ).scalars()
+    }
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow([c["label"] for c in columns])
+    for r in out.rows:
+        cells = []
+        for c in columns:
+            key = c["key"]
+            if key.startswith("field:"):
+                f = fields[uuid.UUID(key.removeprefix("field:"))]
+                v = r["fields"].get(str(f.id))
+                if f.type == "people" and isinstance(v, list):
+                    v = [str(x) for x in v]
+                    text = ", ".join(people.get(uuid.UUID(x), "") for x in v)
+                else:
+                    text = field_text(f, v, people)
+            else:
+                text = _cell_text(key, r)
+            cells.append(safe_cell(text))
+        writer.writerow(cells)
+    return buf.getvalue()
+
+
+def _cell_text(key: str, r: dict[str, Any]) -> str:
+    v = r.get(key)
+    if key == "owner":
+        return str(r.get("owner_name") or "")
+    if key == "stage":
+        return str((r["stage"] or {}).get("label") or "")
+    if key == "progress":
+        return "" if r["progress"] is None else f"{round(r['progress'] * 100)}%"
+    if key == "next_milestone":
+        m = r["next_milestone"]
+        return "" if not m else f"{m['title']} ({m['due_on'] or 'no date'})"
+    if key == "latest_update":
+        u = r["latest_update"]
+        return "" if not u else str(u["title"])
+    if v is None:
+        return ""
+    if hasattr(v, "isoformat"):
+        return str(v.isoformat())
+    return str(v)
+
+
+async def summaries(
+    session: AsyncSession, ctx: Ctx, portfolios: list[Portfolio]
+) -> dict[uuid.UUID, dict[str, Any]]:
+    """For the list page: per portfolio with a stage field, the count of visible projects per
+    stage and the total of its first currency column. Two queries per such portfolio."""
+    from sqlalchemy import func as sa_func
+
+    from momentum.domain.fields.models import ProjectFieldValue
+
+    fields = await _project_fields(session, ctx)
+    out: dict[uuid.UUID, dict[str, Any]] = {}
+    for p in portfolios:
+        stage = fields.get(p.stage_field_id) if p.stage_field_id else None
+        visible = select(Project.id).where(members_clause(p), visible_projects_clause(ctx))
+        counts: dict[str, int] = {}
+        if stage is not None:
+            counts = {
+                str(v): int(n)
+                for v, n in (
+                    await session.execute(
+                        select(ProjectFieldValue.value, sa_func.count())
+                        .where(
+                            ProjectFieldValue.field_id == stage.id,
+                            ProjectFieldValue.project_id.in_(visible),
+                        )
+                        .group_by(ProjectFieldValue.value)
+                    )
+                ).tuples()
+            }
+        value_field = next(
+            (
+                fields[uuid.UUID(c["key"].removeprefix("field:"))]
+                for c in effective_columns(p, fields)
+                if c["key"].startswith("field:")
+                and fields[uuid.UUID(c["key"].removeprefix("field:"))].type == "currency"
+                and (c["visible"] or not p.columns)
+            ),
+            None,
+        )
+        total: float | None = None
+        if value_field is not None:
+            values = (
+                await session.execute(
+                    select(ProjectFieldValue.value).where(
+                        ProjectFieldValue.field_id == value_field.id,
+                        ProjectFieldValue.project_id.in_(visible),
+                    )
+                )
+            ).scalars()
+            nums = [v for v in values if isinstance(v, int | float) and not isinstance(v, bool)]
+            total = float(sum(nums)) if nums else None
+        out[p.id] = {
+            "stages": [
+                {
+                    "option_id": str(o["id"]),
+                    "label": str(o["label"]),
+                    "count": counts.get(str(o["id"]), 0),
+                }
+                for o in (stage.options if stage is not None else None) or []
+                if isinstance(o, dict)
+            ],
+            "value_field": value_field.name if value_field is not None else None,
+            "total_value": total,
+        }
+    return out

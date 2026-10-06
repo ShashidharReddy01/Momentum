@@ -11,21 +11,38 @@ export type WorkloadTask = components['schemas']['WorkloadTaskOut'];
 
 export const workloadKeys = {
   all: ['workload'] as const,
-  view: (start: string, weeks: number, projectId: string | null) =>
-    ['workload', start, weeks, projectId ?? 'all'] as const,
-  row: (start: string, weeks: number, projectId: string | null, person: string) =>
-    ['workload', start, weeks, projectId ?? 'all', 'tasks', person] as const,
+  view: (start: string, weeks: number, projectId: string | null, portfolioId?: string | null) =>
+    ['workload', start, weeks, projectId ?? 'all', portfolioId ?? 'any'] as const,
+  row: (
+    start: string,
+    weeks: number,
+    projectId: string | null,
+    person: string,
+    portfolioId?: string | null,
+  ) => ['workload', start, weeks, projectId ?? 'all', portfolioId ?? 'any', 'tasks', person] as const,
 };
 
-export function useWorkload(start: string, weeks: number, projectId: string | null) {
+/** `portfolioId` (Phase 7.5): only the work of a portfolio's projects (its Workload tab). */
+export function useWorkload(
+  start: string,
+  weeks: number,
+  projectId: string | null,
+  portfolioId?: string | null,
+) {
   const api = useApi();
   return useQuery({
-    queryKey: workloadKeys.view(start, weeks, projectId),
+    queryKey: workloadKeys.view(start, weeks, projectId, portfolioId),
     queryFn: async () =>
       (
         await api.GET('/api/v1/workload', {
           params: {
-            query: { start, weeks, tasks_for: 'none', ...(projectId ? { project_id: projectId } : {}) },
+            query: {
+              start,
+              weeks,
+              tasks_for: 'none',
+              ...(projectId ? { project_id: projectId } : {}),
+              ...(portfolioId ? { portfolio_id: portfolioId } : {}),
+            },
           },
         })
       ).data!,
@@ -40,15 +57,22 @@ export function useWorkloadRow(
   weeks: number,
   projectId: string | null,
   person: string | null,
+  portfolioId?: string | null,
 ) {
   const api = useApi();
   return useQuery({
-    queryKey: workloadKeys.row(start, weeks, projectId, person ?? ''),
+    queryKey: workloadKeys.row(start, weeks, projectId, person ?? '', portfolioId),
     queryFn: async () =>
       (
         await api.GET('/api/v1/workload', {
           params: {
-            query: { start, weeks, tasks_for: person!, ...(projectId ? { project_id: projectId } : {}) },
+            query: {
+              start,
+              weeks,
+              tasks_for: person!,
+              ...(projectId ? { project_id: projectId } : {}),
+              ...(portfolioId ? { portfolio_id: portfolioId } : {}),
+            },
           },
         })
       ).data!.tasks,

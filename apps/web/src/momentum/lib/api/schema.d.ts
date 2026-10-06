@@ -1825,6 +1825,23 @@ export interface paths {
         patch: operations["update_portfolio_api_v1_portfolios__portfolio_id__patch"];
         trace?: never;
     };
+    "/api/v1/portfolios/{portfolio_id}/bulk-set-field": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Set one project field on many rows (one undo: the batch) */
+        post: operations["bulk_set_field_api_v1_portfolios__portfolio_id__bulk_set_field_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/portfolios/{portfolio_id}/convert": {
         parameters: {
             query?: never;
@@ -1836,6 +1853,23 @@ export interface paths {
         put?: never;
         /** Convert manual ↔ rule (undoable) */
         post: operations["convert_api_v1_portfolios__portfolio_id__convert_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/portfolios/{portfolio_id}/export/csv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The view as CSV (visible columns, as the table shows them) */
+        get: operations["export_csv_api_v1_portfolios__portfolio_id__export_csv_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -4734,6 +4768,28 @@ export interface components {
             /** Brief */
             brief: string;
         };
+        /**
+         * BulkSetFieldIn
+         * @description Phase 7.5 (spec §5.4): "Set field…" on the selected rows, one undo for all of them.
+         */
+        BulkSetFieldIn: {
+            /**
+             * Field Id
+             * Format: uuid
+             */
+            field_id: string;
+            /** Project Ids */
+            project_ids: string[];
+            /** Value */
+            value?: unknown;
+        };
+        /** BulkSetFieldOut */
+        BulkSetFieldOut: {
+            /** Skipped */
+            skipped: number;
+            /** Updated */
+            updated: number;
+        };
         /** ChartAskIn */
         ChartAskIn: {
             /**
@@ -6807,6 +6863,11 @@ export interface components {
             data: components["schemas"]["AttachmentOut"];
             meta: components["schemas"]["MutationMeta"];
         };
+        /** MutationOut[BulkSetFieldOut] */
+        MutationOut_BulkSetFieldOut_: {
+            data: components["schemas"]["BulkSetFieldOut"];
+            meta: components["schemas"]["MutationMeta"];
+        };
         /** MutationOut[CommentOut] */
         MutationOut_CommentOut_: {
             data: components["schemas"]["CommentOut"];
@@ -7491,6 +7552,7 @@ export interface components {
             };
             /** Status */
             status: string | null;
+            summary?: components["schemas"]["PortfolioSummaryOut"] | null;
             /** Version */
             version: number;
         };
@@ -7611,6 +7673,7 @@ export interface components {
             };
             /** Status */
             status: string | null;
+            summary?: components["schemas"]["PortfolioSummaryOut"] | null;
             /** Version */
             version: number;
         };
@@ -7661,6 +7724,11 @@ export interface components {
         PortfolioRowOut: {
             /** Blocked */
             blocked: number;
+            /**
+             * Can Edit
+             * @default false
+             */
+            can_edit: boolean;
             /** Color */
             color: string | null;
             /** Completed Tasks */
@@ -7752,6 +7820,24 @@ export interface components {
         /** PortfolioStatusDraftOut */
         PortfolioStatusDraftOut: {
             draft: components["schemas"]["StatusUpdateIn"];
+        };
+        /**
+         * PortfolioSummaryOut
+         * @description The list page's card: count per stage (lifecycle order) and the total of the first
+         *     currency column, as the viewer sees it.
+         */
+        PortfolioSummaryOut: {
+            /**
+             * Portfolio Id
+             * Format: uuid
+             */
+            portfolio_id: string;
+            /** Stages */
+            stages: components["schemas"]["StageCount"][];
+            /** Total Value */
+            total_value: number | null;
+            /** Value Field */
+            value_field: string | null;
         };
         /** PortfolioViewIn */
         PortfolioViewIn: {
@@ -9331,6 +9417,15 @@ export interface components {
             dir: "asc" | "desc";
             /** Key */
             key: string;
+        };
+        /** StageCount */
+        StageCount: {
+            /** Count */
+            count: number;
+            /** Label */
+            label: string;
+            /** Option Id */
+            option_id: string;
         };
         /** StageMoveIn */
         StageMoveIn: {
@@ -14601,7 +14696,10 @@ export interface operations {
     };
     list_portfolios_api_v1_portfolios_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Add each one's count per stage and total value (list page) */
+                summaries?: boolean;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -14615,6 +14713,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ListOut_PortfolioOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -14749,6 +14856,41 @@ export interface operations {
             };
         };
     };
+    bulk_set_field_api_v1_portfolios__portfolio_id__bulk_set_field_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                portfolio_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkSetFieldIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationOut_BulkSetFieldOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     convert_api_v1_portfolios__portfolio_id__convert_post: {
         parameters: {
             query?: never;
@@ -14771,6 +14913,42 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MutationOut_PortfolioDetailOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_csv_api_v1_portfolios__portfolio_id__export_csv_get: {
+        parameters: {
+            query?: {
+                view_id?: string | null;
+                filters?: string | null;
+                group_by?: string | null;
+                sort?: string | null;
+            };
+            header?: never;
+            path: {
+                portfolio_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": unknown;
                 };
             };
             /** @description Validation Error */

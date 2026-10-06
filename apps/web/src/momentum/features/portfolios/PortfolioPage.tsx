@@ -1,7 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { Briefcase, Plus, X } from 'lucide-react';
+import { Briefcase, Plus, Settings2, X } from 'lucide-react';
 import { useMemo, useState, type FormEvent } from 'react';
-import { Link, useParams } from 'react-router';
+import { Link, useNavigate, useParams } from 'react-router';
 import { EmptyState, ErrorState } from '@/components/common/States';
 import { MoMark } from '@/components/common/MoMark';
 import { Avatar } from '@/components/ui/Avatar';
@@ -11,11 +11,13 @@ import { IconButton } from '@/components/ui/IconButton';
 import { Input } from '@/components/ui/Input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/Popover';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Tabs';
 import { usePeople } from '@/features/people';
 import { useProjects } from '@/features/projects';
 import { StatusChip, STATUS_LABEL, type Status } from '@/features/status';
 import { cn } from '@/lib/cn';
 import { useMomentumConfig } from '@/lib/config';
+import { WorkloadPage } from '@/features/workload';
 import { dayDiff, formatRelative, fromISODate } from '@/lib/dates';
 import { useChannel } from '@/lib/realtime';
 import {
@@ -28,6 +30,10 @@ import {
   type PortfolioRow,
   type StatusUpdateIn,
 } from './queries';
+import { PortfolioBoard } from './PortfolioBoard';
+import { PortfolioSettingsDialog } from './PortfolioSettingsDialog';
+import { PortfolioTable } from './PortfolioTable';
+import { PortfolioTimeline } from './PortfolioTimeline';
 
 const DATE = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' });
 // least healthy first, the order the mix bar reads in
@@ -60,16 +66,23 @@ export function PortfolioPage() {
   return <PortfolioBody p={q.data} />;
 }
 
+const TABS = [
+  { value: 'table', label: 'Table' },
+  { value: 'board', label: 'Board' },
+  { value: 'timeline', label: 'Timeline' },
+  { value: 'workload', label: 'Workload' },
+  { value: 'overview', label: 'Overview' },
+] as const;
+
 function PortfolioBody({ p }: { p: PortfolioDetail }) {
-  const aiEnabled = useMomentumConfig().ai_enabled;
+  const { tab } = useParams();
+  const navigate = useNavigate();
+  const current = TABS.some((t) => t.value === tab) ? tab! : 'table';
   const m = usePortfolioMutations(p.id);
-  const lines = usePortfolioLines(p.id, p.version, aiEnabled && p.projects.length > 0);
-  const lineFor = useMemo(() => new Map((lines.data ?? []).map((l) => [l.project_id, l])), [lines.data]);
-  const people = usePeople('', 'all').data;
-  const peopleById = useMemo(() => new Map((people ?? []).map((u) => [u.id, u])), [people]);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6 px-4 py-6 md:px-8">
+    <div className="mx-auto max-w-7xl space-y-5 px-4 py-6 md:px-8">
       <header className="flex flex-wrap items-start gap-3">
         <div className="min-w-0 flex-1">
           <h1 className="flex items-center gap-2 page-title">
@@ -78,10 +91,61 @@ function PortfolioBody({ p }: { p: PortfolioDetail }) {
             {p.status ? <StatusChip status={p.status as Status} /> : null}
           </h1>
           {p.description ? <p className="mt-1 text-sm text-muted">{p.description}</p> : null}
+          {p.kind === 'rule' ? (
+            <p className="mt-1 text-xs text-muted">
+              Projects come from a rule: new matching projects appear by themselves.
+            </p>
+          ) : null}
         </div>
-        {p.can_edit ? <AddProject p={p} onAdd={(id) => m.addProject.mutate(id)} /> : null}
+        {p.can_edit && p.kind === 'manual' ? (
+          <AddProject p={p} onAdd={(id) => m.addProject.mutate(id)} />
+        ) : null}
+        {p.can_edit ? (
+          <Button size="sm" variant="ghost" onClick={() => setSettingsOpen(true)}>
+            <Icon icon={Settings2} size={14} /> Settings
+          </Button>
+        ) : null}
       </header>
+      <Tabs value={current} onValueChange={(v) => void navigate(`/portfolios/${p.id}/${v}`)}>
+        <TabsList aria-label="Portfolio views">
+          {TABS.map((t) => (
+            <TabsTrigger key={t.value} value={t.value}>
+              {t.label}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+        <TabsContent value="table" className="pt-4">
+          <PortfolioTable p={p} />
+        </TabsContent>
+        <TabsContent value="board" className="pt-4">
+          <PortfolioBoard p={p} />
+        </TabsContent>
+        <TabsContent value="timeline" className="pt-4">
+          <PortfolioTimeline p={p} />
+        </TabsContent>
+        <TabsContent value="workload" className="pt-4">
+          <WorkloadPage portfolioId={p.id} />
+        </TabsContent>
+        <TabsContent value="overview" className="pt-4">
+          <PortfolioOverview p={p} />
+        </TabsContent>
+      </Tabs>
+      {settingsOpen ? <PortfolioSettingsDialog p={p} open onOpenChange={setSettingsOpen} /> : null}
+    </div>
+  );
+}
 
+/** The S6.2.2 overview: the status mix, each project with Mo’s one-line read, check-ins. */
+function PortfolioOverview({ p }: { p: PortfolioDetail }) {
+  const aiEnabled = useMomentumConfig().ai_enabled;
+  const m = usePortfolioMutations(p.id);
+  const lines = usePortfolioLines(p.id, p.version, aiEnabled && p.projects.length > 0);
+  const lineFor = useMemo(() => new Map((lines.data ?? []).map((l) => [l.project_id, l])), [lines.data]);
+  const people = usePeople('', 'all').data;
+  const peopleById = useMemo(() => new Map((people ?? []).map((u) => [u.id, u])), [people]);
+
+  return (
+    <div className="space-y-6">
       {p.projects.length ? <StatusMix rows={p.projects} /> : null}
 
       {p.projects.length === 0 ? (

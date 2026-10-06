@@ -20,7 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from momentum.core.context import Ctx
 from momentum.core.errors import ValidationFailed
-from momentum.domain.access import visible_projects_clause
+from momentum.domain.access import project_roles, visible_projects_clause
 from momentum.domain.fields.models import FieldDef, FieldValue, ProjectFieldEvent, ProjectFieldValue
 from momentum.domain.forecasts.models import Forecast
 from momentum.domain.portfolios.membership import condition_clause, members_clause
@@ -394,6 +394,7 @@ async def portfolio_rows_v2(
         else {}
     )
 
+    roles = await project_roles(session, ctx, projects)
     rows: list[dict[str, Any]] = []
     targets = p.stage_targets or {}
     for x in projects:
@@ -442,6 +443,7 @@ async def portfolio_rows_v2(
                 "slip_days": (forecast - target).days if forecast and target else None,
                 "latest_update": updates.get(x.id),
                 "fields": fields,
+                "can_edit": roles.get(x.id) in ("admin", "editor"),
             }
         )
 

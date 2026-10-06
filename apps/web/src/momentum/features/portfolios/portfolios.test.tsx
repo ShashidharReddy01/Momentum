@@ -106,7 +106,7 @@ function boot(detail = DETAIL) {
       );
     }),
   );
-  window.history.replaceState(null, '', '/portfolios/pf-1');
+  window.history.replaceState(null, '', '/portfolios/pf-1/overview'); // the S6.2.2 view is the Overview tab
   render(<MomentumApp />);
   return { posted, user: userEvent.setup() };
 }
