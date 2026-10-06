@@ -30,8 +30,13 @@ from momentum.ai.tools.refs import (
 )
 from momentum.ai.tools.views import target, task_brief
 from momentum.core.ids import task_key
+from momentum.domain.access import require_project_role
 from momentum.domain.comments.service import create_comment
-from momentum.domain.fields.models import FieldValue
+from momentum.domain.fields.models import FieldValue, ProjectFieldValue
+from momentum.domain.fields.project_values import (
+    list_project_field_defs,
+    set_project_field_value,
+)
 from momentum.domain.fields.service import set_task_field_value
 from momentum.domain.mytasks import service as my_tasks
 from momentum.domain.projects.schemas import ProjectCreateIn
@@ -794,11 +799,58 @@ async def reschedule_task(tc: ToolContext, args: RescheduleTaskArgs) -> ToolResu
     )
 
 
+# ---------------- set_project_field (Phase 7.5, spec §5.1) ----------------
+
+
+class SetProjectFieldArgs(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    project: str = Field(max_length=200, description="The project's name or id")
+    field: str = Field(max_length=200, description="The project field's name, e.g. Stage")
+    value: str | float | bool | list[str] | None = Field(
+        description=(
+            "A choice's label (a list for multi-select), a person's name or email (a list for "
+            "people fields), text, a number, true/false, or a YYYY-MM-DD date; null clears it"
+        )
+    )
+
+
+@tool(
+    name="set_project_field",
+    description=(
+        "Set one project field on a project (e.g. Stage = Implementation, Contract value = "
+        "120000). Project fields describe the project itself, not its tasks; use the names "
+        "get_project lists."
+    ),
+    risk="low",
+    scopes=WRITE,
+)
+async def set_project_field(tc: ToolContext, args: SetProjectFieldArgs) -> ToolResult:
+    project, role = await resolve_project(tc, args.project)
+    require_project_role(role, "editor", "change project fields")
+    field = find_field(await list_project_field_defs(tc.session, tc.ctx), args.field)
+    stored = await to_stored(tc, field, args.value)
+    before = await tc.session.get(ProjectFieldValue, (project.id, field.id))
+    if (before.value if before is not None else None) == stored:
+        return ToolResult.success(
+            f"{project.name} already has that {field.name}", {"project": project.name}
+        )
+    await set_project_field_value(
+        tc.session, tc.ctx, project.id, field.id, stored, batch_id=tc.batch_id
+    )
+    shown = "cleared" if args.value is None else f"= {args.value}"
+    return ToolResult.success(
+        f"{tc.verb('Set', 'Would set')} {field.name} {shown} on {project.name}",
+        {"project": project.name, "field": field.name, "value": args.value},
+        targets=[{"type": "project", "id": str(project.id), "title": project.name}],
+    )
+
+
 TOOLS = [
     create_task,
     update_task,
     reschedule_task,
     set_field_value,
+    set_project_field,
     complete_task,
     move_task,
     add_comment,

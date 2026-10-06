@@ -33,7 +33,10 @@ TRIGGER_PARAMS: dict[str, set[str]] = {
 NOT_YET_TRIGGERS: set[str] = set()
 
 TRIGGER_FIELDS = ("priority", "due_on", "start_on")
-CONDITION_FIELDS = ("priority", "assignee", "due_on", "start_on", "tag")
+# Phase 7.5: ``title`` (compared without case) and ``type`` (task, milestone, approval) let a
+# template rule say "when the milestone *Contract signed* is completed"
+CONDITION_FIELDS = ("priority", "assignee", "due_on", "start_on", "tag", "title", "type")
+TASK_TYPES = ("task", "milestone", "approval")
 OPS = ("eq", "neq", "in", "empty", "not_empty", "gt", "lt")
 ORDERED_FIELDS = ("due_on", "start_on")  # gt/lt also work on custom number and date fields
 
@@ -58,6 +61,9 @@ ACTION_PARAMS: dict[str, set[str]] = {
     "set_due_relative": {"days"},
     "notify_user": {"user_id", "text"},
     "ai_step": {"kind", "field_id"},
+    # Phase 7.5 (spec §5.5): set a field of the rule's own project (e.g. Stage = Implementation
+    # when "Contract signed" is completed); respects the project's portfolio stage gates
+    "set_project_field": {"field_id", "value"},
 }
 ACTION_REQUIRED: dict[str, set[str]] = {
     **ACTION_PARAMS,
@@ -139,6 +145,14 @@ class Condition(BaseModel):
             raise ValueError(f"{self.op} needs a single value")
         if self.op in ("gt", "lt") and not (custom or self.field in ORDERED_FIELDS):
             raise ValueError(f"{self.op} only works on dates and custom fields")
+        if self.field == "type" and self.value is not None:
+            values = self.value if isinstance(self.value, list) else [self.value]
+            if not all(v in TASK_TYPES for v in values):
+                raise ValueError(f"type is one of {', '.join(TASK_TYPES)}")
+        if self.field == "title" and self.value is not None:
+            values = self.value if isinstance(self.value, list) else [self.value]
+            if not all(isinstance(v, str) and v.strip() for v in values):
+                raise ValueError("title conditions compare with text")
         if self.field in ("assignee", "tag") and self.value is not None:
             values = self.value if isinstance(self.value, list) else [self.value]
             if not all(isinstance(v, str) and is_custom_field(v) for v in values):
@@ -197,6 +211,10 @@ class Action(BaseModel):
             and not (self.field_id is not None and is_custom_field(self.field_id))
         ):
             raise ValueError("field_id must be 'priority' or a custom field id")
+        if self.type == "set_project_field" and not (
+            self.field_id is not None and is_custom_field(self.field_id)
+        ):
+            raise ValueError("set_project_field needs a project field id")
         if self.type == "ai_step":
             if self.kind not in AI_STEP_KINDS:
                 raise ValueError(f"kind must be one of {', '.join(AI_STEP_KINDS)}")

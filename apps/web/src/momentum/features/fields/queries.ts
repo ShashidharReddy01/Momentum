@@ -247,3 +247,95 @@ export function useFieldValuesLookup(taskIds: readonly string[], enabled = true)
     },
   });
 }
+
+// ---------------- Phase 7.5: project fields (spec §5.1) ----------------
+
+export type ProjectFieldValue = components['schemas']['ProjectFieldValueOut'];
+export type ProjectFieldEvent = components['schemas']['ProjectFieldEventOut'];
+
+export const projectFieldKeys = {
+  defs: ['project-fields'] as const,
+  values: (projectId: string) => ['projects', projectId, 'project-field-values'] as const,
+  history: (projectId: string) => ['projects', projectId, 'project-field-history'] as const,
+};
+
+/** The workspace's project fields (Stage, Account owner, Contract value…). */
+export function useProjectFieldDefs(enabled = true) {
+  const api = useApi();
+  return useQuery({
+    queryKey: projectFieldKeys.defs,
+    enabled,
+    queryFn: async () => (await api.GET('/api/v1/project-fields')).data!.data,
+  });
+}
+
+/** One project's values for the project fields, keyed by field id. */
+export function useProjectDetails(projectId: string, enabled = true) {
+  const api = useApi();
+  return useQuery({
+    queryKey: projectFieldKeys.values(projectId),
+    enabled: enabled && !!projectId,
+    queryFn: async () =>
+      (
+        await api.GET('/api/v1/projects/{project_id}/project-field-values', {
+          params: { path: { project_id: projectId } },
+        })
+      ).data!.data,
+    select: (rows) => new Map(rows.map((r) => [r.field_id, r.value as unknown])),
+  });
+}
+
+/** Set (or clear) a project field on a project. Undoable: the toast offers Undo. */
+export function useSetProjectDetail(projectId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  const undoToast = useUndoToast();
+  const key = projectFieldKeys.values(projectId);
+  return useMutation({
+    mutationFn: async (v: { field: Field; value: unknown }) =>
+      (
+        await api.PUT('/api/v1/projects/{project_id}/project-field-values/{field_id}', {
+          params: { path: { project_id: projectId, field_id: v.field.id } },
+          body: { value: v.value },
+        })
+      ).data!,
+    onError: (e) => toastError(e, "Couldn't save that"),
+    onSuccess: (res, v) => {
+      if (res.meta.activity_id)
+        undoToast(`${v.field.name} ${v.value === null ? 'cleared' : 'updated'}`, res.meta, () => {
+          void qc.invalidateQueries({ queryKey: key });
+        });
+    },
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: key });
+      void qc.invalidateQueries({ queryKey: projectFieldKeys.history(projectId) });
+    },
+  });
+}
+
+/** Create or change a project field definition (workspace-wide). */
+export function useProjectFieldDefMutations() {
+  const api = useApi();
+  const qc = useQueryClient();
+  const settle = () => {
+    void qc.invalidateQueries({ queryKey: projectFieldKeys.defs });
+    void qc.invalidateQueries({ queryKey: fieldKeys.library });
+  };
+  const create = useMutation({
+    mutationFn: async (v: FieldCreate) => (await api.POST('/api/v1/project-fields', { body: v })).data!,
+    onError: (e) => toastError(e, "Couldn't create the field"),
+    onSettled: settle,
+  });
+  const patch = useMutation({
+    mutationFn: async (v: { fieldId: string; patch: FieldPatch }) =>
+      (
+        await api.PATCH('/api/v1/project-fields/{field_id}', {
+          params: { path: { field_id: v.fieldId } },
+          body: v.patch,
+        })
+      ).data!,
+    onError: (e) => toastError(e, "Couldn't save the field"),
+    onSettled: settle,
+  });
+  return { create, patch };
+}

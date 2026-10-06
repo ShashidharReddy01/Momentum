@@ -11,7 +11,7 @@ from sqlalchemy import select
 
 from momentum.ai.tools.base import ToolContext, ToolError
 from momentum.ai.tools.refs import resolve_person
-from momentum.domain.fields.models import FieldDef, FieldValue, ProjectField
+from momentum.domain.fields.models import FieldDef, FieldValue, ProjectField, ProjectFieldValue
 from momentum.domain.fields.service import validate_value
 from momentum.domain.tasks.models import Task, TaskProject
 from momentum.domain.users.models import User
@@ -63,6 +63,30 @@ async def fields_view(tc: ToolContext, task: Task) -> list[dict[str, Any]]:
             await tc.session.execute(select(FieldValue).where(FieldValue.task_id == task.id))
         ).scalars()
     }
+    return await describe_fields(tc, fields, values)
+
+
+async def project_fields_view(tc: ToolContext, project_id: uuid.UUID) -> list[dict[str, Any]]:
+    """Phase 7.5: the workspace's project fields with this project's values, as labels."""
+    from momentum.domain.fields.project_values import list_project_field_defs
+
+    fields = await list_project_field_defs(tc.session, tc.ctx)
+    if not fields:
+        return []
+    values = {
+        v.field_id: v.value
+        for v in (
+            await tc.session.execute(
+                select(ProjectFieldValue).where(ProjectFieldValue.project_id == project_id)
+            )
+        ).scalars()
+    }
+    return await describe_fields(tc, fields, values)
+
+
+async def describe_fields(
+    tc: ToolContext, fields: list[FieldDef], values: dict[uuid.UUID, Any]
+) -> list[dict[str, Any]]:
     out = []
     for f in fields:
         value = values.get(f.id)

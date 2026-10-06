@@ -66,6 +66,7 @@ describe('renderQuestions (internal fill page)', () => {
         description: null,
         is_library: true,
         created_by: null,
+        applies_to: 'task',
       },
     },
   ];

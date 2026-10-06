@@ -122,3 +122,23 @@ describe('Fields management (S2.3.1)', () => {
     expect(screen.getByRole('textbox', { name: 'New field name' })).toBeInTheDocument();
   });
 });
+
+describe('Applies to: Tasks / Projects (Phase 7.5)', () => {
+  it('creates a project field from the library, lists it apart and never attaches it to tasks', async () => {
+    const user = await boot();
+    const dialog = await openDialog(user);
+    await user.click(within(dialog).getByRole('button', { name: 'New field' }));
+    await user.selectOptions(within(dialog).getByRole('combobox', { name: 'Applies to' }), 'project');
+    await user.type(within(dialog).getByRole('textbox', { name: 'New field name' }), 'Contract value');
+    await user.selectOptions(within(dialog).getByRole('combobox', { name: 'Field type' }), 'currency');
+    await user.click(within(dialog).getByRole('button', { name: 'Add field' }));
+    const listed = await within(dialog).findByRole('list', { name: 'Project fields' });
+    expect(within(listed).getByText('Contract value')).toBeInTheDocument();
+    expect(within(listed).getByText('Currency')).toBeInTheDocument();
+    // not on this project's task fields, and not offered for attaching
+    expect(within(dialog).queryByRole('button', { name: 'Contract value' })).toBeNull();
+    expect(
+      within(screen.getByRole('list', { name: 'Fields on this project' })).queryByText('Contract value'),
+    ).toBeNull();
+  });
+});

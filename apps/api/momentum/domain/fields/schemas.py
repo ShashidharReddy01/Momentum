@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
 from typing import Annotated, Any, Literal, get_args
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
@@ -61,6 +62,7 @@ class FieldOut(BaseModel):
     description: str | None
     is_library: bool
     created_by: uuid.UUID | None
+    applies_to: Literal["task", "project"] = "task"
 
 
 class FieldCreateIn(BaseModel):
@@ -123,6 +125,28 @@ class FieldValueOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     field_id: uuid.UUID
     value: Any | None
+
+
+class ProjectFieldValueOut(BaseModel):
+    """Phase 7.5: one project's value for one project field."""
+
+    model_config = ConfigDict(from_attributes=True)
+    field_id: uuid.UUID
+    value: Any
+    updated_at: datetime
+    updated_by: uuid.UUID | None
+
+
+class ProjectFieldEventOut(BaseModel):
+    """Phase 7.5: one change of a project field (history; old/new are stored values)."""
+
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    field_id: uuid.UUID
+    old: Any | None
+    new: Any | None
+    at: datetime
+    actor_id: uuid.UUID | None
 
 
 class FieldValuesLookupIn(BaseModel):

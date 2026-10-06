@@ -14,6 +14,7 @@ type F = {
   description: string | null;
   is_library: boolean;
   created_by: string | null;
+  applies_to?: 'task' | 'project';
 };
 type PF = { project_id: string; field_id: string; position: string; is_visible: boolean };
 
@@ -22,6 +23,16 @@ export function fieldHandlers(base = '') {
   const fields: F[] = [];
   const projectFields: PF[] = [];
   const values: { task_id: string; field_id: string; value: unknown }[] = [];
+  // Phase 7.5: project fields (workspace definitions) and each project's values + history
+  const projectValues: { project_id: string; field_id: string; value: unknown; updated_at: string }[] = [];
+  const history: {
+    id: string;
+    project_id: string;
+    field_id: string;
+    old: unknown;
+    new: unknown;
+    at: string;
+  }[] = [];
   let n = 0;
   let optN = 0;
   const pos = (i: number) => String(1000 + i * 10).padStart(6, '0');
@@ -70,6 +81,89 @@ export function fieldHandlers(base = '') {
         meta: { next_cursor: null },
       }),
     ),
+    http.get(`*${base}/api/v1/project-fields`, () =>
+      HttpResponse.json({
+        data: fields.filter((f) => f.applies_to === 'project'),
+        meta: { next_cursor: null },
+      }),
+    ),
+    http.post(`*${base}/api/v1/project-fields`, async ({ request }) => {
+      const b = (await request.json()) as {
+        name: string;
+        type: string;
+        options?: unknown;
+        description?: string;
+      };
+      if (fields.some((f) => f.applies_to === 'project' && f.name.toLowerCase() === b.name.toLowerCase()))
+        return HttpResponse.json(
+          { code: 'name_taken', message: 'A project field with that name already exists' },
+          { status: 422 },
+        );
+      const f: F = {
+        id: `00000000-0000-4000-8000-${String(++n).padStart(12, '0')}`,
+        name: b.name,
+        type: b.type,
+        options: normalizeOptions(b.type, b.options),
+        description: b.description ?? null,
+        is_library: true,
+        created_by: null,
+        applies_to: 'project',
+      };
+      fields.push(f);
+      return HttpResponse.json({ data: f, meta }, { status: 201 });
+    }),
+    http.patch(`*${base}/api/v1/project-fields/:fid`, async ({ params, request }) => {
+      const b = (await request.json()) as { name?: string; options?: unknown };
+      const f = fields.find((x) => x.id === params.fid);
+      if (!f)
+        return HttpResponse.json({ code: 'not_found', message: 'Project field not found' }, { status: 404 });
+      if (b.name) f.name = b.name;
+      if (b.options !== undefined) f.options = normalizeOptions(f.type, b.options);
+      return HttpResponse.json({ data: f, meta });
+    }),
+    http.get(`*${base}/api/v1/projects/:pid/project-field-values`, ({ params }) =>
+      HttpResponse.json({
+        data: projectValues
+          .filter((v) => v.project_id === params.pid)
+          .map((v) => ({ field_id: v.field_id, value: v.value, updated_at: v.updated_at, updated_by: null })),
+        meta: { next_cursor: null },
+      }),
+    ),
+    http.put(`*${base}/api/v1/projects/:pid/project-field-values/:fid`, async ({ params, request }) => {
+      const b = (await request.json()) as { value: unknown };
+      const i = projectValues.findIndex((v) => v.project_id === params.pid && v.field_id === params.fid);
+      const old = i >= 0 ? projectValues[i]!.value : null;
+      const at = new Date().toISOString();
+      if (b.value === null) {
+        if (i >= 0) projectValues.splice(i, 1);
+      } else if (i >= 0) {
+        projectValues[i]!.value = b.value;
+      } else {
+        projectValues.push({
+          project_id: String(params.pid),
+          field_id: String(params.fid),
+          value: b.value,
+          updated_at: at,
+        });
+      }
+      history.push({
+        id: `h-${history.length + 1}`,
+        project_id: String(params.pid),
+        field_id: String(params.fid),
+        old,
+        new: b.value,
+        at,
+      });
+      return HttpResponse.json({ data: { field_id: params.fid, value: b.value }, meta });
+    }),
+    http.get(`*${base}/api/v1/projects/:pid/project-field-history`, ({ params }) =>
+      HttpResponse.json({
+        data: history
+          .filter((h) => h.project_id === params.pid)
+          .map((h) => ({ id: h.id, field_id: h.field_id, old: h.old, new: h.new, at: h.at, actor_id: null })),
+        meta: { next_cursor: null },
+      }),
+    ),
     http.get(`*${base}/api/v1/projects/:pid/fields`, ({ params }) =>
       HttpResponse.json({ data: attachedOf(String(params.pid)).map(out), meta: { next_cursor: null } }),
     ),
@@ -89,6 +183,7 @@ export function fieldHandlers(base = '') {
         description: b.description ?? null,
         is_library: b.is_library ?? true,
         created_by: null,
+        applies_to: 'task',
       };
       fields.push(f);
       const pid = String(params.pid);

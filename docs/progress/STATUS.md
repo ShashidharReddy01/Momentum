@@ -117,7 +117,7 @@ Decisions D1–D8 in the spec. Built in a browser session in mock mode; live ver
 - [x] S75-01 Files: data model, inventory, project uploads, versions (J15 part 1) (2026-10-06; migration 0042; project Files tab, versions, search files group; H64 upload 500 fixed; J15 part 1 green)
 - [x] S75-02 File parsing: DocumentModel, parsers, cache, safety (no AI) (2026-10-06; every spec §4.2 format parsed or warned; bombs, encryption, timeout, EXIF, no execution tested; 5,000-row workbook parses in ~1.2 s)
 - [x] S75-03 Mo reads files: tools, table queries, vision, conversation files (J15) (2026-10-06; 8 file tools; vision through look_at with caps; chat file chips and paperclip; 4 eval features, 45 mock cases at 1.0, 21 live-only; J15 green)
-- [ ] S75-04 Project fields, template lineage, field history, rules action
+- [x] S75-04 Project fields, template lineage, field history, rules action (2026-10-06; migration 0043 (all lifecycle tables); project fields API, Details card, "Applies to"; rule action `set_project_field` + title/type conditions, gate-aware; Mo tool `set_project_field`; `nl_rule/v6`; 11 backend tests)
 - [ ] S75-05 Portfolio v2 backend: rules, stage, columns, views, gates, snapshots
 - [ ] S75-06 Customer onboarding template, `seed --onboarding`, eval workspace
 - [ ] S75-07 Portfolio v2 web (J16)
@@ -128,7 +128,7 @@ Decisions D1–D8 in the spec. Built in a browser session in mock mode; live ver
 - [ ] S75-12 Smart task creation and project close-out (J19 part 3)
 - [ ] S75-13 Exit (J14 extended, UI audit, live verification list, docs)
 
-**Next up:** S75-04 Project fields, template lineage, field history, rules action.
+**Next up:** S75-05 Portfolio v2 backend: rules, stage, columns, views, gates, snapshots. (Migration 0043 already holds every S75-05 table and column; `domain/portfolios/membership.py` and `gates.py` exist.)
 
 **Decisions (Phase 7.5, delegated):** (the build session records its own calls here)
 - D75-1 (S75-00): `momentum.files` may import only `core`; `momentum.reports` may import `core`, `files` and `domain`, never `ai`/`agents`/`integrations`. Enforced by two new import-linter contracts.
@@ -151,6 +151,13 @@ Decisions D1–D8 in the spec. Built in a browser session in mock mode; live ver
 - D75-18 (S75-03): `look_at` on a slide sends the **pictures on that slide**, not a rendering of the whole slide (rendering slides needs LibreOffice, a system package the ADR rules out). PDF pages and image files are rendered whole.
 - D75-19 (S75-03): images count `(w*h)/750` input tokens in the mock transport; in gateway mode the provider's reported usage (which includes images) is recorded as for any call.
 - D75-20 (S75-03): the per-conversation image cap counts images recorded on Mo's stored answers (`content.images`); the command bar has no conversation, so only the per-call cap applies there.
+- D75-22 (S75-04): project fields are workspace-wide definitions (`applies_to='project'`). Any member may create one (not guests or agents); renaming or changing options needs the creator or an admin. Archiving a project field is left to S75-07's column picker (nothing needs it before).
+- D75-23 (S75-04): `GET /fields` returns task and project fields, each with `applies_to`; new routes `/project-fields` (list, create, patch) and `/projects/{id}/project-field-values` (list, `PUT /{field_id}`) and `/projects/{id}/project-field-history`. Attaching a project field to a project's tasks is refused (422 `project_field`).
+- D75-24 (S75-04): rule conditions gain `title` (compared without case or extra spaces) and `type` (task, milestone, approval), so a template's rule can say "when the milestone *Contract signed* is completed": task ids don't survive "new from template", titles do.
+- D75-25 (S75-04): a `set_project_field` rule action held back by a stage gate leaves the run `success`, doesn't count the action, and puts the note ("Gate for Implementation in Onboarding not met (missing field “Signed on”…), skipped") in the run's `error` text; a test run reports it as that action failing with the note. The rule never overrides a gate.
+- D75-26 (S75-04): the gate check (`domain/portfolios/gates.py`, `readiness`) is built now because the rule action needs it; S75-05 adds its endpoint and the board's "move anyway". A required milestone is met by a **completed** milestone in the project with that title (case-insensitive); a required file by a current, live file of the project or its tasks whose name matches the glob (case-insensitive).
+- D75-27 (S75-04): `projects.template_id`'s foreign key is `use_alter` (templates.project_id points back at projects), so the metadata's table order has no cycle and export/import fill it in on the second pass.
+- D75-28 (S75-04): a template's project field defaults are applied through `set_project_field_value` as the person creating the project, so the new project's field history starts at its creation; a default whose field was deleted or changed since is skipped.
 - D75-21 (S75-03): the four file eval features run through the real chat loop with file chips (fixtures live in `mock_responses/chat.yaml`); `momentum evals` and the eval test build `onboarding_v1` beside `launch_v1`.
 
 ### Phase 7: Hardening and Asana-ready

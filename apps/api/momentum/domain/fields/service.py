@@ -214,6 +214,10 @@ async def attach_field(
     field = await session.get(FieldDef, field_id)
     if field is None or field.workspace_id != ctx.workspace_id or field.deleted_at is not None:
         raise NotFound("Field not found")
+    if field.applies_to != "task":
+        raise ValidationFailed(
+            "That's a project field: set it on the project's Overview", code="project_field"
+        )
     if await session.get(ProjectField, (project_id, field_id)) is not None:
         raise Conflict("This field is already on the project", code="already_attached")
     a, b = await _neighbor_positions(session, project_id, after_id, before_id)

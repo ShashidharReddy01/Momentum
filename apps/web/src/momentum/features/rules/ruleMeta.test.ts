@@ -55,3 +55,39 @@ describe('task.unblocked trigger (S6.1.3)', () => {
     );
   });
 });
+
+describe('set_project_field and the title/type conditions (Phase 7.5)', () => {
+  const stage = {
+    id: 'pf-stage',
+    name: 'Stage',
+    type: 'single_select' as const,
+    options: [
+      { id: 'o-disc', label: 'Discovery', color: 'blue', archived: false },
+      { id: 'o-impl', label: 'Implementation', color: 'green', archived: false },
+    ],
+    description: null,
+    is_library: true,
+    created_by: null,
+    applies_to: 'project' as const,
+  };
+  const withStage: RuleLookups = { ...lookups, projectFields: new Map([[stage.id, stage]]) };
+
+  it('reads back with the choice label, and needs a value (false and 0 count)', async () => {
+    const { CONDITION_FIELDS } = await import('./ruleMeta');
+    expect(CONDITION_FIELDS).toContain('title');
+    expect(CONDITION_FIELDS).toContain('type');
+    const sentence = describeRule(
+      { type: 'task.completed' },
+      [{ field: 'title', op: 'eq', value: 'Contract signed' }],
+      [{ type: 'set_project_field', field_id: 'pf-stage', value: 'o-impl' }],
+      withStage,
+    );
+    expect(sentence).toBe(
+      "When a task is completed, if title is Contract signed, then set the project's Stage to Implementation.",
+    );
+    expect(actionComplete({ type: 'set_project_field', field_id: 'pf-stage' })).toBe(false);
+    expect(actionComplete({ type: 'set_project_field', field_id: 'pf-stage', value: 'o-impl' })).toBe(true);
+    expect(actionComplete({ type: 'set_project_field', field_id: 'pf-signed', value: false })).toBe(true);
+    expect(actionComplete({ type: 'set_project_field', field_id: 'pf-n', value: 0 })).toBe(true);
+  });
+});

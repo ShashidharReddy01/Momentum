@@ -1,10 +1,22 @@
 import { useQueryClient } from '@tanstack/react-query';
 import type { JSONContent } from '@tiptap/react';
-import { CalendarDays, Diamond, Flag, Users } from 'lucide-react';
+import { CalendarDays, Diamond, Flag, ListChecks, Plus, Users } from 'lucide-react';
 import { lazy, Suspense, useMemo, useRef, useState } from 'react';
 import { Avatar } from '@/components/ui/Avatar';
+import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
 import { Skeleton } from '@/components/ui/Skeleton';
+import {
+  FieldValueChip,
+  FieldValueEditor,
+  NewFieldForm,
+  projectFieldKeys,
+  useProjectDetails,
+  useProjectFieldDefMutations,
+  useProjectFieldDefs,
+  useSetProjectDetail,
+  type FieldCreate,
+} from '@/features/fields';
 import { ForecastCard, forecastKey } from '@/features/forecasts';
 import { usePeople } from '@/features/people';
 import { StatusChip, StatusOverview, useStatusUpdates, type Status } from '@/features/status';
@@ -63,6 +75,8 @@ export function ProjectOverview({
     void qc.invalidateQueries({ queryKey: ['projects', project.id, 'overview'] });
     if (event.event.startsWith('project.') || event.event.startsWith('status_update.'))
       void qc.invalidateQueries({ queryKey: projectKeys.detail(project.id) });
+    if (event.event === 'project.field_changed')
+      void qc.invalidateQueries({ queryKey: projectFieldKeys.values(project.id) });
   });
 
   return (
@@ -79,7 +93,8 @@ export function ProjectOverview({
           <Brief project={project} canEdit={canEdit} />
           <StatusOverview projectId={project.id} canEdit={canEdit} startDraft={startDraft} />
         </div>
-        <aside className="space-y-6" aria-label="Milestones and members">
+        <aside className="space-y-6" aria-label="Details, milestones and members">
+          <Details projectId={project.id} canEdit={canEdit} />
           <Milestones overview={overview.data} loading={overview.isPending} />
           <Members project={project} />
         </aside>
@@ -400,6 +415,83 @@ function Milestones({
         >
           {all ? 'Show fewer' : `Show all ${list.length}`}
         </button>
+      ) : null}
+    </section>
+  );
+}
+
+/**
+ * Phase 7.5 (spec §5.1): the project's own fields (Stage, Account owner, Contract value…), the
+ * same definitions for every project in the workspace. Editors change them in place (each change
+ * is undoable and kept in the field's history); everyone else reads them. An unset value says
+ * "Not set" rather than showing a made-up default.
+ */
+function Details({ projectId, canEdit }: { projectId: string; canEdit: boolean }) {
+  const defs = useProjectFieldDefs();
+  const values = useProjectDetails(projectId);
+  const set = useSetProjectDetail(projectId);
+  const { create } = useProjectFieldDefMutations();
+  const [adding, setAdding] = useState(false);
+  const fields = defs.data ?? [];
+  return (
+    <section aria-labelledby="details-heading" className="rounded-xl border border-hairline bg-surface p-5">
+      <h2 id="details-heading" className="mb-3 flex items-center gap-2 text-[15px] font-semibold">
+        <Icon icon={ListChecks} size={15} /> Details
+      </h2>
+      {defs.isPending || values.isPending ? (
+        <Skeleton className="h-10" />
+      ) : fields.length === 0 ? (
+        <p className="text-sm text-muted">
+          No project fields yet.
+          {canEdit ? ' Add one, like Stage or Contract value, to describe every project the same way.' : ''}
+        </p>
+      ) : (
+        <dl className="space-y-2">
+          {fields.map((f) => {
+            const value = values.data?.get(f.id) ?? null;
+            return (
+              <div
+                key={f.id}
+                className="grid grid-cols-[minmax(0,2fr)_minmax(0,3fr)] items-center gap-2 text-sm"
+              >
+                <dt className="truncate text-muted" title={f.name}>
+                  {f.name}
+                </dt>
+                <dd className="min-w-0">
+                  {canEdit ? (
+                    <FieldValueEditor
+                      field={f}
+                      value={value}
+                      onChange={(v) => set.mutate({ field: f, value: v })}
+                    />
+                  ) : value === null ? (
+                    <span className="text-muted-2">Not set</span>
+                  ) : (
+                    <FieldValueChip field={f} value={value} />
+                  )}
+                </dd>
+              </div>
+            );
+          })}
+        </dl>
+      )}
+      {canEdit ? (
+        adding ? (
+          <div className="mt-3">
+            <NewFieldForm
+              appliesTo="project"
+              onCancel={() => setAdding(false)}
+              onCreate={(v) => {
+                create.mutate({ name: v.name, type: v.type, options: v.options } as FieldCreate);
+                setAdding(false);
+              }}
+            />
+          </div>
+        ) : (
+          <Button size="sm" variant="ghost" className="mt-2 justify-start" onClick={() => setAdding(true)}>
+            <Icon icon={Plus} /> Add a project field
+          </Button>
+        )
       ) : null}
     </section>
   );

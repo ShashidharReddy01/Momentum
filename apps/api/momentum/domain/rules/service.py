@@ -33,6 +33,7 @@ from momentum.domain.access import (
     require_project_role,
 )
 from momentum.domain.fields.models import FieldDef
+from momentum.domain.fields.service import validate_value
 from momentum.domain.forms.models import Form
 from momentum.domain.projects.models import Project
 from momentum.domain.rules import engine
@@ -100,6 +101,21 @@ async def _check_references(
     for a in actions:
         if a.type in ("set_field", "ai_step") and a.field_id and is_custom_field(a.field_id):
             fields.add(uuid.UUID(a.field_id))
+        if a.type == "set_project_field":
+            if project_id is None:
+                raise ValidationFailed("Only a project's own rules can set a project field")
+            pf = await session.get(FieldDef, uuid.UUID(str(a.field_id)))
+            if (
+                pf is None
+                or pf.workspace_id != ctx.workspace_id
+                or pf.deleted_at is not None
+                or pf.applies_to != "project"
+            ):
+                raise ValidationFailed("Unknown project field in the rule")
+            try:
+                validate_value(pf, a.value)
+            except ValidationFailed as e:
+                raise ValidationFailed(f"{pf.name}: {e.detail}") from None
     for c in conditions:
         raw = c.value if isinstance(c.value, list) else [c.value]
         ids = {uuid.UUID(v) for v in raw if c.field in ("assignee", "tag") and isinstance(v, str)}

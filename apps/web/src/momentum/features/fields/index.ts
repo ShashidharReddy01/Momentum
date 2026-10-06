@@ -1,12 +1,17 @@
-export { FieldsDialog } from './FieldsDialog';
+export { FieldsDialog, NewFieldForm, TYPE_LABEL, type NewField } from './FieldsDialog';
 export { FieldValueChip, FieldValueEditor } from './FieldValueEditor';
 export {
   fieldKeys,
   useFieldLibrary,
   useFieldMutations,
   useFieldValuesLookup,
+  projectFieldKeys,
+  useProjectDetails,
+  useProjectFieldDefMutations,
+  useProjectFieldDefs,
   useProjectFields,
   useProjectFieldValues,
+  useSetProjectDetail,
   useSetFieldValue,
   useTaskFieldValues,
   type Field,
@@ -15,6 +20,8 @@ export {
   type FieldType,
   type FieldValue,
   type ProjectField,
+  type ProjectFieldEvent,
+  type ProjectFieldValue,
   type SelectOption,
   type TaskFieldValue,
 } from './queries';

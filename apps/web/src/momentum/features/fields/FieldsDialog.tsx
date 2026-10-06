@@ -16,13 +16,14 @@ import { InlineText } from '@/components/common/InlineText';
 import {
   useFieldLibrary,
   useFieldMutations,
+  useProjectFieldDefMutations,
   useProjectFields,
   type FieldCreate,
   type FieldType,
   type ProjectField,
 } from './queries';
 
-const TYPE_LABEL: Record<FieldType, string> = {
+export const TYPE_LABEL: Record<FieldType, string> = {
   text: 'Text',
   number: 'Number',
   single_select: 'Single select',
@@ -56,10 +57,13 @@ export function FieldsDialog({
   const attached = useProjectFields(projectId, open);
   const library = useFieldLibrary(open);
   const m = useFieldMutations(projectId);
+  const projectDefs = useProjectFieldDefMutations();
   const [adding, setAdding] = useState(false);
 
   const attachedIds = new Set((attached.data ?? []).map((f) => f.field.id));
-  const available = (library.data ?? []).filter((f) => !attachedIds.has(f.id));
+  // Phase 7.5: project fields live on the project's Overview (Details), never on its tasks
+  const available = (library.data ?? []).filter((f) => f.applies_to !== 'project' && !attachedIds.has(f.id));
+  const projectFields = (library.data ?? []).filter((f) => f.applies_to === 'project');
 
   const moveTo = (list: ProjectField[], index: number, dir: 1 | -1) => {
     const target = list[index + dir];
@@ -151,15 +155,30 @@ export function FieldsDialog({
         {canEdit ? (
           adding ? (
             <NewFieldForm
+              chooseAppliesTo
               onCancel={() => setAdding(false)}
               onCreate={(v) => {
+                if (v.appliesTo === 'project') {
+                  projectDefs.create.mutate({
+                    name: v.name,
+                    type: v.type,
+                    options: v.options,
+                  } as FieldCreate);
+                  setAdding(false);
+                  return;
+                }
                 // `color`/`archived` on each option, and `is_library`, all have server-side
                 // defaults (Pydantic), but the generated types still mark them required — a
                 // known openapi-typescript quirk for fields with defaults, not a real API
                 // requirement. Casting here rather than fabricating values (which would also
                 // need a literal color, blocked by the design-token lint rule) keeps this
                 // honest about which fields the user actually chose.
-                m.create.mutate({ ...v, is_library: true } as FieldCreate);
+                m.create.mutate({
+                  name: v.name,
+                  type: v.type,
+                  options: v.options,
+                  is_library: true,
+                } as FieldCreate);
                 setAdding(false);
               }}
             />
@@ -187,6 +206,22 @@ export function FieldsDialog({
                   ))}
                 </div>
               ) : null}
+              {projectFields.length ? (
+                <div className="flex flex-col gap-1">
+                  <span className="section-label px-0.5">Applies to projects</span>
+                  <p className="px-0.5 text-xs text-muted">
+                    Set these on a project&apos;s Overview, under Details.
+                  </p>
+                  <ul aria-label="Project fields">
+                    {projectFields.map((f) => (
+                      <li key={f.id} className="flex h-8 items-center justify-between px-2 text-sm">
+                        <span>{f.name}</span>
+                        <span className="text-xs text-muted-2">{TYPE_LABEL[f.type]}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
             </div>
           )
         ) : null}
@@ -195,13 +230,27 @@ export function FieldsDialog({
   );
 }
 
-function NewFieldForm({
+export type NewField = {
+  name: string;
+  type: FieldType;
+  options?: { label: string }[];
+  appliesTo: 'task' | 'project';
+};
+
+/** A new field's name, type and options. `chooseAppliesTo` (Phase 7.5) adds "Applies to: Tasks /
+ * Projects"; `appliesTo` fixes it (the Details card only makes project fields). */
+export function NewFieldForm({
   onCancel,
   onCreate,
+  chooseAppliesTo = false,
+  appliesTo: fixed,
 }: {
   onCancel: () => void;
-  onCreate: (v: { name: string; type: FieldType; options?: { label: string }[] }) => void;
+  onCreate: (v: NewField) => void;
+  chooseAppliesTo?: boolean;
+  appliesTo?: 'task' | 'project';
 }) {
+  const [appliesTo, setAppliesTo] = useState<'task' | 'project'>(fixed ?? 'task');
   const [name, setName] = useState('');
   const [type, setType] = useState<FieldType>('text');
   const [options, setOptions] = useState<{ label: string }[]>([{ label: '' }, { label: '' }]);
@@ -217,7 +266,7 @@ function NewFieldForm({
           .filter(Boolean)
           .map((label) => ({ label }))
       : undefined;
-    onCreate({ name: n, type, options: opts });
+    onCreate({ name: n, type, options: opts, appliesTo });
   };
 
   return (
@@ -230,6 +279,17 @@ function NewFieldForm({
         // eslint-disable-next-line jsx-a11y/no-autofocus -- user just asked to add a field
         autoFocus
       />
+      {chooseAppliesTo ? (
+        <select
+          aria-label="Applies to"
+          value={appliesTo}
+          onChange={(e) => setAppliesTo(e.target.value as 'task' | 'project')}
+          className="h-8 rounded-md border border-hairline bg-surface-2 px-2.5 text-sm focus:border-focus focus:outline-none"
+        >
+          <option value="task">Applies to: Tasks</option>
+          <option value="project">Applies to: Projects (each project's Details)</option>
+        </select>
+      ) : null}
       <select
         aria-label="Field type"
         value={type}

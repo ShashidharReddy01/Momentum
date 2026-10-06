@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
 import { IconButton } from '@/components/ui/IconButton';
 import { Input } from '@/components/ui/Input';
-import { useFieldLibrary, useProjectFields } from '@/features/fields';
+import { FieldValueEditor, useFieldLibrary, useProjectFieldDefs, useProjectFields } from '@/features/fields';
 import { useForms } from '@/features/forms';
 import { usePeople } from '@/features/people';
 import { useProjects } from '@/features/projects';
@@ -21,6 +21,7 @@ import {
   defaultTrigger,
   describeRule,
   OPS,
+  TASK_TYPES,
   TRIGGER_FIELDS,
   TRIGGERS,
   type RuleLookups,
@@ -71,6 +72,7 @@ function useRuleLookups(projectId: string) {
   const projectFields = useProjectFields(projectId);
   const fieldLibrary = useFieldLibrary();
   const forms = useForms(projectId);
+  const projectFieldDefs = useProjectFieldDefs();
 
   const lookups: RuleLookups = useMemo(
     () => ({
@@ -80,8 +82,17 @@ function useRuleLookups(projectId: string) {
       projects: new Map((projects.data ?? []).map((p) => [p.id, p.name])),
       fields: new Map((fieldLibrary.data ?? []).map((f) => [f.id, f.name])),
       forms: new Map((forms.data ?? []).map((f) => [f.id, f.name])),
+      projectFields: new Map((projectFieldDefs.data ?? []).map((f) => [f.id, f])),
     }),
-    [people.data, tags.data, sections.data, projects.data, fieldLibrary.data, forms.data],
+    [
+      people.data,
+      tags.data,
+      sections.data,
+      projects.data,
+      fieldLibrary.data,
+      forms.data,
+      projectFieldDefs.data,
+    ],
   );
 
   return {
@@ -97,6 +108,7 @@ function useRuleLookups(projectId: string) {
       ...(projectFields.data ?? []).map((pf) => ({ id: pf.field.id, label: pf.field.name })),
     ],
     formOptions: (forms.data ?? []).map((f) => ({ id: f.id, label: f.name })),
+    projectFieldOptions: (projectFieldDefs.data ?? []).map((f) => ({ id: f.id, label: f.name })),
   };
 }
 
@@ -249,6 +261,14 @@ function ConditionRow({
             placeholder="Choose…"
             options={lookups.peopleOptions}
           />
+        ) : condition.field === 'type' ? (
+          <Select
+            aria-label="Condition value"
+            value={typeof condition.value === 'string' ? condition.value : ''}
+            onChange={(v) => onChange({ ...condition, value: v })}
+            placeholder="Choose…"
+            options={TASK_TYPES}
+          />
         ) : condition.field === 'tag' ? (
           <Select
             aria-label="Condition value"
@@ -342,7 +362,10 @@ function ActionRow({
           options={AI_STEP_KINDS.map((k) => ({ id: k.kind, label: k.label }))}
         />
       ) : null}
-      {meta.params.includes('field_id') && needsField(action) ? (
+      {action.type === 'set_project_field' ? (
+        <ProjectFieldAction action={action} onChange={onChange} lookups={lookups} />
+      ) : null}
+      {meta.params.includes('field_id') && needsField(action) && action.type !== 'set_project_field' ? (
         <Select
           aria-label="Field"
           value={action.field_id ?? ''}
@@ -350,7 +373,7 @@ function ActionRow({
           options={lookups.fieldOptions}
         />
       ) : null}
-      {meta.params.includes('value') ? (
+      {meta.params.includes('value') && action.type !== 'set_project_field' ? (
         <Input
           aria-label="Value"
           value={action.value === undefined || action.value === null ? '' : String(action.value)}
@@ -405,6 +428,40 @@ function ActionRow({
       ) : null}
       <IconButton icon={X} label="Remove action" size="icon-sm" className="ml-auto" onClick={onRemove} />
     </div>
+  );
+}
+
+/** Phase 7.5: "Set a field of this project": which project field, and its value with the field's
+ * own editor (a choice list for Stage, a number for Contract value…). */
+function ProjectFieldAction({
+  action,
+  onChange,
+  lookups,
+}: {
+  action: RuleAction;
+  onChange: (a: RuleAction) => void;
+  lookups: ReturnType<typeof useRuleLookups>;
+}) {
+  const field = action.field_id ? lookups.lookups.projectFields?.get(action.field_id) : undefined;
+  return (
+    <>
+      <Select
+        aria-label="Project field"
+        value={action.field_id ?? ''}
+        onChange={(v) => onChange({ type: action.type, field_id: v || null, value: null })}
+        placeholder={lookups.projectFieldOptions.length ? 'Choose a project field…' : 'No project fields yet'}
+        options={lookups.projectFieldOptions}
+      />
+      {field ? (
+        <div className="min-w-32">
+          <FieldValueEditor
+            field={field}
+            value={action.value ?? null}
+            onChange={(value) => onChange({ ...action, value })}
+          />
+        </div>
+      ) : null}
+    </>
   );
 }
 

@@ -158,3 +158,32 @@ cases:
         trigger: {type: task.completed}
         conditions: []
         actions: [{type: move_section, section_id: "Done"}]
+  # Phase 7.5 (S75-04): a rule that moves the project itself along its lifecycle. The title
+  # condition matches the milestone by name; the Stage choice resolves to its option id (named
+  # here by its label). The second mock case names a stage that isn't a choice: it asks back.
+  - id: contract_signed_sets_stage
+    mock: true
+    input: "When the milestone Contract signed is completed, set the project's Stage to Implementation."
+    expect:
+      rule_exact:
+        trigger: {type: task.completed}
+        conditions: [{field: title, op: eq, value: "Contract signed"}]
+        actions: [{type: set_project_field, field_id: "Stage", value: "Implementation"}]
+  - id: unknown_stage_asks
+    mock: true
+    input: "When a milestone is completed, move the project to Closed won."
+    expect: {clarifies: true, text_include_any: ["Implementation", "Stage"]}
+  - id: go_live_moves_to_hypercare
+    input: "When the Go-live milestone is done, move the project to Hypercare."
+    expect:
+      rule_exact:
+        trigger: {type: task.completed}
+        conditions: [{field: title, op: eq, value: "Go-live"}]
+        actions: [{type: set_project_field, field_id: "Stage", value: "Hypercare"}]
+  - id: any_milestone_sets_contract_value
+    input: "Whenever a milestone is completed, set Contract value to 0."
+    expect:
+      rule_exact:
+        trigger: {type: task.completed}
+        conditions: [{field: type, op: eq, value: milestone}]
+        actions: [{type: set_project_field, field_id: "Contract value", value: 0}]

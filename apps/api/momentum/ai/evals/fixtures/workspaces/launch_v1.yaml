@@ -11,6 +11,13 @@ tags: ["Escalated", "Needs review"]
 fields:
   - {project: "Launch Plan", name: "Risk", type: single_select, options: ["Low", "Medium", "High"]}
   - {project: "Launch Plan", name: "Vendor", type: text}
+# Project fields (Phase 7.5): a workspace-wide lifecycle Stage, for rules that move a project's
+# stage ("when the milestone Contract signed is completed, set Stage to Implementation").
+project_fields:
+  - name: "Stage"
+    type: single_select
+    options: ["Pre-sales", "Discovery", "Contracts", "Implementation", "Go-live", "Hypercare"]
+  - {name: "Contract value", type: currency}
 projects:
   - name: "Launch Plan"
     team: "Product"

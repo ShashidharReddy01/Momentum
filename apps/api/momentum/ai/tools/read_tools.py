@@ -22,7 +22,7 @@ from sqlalchemy.orm import aliased
 from momentum.ai import chart, retrieval
 from momentum.ai.embeddings import INDEXED
 from momentum.ai.tools.base import ToolContext, ToolError, ToolResult, tool
-from momentum.ai.tools.fields import fields_view
+from momentum.ai.tools.fields import fields_view, project_fields_view
 from momentum.ai.tools.refs import (
     TaskRef,
     resolve_person,
@@ -324,6 +324,9 @@ async def get_project(tc: ToolContext, args: GetProjectArgs) -> ToolResult:
         data["due_on"] = iso(project.due_on)
     if project.brief_text:
         data["brief"] = project.brief_text[:1500]  # S6.2.1: the overview's brief, as plain text
+    details = await project_fields_view(tc, project.id)
+    if details:
+        data["fields"] = details  # Phase 7.5: project fields (Stage, Contract value…), as labels
     return ToolResult.success(project.name, {"project": data})
 
 

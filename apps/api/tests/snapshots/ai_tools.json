@@ -2723,6 +2723,57 @@
   },
   {
     "function": {
+      "description": "Set one project field on a project (e.g. Stage = Implementation, Contract value = 120000). Project fields describe the project itself, not its tasks; use the names get_project lists.",
+      "name": "set_project_field",
+      "parameters": {
+        "additionalProperties": false,
+        "properties": {
+          "field": {
+            "description": "The project field's name, e.g. Stage",
+            "maxLength": 200,
+            "type": "string"
+          },
+          "project": {
+            "description": "The project's name or id",
+            "maxLength": 200,
+            "type": "string"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A choice's label (a list for multi-select), a person's name or email (a list for people fields), text, a number, true/false, or a YYYY-MM-DD date; null clears it"
+          }
+        },
+        "required": [
+          "project",
+          "field",
+          "value"
+        ],
+        "type": "object"
+      }
+    },
+    "type": "function"
+  },
+  {
+    "function": {
       "description": "Mark a task complete (or reopen it).",
       "name": "complete_task",
       "parameters": {

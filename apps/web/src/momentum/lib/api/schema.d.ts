@@ -1894,6 +1894,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/project-fields": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The workspace's project fields (Stage, Account owner, Contract value…) */
+        get: operations["list_project_field_defs_api_v1_project_fields_get"];
+        put?: never;
+        /** Create a project field */
+        post: operations["create_project_field_api_v1_project_fields_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/project-fields/{field_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Rename a project field or change its options */
+        patch: operations["patch_project_field_api_v1_project_fields__field_id__patch"];
+        trace?: never;
+    };
     "/api/v1/projects": {
         parameters: {
             query?: never;
@@ -2252,6 +2287,57 @@ export interface paths {
         /** Progress, overdue count and milestones for the project overview */
         get: operations["project_overview_api_v1_projects__project_id__overview_get"];
         put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}/project-field-history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Every change of a project's fields, oldest first (optionally one field) */
+        get: operations["project_field_history_api_v1_projects__project_id__project_field_history_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}/project-field-values": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A project's values for the workspace's project fields */
+        get: operations["list_project_field_values_of_api_v1_projects__project_id__project_field_values_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}/project-field-values/{field_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Set (or clear, with value: null) a project's value for a project field */
+        put: operations["set_project_field_value_api_v1_projects__project_id__project_field_values__field_id__put"];
         post?: never;
         delete?: never;
         options?: never;
@@ -5229,6 +5315,12 @@ export interface components {
         };
         /** FieldOut */
         FieldOut: {
+            /**
+             * Applies To
+             * @default task
+             * @enum {string}
+             */
+            applies_to: "task" | "project";
             /** Created By */
             created_by: string | null;
             /** Description */
@@ -6164,10 +6256,24 @@ export interface components {
             /** @default {} */
             meta: components["schemas"]["ListMeta"];
         };
+        /** ListOut[ProjectFieldEventOut] */
+        ListOut_ProjectFieldEventOut_: {
+            /** Data */
+            data: components["schemas"]["ProjectFieldEventOut"][];
+            /** @default {} */
+            meta: components["schemas"]["ListMeta"];
+        };
         /** ListOut[ProjectFieldOut] */
         ListOut_ProjectFieldOut_: {
             /** Data */
             data: components["schemas"]["ProjectFieldOut"][];
+            /** @default {} */
+            meta: components["schemas"]["ListMeta"];
+        };
+        /** ListOut[ProjectFieldValueOut] */
+        ListOut_ProjectFieldValueOut_: {
+            /** Data */
+            data: components["schemas"]["ProjectFieldValueOut"][];
             /** @default {} */
             meta: components["schemas"]["ListMeta"];
         };
@@ -6448,6 +6554,11 @@ export interface components {
         /** MutationOut[FieldOut] */
         MutationOut_FieldOut_: {
             data: components["schemas"]["FieldOut"];
+            meta: components["schemas"]["MutationMeta"];
+        };
+        /** MutationOut[FieldValueOut] */
+        MutationOut_FieldValueOut_: {
+            data: components["schemas"]["FieldValueOut"];
             meta: components["schemas"]["MutationMeta"];
         };
         /** MutationOut[FollowersOut] */
@@ -7245,6 +7356,33 @@ export interface components {
             /** Version */
             version: number;
         };
+        /**
+         * ProjectFieldEventOut
+         * @description Phase 7.5: one change of a project field (history; old/new are stored values).
+         */
+        ProjectFieldEventOut: {
+            /** Actor Id */
+            actor_id: string | null;
+            /**
+             * At
+             * Format: date-time
+             */
+            at: string;
+            /**
+             * Field Id
+             * Format: uuid
+             */
+            field_id: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** New */
+            new: unknown | null;
+            /** Old */
+            old: unknown | null;
+        };
         /** ProjectFieldMoveIn */
         ProjectFieldMoveIn: {
             /** After Id */
@@ -7263,6 +7401,26 @@ export interface components {
             is_visible: boolean;
             /** Position */
             position: string;
+        };
+        /**
+         * ProjectFieldValueOut
+         * @description Phase 7.5: one project's value for one project field.
+         */
+        ProjectFieldValueOut: {
+            /**
+             * Field Id
+             * Format: uuid
+             */
+            field_id: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Updated By */
+            updated_by: string | null;
+            /** Value */
+            value: unknown;
         };
         /** ProjectFieldVisibilityIn */
         ProjectFieldVisibilityIn: {
@@ -14161,6 +14319,94 @@ export interface operations {
             };
         };
     };
+    list_project_field_defs_api_v1_project_fields_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListOut_FieldOut_"];
+                };
+            };
+        };
+    };
+    create_project_field_api_v1_project_fields_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FieldCreateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationOut_FieldOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    patch_project_field_api_v1_project_fields__field_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                field_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FieldPatchIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationOut_FieldOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_projects_api_v1_projects_get: {
         parameters: {
             query?: {
@@ -15109,6 +15355,106 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProjectOverviewOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    project_field_history_api_v1_projects__project_id__project_field_history_get: {
+        parameters: {
+            query?: {
+                field_id?: string | null;
+            };
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListOut_ProjectFieldEventOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_project_field_values_of_api_v1_projects__project_id__project_field_values_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListOut_ProjectFieldValueOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_project_field_value_api_v1_projects__project_id__project_field_values__field_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+                field_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FieldValueIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationOut_FieldValueOut_"];
                 };
             };
             /** @description Validation Error */

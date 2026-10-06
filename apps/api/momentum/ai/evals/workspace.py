@@ -23,6 +23,7 @@ from momentum.core.settings import Settings
 from momentum.domain.attachments.models import Attachment
 from momentum.domain.comments.service import create_comment
 from momentum.domain.fields.models import FieldDef
+from momentum.domain.fields.project_values import create_project_field
 from momentum.domain.fields.schemas import FieldCreateIn, SelectOptionIn
 from momentum.domain.fields.service import create_field
 from momentum.domain.projects.models import Project
@@ -211,6 +212,29 @@ async def _build_one(session: AsyncSession, settings: Settings, name: str) -> No
                     [SelectOptionIn(label=o) for o in f["options"]] if f.get("options") else None
                 ),
                 description=f.get("description"),
+            ),
+        )
+
+    # Phase 7.5: workspace project fields (Stage…), for rules that set a project's stage
+    for f in spec.get("project_fields", []):
+        exists = (
+            await session.execute(
+                select(FieldDef.id).where(
+                    FieldDef.name == f["name"], FieldDef.applies_to == "project"
+                )
+            )
+        ).scalar_one_or_none()
+        if exists is not None:
+            continue
+        await create_project_field(
+            session,
+            world.ctx(f.get("owner", "ravi"), settings),
+            FieldCreateIn(
+                name=f["name"],
+                type=f["type"],
+                options=(
+                    [SelectOptionIn(label=o) for o in f["options"]] if f.get("options") else None
+                ),
             ),
         )
 

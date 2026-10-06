@@ -133,8 +133,10 @@ async def _values(uow: UnitOfWork, task_id: uuid.UUID) -> dict[uuid.UUID, Any]:
 
 async def test_every_action_type_the_schema_offers_can_actually_run() -> None:
     """``ai_step`` is handled in ``_fire`` rather than through ``ACTIONS`` (it queues instead of
-    writing), so the two together must cover exactly what the schema accepts."""
-    runnable = set(ACTIONS) | {"ai_step"}
+    writing), and so is Phase 7.5's ``set_project_field`` (it acts on the rule's project, not the
+    task, and asks the stage gates first), so together they must cover exactly what the schema
+    accepts."""
+    runnable = set(ACTIONS) | {"ai_step", "set_project_field"}
     assert runnable == set(ACTION_PARAMS) - NOT_YET_ACTIONS
     assert "slack_message" in NOT_YET_ACTIONS and "ai_step" not in NOT_YET_ACTIONS
 

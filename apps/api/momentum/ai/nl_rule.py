@@ -32,7 +32,9 @@ from momentum.ai.tools.refs import resolve_project
 from momentum.core.context import Ctx
 from momentum.core.errors import ValidationFailed
 from momentum.domain.access import visible_projects_clause
-from momentum.domain.fields.service import list_project_fields
+from momentum.domain.fields.models import FieldDef
+from momentum.domain.fields.project_values import list_project_field_defs
+from momentum.domain.fields.service import list_project_fields, validate_value
 from momentum.domain.forms.service import list_forms
 from momentum.domain.projects.models import Project
 from momentum.domain.rules.schemas import MAX_ACTIONS, MAX_CONDITIONS, RuleIn
@@ -75,6 +77,7 @@ ActionType = Literal[
     "set_due_relative",
     "notify_user",
     "ai_step",
+    "set_project_field",
 ]
 AiStepKind = Literal["summarize_to_comment", "classify_field", "extract_fields", "draft_reply"]
 Op = Literal["eq", "neq", "in", "empty", "not_empty", "gt", "lt"]
@@ -88,7 +91,16 @@ TASK_FIELDS = {
     "start date": "start_on",
     "start": "start_on",
 }
-CONDITION_ONLY = {"assignee": "assignee", "assigned to": "assignee", "tag": "tag", "tags": "tag"}
+CONDITION_ONLY = {
+    "assignee": "assignee",
+    "assigned to": "assignee",
+    "tag": "tag",
+    "tags": "tag",
+    # Phase 7.5: "when the milestone Contract signed is completed"
+    "title": "title",
+    "name": "title",
+    "type": "type",
+}
 # S4.1.5: how an AI step reads in the confirmation sentence.
 AI_STEP_WORDS = {
     "summarize_to_comment": "let Mo post a summary of the comments",
@@ -177,6 +189,7 @@ class _Refs:
     fields: list[tuple[uuid.UUID, str, str]]  # id, name, kind
     others: list[str]  # other projects the user can see, by name (add_to/remove_from_project)
     forms: list[tuple[uuid.UUID, str]]  # form.submitted
+    project_fields: list[FieldDef] = dc_field(default_factory=list)  # set_project_field
 
     @property
     def person_options(self) -> list[tuple[uuid.UUID, str]]:
@@ -204,12 +217,14 @@ async def load_refs(session: AsyncSession, ctx: Ctx, project: Project) -> _Refs:
         fields=[(f.id, f.name, f.type) for _pf, f in attached],
         others=list(others.scalars()),
         forms=[(f.id, f.name) for f in forms],
+        project_fields=await list_project_field_defs(session, ctx),
     )
 
 
 def reference_block(refs: _Refs) -> str:
     """The names the model may use, as prompt data (never instructions)."""
     fields = ", ".join(f"{safe(n)} ({k})" for _i, n, k in refs.fields) or "none"
+    project_fields = "; ".join(_project_field_words(f) for f in refs.project_fields) or "none"
     return "\n".join(
         [
             '<data source="project">',
@@ -219,10 +234,47 @@ def reference_block(refs: _Refs) -> str:
             f"Tags: {', '.join(safe(n) for _i, n in refs.tags) or 'none'}",
             f"Custom fields: {fields}",
             f"Forms: {', '.join(safe(n) for _i, n in refs.forms) or 'none'}",
+            f"Project fields: {project_fields}",
             f"Other projects: {', '.join(safe(n) for n in refs.others) or 'none'}",
             "</data>",
         ]
     )
+
+
+def _project_field_words(f: FieldDef) -> str:
+    choices = [str(o["label"]) for o in _options(f)]
+    return f"{safe(f.name)} ({f.type}" + (
+        f": {', '.join(safe(c) for c in choices)})" if choices else ")"
+    )
+
+
+def _options(f: FieldDef) -> list[dict[str, Any]]:
+    return (
+        [o for o in (f.options or []) if isinstance(o, dict) and not o.get("archived")]
+        if f.type in ("single_select", "multi_select")
+        else []
+    )
+
+
+def _project_field_value(f: FieldDef, value: Any) -> tuple[Any, Any]:
+    """A project field value in words → (stored, shown). Choices are matched by label (never
+    guessed); anything else is validated like the field's own editor would."""
+    if f.type in ("single_select", "multi_select"):
+        labels = [str(v) for v in _values(value)]
+        options = [(o["id"], str(o["label"])) for o in _options(f)]
+        picked = [_pick(f"{f.name} choice", label, options) for label in labels]
+        if f.type == "single_select":
+            if len(picked) != 1:
+                raise _Ask(f"Which one {f.name} should it be?")
+            return picked[0][0], picked[0][1]
+        return [i for i, _n in picked], [n for _i, n in picked]
+    if f.type == "people":
+        raise _Ask(f"A rule can't set {f.name} (a people field) yet. Set it on the project.")
+    try:
+        stored = validate_value(f, value)
+    except ValidationFailed as e:
+        raise _Ask(f"{f.name} can't be set to “{value}”: {e.detail}") from None
+    return stored, stored
 
 
 def _pick(kind: str, value: str, options: list[tuple[uuid.UUID, str]]) -> tuple[uuid.UUID, str]:
@@ -392,6 +444,17 @@ async def _resolve_action(
         if a.days is None:
             raise _Ask("How many days from when the rule runs should the due date be?")
         spec["days"] = named["days"] = a.days
+    elif a.type == "set_project_field":
+        if not a.field:
+            raise _Ask("Which project field should be set?")
+        options = [(f.id, f.name) for f in refs.project_fields]
+        pfid, fname = _pick("project field", a.field, options)
+        pfield = next(f for f in refs.project_fields if f.id == pfid)
+        if a.value is None:
+            raise _Ask(f"What should {fname} be set to?")
+        stored, shown = _project_field_value(pfield, a.value)
+        spec["field_id"], named["field_id"] = str(pfid), fname
+        spec["value"], named["value"] = stored, shown
     elif a.type == "ai_step":
         if a.kind is None:
             raise _Ask(
@@ -479,6 +542,10 @@ def _action_words(a: dict[str, Any]) -> str:
         return "create subtasks: " + ", ".join(a["titles"])
     if kind == "ai_step":
         return AI_STEP_WORDS[str(a["kind"])].format(field=a.get("field_id", "a field"))
+    if kind == "set_project_field":
+        value = a["value"]
+        shown = ", ".join(str(v) for v in value) if isinstance(value, list) else value
+        return f"set the project's {a['field_id']} to {shown}"
     if kind == "set_due_relative":
         days = a["days"]
         return f"set the due date {abs(days)} day{'' if abs(days) == 1 else 's'} " + (

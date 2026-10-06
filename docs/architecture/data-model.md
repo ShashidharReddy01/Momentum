@@ -86,6 +86,7 @@ team_id, user_id, role check in (`lead`,`member`), pk (team_id, user_id).
 | start_on, due_on | date null | Editable since S6.2.1 (overview; editors; activity + undo; start ≤ due) |
 | archived_at | timestamptz null | |
 | is_template | bool default false | |
+| template_id | uuid fk templates null | **Phase 7.5 (S75-04, migration 0043):** the template it was made from, set by `create_project_from_template`; null for every other project (Asana imports included). Partial index where not null. The FK is `use_alter` (templates.project_id points back), so export/import fill it in on the second pass |
 | version, created_by, created_via, timestamps, deleted_at | | |
 
 ### `project_members`
@@ -159,10 +160,17 @@ user_id, task_id, bucket (`recently_assigned`,`today`,`this_week`,`later`), posi
 | options | jsonb | For selects: `[{id,label,color,archived}]`; number: `{precision, unit}` |
 | description | text | |
 | is_library | bool | Shared workspace field |
+| applies_to | text check in (`task`,`project`) default `task` | **Phase 7.5 (S75-04, migration 0043).** `project` fields (Stage, Account owner, Contract value…) are workspace-wide, set on projects, never attached to a project as task fields (`attach_field` refuses them) |
 | created_by, timestamps, deleted_at | | |
 
 ### `project_fields`
-project_id, field_id, position, is_visible, pk (project_id, field_id).
+project_id, field_id, position, is_visible, pk (project_id, field_id). (The task fields attached to a project; despite the name, unrelated to project fields below.)
+
+### `project_field_values` (Phase 7.5, S75-04, migration 0043)
+project_id, field_id, workspace_id, `value jsonb` (stored like `field_values`: option id, number, date, [user ids]…), updated_at, updated_by. pk (project_id, field_id); index (field_id). Written only by `domain/fields/project_values.set_project_field_value` (needs project editor; activity `project.field_set` with undo `projects.field_set`; event `project.field_changed`). Clearing deletes the row.
+
+### `project_field_events` (Phase 7.5, S75-04, migration 0043)
+id, workspace_id, project_id, field_id, `old jsonb` null, `new jsonb` null, at, actor_id null. One row per change of a project field, written in the same transaction as the change (an undo writes its own row, so time in stage stays truthful). Indexes (project_id, field_id, at) and (field_id, at). Powers time in stage, funnels and trends for any single-select field.
 
 ### `field_values`
 task_id, field_id, `value jsonb` (typed by field type: string / number / option id / [option ids] / date / [user ids] / bool), updated_at, updated_by. pk (task_id, field_id). GIN(value) for filters.
@@ -233,6 +241,8 @@ key text, user_id, method, path, response_status, response_body jsonb, created_a
 ## 8. Planning (Phase 6)
 
 - `portfolios` (**as built, S6.2.2, migration 0032**): id, workspace_id, name, description, owner_id, status null (latest check-in, denormalized like `projects.status`, same values), version, timestamps, deleted_at. Visible to every workspace member; the owner and workspace admins edit. `portfolio_items`: portfolio_id + project_id (pk), workspace_id, position (fractional key, `COLLATE "C"`), created_at. Check-ins are `status_updates` rows with `entity_type='portfolio'`. A portfolio's project rows are computed per viewer (projects they can't see are only counted).
+- **Portfolios v2 (Phase 7.5, migration 0043; columns created in S75-04, used from S75-05):** `portfolios` gains `kind` (`manual` default, or `rule`), `rule` jsonb null (`{template_ids[], team_ids[], project_ids[], project_field_conditions[{field_id, op: is|is_not|any|empty|set, value}], include_completed, include_archived}`; membership computed at query time in `domain/portfolios/membership.py`, an empty rule matches nothing), `stage_field_id` uuid fk field_defs null (a single-select project field whose option order is the lifecycle), `stage_targets` jsonb `{option_id: target_days}`, `stage_gates` jsonb `{option_id: {required_fields[field_id], required_milestones[title], required_files[glob]}}` (checked by `domain/portfolios/gates.py`; a rule never overrides a gate), `columns` jsonb `[{key, visible, width}]`. `portfolio_views`: id, workspace_id, portfolio_id, name, owner_id null (null = shared), layout (`table`,`board`,`timeline`,`workload`), filters jsonb, group_by, sort jsonb, timestamps, deleted_at. `portfolio_members`: portfolio_id + user_id (pk), workspace_id, role (`editor`,`viewer`), created_at. `project_snapshots`: project_id + day (pk), workspace_id, data jsonb (counts, progress, status, stage, every project field value, forecast p50/p80); index (workspace_id, day).
+- **Template payload `project_field_defaults` (Phase 7.5, S75-04, no migration):** a `project` template saves the project's project-field values (`{field_id: value}`); "new from template" applies them through `set_project_field_value` (a field deleted or changed since is skipped) and sets `projects.template_id`.
 - `goals` (**as built, S6.3.1, migration 0033**): id, workspace_id, parent_id null (sub-goals, ≤ 4 levels, no cycles), name, description, owner_id (a person), period_start/period_end (dates, start ≤ end) + period_label ("Q4 2026"), metric jsonb null (`{type: number|percent|currency, start, target, current, unit}`; a target below the start works), progress_source (`manual`,`projects`,`subgoals`), status null (latest check-in), version, timestamps, deleted_at. `goal_links`: goal_id + entity_type (`project`,`portfolio`) + entity_id (pk), workspace_id, created_at. Progress is never stored: it's computed per viewer (metric position; average completion of linked projects and linked portfolios' projects they can see; average of sub-goals), null when there's nothing to go on. Check-ins are `status_updates` with `entity_type='goal'` and can move `metric.current`.
 - `capacity` (**as built, S6.4.1, migration 0034**): user_id + week_start (pk; a Monday), workspace_id, capacity_minutes (0–6000), updated_at. One person's capacity for one week (time off, a short week), overriding their usual hours in `users.prefs['weekly_hours']` (hours, null = default) and the workspace default in `workspaces.settings['workload']['default_hours']` (else `MOMENTUM_WORKLOAD_DEFAULT_HOURS`). `tasks.estimate_minutes` (existing column) is now editable end to end: the effort the workload view spreads over a task's working days.
 - `capacity`: user_id, week_start date, capacity_minutes int. Default from user prefs.

@@ -229,6 +229,32 @@ async def _queue_ai_step(
     await session.flush()
 
 
+async def set_project_field_action(
+    session: AsyncSession,
+    ctx: Ctx,
+    project_id: uuid.UUID | None,
+    spec: dict[str, Any],
+    batch: uuid.UUID,
+) -> str | None:
+    """Phase 7.5: set a field of the rule's own project. When the field is a portfolio's stage
+    field and the target stage's gate isn't met, the rule never overrides it: nothing changes and
+    the note says why (the run records it). Returns that note, or None when the value was set."""
+    from momentum.domain.fields.project_values import set_project_field_value
+    from momentum.domain.portfolios.gates import blocking_gate
+
+    if project_id is None:
+        raise Forbidden("Only a project's own rules can set a project field")
+    field_id = uuid.UUID(str(spec["field_id"]))
+    blocked = await blocking_gate(session, ctx, project_id, field_id, spec.get("value"))
+    if blocked is not None:
+        log.info("rule_gate_skip", project_id=str(project_id), note=blocked)
+        return blocked
+    await set_project_field_value(
+        session, ctx, project_id, field_id, spec.get("value"), batch_id=batch
+    )
+    return None
+
+
 ACTIONS: dict[str, ActionFn] = {
     "assign": _assign,
     "add_comment": _add_comment,
@@ -255,11 +281,22 @@ async def _field_value(session: AsyncSession, task: Task, field: str) -> Any:
     if field in ("due_on", "start_on"):
         day = getattr(task, field)
         return day.isoformat() if day else None
+    if field == "title":
+        return _fold(task.title)
+    if field == "type":
+        return task.type
     if field == "tag":
         rows = await session.execute(select(TaskTag.tag_id).where(TaskTag.task_id == task.id))
         return sorted(str(t) for (t,) in rows)
     row = await session.get(FieldValue, (task.id, uuid.UUID(field)))
     return row.value if row else None
+
+
+def _fold(value: Any) -> Any:
+    """Titles compare without case or surrounding space ("Contract signed" = "contract signed")."""
+    if isinstance(value, list):
+        return [_fold(v) for v in value]
+    return " ".join(value.split()).lower() if isinstance(value, str) else value
 
 
 def _is_empty(value: Any) -> bool:
@@ -297,7 +334,8 @@ def compare(op: str, actual: Any, expected: Any) -> bool:
 async def _conditions_pass(session: AsyncSession, rule: Rule, task: Task) -> bool:
     for c in rule.conditions:
         actual = await _field_value(session, task, c["field"])
-        if not compare(c["op"], actual, c.get("value")):
+        expected = _fold(c.get("value")) if c["field"] == "title" else c.get("value")
+        if not compare(c["op"], actual, expected):
             return False
     return True
 
@@ -404,6 +442,7 @@ async def _fire(
     user = await session.get(User, rule.created_by)
     ctx = _rule_ctx(user, rule, ev, settings, depth)
     status, error, ran = "success", None, 0
+    skipped_notes: list[str] = []  # Phase 7.5: actions a stage gate held back (not failures)
     batch_id = uuid.uuid4()
     # The row is inserted before the actions run so a queued AI step (S4.1.5) can point at it;
     # its outcome is filled in at the end. Core insert/update rather than the ORM: the actions
@@ -450,12 +489,22 @@ async def _fire(
                         await _queue_ai_step(
                             session, ctx, rule, run_id, project_id, ev.entity_id, spec, batch_id
                         )
+                    elif spec["type"] == "set_project_field":
+                        note = await set_project_field_action(
+                            session, ctx, rule.project_id, spec, batch_id
+                        )
+                        if note:
+                            skipped_notes.append(note)
+                            continue
                     else:
                         await ACTIONS[spec["type"]](session, ctx, ev.entity_id, spec, batch_id)
                     ran += 1
         except Exception as e:  # a rule must never take the executor down; the run keeps the error
             status, error, ran = "failed", (str(e) or type(e).__name__)[:500], 0
             log.warning("rule_failed", rule_id=str(rule.id), event_id=ev.id, error=error)
+    if status == "success" and skipped_notes:
+        # the run succeeded; the note says what a gate held back (spec §5.5: never override)
+        error = "; ".join(skipped_notes)[:500]
     await session.execute(
         update(RuleRun)
         .where(RuleRun.id == run_id)
@@ -571,7 +620,14 @@ async def test_run(
                 continue
             savepoint = await session.begin_nested()
             try:
-                await ACTIONS[spec["type"]](session, ctx, task_id, spec, uuid.uuid4())
+                if spec["type"] == "set_project_field":
+                    note = await set_project_field_action(
+                        session, ctx, rule.project_id, spec, uuid.uuid4()
+                    )
+                    if note:
+                        raise Forbidden(note)
+                else:
+                    await ACTIONS[spec["type"]](session, ctx, task_id, spec, uuid.uuid4())
                 results.append(ActionResult(spec["type"], True, None))
             except Exception as e:  # a preview must never raise; the row records the error
                 error = (str(e) or type(e).__name__)[:500]

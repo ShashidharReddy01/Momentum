@@ -28,6 +28,7 @@ from momentum.core.mutation import Mutation
 from momentum.core.permissions import Action, can
 from momentum.domain.access import forbid_agent, get_visible_project, require_project_role
 from momentum.domain.fields.models import FieldDef
+from momentum.domain.fields.project_values import project_field_values, set_project_field_value
 from momentum.domain.fields.service import (
     attach_field,
     list_project_field_values,
@@ -306,9 +307,14 @@ async def save_project_template(
         else []
     )
 
+    # Phase 7.5: the project's own field values become the new projects' defaults
+    project_defaults = {
+        str(v.field_id): v.value for v in await project_field_values(session, ctx, project.id)
+    }
     payload = {
         "roles": roles.as_list(),
         "fields": [str(f) for f in fields],
+        "project_field_defaults": project_defaults,
         "sections": sections_payload,
         "rules": rules_payload,
         "dependencies": dependencies,
@@ -479,6 +485,13 @@ async def create_project_from_template(
         ),
     )
     project = m.entity
+    # Phase 7.5: lineage, so a rule portfolio can include "every project made from this template"
+    project.template_id = template.id
+    for fid, value in (payload.get("project_field_defaults") or {}).items():
+        try:
+            await set_project_field_value(session, ctx, project.id, uuid.UUID(fid), value)
+        except (DomainError, ValueError):
+            continue  # a field deleted or changed since the template was saved: skip it
 
     sections_payload = payload.get("sections") or []
     default = (

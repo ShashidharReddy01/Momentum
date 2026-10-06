@@ -12,6 +12,8 @@ from momentum.core.db import Base, IdMixin, SoftDeleteMixin, TimestampMixin
 
 POSITION = String(64, collation="C")
 
+APPLIES_TO = ("task", "project")
+
 # Field types per docs/architecture/data-model.md §4.
 FIELD_TYPES = (
     "text",
@@ -44,8 +46,50 @@ class FieldDef(IdMixin, TimestampMixin, SoftDeleteMixin, Base):
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_library: Mapped[bool] = mapped_column(Boolean, default=True)
     created_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    # Phase 7.5: `project` fields describe projects (Stage, Account owner, Contract value…)
+    applies_to: Mapped[str] = mapped_column(String(8), default="task", server_default="task")
 
-    __table_args__ = (CheckConstraint(f"type in {FIELD_TYPES}", name="type"),)
+    __table_args__ = (
+        CheckConstraint(f"type in {FIELD_TYPES}", name="type"),
+        CheckConstraint(f"applies_to in {APPLIES_TO}", name="applies_to"),
+    )
+
+
+class ProjectFieldValue(Base):
+    """Phase 7.5 (spec §5.1): a project's value for a project field (``applies_to='project'``)."""
+
+    __tablename__ = "project_field_values"
+
+    project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id"), primary_key=True)
+    field_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("field_defs.id"), primary_key=True)
+    workspace_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("workspaces.id"))
+    value: Mapped[Any] = mapped_column(JSONB)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+    updated_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+
+    __table_args__ = (Index("ix_project_field_values_field", "field_id"),)
+
+
+class ProjectFieldEvent(IdMixin, Base):
+    """Phase 7.5 (spec §5.1): history of every project field change, written with the change.
+    Time in stage, funnels and trends read it."""
+
+    __tablename__ = "project_field_events"
+
+    workspace_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("workspaces.id"))
+    project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id"))
+    field_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("field_defs.id"))
+    old: Mapped[Any | None] = mapped_column(JSONB, nullable=True)
+    new: Mapped[Any | None] = mapped_column(JSONB, nullable=True)
+    at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    actor_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+
+    __table_args__ = (
+        Index("ix_project_field_events_project_field_at", "project_id", "field_id", "at"),
+        Index("ix_project_field_events_field_at", "field_id", "at"),
+    )
 
 
 class ProjectField(Base):

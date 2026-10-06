@@ -9,15 +9,26 @@ from momentum.domain.agents.models import Agent, AgentRun
 from momentum.domain.attachments.models import Attachment
 from momentum.domain.comments.models import Comment, Mention, Reaction
 from momentum.domain.dashboards.models import Dashboard, DashboardWidget
-from momentum.domain.fields.models import FieldDef, FieldValue, ProjectField
+from momentum.domain.fields.models import (
+    FieldDef,
+    FieldValue,
+    ProjectField,
+    ProjectFieldEvent,
+    ProjectFieldValue,
+)
 from momentum.domain.forecasts.models import Forecast
 from momentum.domain.forms.models import Form, FormSubmission
 from momentum.domain.goals.models import Goal, GoalLink
 from momentum.domain.integrations.models import ExternalLink, ImportJob
 from momentum.domain.mytasks.models import MyTaskPlacement
 from momentum.domain.notifications.models import Notification
-from momentum.domain.portfolios.models import Portfolio, PortfolioItem
-from momentum.domain.projects.models import Favorite, Project, ProjectMember
+from momentum.domain.portfolios.models import (
+    Portfolio,
+    PortfolioItem,
+    PortfolioMember,
+    PortfolioView,
+)
+from momentum.domain.projects.models import Favorite, Project, ProjectMember, ProjectSnapshot
 from momentum.domain.rules.models import Rule, RuleRun
 from momentum.domain.sections.models import Section
 from momentum.domain.status_updates.models import StatusUpdate
@@ -67,9 +78,14 @@ __all__ = [
     "OutboxEvent",
     "Portfolio",
     "PortfolioItem",
+    "PortfolioMember",
+    "PortfolioView",
     "Project",
     "ProjectField",
+    "ProjectFieldEvent",
+    "ProjectFieldValue",
     "ProjectMember",
+    "ProjectSnapshot",
     "Reaction",
     "Rule",
     "RuleRun",

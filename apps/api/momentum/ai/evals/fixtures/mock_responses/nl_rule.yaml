@@ -23,6 +23,24 @@ responses:
         arguments:
           question: "I can't post to Slack yet. Should I add a comment on the task instead?"
 
+  # Phase 7.5 (S75-04): set_project_field, with the title and type conditions
+  - match: {contains: "milestone contract signed is completed"}
+    tool_calls:
+      - name: submit_result
+        arguments:
+          name: "Contract signed moves to Implementation"
+          trigger: {type: task.completed}
+          conditions: [{field: title, op: eq, value: "Contract signed"}]
+          actions: [{type: set_project_field, field: "Stage", value: "Implementation"}]
+  - match: {contains: "move the project to closed won"}
+    tool_calls:
+      - name: submit_result
+        arguments:
+          name: "Milestone closes the deal"
+          trigger: {type: task.completed}
+          conditions: [{field: type, op: eq, value: milestone}]
+          actions: [{type: set_project_field, field: "Stage", value: "Closed won"}]
+
   # tests/test_ai_nl_rule.py
   - match: {contains: "moves to doing, assign it to ana and add the beta tag"}
     tool_calls:

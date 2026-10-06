@@ -49,6 +49,12 @@ class Project(IdMixin, TimestampMixin, SoftDeleteMixin, Base):
     due_on: Mapped[date | None] = mapped_column(Date)
     archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     is_template: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Phase 7.5: the template it was made from ("every project made from Customer onboarding").
+    # templates.project_id points back here: use_alter keeps the cycle out of table ordering
+    # (export/import load projects first and fill this in on the second pass)
+    template_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("templates.id", use_alter=True), nullable=True
+    )
     # deferred: only ever used inside SQL (search), never read per row; loading it parsed a
     # whole tsvector for every row of every list (Phase 7 load test)
     search_tsv: Mapped[Any] = mapped_column(
@@ -101,3 +107,17 @@ class Favorite(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     __table_args__ = (Index("ix_favorites_user_position", "user_id", "position"),)
+
+
+class ProjectSnapshot(Base):
+    """Phase 7.5 (spec §5.7): one row per live project and day for trend widgets (open,
+    completed, overdue, progress, status, stage, project field values, forecast p50/p80)."""
+
+    __tablename__ = "project_snapshots"
+
+    project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id"), primary_key=True)
+    day: Mapped[date] = mapped_column(Date, primary_key=True)
+    workspace_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("workspaces.id"))
+    data: Mapped[dict[str, Any]] = mapped_column(JSONB)
+
+    __table_args__ = (Index("ix_project_snapshots_workspace_day", "workspace_id", "day"),)

@@ -1,3 +1,4 @@
+import type { Field } from '@/features/fields';
 import type { RuleAction, RuleCondition, RuleTrigger } from './queries';
 
 /** Mirrors `domain/rules/schemas.py`'s `TRIGGER_PARAMS` (minus `NOT_YET_TRIGGERS`, which the API
@@ -21,7 +22,22 @@ export const DECISIONS: { id: string; label: string }[] = [
 ];
 
 export const TRIGGER_FIELDS = ['priority', 'due_on', 'start_on'] as const;
-export const CONDITION_FIELDS = ['priority', 'assignee', 'due_on', 'start_on', 'tag'] as const;
+/** Phase 7.5 adds `title` (compared without case) and `type` (task, milestone, approval), so a
+ * template rule can say "when the milestone *Contract signed* is completed". */
+export const CONDITION_FIELDS = [
+  'priority',
+  'assignee',
+  'due_on',
+  'start_on',
+  'tag',
+  'title',
+  'type',
+] as const;
+export const TASK_TYPES: { id: string; label: string }[] = [
+  { id: 'task', label: 'Task' },
+  { id: 'milestone', label: 'Milestone' },
+  { id: 'approval', label: 'Approval' },
+];
 export const OPS: { op: string; label: string; needsValue: boolean }[] = [
   { op: 'eq', label: 'is', needsValue: true },
   { op: 'neq', label: 'is not', needsValue: true },
@@ -57,6 +73,14 @@ export const ACTIONS: { type: string; label: string; params: string[]; required:
   { type: 'set_due_relative', label: 'Set a relative due date', params: ['days'], required: ['days'] },
   { type: 'notify_user', label: 'Notify someone', params: ['user_id', 'text'], required: ['text'] },
   { type: 'ai_step', label: 'Let Mo do a step (AI)', params: ['kind', 'field_id'], required: ['kind'] },
+  // Phase 7.5: a field of the rule's own project (Stage = Implementation); a portfolio's stage
+  // gate is never overridden by a rule (the run says "gate not met, skipped")
+  {
+    type: 'set_project_field',
+    label: 'Set a field of this project',
+    params: ['field_id', 'value'],
+    required: ['field_id', 'value'],
+  },
 ];
 
 /** S4.1.5 `AI_STEP_KINDS`: what the AI step does. `classify_field` is the only one that takes a
@@ -73,6 +97,9 @@ export function actionComplete(a: RuleAction): boolean {
   const meta = ACTIONS.find((m) => m.type === a.type);
   if (!meta) return false;
   const values = a as unknown as Record<string, unknown>;
+  // a project field's value may be false or 0 (a checkbox, a number): only "unset" is missing
+  if (a.type === 'set_project_field')
+    return !!a.field_id && a.value !== undefined && a.value !== null && a.value !== '';
   if (!meta.required.every((p) => values[p])) return false;
   return !(a.type === 'ai_step' && a.kind === 'classify_field' && !a.field_id);
 }
@@ -99,6 +126,8 @@ export interface RuleLookups {
   projects: Map<string, string>;
   fields: Map<string, string>;
   forms: Map<string, string>;
+  /** Phase 7.5: project fields by id, for choice labels in "set the project's Stage to …". */
+  projectFields?: Map<string, Field>;
 }
 
 const person = (l: RuleLookups, id: string | null | undefined) =>
@@ -106,6 +135,7 @@ const person = (l: RuleLookups, id: string | null | undefined) =>
 const fieldName = (l: RuleLookups, id: string | null | undefined) => {
   if (!id) return 'a field';
   if (id === 'priority' || id === 'due_on' || id === 'start_on') return id.replace('_', ' ');
+  if (id === 'title' || id === 'type') return id;
   return l.fields.get(id) ?? 'a custom field';
 };
 
@@ -168,6 +198,10 @@ function describeAction(a: RuleAction, l: RuleLookups): string {
       return 'mark complete';
     case 'set_field':
       return `set ${fieldName(l, a.field_id)} to ${JSON.stringify(a.value)}`;
+    case 'set_project_field': {
+      const f = a.field_id ? l.projectFields?.get(a.field_id) : undefined;
+      return `set the project's ${f?.name ?? 'field'} to ${projectValueWords(f, a.value)}`;
+    }
     case 'add_to_project':
       return `add to ${a.project_id ? (l.projects.get(a.project_id) ?? 'another project') : 'another project'}`;
     case 'remove_from_project':
@@ -196,6 +230,18 @@ function describeAction(a: RuleAction, l: RuleLookups): string {
     default:
       return a.type;
   }
+}
+
+function projectValueWords(f: Field | undefined, value: unknown): string {
+  if (value === undefined || value === null || value === '') return '…';
+  if (f && Array.isArray(f.options)) {
+    const ids = Array.isArray(value) ? (value as string[]) : [value as string];
+    const labels = ids.map(
+      (id) => (f.options as { id: string; label: string }[]).find((o) => o.id === id)?.label,
+    );
+    if (labels.every(Boolean)) return labels.join(', ');
+  }
+  return typeof value === 'string' ? value : JSON.stringify(value);
 }
 
 /** A readable sentence for the builder's live preview and the rule list row, e.g. "When a task

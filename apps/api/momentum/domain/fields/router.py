@@ -6,7 +6,7 @@ from fastapi import APIRouter, status
 
 from momentum.api.deps import CtxDep, UowDep
 from momentum.api.schemas import ListOut, MutationMeta, MutationOut, OkOut
-from momentum.domain.fields import service
+from momentum.domain.fields import project_values, service
 from momentum.domain.fields.schemas import (
     FieldAttachIn,
     FieldCreateIn,
@@ -15,8 +15,10 @@ from momentum.domain.fields.schemas import (
     FieldValueIn,
     FieldValueOut,
     FieldValuesLookupIn,
+    ProjectFieldEventOut,
     ProjectFieldMoveIn,
     ProjectFieldOut,
+    ProjectFieldValueOut,
     ProjectFieldVisibilityIn,
     TaskFieldValueOut,
 )
@@ -205,3 +207,86 @@ async def set_task_field_value(
     async with uow.transaction() as s:
         row = await service.set_task_field_value(s, ctx, task_id, field_id, body.value)
         return FieldValueOut(field_id=field_id, value=row.value if row else None)
+
+
+# ---------------- Phase 7.5: project fields (spec §5.1) ----------------
+
+
+@router.get(
+    "/project-fields",
+    response_model=ListOut[FieldOut],
+    summary="The workspace's project fields (Stage, Account owner, Contract value…)",
+)
+async def list_project_field_defs(ctx: CtxDep, uow: UowDep) -> ListOut[FieldOut]:
+    async with uow.transaction() as s:
+        fields = await project_values.list_project_field_defs(s, ctx)
+        return ListOut(data=[FieldOut.model_validate(f) for f in fields])
+
+
+@router.post(
+    "/project-fields",
+    response_model=MutationOut[FieldOut],
+    status_code=status.HTTP_201_CREATED,
+    summary="Create a project field",
+)
+async def create_project_field(
+    body: FieldCreateIn, ctx: CtxDep, uow: UowDep
+) -> MutationOut[FieldOut]:
+    async with uow.transaction() as s:
+        m = await project_values.create_project_field(s, ctx, body)
+        return MutationOut.of(m, FieldOut)
+
+
+@router.patch(
+    "/project-fields/{field_id}",
+    response_model=MutationOut[FieldOut],
+    summary="Rename a project field or change its options",
+)
+async def patch_project_field(
+    field_id: uuid.UUID, body: FieldPatchIn, ctx: CtxDep, uow: UowDep
+) -> MutationOut[FieldOut]:
+    async with uow.transaction() as s:
+        m = await project_values.patch_project_field(s, ctx, field_id, body)
+        return MutationOut.of(m, FieldOut)
+
+
+@router.get(
+    "/projects/{project_id}/project-field-values",
+    response_model=ListOut[ProjectFieldValueOut],
+    summary="A project's values for the workspace's project fields",
+)
+async def list_project_field_values_of(
+    project_id: uuid.UUID, ctx: CtxDep, uow: UowDep
+) -> ListOut[ProjectFieldValueOut]:
+    async with uow.transaction() as s:
+        rows = await project_values.project_field_values(s, ctx, project_id)
+        return ListOut(data=[ProjectFieldValueOut.model_validate(r) for r in rows])
+
+
+@router.put(
+    "/projects/{project_id}/project-field-values/{field_id}",
+    response_model=MutationOut[FieldValueOut],
+    summary="Set (or clear, with value: null) a project's value for a project field",
+)
+async def set_project_field_value(
+    project_id: uuid.UUID, field_id: uuid.UUID, body: FieldValueIn, ctx: CtxDep, uow: UowDep
+) -> MutationOut[FieldValueOut]:
+    async with uow.transaction() as s:
+        m = await project_values.set_project_field_value(s, ctx, project_id, field_id, body.value)
+        return MutationOut(
+            data=FieldValueOut(field_id=field_id, value=m.entity.value if m.entity else None),
+            meta=MutationMeta(activity_id=m.activity_id),
+        )
+
+
+@router.get(
+    "/projects/{project_id}/project-field-history",
+    response_model=ListOut[ProjectFieldEventOut],
+    summary="Every change of a project's fields, oldest first (optionally one field)",
+)
+async def project_field_history(
+    project_id: uuid.UUID, ctx: CtxDep, uow: UowDep, field_id: uuid.UUID | None = None
+) -> ListOut[ProjectFieldEventOut]:
+    async with uow.transaction() as s:
+        rows = await project_values.field_history(s, ctx, project_id, field_id)
+        return ListOut(data=[ProjectFieldEventOut.model_validate(r) for r in rows])
