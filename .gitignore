@@ -23,7 +23,7 @@ infra/litellm/config.yaml
 !.vscode/extensions.json
 
 # AI eval reports (make evals)
-reports/
+/reports/
 
 # design-skill working files (decision boards, local config)
 .impeccable/mocks/

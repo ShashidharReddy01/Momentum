@@ -114,6 +114,15 @@ Frontend build-time variables use the `VITE_MOMENTUM_` prefix, but the SPA prefe
 | `MOMENTUM_WORKLOAD_DEFAULT_HOURS` | `30` | Weekly hours a person can plan against when neither they nor a workspace admin has set one (0–80). Admins override it per workspace (`workspaces.settings['workload']`), people per themselves (`users.prefs['weekly_hours']`) and per week (`capacity`, e.g. time off). Used by the Workload view and Architect's capacity notes (S6.4.1) |
 | `MOMENTUM_FORECAST_RUNS` | `10000` | Monte Carlo runs per project forecast (100–200,000). About 0.2 s per project at the default (pure Python) (S6.5.3) |
 | `MOMENTUM_FORECASTS_ENABLED` | `true` | The nightly forecast job's kill switch (`compute_forecasts`, nightly at 02:30 on the worker's clock). When off, a forecast can still be refreshed from a project's overview (S6.5.3) |
+| `MOMENTUM_LLM_SUPPORTS_VISION` | `true` | Whether the gateway model accepts images. Mo's `look_at` tool sends a rendered page or picture only when a person asks; off = `look_at` answers `not_supported` and Mo explains (Phase 7.5, ADR-0011) |
+| `MOMENTUM_AI_MAX_IMAGES_PER_CALL` | `5` | Images attached to one model call (1–20). Each image counts `(w*h)/750` input tokens toward usage and budgets (Phase 7.5) |
+| `MOMENTUM_AI_MAX_IMAGES_PER_CONVERSATION` | `20` | Images over a whole Ask Mo conversation (1–200) (Phase 7.5) |
+| `MOMENTUM_FILE_PARSE_TIMEOUT_S` | `20` | Seconds a file parse may take (worker thread) before it's recorded as failed and Mo says the file took too long (Phase 7.5) |
+| `MOMENTUM_FILE_PARSE_MAX_ROWS` | `200000` | Rows kept per sheet when a spreadsheet or CSV is parsed; beyond that the sheet is marked truncated and Mo says so (Phase 7.5) |
+| `MOMENTUM_REPORT_TIMEOUT_S` | `120` | Cap on one report generation job (seconds) (Phase 7.5) |
+| `MOMENTUM_AI_TASK_SUGGESTIONS` | `true` | Smart task creation: duplicate warnings and assignee/due/field/tag suggestions while typing a task (no model call). A per-user preference can hide them (Phase 7.5) |
+| `MOMENTUM_SNAPSHOTS_ENABLED` | `true` | The nightly `snapshot_projects` job (02:45, worker clock) that records one row per live project for trend widgets (Phase 7.5) |
+| `MOMENTUM_SNAPSHOT_RETENTION_DAYS` | `730` | Project snapshots older than this are deleted by the nightly job (30–3650) (Phase 7.5) |
 
 ## Integrations (Phase 9)
 

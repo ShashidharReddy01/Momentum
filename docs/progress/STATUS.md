@@ -8,7 +8,7 @@
 - **Phase:** 6: Planning and Insight — **complete** (exit criteria met 2026-10-01; one live check left for the product owner: `momentum evals --live --feature chart`). Phase 5: Agents v1 — complete and verified live (2026-09-30).
 - **Plan change (product owner, 2026-10-01):** Momentum will serve **~150 people in one workspace**, many moving off Asana. After Phase 6.5: **Phase 7 Hardening and Asana-ready** (audit-first edge-case register reviewed by the product owner, zero open P0/P1, 150-user load test, AI/agent hardening, custom-field reporting, full Asana import, security, a11y, admin) → **Phase 8 Azure go-live** → **Phase 9 Integrations after go-live** (Slack first). Phases renumbered (old 8 → 7, old 9 → 8, old 7 → 9); mobile/PWA moved to Later. Design: `docs/superpowers/specs/2026-10-01-phase-7-hardening-design.md`; phase files `phase-7.md` to `phase-9.md`.
 - **Working mode (product owner, 2026-10-04):** one branch only (`main`); sessions run one at a time (a new session may start in another account when tokens run out), so **fetch before starting and before every push**. The product owner asked this session to finish Phase 6.5 (UX8) and all of Phase 7 without checking in: "fix everything" (P3 included), review gates delegated to the AI (decisions recorded here and in the register), live gateway approved, dev deps locust + security tools approved, email notifications moved to Later. Leftover from the old parallel session: the folder `Momentum-bohr` and its dev servers (API :8000, Vite :5173) still run; the product owner can stop them and delete the folder.
-- **Now (2026-10-06): Phase 7 complete. Next: Phase 7.5 Files, reports, lifecycle portfolios and dashboards, and Mo** (`docs/roadmap/phase-7.5.md`, spec `docs/superpowers/specs/2026-10-06-phase-7-5-ai-files-insight-design.md`), added by the product owner before Phase 8. It is built in a separate browser session with **no AI gateway** (mock mode throughout; the build prompt is at the end of `phase-7.5.md`), then pulled here for the live verification listed there. For the product owner meanwhile: review the Phase 7 delegated decisions (register H1–H63, guests H61, the parity "later" list) and the Phase 6.5 laptop sign-off. Phase 8 Azure go-live follows Phase 7.5.
+- **Now (2026-10-06): Phase 7.5 in progress** (build session started 2026-10-06; resume from the first unchecked S75 slice below). Phase 7 complete. **Phase 7.5 Files, reports, lifecycle portfolios and dashboards, and Mo** (`docs/roadmap/phase-7.5.md`, spec `docs/superpowers/specs/2026-10-06-phase-7-5-ai-files-insight-design.md`), added by the product owner before Phase 8. It is built in a separate browser session with **no AI gateway** (mock mode throughout; the build prompt is at the end of `phase-7.5.md`), then pulled here for the live verification listed there. For the product owner meanwhile: review the Phase 7 delegated decisions (register H1–H63, guests H61, the parity "later" list) and the Phase 6.5 laptop sign-off. Phase 8 Azure go-live follows Phase 7.5.
 - **Product-owner instruction (2026-09-26):** finish all remaining slices, then one big local test run against the real gateway (100+ questions/actions covering edge cases), then fix from that run.
 - **Scope note (product owner, 2026-09-26):** the customer-operations capabilities (SQQ, pricing, contracts, invoices, pushes to internal systems as tools and assignable agents) will be done later in the product owner's own codebase, **not in this repo**. Finish the roadmap as written.
 - **Branch:** Phases 3–4 are on `claude/clever-hopper-pbv7yr` (ahead of `main`). Phase 5 continues on `claude/intelligent-meitner-9ne4e8`, which starts from that branch's Phase 4 exit commit.
@@ -23,17 +23,10 @@
 - **Phase 5 AI mode:** mock mode throughout (no gateway in this environment). Deferred to the product owner's machine: `momentum llm-check`, `EVALS_LIVE=1 make evals` at phase exit. The dogfood exit criterion is a post-ship observation, not blocking.
 - **Carried past Phase 4 exit** (kickoff Q6: the inbox/bell gap → S5.0.1 and the forms security review → S5.0.2 (**done**) are now Phase 5 slices; J1 flake **fixed** 2026-09-28, see handoff; the other two stay deferred): a security review pass of S4.2.1's public form endpoint (member-name exposure on assignee questions, no `X-Forwarded-For` handling); wiring `conversational_intake` into the `momentum/ai/evals/` harness (its `EvalWorld` has no notion of a form and the harness models one-shot input → output, not a stateless multi-turn feature); a real per-turn spam counter for conversational intake (currently reuses the submission rate limiter as a coarse guard); the inbox/bell live-update gap (**fixed in S5.0.1**) and the J1 quick-entry flake (**fixed**) found at exit (both described in the Phase 4 exit handoff, now in `handoff-archive.md`).
 
-## Handoff notes (latest session: 2026-10-01, S6.5.1–S6.5.3 and the Phase 6 exit)
-- **Phase 6 exit (2026-10-01):** all criteria met (details in `phase-6.md` "Phase 6 exit"); full e2e **13/13 on two consecutive runs**. Found at exit and fixed: a real rapid-entry bug (typing tasks fast lost one on screen: a refetch from our own realtime echo replaced the list without the still-saving task) and three journey-hygiene issues. **Your one live check:** `momentum evals --live --feature chart`.
-- **Shipped:** S6.5.1 Dashboards (project **Dashboard** tab with a live starter layout, workspace **Dashboards**, every mark opens its tasks) and S6.5.2 **✦ Ask for a chart** (a question → Mo picks the chart and filters → live preview → add; the numbers are always counted by the server as you; Mo's `query_metrics` tool counts the same way). Details: `phase-6.md` "As built" for both.
-- **S6.5.3 Forecasts:** every project's overview has a **Forecast** card (likely finish date, the P50–P95 range against the due date, a 0–100 risk score and why) and the timeline shows the **forecast cone**. Try it: `momentum seed --history` adds a **Delivery** team with two in-flight projects (**Customer portal**, on track; **Mobile onboarding**, due too early) and 20 finished ones; open one → Overview → Refresh. `momentum forecast-backtest`: **15/20 = 75% on or before P80 (pass 70–90%)**. Forecasts are computed nightly (`MOMENTUM_FORECASTS_ENABLED`, `MOMENTUM_FORECAST_RUNS`); Radar now reads the stored score.
-- **Try it:** `make migrate` (0036–0038 are new), `make dev`, Ravi → Website Revamp → **Dashboard**: click numbers, bars, slices; **✦ Ask for a chart** → "How many tasks are blocked?" → Add to dashboard (the card gets the amber ✦; hover it for the question). In Ask Mo: "how many open tasks does Mei have in Website Revamp, by priority?" uses `query_metrics`.
-- **Your running app:** your usual checkout (`Documents\Projects\Momentum`) was still on the Phase 5 branch, so it had none of Phase 6. Switch it to `main` (fast-forwarded with every slice), `pnpm install` in `apps/web` (Recharts is new), then `make migrate`.
-- **Live check (not blocking):** the new eval feature `chart` (15 fixture questions + 2 live-only cases; live threshold 0.9). The phase exit reads "answers the 15 fixture questions correctly" live on your gateway: `momentum evals --live --feature chart`.
-- **E2E:** J11 (timeline cascade → apply → one undo) and J12 (ask for a chart → add → reload) are new and pass on this machine.
-- **Found and fixed while testing:** the folded "Other" group lost unassigned tasks (S6.5.1); J11's first draft expected the dependent to move a full week, but the planner correctly pushes it only as far as the same-day hand-off (6 days): the test was wrong, not the product.
-- **New dependencies (S6.5.1):** `recharts` 3.10 (lazy `charts` chunk, 113 KB gzip) and `react-is` 19 (its peer).
-- **Model note:** `model-guide.md` tags S6.5.1 as Sonnet and S6.5.2 as Opus; this session ran on Opus 5.5.
+## Handoff notes (latest session: 2026-10-06, Phase 7.5 build session, cloud, mock AI)
+- **Where it stands:** see the Phase 7.5 checklist below; the first unchecked slice is next. Everything is built in `MOMENTUM_LLM_MODE=mock` (no gateway here); live-only eval cases are written for the product owner.
+- **Fresh container recipe (this session):** `apt-get install -y postgresql-16-pgvector`; `initdb -D /home/user/.pgdata -U postgres` as `postgres`; start with `su postgres -c "/usr/lib/postgresql/16/bin/pg_ctl -D /home/user/.pgdata -o '-p 5432 -k /tmp' -l /tmp/pg.log start"`; role `momentum`/`momentum` (createdb), databases `momentum` + `momentum_test`; `vector`, `pg_trgm`, `citext` in `template1` and both databases; `uv sync` in `apps/api`, `pnpm install` in `apps/web`. `make check` takes ~12 minutes; run it in the background.
+- **Branches:** each green slice is pushed to the session branch and to `main` (product owner's working rule: one branch, `main`; fetch before starting and before every push).
 
 ## Open questions
 | # | Question | Needed by | Status |
@@ -120,7 +113,7 @@ Tracked in their phase files; copy the slice list here at each phase kickoff.
 
 ### Phase 7.5: Files, reports, lifecycle portfolios and dashboards, and Mo
 Decisions D1–D8 in the spec. Built in a browser session in mock mode; live verification after the pull.
-- [ ] S75-00 Kickoff and foundations (ADR-0011, dependencies, settings, import contracts)
+- [x] S75-00 Kickoff and foundations (2026-10-06; ADR-0011; 11 runtime dependencies locked, pip-audit clean; 9 settings; `files`/`reports` packages and import contracts, a deliberate bad import fails lint-imports)
 - [ ] S75-01 Files: data model, inventory, project uploads, versions (J15 part 1)
 - [ ] S75-02 File parsing: DocumentModel, parsers, cache, safety (no AI)
 - [ ] S75-03 Mo reads files: tools, table queries, vision, conversation files (J15)
@@ -135,7 +128,12 @@ Decisions D1–D8 in the spec. Built in a browser session in mock mode; live ver
 - [ ] S75-12 Smart task creation and project close-out (J19 part 3)
 - [ ] S75-13 Exit (J14 extended, UI audit, live verification list, docs)
 
+**Next up:** S75-01 Files: data model, inventory, project uploads, versions.
+
 **Decisions (Phase 7.5, delegated):** (the build session records its own calls here)
+- D75-1 (S75-00): `momentum.files` may import only `core`; `momentum.reports` may import `core`, `files` and `domain`, never `ai`/`agents`/`integrations`. Enforced by two new import-linter contracts.
+- D75-2 (S75-00): mypy treats the new third-party libraries as untyped (`ignore_missing_imports`), like `docx` and `pypdf` already were; our own wrappers are fully typed.
+- D75-3 (S75-00): the DejaVu Sans fonts are copied from the Debian `fonts-dejavu-core` package with its copyright file (`reports/fonts/LICENSE-DejaVu.txt`).
 
 ### Phase 7: Hardening and Asana-ready
 - [x] E7.0 audit register started (`hardening-register.md`; H1–H44 so far, all fixed)
@@ -168,6 +166,7 @@ Decisions D1–D8 in the spec. Built in a browser session in mock mode; live ver
 ## Plan changes log
 | Date | Change | Reason |
 |---|---|---|
+| 2026-10-06 | **Phase 7.5 build started** (S75-00): ADR-0011, new dependencies and settings, `files`/`reports` packages | Phase 7.5 kickoff per `phase-7.5.md` |
 | 2026-10-06 | **Phase 7.5 added** between Phase 7 and Phase 8: files (project Files tab, Mo reads every common file type on request), reports from work data (Word/Excel/PDF), lifecycle portfolios and dashboards v2 with role templates, catch-me-up, plain-English filters, smart task creation, close-out | Product owner: AI focus before go-live; dashboards and portfolios were too basic for the onboarding lifecycle (pre-sales → go-live); built in a browser session without a gateway |
 | 2026-09-23 | Backend tests use a real Postgres via `MOMENTUM_TEST_DATABASE_URL` + truncate-per-test, instead of testcontainers + SAVEPOINT | Build environment has no Docker; services commit normally, which keeps tests realistic |
 | 2026-09-23 | Migrations live inside the package (`momentum/migrations`) | Hosts that install the package get migrations too (embedding) |

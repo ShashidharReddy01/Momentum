@@ -378,6 +378,8 @@ Fill in at S75-13. At minimum:
 
 (One note per slice, added as each slice lands.)
 
+**S75-00 as built (2026-10-06).** ADR-0011 (`docs/adr/0011-files-parsing-and-reports.md`). Runtime dependencies added with `uv add` and locked: openpyxl 3.1.5, xlrd 2.0.2, python-pptx 1.0.2, pdfplumber 0.11.10, pypdfium2 5.14.0, Pillow 12.3.0, oletools 0.60.2, extract-msg 0.56.1, striprtf 0.0.33, defusedxml 0.7.1, reportlab 5.0.1; `pip-audit` on the exported runtime requirements: no known vulnerabilities. Nine settings (spec §10) in `core/settings.py`, `configuration.md` and `.env.example`. Packages `momentum/files/` (with `parsers/`) and `momentum/reports/` (with `builders/`, `render/`, `fonts/` holding DejaVu Sans regular and bold plus the license). Two import-linter contracts: `files` imports only `core`; `reports` never imports `ai`, `agents`, `integrations` or app wiring. Checked by adding `from momentum.ai import llm` to each package: `lint-imports` reported the contract broken, then the line was removed.
+
 ## The prompt for the build session
 
 Paste this into the browser session (also correct for resuming after a context reset):

@@ -25,6 +25,17 @@ dependencies = [
   "openai>=1.40",
   "pyyaml>=6.0",
   "croniter>=6.0",
+  "openpyxl>=3.1.5",
+  "xlrd>=2.0.2",
+  "python-pptx>=1.0.2",
+  "pdfplumber>=0.11.10",
+  "pypdfium2>=5.14.0",
+  "pillow>=12.3.0",
+  "oletools>=0.60.2",
+  "extract-msg>=0.56.1",
+  "striprtf>=0.0.33",
+  "defusedxml>=0.7.1",
+  "reportlab>=5.0.1",
 ]
 
 [project.scripts]
@@ -68,7 +79,7 @@ plugins = ["pydantic.mypy"]
 packages = ["momentum"]
 
 [[tool.mypy.overrides]]
-module = ["procrastinate.*", "uuid_utils.*", "filetype.*", "docx.*", "pypdf.*", "croniter.*"]
+module = ["procrastinate.*", "uuid_utils.*", "filetype.*", "docx.*", "pypdf.*", "croniter.*", "pptx.*", "pdfplumber.*", "pypdfium2.*", "oletools.*", "extract_msg.*", "striprtf.*", "defusedxml.*", "reportlab.*", "xlrd.*", "openpyxl.*", "olefile.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
@@ -92,3 +103,15 @@ name = "Domain does not depend on AI, agents, integrations, or app wiring"
 type = "forbidden"
 source_modules = ["momentum.domain"]
 forbidden_modules = ["momentum.agents", "momentum.integrations", "momentum.mcp", "momentum.app", "momentum.web"]
+
+[[tool.importlinter.contracts]]
+name = "Files is infrastructure: it imports only core"
+type = "forbidden"
+source_modules = ["momentum.files"]
+forbidden_modules = ["momentum.domain", "momentum.ai", "momentum.agents", "momentum.integrations", "momentum.auth", "momentum.reports", "momentum.web", "momentum.app"]
+
+[[tool.importlinter.contracts]]
+name = "Reports never import AI (narrative is injected by ai/)"
+type = "forbidden"
+source_modules = ["momentum.reports"]
+forbidden_modules = ["momentum.ai", "momentum.agents", "momentum.integrations", "momentum.web", "momentum.app"]

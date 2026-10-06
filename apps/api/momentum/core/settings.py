@@ -163,6 +163,24 @@ class Settings(BaseSettings):
     forecast_runs: int = Field(default=10_000, ge=100, le=200_000)
     forecasts_enabled: bool = True
 
+    # Phase 7.5 (ADR-0011). Vision: images go to the gateway model only when a person asks Mo to
+    # look at a page or picture; off = `look_at` answers "not supported". Caps per model call and
+    # per conversation keep cost bounded.
+    llm_supports_vision: bool = True
+    ai_max_images_per_call: int = Field(default=5, ge=1, le=20)
+    ai_max_images_per_conversation: int = Field(default=20, ge=1, le=200)
+    # File parsing (on request only, never on upload): a worker-thread timeout and a row cap per
+    # sheet; beyond the cap a sheet is marked truncated.
+    file_parse_timeout_s: float = Field(default=20, gt=0, le=300)
+    file_parse_max_rows: int = Field(default=200_000, ge=100, le=2_000_000)
+    # Report generation job cap (seconds).
+    report_timeout_s: int = Field(default=120, ge=5, le=3600)
+    # Smart task creation suggestions (no model call; a per-user preference can hide them).
+    ai_task_suggestions: bool = True
+    # Nightly project snapshots (trend widgets) and how long they're kept.
+    snapshots_enabled: bool = True
+    snapshot_retention_days: int = Field(default=730, ge=30, le=3650)
+
     # Integrations (S2.7.1) — overridable so J6's e2e journey can point this at a local recorded
     # fixture server instead of the real Asana API (see tools/e2e/asana_fixture_server.py).
     asana_base_url: str = "https://app.asana.com/api/1.0"
