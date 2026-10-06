@@ -58,6 +58,9 @@ How findings are found:
 | H44 | P2 | Accessibility | Rich-text editors (description, project brief, status) showed no focus indicator. | Keyboard pass | fixed: an editable editor shows the standard focus outline |
 | H45 | P3 | Configuration docs | `configuration.md` listed `MOMENTUM_ASANA_IMPORT_ENABLED`, which doesn't exist, and missed `MOMENTUM_ASANA_BASE_URL`, which does. | S7.4.2 review | fixed: the real setting documented (and in `.env.example`) |
 | H46 | P2 | Asana import | The importer's link lookup didn't filter by workspace, a team was imported only from its own members (assignees outside the team lost their assignee), and archived projects were skipped. | S7.4.2 review | fixed in the rebuilt engine: links per workspace, people from the whole Asana workspace, archived projects imported archived |
+| H47 | **P0** | Security (files) | An SVG (or any file the uploader called an image) was shown inline from Momentum's own origin; an SVG can carry script, so opening it would run that script as the viewer (stored XSS). | Security review S7.5.2 | fixed: only PNG, JPEG, GIF, WebP, AVIF and PDF whose bytes match are inline; everything else downloads with a sandbox CSP and `nosniff`; test |
+| H48 | P1 | Security (headers) | No security headers: no CSP, `nosniff`, frame options, Referrer-Policy or HSTS. | Security review S7.5.2 | fixed: `SecurityHeadersMiddleware` (strict script CSP, API `default-src 'none'`, HSTS in production, `MOMENTUM_FRAME_ANCESTORS` for embedding); tests; e2e journeys run under it |
+| H49 | P3 | Security (files) | A file name containing a quote could break the download's Content-Disposition header. | Security review S7.5.2 | fixed: ASCII fallback + RFC 5987 encoded name; test |
 
 ## Reviewed, no change needed
 

@@ -86,6 +86,71 @@ class StripNulMiddleware:
         )
 
 
+class SecurityHeadersMiddleware:
+    """S7.5.2 (OWASP ASVS L1 V14.4): security headers on every response.
+
+    Pages get a Content Security Policy that only runs Momentum's own scripts (no inline
+    script, no eval), allows inline *styles* (the UI sets style attributes), images from
+    anywhere over HTTPS (avatars), fonts and connections to this origin only (including its
+    websocket), and says who may frame the app. API responses can't be rendered at all
+    (``default-src 'none'``). A response that set its own CSP (a file download's sandbox)
+    keeps it. HSTS only in production (behind TLS)."""
+
+    def __init__(self, app: Any, *, api_prefix: str, settings: Any) -> None:
+        self.app = app
+        self.api_prefix = api_prefix
+        self.hsts = settings.env == "production"
+        self.frame_ancestors = settings.frame_ancestors or "'self'"
+        self.page_csp: str = settings.content_security_policy
+
+    def _csp(self, scope: Any) -> str:
+        if scope["path"].startswith(self.api_prefix):
+            return "default-src 'none'; frame-ancestors 'none'"
+        if self.page_csp:
+            return self.page_csp
+        host = dict(scope.get("headers") or []).get(b"host", b"").decode("latin-1")
+        sockets = f" ws://{host} wss://{host}" if host else ""
+        return (
+            "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
+            "img-src 'self' data: blob: https:; font-src 'self' data:; "
+            f"connect-src 'self'{sockets}; object-src 'none'; base-uri 'self'; "
+            f"form-action 'self'; frame-ancestors {self.frame_ancestors}"
+        )
+
+    async def __call__(self, scope: Any, receive: Any, send: Any) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+        csp = self._csp(scope).encode("latin-1")
+        frame = {"'none'": b"DENY", "'self'": b"SAMEORIGIN"}.get(self.frame_ancestors)
+
+        async def send_with_headers(message: dict[str, Any]) -> None:
+            if message["type"] == "http.response.start":
+                headers = list(message.get("headers") or [])
+                have = {k.lower() for k, _ in headers}
+                extra = [
+                    (b"content-security-policy", csp),
+                    (b"x-content-type-options", b"nosniff"),
+                    (b"referrer-policy", b"strict-origin-when-cross-origin"),
+                    (
+                        b"permissions-policy",
+                        b"camera=(), microphone=(), geolocation=(), payment=()",
+                    ),
+                    (b"cross-origin-opener-policy", b"same-origin"),
+                ]
+                if frame:
+                    extra.append((b"x-frame-options", frame))
+                if self.hsts:
+                    extra.append(
+                        (b"strict-transport-security", b"max-age=31536000; includeSubDomains")
+                    )
+                headers += [(k, v) for k, v in extra if k not in have]
+                message = {**message, "headers": headers}
+            await send(message)
+
+        await self.app(scope, receive, send_with_headers)
+
+
 def _replay(messages: list[dict[str, Any]], downstream: Any) -> Any:
     """The body we already read, then the real channel: a streaming response (SSE) waits on it
     for the client's disconnect, so answering "disconnected" here would end every stream at once."""

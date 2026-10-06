@@ -11,6 +11,7 @@ from __future__ import annotations
 import hashlib
 import uuid
 from collections.abc import AsyncIterator
+from urllib.parse import quote
 
 import filetype
 from fastapi import APIRouter, File, UploadFile, status
@@ -29,8 +30,14 @@ router = APIRouter(tags=["attachments"])
 CHUNK_SIZE = 1024 * 1024
 SNIFF_BYTES = 8192
 # Previewed inline (image viewer / PDF viewer in the browser); everything else downloads.
-INLINE_MIME_PREFIXES = ("image/",)
-INLINE_MIMES = ("application/pdf",)
+# shown in the browser rather than downloaded: only formats that can't carry script (an SVG or an
+# HTML file served from our own origin could, so they always download), and only when the type was
+# recognised from the bytes, not taken from the uploader (S7.5.2)
+INLINE_MIMES = frozenset(
+    {"image/png", "image/jpeg", "image/gif", "image/webp", "image/avif", "application/pdf"}
+)
+# a download can't run anything here even if a browser tried to render it
+DOWNLOAD_CSP = "default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'; sandbox"
 
 
 async def _stream_upload(
@@ -187,13 +194,27 @@ async def download_attachment(
         filename, mime, key = att.filename, att.mime, att.storage_key
     storage = build_storage(runtime.settings)
     data = await storage.read(key)
-    inline = mime.startswith(INLINE_MIME_PREFIXES) or mime in INLINE_MIMES
-    disposition = "inline" if inline else "attachment"
+    sniffed = filetype.guess(data[:SNIFF_BYTES])
+    inline = sniffed is not None and sniffed.mime == mime and mime in INLINE_MIMES
     return Response(
         content=data,
-        media_type=mime,
-        headers={"Content-Disposition": f'{disposition}; filename="{filename}"'},
+        media_type=mime,  # "attachment" + nosniff + the sandbox: saved, never rendered
+        headers={
+            "Content-Disposition": content_disposition(
+                "inline" if inline else "attachment", filename
+            ),
+            "Content-Security-Policy": DOWNLOAD_CSP,
+            "X-Content-Type-Options": "nosniff",
+        },
     )
+
+
+def content_disposition(kind: str, filename: str) -> str:
+    """A safe header for any file name: an ASCII fallback (no quotes, backslashes or control
+    characters) plus the exact name UTF-8 encoded (RFC 6266 / 5987)."""
+    ascii_name = "".join(c if 32 <= ord(c) < 127 and c not in '"\\' else "_" for c in filename)
+    encoded = quote(filename, safe="")
+    return f"{kind}; filename=\"{ascii_name or 'file'}\"; filename*=UTF-8''{encoded}"
 
 
 @router.delete(

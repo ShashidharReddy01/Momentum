@@ -24,6 +24,7 @@ from momentum.core.db import create_engine, create_session_factory
 from momentum.core.http import (
     CsrfMiddleware,
     RequestIdMiddleware,
+    SecurityHeadersMiddleware,
     StripNulMiddleware,
     install_error_handlers,
 )
@@ -263,6 +264,8 @@ def create_app(
     # level 1: half the CPU of level 5 for ~20% more bytes (a 260 KB list: 26 KB in 3.6 ms vs
     # 21 KB in 7.4 ms; Phase 7 load test), and CPU is what runs out first under load
     app.add_middleware(GZipMiddleware, minimum_size=1024, compresslevel=1)
+    if settings.security_headers:
+        app.add_middleware(SecurityHeadersMiddleware, api_prefix=API_PREFIX, settings=settings)
     install_error_handlers(app)
     app.include_router(health_router)
     app.include_router(_api_router(settings))

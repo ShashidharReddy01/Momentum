@@ -83,6 +83,8 @@ Every register finding (P0 first, then P1, P2, P3), grouped by area into slices.
 
 **S7.5.5 as built (2026-10-06).** `tools/ops/backup.sh` (pg_dump of the Momentum schema + the files + the list of extensions), `restore.sh` (into a fresh database: extensions, schema, files) and `rehearse_restore.sh` (backup → new database → restore → `momentum export` of both must match table by table). Rehearsed on the dev database and on the 50,000-task load database (280,957 rows, identical checksums, 116 s). The rehearsal found that `pg_trgm` was missing from the restore's extensions; the backup now records them. Runbook: `docs/runbooks/backup-restore.md`.
 
+**S7.5.2 as built (2026-10-06).** ASVS L1 controls and the review are in `docs/engineering/security.md`. Fixed: a stored-XSS path through inline SVG downloads (H47, P0), missing security headers (H48), an unsafe download file name (H49). New automated checks: every API operation refuses an anonymous caller except a reviewed public list; headers on pages and API; CSRF on cookie sessions; files that could carry script never render. Scans clean: pip-audit, pnpm audit, Semgrep, detect-secrets, git history. Prompt-injection fixtures for agents are part of E7.3.
+
 ## Order and models
 
 Kickoff + E7.0 (Opus) → register review with the product owner → E7.1 (Opus) → E7.2 P0 fixes (Opus) → E7.4 (Sonnet; the importer on Opus) → E7.2 P1/P2 (Sonnet) → E7.3 (Opus) → E7.5 (mixed) → exit (Opus). Live checkpoints on the product owner's machine: after the audit, after E7.3, at exit.

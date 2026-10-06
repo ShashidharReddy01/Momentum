@@ -62,6 +62,13 @@ class Settings(BaseSettings):
     db_max_overflow: int = 10
     db_auto_migrate: bool = False
 
+    # S7.5.2: security headers on every response (core/http.py). A host that embeds Momentum
+    # and sets its own can turn them off; frame_ancestors says who may frame Momentum's pages
+    # (CSP frame-ancestors sources); content_security_policy replaces the default page CSP.
+    security_headers: bool = True
+    frame_ancestors: str = Field(default="'self'", max_length=500)
+    content_security_policy: str = Field(default="", max_length=4000)
+
     # Auth
     auth_mode: AuthMode = "dev"
     allowed_tenant_ids: str = ""
