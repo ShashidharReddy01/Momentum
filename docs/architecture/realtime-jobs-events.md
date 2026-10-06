@@ -95,6 +95,7 @@ Event payloads share an envelope:
 | `task.due_approaching` | 4 | `due_on` (S4.1.2; emitted by the hourly `scan_due_approaching` job, deduped per (task, due date); actor `system`) |
 | `agent_run.started` / `agent_run.finished` | 5 | agent_id, status, cost |
 | `notification.created` | 2 | notification summary (channel `user:<id>` only). Since S5.0.1 the app shell subscribes to `user:<me>` on every page (`features/notifications/live.ts`), so the inbox and the bell update live wherever the person is |
+| `user.updated` | 2 (S7.5.4) | `{changes}` (role, status) on `user:<id>`; an access event: every open connection re-checks, so a disabled person is disconnected at once |
 | `import.finished` | 2 (S7.4.2) | `{source, projects}`; channel `user:<who imported>` (one event for the whole import: imported rows don't emit events of their own, see `integrations/asana_import/engine.py`). Progress is the job itself (`GET /integrations/asana/imports/{id}`), returned by every step |
 | `ai_memory.changed` | 3 | `{scope}` (created, edited, removed or restored; channel `workspace:<id>`, `team:<id>` or `project:<id>`) |
 

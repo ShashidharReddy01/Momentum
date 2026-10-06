@@ -17,10 +17,13 @@ from momentum.domain.users.schemas import (
     ApiTokenCreatedOut,
     ApiTokenIn,
     ApiTokenOut,
+    MemberPatchIn,
     MeOut,
     OnboardingPatchIn,
     OnboardingStatusOut,
     ProjectViewPrefs,
+    TransferIn,
+    TransferOut,
     UserInviteIn,
     UserOut,
     WorkspaceOut,
@@ -62,6 +65,34 @@ async def list_members(ctx: CtxDep, uow: UowDep) -> ListOut[UserOut]:
     async with uow.transaction() as session:
         users = await service.list_members(session, ctx)
         return ListOut(data=[UserOut.model_validate(u) for u in users])
+
+
+@router.patch(
+    "/users/{user_id}",
+    response_model=MutationOut[UserOut],
+    summary="Change a member's role, or disable / re-enable them (admin; undoable)",
+)
+async def update_member(
+    user_id: uuid.UUID, body: MemberPatchIn, ctx: CtxDep, uow: UowDep
+) -> MutationOut[UserOut]:
+    async with uow.transaction() as session:
+        m = await service.update_member(session, ctx, user_id, role=body.role, status=body.status)
+        return MutationOut(
+            data=UserOut.model_validate(m.entity), meta=MutationMeta(activity_id=m.activity_id)
+        )
+
+
+@router.post(
+    "/users/{user_id}/transfer",
+    response_model=TransferOut,
+    summary="Hand a member's open tasks and owned projects to someone else (admin)",
+)
+async def transfer_work(
+    user_id: uuid.UUID, body: TransferIn, ctx: CtxDep, uow: UowDep
+) -> TransferOut:
+    async with uow.transaction() as session:
+        r = await service.transfer_work(session, ctx, user_id, body.to_user_id)
+        return TransferOut(tasks=r.tasks, projects=r.projects, not_visible=r.not_visible)
 
 
 @router.post(

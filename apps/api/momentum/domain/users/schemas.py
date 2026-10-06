@@ -36,6 +36,27 @@ class MeOut(BaseModel):
     workspace: WorkspaceOut
 
 
+class MemberPatchIn(BaseModel):
+    """S7.5.4: an admin changes someone's role or disables / re-enables them."""
+
+    model_config = ConfigDict(extra="forbid")
+    role: Literal["admin", "member", "guest"] | None = None
+    status: Literal["active", "disabled"] | None = None
+
+
+class TransferIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    to_user_id: uuid.UUID
+
+
+class TransferOut(BaseModel):
+    tasks: int = Field(description="Open tasks reassigned")
+    projects: int = Field(description="Projects whose owner changed")
+    not_visible: int = Field(
+        description="Left in place: in private projects the admin can't see (their admins can)"
+    )
+
+
 class UserInviteIn(BaseModel):
     email: Annotated[str, StringConstraints(strip_whitespace=True, min_length=3, max_length=254)]
     name: Annotated[str, StringConstraints(strip_whitespace=True, max_length=200)] | None = None

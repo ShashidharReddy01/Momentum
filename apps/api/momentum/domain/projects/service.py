@@ -32,7 +32,11 @@ from momentum.domain.users.models import User
 
 DEFAULT_SECTION = "To do"
 DETAIL_FIELDS = ("name", "color", "start_on", "due_on", "brief")  # editors (dates, brief: S6.2.1)
-ADMIN_FIELDS = ("privacy", "default_view")  # project admins (S2.2.3: the roadmap AC says
+ADMIN_FIELDS = (
+    "privacy",
+    "default_view",
+    "owner_id",
+)  # project admins (S2.2.3: the roadmap AC says
 # "per-project default view (project admin)"; moved here from DETAIL_FIELDS)
 
 
@@ -174,9 +178,18 @@ async def update_project(
         require_project_role(role, "editor", "edit this project")
     if "name" in fields and not (patch.name or "").strip():
         raise ValidationFailed("Project name can't be empty")
-    for f in ("privacy", "default_view"):
+    for f in ("privacy", "default_view", "owner_id"):
         if f in fields and getattr(patch, f) is None:
             raise ValidationFailed(f"{f} can't be empty")
+    if "owner_id" in fields:
+        owner = await session.get(User, patch.owner_id)
+        if (
+            owner is None
+            or owner.workspace_id != ctx.workspace_id
+            or owner.status == "disabled"
+            or owner.is_agent
+        ):
+            raise ValidationFailed("The owner must be a member of this workspace")
     start = patch.start_on if "start_on" in fields else project.start_on
     due = patch.due_on if "due_on" in fields else project.due_on
     if start is not None and due is not None and start > due:

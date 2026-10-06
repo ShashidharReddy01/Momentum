@@ -168,6 +168,16 @@ export function buildRoutes(config: RuntimeConfig): RouteObject[] {
           handle: { crumb: 'Members' },
         },
         {
+          path: 'settings/jobs',
+          lazy: async () => ({ Component: (await import('@/features/admin/JobsPage')).JobsPage }),
+          handle: { crumb: 'Background jobs' },
+        },
+        {
+          path: 'settings/audit',
+          lazy: async () => ({ Component: (await import('@/features/admin/AuditPage')).AuditPage }),
+          handle: { crumb: 'Audit trail' },
+        },
+        {
           path: 'settings/ai',
           lazy: async () => ({ Component: (await import('@/features/ai/AiSettingsPage')).AiSettingsPage }),
           handle: { crumb: 'AI settings' },

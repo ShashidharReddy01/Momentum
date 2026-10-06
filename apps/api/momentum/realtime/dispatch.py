@@ -45,6 +45,7 @@ ACCESS_EVENTS = frozenset(
         "task.removed_from_project",
         "task.follower_removed",
         "task.assigned",  # assignee changes move personal access
+        "user.updated",  # S7.5.4: a role change or a disabled account (an admin's action)
     }
 )
 # a task update re-checks access only when it changes who or what the task belongs to (every

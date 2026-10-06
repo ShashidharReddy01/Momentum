@@ -1,2 +1,2 @@
 export { MembersPage } from './MembersPage';
-export { useMarkOnboarding, useOnboarding, type OnboardingStatus } from './queries';
+export { useMarkOnboarding, useMembers, useOnboarding, type Member, type OnboardingStatus } from './queries';

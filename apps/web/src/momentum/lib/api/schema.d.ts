@@ -4,6 +4,74 @@
  */
 
 export interface paths {
+    "/api/v1/admin/activity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The audit trail: every change, newest first, searchable (admins) */
+        get: operations["audit_api_v1_admin_activity_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Download everything as an export bundle (.zip; admins) */
+        get: operations["download_export_api_v1_admin_export_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Background jobs: counts and the latest (admins) */
+        get: operations["list_jobs_api_v1_admin_jobs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/jobs/{job_id}/retry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Run a failed job again (admins) */
+        post: operations["retry_job_api_v1_admin_jobs__job_id__retry_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/agents": {
         parameters: {
             query?: never;
@@ -3160,6 +3228,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/users/{user_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Change a member's role, or disable / re-enable them (admin; undoable) */
+        patch: operations["update_member_api_v1_users__user_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/users/{user_id}/transfer": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Hand a member's open tasks and owned projects to someone else (admin) */
+        post: operations["transfer_work_api_v1_users__user_id__transfer_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/workload": {
         parameters: {
             query?: never;
@@ -4124,6 +4226,46 @@ export interface components {
              * Format: uuid
              */
             uploaded_by: string;
+        };
+        /** AuditEntry */
+        AuditEntry: {
+            /** Actor Id */
+            actor_id: string | null;
+            /** Actor Kind */
+            actor_kind: string;
+            /** Actor Name */
+            actor_name: string | null;
+            /**
+             * Changes
+             * @description The fields that changed
+             */
+            changes: string[];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Entity Id
+             * Format: uuid
+             */
+            entity_id: string;
+            /**
+             * Entity Label
+             * @description What it was, when the admin may see it
+             */
+            entity_label: string | null;
+            /** Entity Type */
+            entity_type: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Undone */
+            undone: boolean;
+            /** Verb */
+            verb: string;
         };
         /**
          * BlockedTaskOut
@@ -5600,6 +5742,38 @@ export interface components {
              */
             outcome: "installed" | "updated" | "unchanged" | "drifted" | "forced";
         };
+        /** JobOut */
+        JobOut: {
+            /** Attempts */
+            attempts: number;
+            /** Id */
+            id: number;
+            /**
+             * Last Event At
+             * @description When it last started, failed or finished
+             */
+            last_event_at: string | null;
+            /** Queue Name */
+            queue_name: string;
+            /** Scheduled At */
+            scheduled_at: string | null;
+            /** Status */
+            status: string;
+            /** Task Name */
+            task_name: string;
+        };
+        /** JobsOut */
+        JobsOut: {
+            /**
+             * Counts
+             * @description Jobs per status (the whole queue)
+             */
+            counts: {
+                [key: string]: number;
+            };
+            /** Jobs */
+            jobs: components["schemas"]["JobOut"][];
+        };
         /** ListMeta */
         ListMeta: {
             /** Next Cursor */
@@ -5637,6 +5811,13 @@ export interface components {
         ListOut_AttachmentOut_: {
             /** Data */
             data: components["schemas"]["AttachmentOut"][];
+            /** @default {} */
+            meta: components["schemas"]["ListMeta"];
+        };
+        /** ListOut[AuditEntry] */
+        ListOut_AuditEntry_: {
+            /** Data */
+            data: components["schemas"]["AuditEntry"][];
             /** @default {} */
             meta: components["schemas"]["ListMeta"];
         };
@@ -5859,6 +6040,16 @@ export interface components {
         MeOut: {
             user: components["schemas"]["UserOut"];
             workspace: components["schemas"]["WorkspaceOut"];
+        };
+        /**
+         * MemberPatchIn
+         * @description S7.5.4: an admin changes someone's role or disables / re-enables them.
+         */
+        MemberPatchIn: {
+            /** Role */
+            role?: ("admin" | "member" | "guest") | null;
+            /** Status */
+            status?: ("active" | "disabled") | null;
         };
         /** MemoryCreateIn */
         MemoryCreateIn: {
@@ -6134,6 +6325,11 @@ export interface components {
         /** MutationOut[TemplateOut] */
         MutationOut_TemplateOut_: {
             data: components["schemas"]["TemplateOut"];
+            meta: components["schemas"]["MutationMeta"];
+        };
+        /** MutationOut[UserOut] */
+        MutationOut_UserOut_: {
+            data: components["schemas"]["UserOut"];
             meta: components["schemas"]["MutationMeta"];
         };
         /** MutationOut[WidgetOut] */
@@ -6939,6 +7135,8 @@ export interface components {
             due_on?: string | null;
             /** Name */
             name?: string | null;
+            /** Owner Id */
+            owner_id?: string | null;
             /** Privacy */
             privacy?: ("team" | "private") | null;
             /** Start On */
@@ -8948,6 +9146,32 @@ export interface components {
             /** Summary */
             summary: string;
         };
+        /** TransferIn */
+        TransferIn: {
+            /**
+             * To User Id
+             * Format: uuid
+             */
+            to_user_id: string;
+        };
+        /** TransferOut */
+        TransferOut: {
+            /**
+             * Not Visible
+             * @description Left in place: in private projects the admin can't see (their admins can)
+             */
+            not_visible: number;
+            /**
+             * Projects
+             * @description Projects whose owner changed
+             */
+            projects: number;
+            /**
+             * Tasks
+             * @description Open tasks reassigned
+             */
+            tasks: number;
+        };
         /** Trigger */
         Trigger: {
             /** Decision */
@@ -9330,6 +9554,138 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    audit_api_v1_admin_activity_get: {
+        parameters: {
+            query?: {
+                actor_id?: string | null;
+                entity_type?: string | null;
+                /** @description A verb or its prefix (task.) */
+                verb?: string | null;
+                since?: string | null;
+                until?: string | null;
+                /** @description Cursor: entries older than this */
+                before?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListOut_AuditEntry_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    download_export_api_v1_admin_export_get: {
+        parameters: {
+            query?: {
+                /** @description Include every attachment's file */
+                files?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_jobs_api_v1_admin_jobs_get: {
+        parameters: {
+            query?: {
+                status?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    retry_job_api_v1_admin_jobs__job_id__retry_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_agents_api_v1_agents_get: {
         parameters: {
             query?: never;
@@ -16959,6 +17315,76 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ListOut_UserOut_"];
+                };
+            };
+        };
+    };
+    update_member_api_v1_users__user_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MemberPatchIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationOut_UserOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    transfer_work_api_v1_users__user_id__transfer_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TransferIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TransferOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

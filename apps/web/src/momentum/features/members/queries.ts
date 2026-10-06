@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { components } from '@/lib/api/schema';
 import { toastError } from '@/lib/toast';
+import { useUndoToast } from '@/lib/undo';
 import { useApi } from '@/providers/api';
 
 export type Member = components['schemas']['UserOut'];
@@ -29,6 +30,51 @@ export function useInviteMember() {
     mutationFn: async (body: UserInvite) => (await api.POST('/api/v1/users/invite', { body })).data!,
     onSuccess: () => void qc.invalidateQueries({ queryKey: memberKeys.list }),
     onError: (e) => toastError(e, "Couldn't send that invite"),
+  });
+}
+
+/** S7.5.4: an admin changes a role or disables / re-enables someone (undoable). */
+export function useUpdateMember() {
+  const api = useApi();
+  const qc = useQueryClient();
+  const undoToast = useUndoToast();
+  const refresh = () => void qc.invalidateQueries({ queryKey: memberKeys.list });
+  return useMutation({
+    mutationFn: async (v: {
+      id: string;
+      role?: Member['role'];
+      status?: 'active' | 'disabled';
+      message: string;
+    }) =>
+      (
+        await api.PATCH('/api/v1/users/{user_id}', {
+          params: { path: { user_id: v.id } },
+          body: {
+            ...(v.role ? { role: v.role as 'admin' | 'member' | 'guest' } : {}),
+            ...(v.status ? { status: v.status } : {}),
+          },
+        })
+      ).data!,
+    onSuccess: (res, v) => {
+      refresh();
+      undoToast(v.message, res.meta, refresh);
+    },
+    onError: (e) => toastError(e, "Couldn't change that member"),
+  });
+}
+
+/** S7.5.4: hand a member's open tasks and owned projects to someone else. */
+export function useTransferWork() {
+  const api = useApi();
+  return useMutation({
+    mutationFn: async (v: { from: string; to: string }) =>
+      (
+        await api.POST('/api/v1/users/{user_id}/transfer', {
+          params: { path: { user_id: v.from } },
+          body: { to_user_id: v.to },
+        })
+      ).data!,
+    onError: (e) => toastError(e, "Couldn't hand the work on"),
   });
 }
 

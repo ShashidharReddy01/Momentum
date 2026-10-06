@@ -35,5 +35,15 @@ export function membersHandlers(base = '', initial: Member[] = [ravi]) {
       members.push(invited);
       return HttpResponse.json(invited);
     }),
+    // S7.5.4: role / status changes and handing work on
+    http.patch(`*${base}/api/v1/users/:id`, async ({ request, params }) => {
+      const m = members.find((x) => x.id === params.id);
+      if (!m) return HttpResponse.json({ code: 'not_found' }, { status: 404 });
+      Object.assign(m, (await request.json()) as Partial<Member>);
+      return HttpResponse.json({ data: m, meta: { activity_id: `act-${m.id}` } });
+    }),
+    http.post(`*${base}/api/v1/users/:id/transfer`, () =>
+      HttpResponse.json({ tasks: 4, projects: 1, not_visible: 2 }),
+    ),
   ];
 }

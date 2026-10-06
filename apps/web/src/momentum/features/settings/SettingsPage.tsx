@@ -1,6 +1,8 @@
 import {
   Bell,
   ChevronRight,
+  Cog,
+  History,
   Download,
   FileArchive,
   KeyRound,
@@ -43,6 +45,20 @@ const ENTRIES: Entry[] = [
     title: 'Import from Asana',
     detail: 'Bring a team’s projects, tasks and comments across',
   },
+  {
+    to: '/settings/jobs',
+    icon: Cog,
+    title: 'Background jobs',
+    detail: 'What the queue is doing; retry anything that failed',
+    admin: true,
+  },
+  {
+    to: '/settings/audit',
+    icon: History,
+    title: 'Audit trail',
+    detail: 'Every change: who, what and when, searchable',
+    admin: true,
+  },
 ];
 
 /** `/settings`: every settings screen in one place (the account menu links to each too). */
@@ -81,7 +97,7 @@ export function SettingsPage() {
         aria-label="Settings"
         className="mt-4 divide-y divide-hair-soft rounded-xl border border-hairline bg-surface"
       >
-        {ENTRIES.map((e) => (
+        {ENTRIES.filter((e) => !e.admin || me?.role === 'admin').map((e) => (
           <li key={e.to}>
             <Link to={e.to} className="flex items-center gap-3 px-4 py-3 hover:bg-surface-2">
               <Icon icon={e.icon} size={18} className="shrink-0 text-muted" />

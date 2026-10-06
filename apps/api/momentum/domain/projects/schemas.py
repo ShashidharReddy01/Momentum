@@ -32,6 +32,8 @@ class ProjectPatchIn(BaseModel):
     start_on: date | None = None
     due_on: date | None = None
     brief: dict[str, Any] | None = None
+    # S7.5.4: who owns the project (an active member; project admins change it)
+    owner_id: uuid.UUID | None = None
 
 
 class ProjectOut(BaseModel):

@@ -7,14 +7,18 @@ from typing import Any, Literal
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from momentum.core.activity import jsonable_diff, record_activity
 from momentum.core.context import Ctx
-from momentum.core.errors import Conflict, NotFound
+from momentum.core.errors import Conflict, Forbidden, NotFound, ValidationFailed
+from momentum.core.events import emit
 from momentum.core.ids import new_id
+from momentum.core.mutation import Mutation
 from momentum.core.permissions import Action, require
+from momentum.core.undo import undo_handler, undo_op
 from momentum.domain.agents.models import Agent
 from momentum.domain.integrations.models import ImportJob
 from momentum.domain.projects.models import Project
-from momentum.domain.users.models import User
+from momentum.domain.users.models import User, UserIdentity
 from momentum.domain.workspace.models import Workspace
 
 AgentFilter = Literal["assigned", "mentioned", "all"]
@@ -144,6 +148,15 @@ async def invite_user(
     )
     session.add(user)
     await session.flush()
+    # S7.5.4: an invitation is part of the admin trail (no undo: disable them instead)
+    await record_activity(
+        session,
+        ctx,
+        entity_type="user",
+        entity_id=user.id,
+        verb="user.invited",
+        changes={"email": (None, email), "role": (None, role)},
+    )
     return user
 
 
@@ -217,3 +230,190 @@ async def mark_onboarding(
         ),
         {"patch": json.dumps(patch), "uid": ctx.actor.id},
     )
+
+
+# ---------- S7.5.4: member administration ----------
+
+ROLES = ("admin", "member", "guest")
+
+
+async def _member(session: AsyncSession, ctx: Ctx, user_id: uuid.UUID) -> User:
+    user = await session.get(User, user_id)
+    if user is None or user.workspace_id != ctx.workspace_id or user.is_agent:
+        raise NotFound("Member not found")
+    return user
+
+
+async def _other_active_admins(session: AsyncSession, ctx: Ctx, user_id: uuid.UUID) -> int:
+    return int(
+        (
+            await session.execute(
+                select(func.count()).where(
+                    User.workspace_id == ctx.workspace_id,
+                    User.role == "admin",
+                    User.status == "active",
+                    User.is_agent.is_(False),
+                    User.id != user_id,
+                )
+            )
+        ).scalar_one()
+    )
+
+
+async def update_member(
+    session: AsyncSession,
+    ctx: Ctx,
+    user_id: uuid.UUID,
+    *,
+    role: str | None = None,
+    status: str | None = None,
+    record_undo: bool = True,
+) -> Mutation[User]:
+    """An admin changes someone's role, or disables / re-enables them. A disabled person can't
+    sign in or use their API tokens, and any open tab is disconnected (realtime re-checks access
+    on ``user.updated``); their work stays where it is (``transfer_work`` hands it on).
+    Re-enabling someone who never signed in makes them invited again."""
+    require(ctx, Action.USERS_MANAGE)
+    user = await _member(session, ctx, user_id)
+    if role is not None and role not in ROLES:
+        raise ValidationFailed("role must be admin, member or guest")
+    if status is not None and status not in ("active", "disabled"):
+        raise ValidationFailed("status must be active or disabled")
+    new_status = status
+    if status == "active" and user.status == "disabled":
+        signed_in = (
+            await session.execute(
+                select(UserIdentity.user_id).where(UserIdentity.user_id == user.id).limit(1)
+            )
+        ).first()
+        new_status = "active" if signed_in else "invited"
+    elif status == "active":
+        new_status = user.status  # already active or invited: nothing to do
+    losing_admin = user.role == "admin" and (
+        (role is not None and role != "admin") or new_status == "disabled"
+    )
+    if losing_admin and user.id == ctx.actor.id:
+        raise Conflict("You can't remove your own admin access or disable yourself")
+    if losing_admin and await _other_active_admins(session, ctx, user.id) == 0:
+        raise Conflict("Momentum needs at least one active admin")
+    changes: dict[str, tuple[Any, Any]] = {}
+    if role is not None and role != user.role:
+        changes["role"] = (user.role, role)
+        user.role = role
+    if new_status is not None and new_status != user.status:
+        changes["status"] = (user.status, new_status)
+        user.status = new_status
+    if not changes:
+        return Mutation(user)
+    act = await record_activity(
+        session,
+        ctx,
+        entity_type="user",
+        entity_id=user.id,
+        verb="user.updated",
+        changes=changes,
+        undo=undo_op(
+            "users.update",
+            user_id=user.id,
+            role=changes.get("role", (None,))[0],
+            status=changes.get("status", (None,))[0],
+        )
+        if record_undo
+        else None,
+    )
+    await emit(
+        session,
+        ctx,
+        type="user.updated",
+        entity_type="user",
+        entity_id=user.id,
+        data={"changes": jsonable_diff(changes)},
+        channels=[f"user:{user.id}"],
+        activity_id=act.id,
+    )
+    return Mutation(user, act.id)
+
+
+@undo_handler("users.update")
+async def _undo_update(session: AsyncSession, ctx: Ctx, args: dict[str, Any]) -> None:
+    status = args.get("status")
+    await update_member(
+        session,
+        ctx,
+        uuid.UUID(str(args["user_id"])),
+        role=args.get("role"),
+        status="active" if status in ("active", "invited") else status,
+        record_undo=False,
+    )
+
+
+class TransferResult:
+    def __init__(self, tasks: int, projects: int, not_visible: int, batch_id: uuid.UUID) -> None:
+        self.tasks = tasks
+        self.projects = projects
+        self.not_visible = not_visible
+        self.batch_id = batch_id
+
+
+async def transfer_work(
+    session: AsyncSession, ctx: Ctx, from_id: uuid.UUID, to_id: uuid.UUID
+) -> TransferResult:
+    """Hand someone's open tasks and the projects they own to another member (a departure, a
+    role change). Goes through the task and project services (notifications, activity, one
+    batch). Tasks in projects the admin can't see (private ones) stay put and are counted:
+    privacy isn't overridden; their project's admins can reassign them."""
+    from momentum.domain.projects.schemas import ProjectPatchIn
+    from momentum.domain.projects.service import update_project
+    from momentum.domain.tasks.models import Task
+    from momentum.domain.tasks.service import update_task
+
+    require(ctx, Action.USERS_MANAGE)
+    source = await _member(session, ctx, from_id)
+    target = await _member(session, ctx, to_id)
+    if source.id == target.id:
+        raise ValidationFailed("Choose someone else to take the work")
+    if target.status == "disabled":
+        raise ValidationFailed("That person is disabled")
+    batch = new_id()
+    task_ids = (
+        (
+            await session.execute(
+                select(Task.id).where(
+                    Task.workspace_id == ctx.workspace_id,
+                    Task.assignee_id == source.id,
+                    Task.completed_at.is_(None),
+                    Task.deleted_at.is_(None),
+                )
+            )
+        )
+        .scalars()
+        .all()
+    )
+    moved = hidden = 0
+    for tid in task_ids:
+        try:
+            await update_task(session, ctx, tid, {"assignee_id": target.id}, batch_id=batch)
+            moved += 1
+        except (NotFound, Forbidden):
+            hidden += 1
+    project_ids = (
+        (
+            await session.execute(
+                select(Project.id).where(
+                    Project.workspace_id == ctx.workspace_id,
+                    Project.owner_id == source.id,
+                    Project.deleted_at.is_(None),
+                )
+            )
+        )
+        .scalars()
+        .all()
+    )
+    owned = 0
+    for pid in project_ids:
+        try:
+            await update_project(session, ctx, pid, ProjectPatchIn(owner_id=target.id))
+            owned += 1
+        except (NotFound, Forbidden):
+            hidden += 1
+    return TransferResult(moved, owned, hidden, batch)

@@ -4,6 +4,7 @@ import { setupServer } from 'msw/node';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { MomentumApp } from '@/MomentumApp';
 import { authHandlers } from '@/mocks/handlers';
+import { ravi } from '@/mocks/fixtures';
 import { membersHandlers } from '@/mocks/members';
 import { notificationHandlers } from '@/mocks/notifications';
 import { projectHandlers } from '@/mocks/projects';
@@ -18,6 +19,17 @@ afterEach(() => {
 });
 afterAll(() => server.close());
 
+const ana = {
+  id: 'u-ana',
+  email: 'ana@acme-demo.test',
+  name: 'Ana Souza',
+  avatar_url: null,
+  role: 'member',
+  status: 'active',
+  is_agent: false,
+  timezone: 'UTC',
+};
+
 function boot(role: 'admin' | 'member') {
   server.use(
     ...authHandlers({ loggedIn: true, me: { role } }).handlers,
@@ -25,7 +37,7 @@ function boot(role: 'admin' | 'member') {
     ...projectHandlers(),
     ...notificationHandlers(),
     ...searchHandlers(),
-    ...membersHandlers(),
+    ...membersHandlers('', [ravi, ana]),
   );
   window.history.replaceState(null, '', '/settings/members');
   render(<MomentumApp />);
@@ -52,5 +64,29 @@ describe('Members (S2.7.3)', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     const row = await screen.findByText('newperson@acme-demo.test');
     expect(within(row.closest('li')!).getByText('Invited')).toBeInTheDocument();
+  });
+
+  it('an admin changes a role, disables someone and hands their work on (S7.5.4)', async () => {
+    const user = boot('admin');
+    const row = await screen.findByRole('listitem', { name: 'Ana Souza' });
+    expect(
+      within(screen.getByRole('listitem', { name: 'Ravi Kumar' })).queryByLabelText(/Role for/),
+    ).toBeNull();
+
+    await user.selectOptions(within(row).getByLabelText('Role for Ana Souza'), 'admin');
+    expect(await screen.findByText('Ana Souza is now an admin')).toBeInTheDocument();
+
+    await user.click(within(row).getByRole('button', { name: 'More for Ana Souza' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Disable' }));
+    await waitFor(() => expect(within(row).getByText('Disabled')).toBeInTheDocument());
+
+    await user.click(within(row).getByRole('button', { name: 'More for Ana Souza' }));
+    await user.click(await screen.findByRole('menuitem', { name: /Hand on their work/ }));
+    const dialog = await screen.findByRole('dialog', { name: /Hand on Ana Souza/ });
+    await user.selectOptions(within(dialog).getByLabelText('Give it to'), 'Ravi Kumar');
+    await user.click(within(dialog).getByRole('button', { name: 'Hand on' }));
+    expect(
+      await screen.findByText(/4 open tasks and 1 project handed to Ravi Kumar; 2 in private projects/),
+    ).toBeInTheDocument();
   });
 });
