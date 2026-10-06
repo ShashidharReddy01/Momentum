@@ -20,17 +20,18 @@ import {
   type Draft,
   type NarrowKey,
 } from './model';
-import { useSpecData, type FilterName, type WidgetIn, type WidgetKind } from './queries';
+import { isV1, useSpecData, type FilterName, type QuerySpec, type V1Kind, type WidgetIn } from './queries';
 import { WidgetCard, type WidgetItem } from './WidgetCard';
+import { entityOf, V2EditorBody, type Entity } from './WidgetEditorV2';
 
-const KIND_ICONS: Record<WidgetKind, LucideIcon> = {
+const KIND_ICONS: Record<V1Kind, LucideIcon> = {
   count: Hash,
   bar: BarChart3,
   donut: PieChart,
   line: LineChart,
   list: ListChecks,
 };
-const KIND_HINTS: Record<WidgetKind, string> = {
+const KIND_HINTS: Record<V1Kind, string> = {
   count: 'One number',
   bar: 'Compare groups',
   donut: 'Share of a whole',
@@ -72,7 +73,7 @@ export function WidgetEditor({
       className="top-[6vh] w-[min(980px,calc(100vw-32px))]"
     >
       {open ? (
-        <EditorBody
+        <EditorSwitch
           key={initial?.id ?? 'new'}
           initial={initial}
           projectId={projectId}
@@ -85,7 +86,9 @@ export function WidgetEditor({
   );
 }
 
-function EditorBody({
+/** Phase 7.5: a new chart picks what it shows (tasks, projects, the lifecycle, a note); an
+ * existing one keeps its entity. A project's dashboard shows its tasks (or a note). */
+function EditorSwitch({
   initial,
   projectId,
   onSave,
@@ -97,6 +100,63 @@ function EditorBody({
   onSave: (body: WidgetIn) => void;
   onCancel: () => void;
   saving?: boolean;
+}) {
+  const fixed = initial ? entityOf(initial) : null;
+  const [entity, setEntity] = useState<Entity>(fixed ?? 'tasks');
+  const options: { value: Entity; label: string }[] =
+    projectId === null
+      ? [
+          { value: 'tasks', label: 'Tasks' },
+          { value: 'projects', label: 'Projects' },
+          { value: 'stage_events', label: 'Lifecycle' },
+          { value: 'note', label: 'Note' },
+        ]
+      : [
+          { value: 'tasks', label: 'Tasks' },
+          { value: 'note', label: 'Note' },
+        ];
+  const header = fixed ? null : (
+    <Segmented label="What it shows" value={entity} onChange={setEntity} options={options} />
+  );
+  if (entity === 'tasks' && (!initial || isV1(initial.spec)))
+    return (
+      <EditorBody
+        initial={initial as V1Item | null}
+        projectId={projectId}
+        onSave={onSave}
+        onCancel={onCancel}
+        saving={saving}
+        header={header}
+      />
+    );
+  return (
+    <V2EditorBody
+      entity={entity}
+      initial={initial}
+      onSave={onSave}
+      onCancel={onCancel}
+      saving={saving}
+      header={header}
+    />
+  );
+}
+
+type V1Item = WidgetItem & { kind: V1Kind; spec: QuerySpec };
+
+function EditorBody({
+  initial,
+  projectId,
+  onSave,
+  onCancel,
+  saving,
+  header,
+}: {
+  initial: V1Item | null;
+  projectId: string | null;
+  onSave: (body: WidgetIn) => void;
+  onCancel: () => void;
+  saving?: boolean;
+  header?: ReactNode;
 }) {
   const [d, setD] = useState<Draft>(() => (initial ? draftOf(initial) : newDraft('bar')));
   const set = (patch: Partial<Draft>) => setD((x) => ({ ...x, ...patch }));
@@ -143,10 +203,11 @@ function EditorBody({
           save();
         }}
       >
+        {header}
         <fieldset>
           <legend className="mb-2 text-xs font-medium text-muted">Chart</legend>
           <div className="grid grid-cols-5 gap-1.5">
-            {(Object.keys(KIND_LABELS) as WidgetKind[]).map((k) => (
+            {(Object.keys(KIND_LABELS) as V1Kind[]).map((k) => (
               <button
                 key={k}
                 type="button"

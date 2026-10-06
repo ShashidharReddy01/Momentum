@@ -9,6 +9,12 @@ grants anything.
 
 Until a project has a saved dashboard, its tab shows the starter layout live (``starter()``); the
 first edit saves it (``create_dashboard`` with ``starter=True``), one undo.
+
+Phase 7.5 (spec §7): widgets store a v1 or v2 spec (``AnySpec``) run through ``query_v2.run_any``
+with the dashboard's filters (saved, or the viewer's own for one view); ``dashboard_members`` add
+editors to a workspace dashboard; a portfolio's editors edit its Dashboard tab; people pin
+dashboards to their Home (a personal preference like a favourite: no activity, no undo); results
+are cached for 60 s by the running app (``cache.py``).
 """
 
 from __future__ import annotations
@@ -17,25 +23,31 @@ import uuid
 from datetime import UTC, datetime
 from typing import Any
 
-from pydantic import ValidationError
+from pydantic import TypeAdapter, ValidationError
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from momentum.core.activity import Diff, record_activity
 from momentum.core.context import Ctx
 from momentum.core.errors import Conflict, Forbidden, NotFound, ValidationFailed
-from momentum.core.events import emit
+from momentum.core.events import OutboxEvent, emit
 from momentum.core.mutation import Mutation
 from momentum.core.ordering import key_between
 from momentum.core.permissions import Action, can
 from momentum.core.undo import UndoConflict, undo_handler, undo_op
 from momentum.domain.access import ROLE_RANK, forbid_agent, get_visible_project
-from momentum.domain.dashboards import query
-from momentum.domain.dashboards.models import Dashboard, DashboardWidget
+from momentum.domain.dashboards import query_v2
+from momentum.domain.dashboards.cache import ResultCache
+from momentum.domain.dashboards.models import (
+    Dashboard,
+    DashboardMember,
+    DashboardPin,
+    DashboardWidget,
+)
 from momentum.domain.dashboards.schemas import (
     DashboardIn,
     DashboardPatchIn,
-    DrillIn,
+    DrillAnyIn,
     DrillOut,
     QueryFilters,
     QueryResultOut,
@@ -46,10 +58,17 @@ from momentum.domain.dashboards.schemas import (
     WidgetKind,
     WidgetMoveIn,
     WidgetPatchIn,
-    check_kind,
+)
+from momentum.domain.dashboards.schemas_v2 import (
+    AnySpec,
+    DashboardFilters,
+    NoteSpec,
+    TasksSpec,
+    check_any,
 )
 
 MAX_WIDGETS = 24
+SPEC = TypeAdapter[Any](AnySpec)
 
 
 def _w(
@@ -115,7 +134,32 @@ async def get_dashboard(
         project, role = await get_visible_project(session, ctx, d.project_id)
         editable = ROLE_RANK[role] >= ROLE_RANK["editor"] and project.archived_at is None
         return d, editable
-    return d, ctx.actor.is_admin or d.owner_id == ctx.actor.id
+    return d, await _can_edit_workspace(session, ctx, d)
+
+
+async def _can_edit_workspace(session: AsyncSession, ctx: Ctx, d: Dashboard) -> bool:
+    """Owner, admins, ``dashboard_members`` editors, and (a portfolio's tab) its editors."""
+    if ctx.actor.is_admin or d.owner_id == ctx.actor.id:
+        return True
+    if ctx.actor.id is None or ctx.actor.is_agent:
+        return False
+    m = await session.get(DashboardMember, (d.id, ctx.actor.id))
+    if m is not None and m.role == "editor":
+        return True
+    if d.portfolio_id is not None:
+        from momentum.domain.portfolios.service import can_edit, get_portfolio
+
+        try:
+            return await can_edit(session, ctx, await get_portfolio(session, ctx, d.portfolio_id))
+        except NotFound:
+            return False
+    return False
+
+
+async def can_edit_many(
+    session: AsyncSession, ctx: Ctx, boards: list[Dashboard]
+) -> dict[uuid.UUID, bool]:
+    return {d.id: await _can_edit_workspace(session, ctx, d) for d in boards}
 
 
 def _require_edit(editable: bool) -> None:
@@ -231,6 +275,12 @@ async def create_dashboard(
         _require_edit(editable)
         if existing is not None:
             raise Conflict("This project already has a dashboard", code="duplicate")
+    elif data.portfolio_id is not None:
+        from momentum.domain.portfolios.service import get_portfolio, require_edit
+
+        await require_edit(session, ctx, await get_portfolio(session, ctx, data.portfolio_id))
+        if await portfolio_dashboard_of(session, data.portfolio_id) is not None:
+            raise Conflict("This portfolio already has a dashboard", code="duplicate")
     elif not can(ctx, Action.PROJECT_CREATE):
         raise Forbidden("You can't create dashboards")
     d = Dashboard(
@@ -240,10 +290,12 @@ async def create_dashboard(
         description=(data.description or "").strip() or None,
         scope="project" if data.project_id else "workspace",
         project_id=data.project_id,
+        portfolio_id=data.portfolio_id,
+        filters={"portfolio_id": str(data.portfolio_id)} if data.portfolio_id else {},
     )
     session.add(d)
     await session.flush()
-    if data.starter:
+    if data.starter and data.portfolio_id is None:
         keys = _keys(None, len(starter(d.scope)))
         for w, pos in zip(starter(d.scope), keys, strict=True):
             session.add(_widget_row(ctx, d, w.kind, w.title, w.query_spec, w.viz, pos))
@@ -279,6 +331,16 @@ async def update_dashboard(
     d, editable = await get_dashboard(session, ctx, dashboard_id)
     _require_edit(editable)
     changes: Diff = {}
+    if "filters" in patch.model_fields_set:
+        if d.project_id is not None:
+            raise ValidationFailed("A project dashboard has no filters")
+        await _check_filters(session, ctx, patch.filters)
+        new_filters = (
+            patch.filters.model_dump(mode="json", exclude_defaults=True) if patch.filters else {}
+        )
+        if d.filters != new_filters:
+            changes["filters"] = (d.filters, new_filters)
+            d.filters = new_filters
     for f in patch.model_fields_set & {"name", "description"}:
         new = getattr(patch, f)
         new = new.strip() if isinstance(new, str) else new
@@ -337,7 +399,7 @@ def _widget_row(
     d: Dashboard,
     kind: str,
     title: str,
-    spec: QuerySpec,
+    spec: Any,
     viz: VizIn,
     position: str,
 ) -> DashboardWidget:
@@ -353,13 +415,42 @@ def _widget_row(
     )
 
 
-def _check_scope(d: Dashboard, spec: QuerySpec) -> None:
-    if d.project_id is not None and spec.filters.project_ids:
+def _check_scope(d: Dashboard, spec: Any) -> None:
+    if d.project_id is None:
+        return
+    if isinstance(spec, QuerySpec) and spec.filters.project_ids:
         raise ValidationFailed("A project dashboard always shows its own project")
+    if isinstance(spec, TasksSpec) and (spec.filters.project_ids or spec.filters.portfolio_id):
+        raise ValidationFailed("A project dashboard always shows its own project")
+    if not isinstance(spec, QuerySpec | TasksSpec | NoteSpec):
+        raise ValidationFailed("A project dashboard shows its own project's tasks (or a note)")
 
 
-def widget_spec(w: DashboardWidget) -> QuerySpec:
-    return QuerySpec.model_validate(w.query_spec)
+def widget_spec(w: DashboardWidget) -> Any:
+    """The stored spec, v1 (``QuerySpec``) or v2."""
+    return SPEC.validate_python(w.query_spec)
+
+
+async def _check_widget(
+    session: AsyncSession, ctx: Ctx, d: Dashboard, kind: str, spec: Any
+) -> None:
+    try:
+        check_any(kind, spec)
+    except ValueError as e:
+        raise ValidationFailed(str(e)) from None
+    _check_scope(d, spec)
+    await query_v2.check_any(session, ctx, spec)
+
+
+async def _check_filters(session: AsyncSession, ctx: Ctx, filters: DashboardFilters | None) -> None:
+    if filters is None:
+        return
+    if filters.portfolio_id is not None:
+        from momentum.domain.portfolios.service import get_portfolio
+
+        await get_portfolio(session, ctx, filters.portfolio_id)
+    for c in filters.fields:
+        await query_v2._field(session, ctx, c.field_id, "project", None)
 
 
 async def get_widget(
@@ -384,8 +475,7 @@ async def add_widget(
 ) -> Mutation[DashboardWidget]:
     d, editable = await get_dashboard(session, ctx, dashboard_id)
     _require_edit(editable)
-    _check_scope(d, data.query_spec)
-    await query.check_spec(session, ctx, data.query_spec)
+    await _check_widget(session, ctx, d, data.kind, data.query_spec)
     live = await widgets_of(session, d)
     if len(live) >= MAX_WIDGETS:
         raise ValidationFailed(f"A dashboard holds up to {MAX_WIDGETS} widgets")
@@ -417,15 +507,15 @@ async def update_widget(
 ) -> Mutation[DashboardWidget]:
     w, d, editable = await get_widget(session, ctx, widget_id)
     _require_edit(editable)
-    kind: WidgetKind = patch.kind or w.kind  # type: ignore[assignment]
+    kind = patch.kind or w.kind
     spec = patch.query_spec or widget_spec(w)
-    try:
-        check_kind(kind, spec)
-    except ValueError as e:
-        raise ValidationFailed(str(e)) from None
     if patch.query_spec is not None:
-        _check_scope(d, spec)
-        await query.check_spec(session, ctx, spec)
+        await _check_widget(session, ctx, d, kind, spec)
+    else:
+        try:
+            check_any(kind, spec)
+        except ValueError as e:
+            raise ValidationFailed(str(e)) from None
     new: dict[str, Any] = {}
     if patch.kind is not None:
         new["kind"] = patch.kind
@@ -532,24 +622,213 @@ async def move_widget(
 # ---------- numbers (as the viewer) ----------
 
 
-async def widget_data(session: AsyncSession, ctx: Ctx, widget_id: uuid.UUID) -> QueryResultOut:
+def saved_filters(d: Dashboard) -> DashboardFilters:
+    try:
+        return DashboardFilters.model_validate(d.filters or {})
+    except ValidationError:  # a stored filter that no longer validates is ignored, not fatal
+        return DashboardFilters()
+
+
+async def _latest_event(session: AsyncSession) -> int:
+    return int(
+        (
+            await session.execute(select(OutboxEvent.id).order_by(OutboxEvent.id.desc()).limit(1))
+        ).scalar_one_or_none()
+        or 0
+    )
+
+
+async def widget_data(
+    session: AsyncSession,
+    ctx: Ctx,
+    widget_id: uuid.UUID,
+    *,
+    filters: DashboardFilters | None = None,
+    cache: ResultCache | None = None,
+) -> QueryResultOut:
+    """A widget's numbers as the viewer, with the viewer's own ``filters`` for this view, or the
+    dashboard's saved ones. Cached 60 s per (widget version, viewer, filters, newest event)."""
     w, d, _ = await get_widget(session, ctx, widget_id)
-    return await query.run(session, ctx, w.kind, widget_spec(w), project_id=d.project_id)  # type: ignore[arg-type]
+    applied = filters if filters is not None else saved_filters(d)
+    key = None
+    if cache is not None:
+        key = (
+            w.id,
+            w.version,
+            ctx.actor.id,
+            ctx.workspace_id,
+            applied.model_dump_json(exclude_defaults=True),
+            await _latest_event(session),
+        )
+        hit = cache.get(key)
+        if hit is not None:
+            return QueryResultOut.model_validate(hit)
+    out = await query_v2.run_any(
+        session, ctx, w.kind, widget_spec(w), project_id=d.project_id, filters=applied
+    )
+    if cache is not None and key is not None:
+        cache.put(key, out.model_dump())
+    return out
 
 
 async def run_query(
     session: AsyncSession,
     ctx: Ctx,
-    kind: WidgetKind,
-    spec: QuerySpec,
+    kind: str,
+    spec: Any,
     project_id: uuid.UUID | None,
+    filters: DashboardFilters | None = None,
 ) -> QueryResultOut:
     """An unsaved spec (the add-chart preview, the starter layout), run as the viewer."""
-    return await query.run(session, ctx, kind, spec, project_id=project_id)
+    if project_id is not None:
+        _check_scope(Dashboard(project_id=project_id), spec)
+    await query_v2.check_any(session, ctx, spec)
+    return await query_v2.run_any(session, ctx, kind, spec, project_id=project_id, filters=filters)
 
 
-async def drill(session: AsyncSession, ctx: Ctx, body: DrillIn) -> DrillOut:
-    return await query.drill(session, ctx, body)
+async def drill(
+    session: AsyncSession, ctx: Ctx, body: DrillAnyIn, split_key: str | None = None
+) -> DrillOut:
+    if not isinstance(body.query_spec, QuerySpec):
+        await query_v2.check_any(session, ctx, body.query_spec)
+    return await query_v2.drill_any(session, ctx, body, split_key)
+
+
+# ---------- the portfolio tab, members, pins (Phase 7.5) ----------
+
+
+async def portfolio_dashboard_of(
+    session: AsyncSession, portfolio_id: uuid.UUID
+) -> Dashboard | None:
+    return (
+        await session.execute(
+            select(Dashboard).where(
+                Dashboard.portfolio_id == portfolio_id, Dashboard.deleted_at.is_(None)
+            )
+        )
+    ).scalar_one_or_none()
+
+
+async def portfolio_dashboard(
+    session: AsyncSession, ctx: Ctx, portfolio_id: uuid.UUID
+) -> tuple[Dashboard | None, bool]:
+    """A portfolio's Dashboard tab (or None yet) and whether the viewer may make or edit it."""
+    from momentum.domain.portfolios.service import can_edit, get_portfolio
+
+    p = await get_portfolio(session, ctx, portfolio_id)
+    return await portfolio_dashboard_of(session, p.id), await can_edit(session, ctx, p)
+
+
+async def list_members(
+    session: AsyncSession, ctx: Ctx, dashboard_id: uuid.UUID
+) -> list[DashboardMember]:
+    d, _ = await get_dashboard(session, ctx, dashboard_id)
+    return list(
+        (
+            await session.execute(
+                select(DashboardMember)
+                .where(DashboardMember.dashboard_id == d.id)
+                .order_by(DashboardMember.created_at)
+            )
+        ).scalars()
+    )
+
+
+async def set_member(
+    session: AsyncSession,
+    ctx: Ctx,
+    dashboard_id: uuid.UUID,
+    user_id: uuid.UUID,
+    role: str | None,
+    *,
+    record_undo: bool = True,
+) -> Mutation[Dashboard]:
+    """Add, change or (``role=None``) remove a member of a workspace dashboard: its owner or an
+    admin decides who else edits it."""
+    from momentum.domain.users.models import User
+
+    forbid_agent(ctx, "share dashboards")
+    d, _ = await get_dashboard(session, ctx, dashboard_id)
+    if d.project_id is not None:
+        raise ValidationFailed("A project dashboard follows its project's members")
+    if not (ctx.actor.is_admin or d.owner_id == ctx.actor.id):
+        raise Forbidden("Only the dashboard's owner or an admin can share it")
+    user = await session.get(User, user_id)
+    if user is None or user.workspace_id != ctx.workspace_id or user.status != "active":
+        raise NotFound("Person not found")
+    if user.is_agent:
+        raise ValidationFailed("Agents can't be dashboard members")
+    m = await session.get(DashboardMember, (d.id, user_id))
+    old = m.role if m is not None else None
+    if old == role:
+        return Mutation(d, version=d.version)
+    if role is None:
+        await session.delete(m)
+    elif m is None:
+        session.add(
+            DashboardMember(
+                dashboard_id=d.id, user_id=user_id, workspace_id=ctx.workspace_id, role=role
+            )
+        )
+    else:
+        m.role = role
+    d.version += 1
+    await session.flush()
+    act = await _record(
+        session,
+        ctx,
+        d,
+        "dashboard.member_changed",
+        {"member": (old, role), "user_id": (None, str(user_id))},
+        undo_op("dashboards.set_member", dashboard_id=d.id, user_id=user_id, role=old)
+        if record_undo
+        else None,
+    )
+    return Mutation(d, act, version=d.version)
+
+
+async def pinned_ids(session: AsyncSession, ctx: Ctx) -> list[uuid.UUID]:
+    if ctx.actor.id is None:
+        return []
+    return list(
+        (
+            await session.execute(
+                select(DashboardPin.dashboard_id)
+                .join(Dashboard, Dashboard.id == DashboardPin.dashboard_id)
+                .where(DashboardPin.user_id == ctx.actor.id, Dashboard.deleted_at.is_(None))
+                .order_by(DashboardPin.position)
+            )
+        ).scalars()
+    )
+
+
+async def pin(session: AsyncSession, ctx: Ctx, dashboard_id: uuid.UUID, pinned: bool) -> None:
+    """Pin to (or take off) the viewer's Home: a personal preference, like a favourite."""
+    if ctx.actor.id is None or ctx.actor.is_agent:
+        raise Forbidden("Only people pin dashboards")
+    d, _ = await get_dashboard(session, ctx, dashboard_id)
+    have = await session.get(DashboardPin, (ctx.actor.id, d.id))
+    if not pinned:
+        if have is not None:
+            await session.delete(have)
+            await session.flush()
+        return
+    if have is not None:
+        return
+    last = (
+        await session.execute(
+            select(func.max(DashboardPin.position)).where(DashboardPin.user_id == ctx.actor.id)
+        )
+    ).scalar_one_or_none()
+    session.add(
+        DashboardPin(
+            user_id=ctx.actor.id,
+            dashboard_id=d.id,
+            workspace_id=ctx.workspace_id,
+            position=key_between(last, None),
+        )
+    )
+    await session.flush()
 
 
 # ---------- undo ----------
@@ -626,8 +905,8 @@ async def _undo_update_widget(session: AsyncSession, ctx: Ctx, args: dict[str, A
         raise UndoConflict("This widget changed after your edit")
     previous: dict[str, Any] = args["previous"]
     try:
-        spec = QuerySpec.model_validate(previous.get("query_spec", w.query_spec))
-        check_kind(previous.get("kind", w.kind), spec)
+        spec = SPEC.validate_python(previous.get("query_spec", w.query_spec))
+        check_any(previous.get("kind", w.kind), spec)
     except (ValidationError, ValueError):
         raise UndoConflict("The earlier version of this widget is no longer valid") from None
     for k, v in previous.items():
@@ -647,3 +926,70 @@ async def _undo_move_widget(session: AsyncSession, ctx: Ctx, args: dict[str, Any
     w.version += 1
     d.version += 1
     await _record(session, ctx, d, "dashboard.widget_moved", {"widget": (w.title, w.title)})
+
+
+@undo_handler("dashboards.set_member")
+async def _undo_set_member(session: AsyncSession, ctx: Ctx, args: dict[str, Any]) -> None:
+    role = args.get("role")
+    await set_member(
+        session,
+        ctx,
+        _did(args),
+        uuid.UUID(str(args["user_id"])),
+        str(role) if role else None,
+        record_undo=False,
+    )
+
+
+# ---------- role templates (Phase 7.5, spec §7.5) ----------
+
+
+async def create_from_template(
+    session: AsyncSession,
+    ctx: Ctx,
+    key: str,
+    portfolio_id: uuid.UUID,
+    name: str | None = None,
+    *,
+    portfolio_tab: bool = False,
+) -> tuple[Mutation[Dashboard], list[str]]:
+    """A workspace dashboard from a role template bound to a portfolio (or that portfolio's
+    Dashboard tab), in one undoable step; with the notes on anything left out."""
+    from momentum.domain.dashboards import role_templates
+
+    if ctx.actor.id is None:
+        raise Forbidden("You can't create dashboards")
+    if portfolio_tab:
+        from momentum.domain.portfolios.service import get_portfolio, require_edit
+
+        await require_edit(session, ctx, await get_portfolio(session, ctx, portfolio_id))
+        if await portfolio_dashboard_of(session, portfolio_id) is not None:
+            raise Conflict("This portfolio already has a dashboard", code="duplicate")
+    elif not can(ctx, Action.PROJECT_CREATE):
+        raise Forbidden("You can't create dashboards")
+    bound = await role_templates.bind(session, ctx, key, portfolio_id)  # checked, as the viewer
+    d = Dashboard(
+        workspace_id=ctx.workspace_id,
+        owner_id=ctx.actor.id,
+        name=(name or "").strip() or bound.name,
+        description=bound.description or None,
+        scope="workspace",
+        filters=bound.filters.model_dump(mode="json", exclude_defaults=True),
+        template=key,
+        portfolio_id=portfolio_id if portfolio_tab else None,
+    )
+    session.add(d)
+    await session.flush()
+    for w, pos in zip(bound.widgets, _keys(None, len(bound.widgets)), strict=True):
+        viz = VizIn.model_validate({"size": w.size})
+        session.add(_widget_row(ctx, d, w.kind, w.title, w.spec, viz, pos))
+    await session.flush()
+    act = await _record(
+        session,
+        ctx,
+        d,
+        "dashboard.created",
+        {"name": (None, d.name), "template": (None, key)},
+        undo_op("dashboards.delete", dashboard_id=d.id),
+    )
+    return Mutation(d, act, version=d.version), bound.notes

@@ -1,0 +1,52 @@
+# Phase 7.5 role template (spec §7.5); see sales.yaml for the "$…" bindings.
+name: Discovery
+description: Discoveries in flight, how long they take, and who is waiting on whom.
+persona: Discovery consultant
+filters:
+  portfolio_id: $portfolio
+widgets:
+  - kind: kpi
+    title: Median discovery time (90 days)
+    size: sm
+    spec: {version: 2, entity: stage_events, portfolio_id: $portfolio, analysis: time_in_stage,
+           stages: ["$stage:Discovery"], window_days: 90}
+  - kind: list
+    title: My discovery tasks this week
+    size: md
+    spec:
+      version: 2
+      entity: tasks
+      period: this_week
+      limit: 10
+      filters:
+        portfolio_id: $portfolio
+        assignees: [me]
+        due_within_days: 7
+        project_fields: [{field_id: $stagefield, op: any, value: ["$stage:Discovery"]}]
+  - kind: aging
+    title: Discovery aging vs 21 days
+    size: md
+    spec: {version: 2, entity: stage_events, portfolio_id: $portfolio, analysis: aging,
+           stages: ["$stage:Discovery"]}
+  - kind: table
+    title: Discoveries in flight
+    size: lg
+    spec:
+      version: 2
+      entity: projects
+      columns: [name, owner, stage_age_days, waiting_on_customer, next_milestone]
+      sort: stage_age_days:desc
+      limit: 20
+      filters:
+        portfolio_id: $portfolio
+        fields: [{field_id: $stagefield, op: any, value: ["$stage:Discovery"]}]
+  - kind: bar
+    title: Waiting on customer by customer
+    size: md
+    spec:
+      version: 2
+      entity: tasks
+      group_by: project
+      filters:
+        portfolio_id: $portfolio
+        fields: [{field_id: "$tf:Waiting on", op: any, values: ["$topt:Waiting on:Customer"]}]

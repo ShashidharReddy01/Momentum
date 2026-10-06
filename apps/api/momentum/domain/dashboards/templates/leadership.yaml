@@ -1,0 +1,64 @@
+# Phase 7.5 role template (spec §7.5); see sales.yaml for the "$…" bindings.
+name: Leadership
+description: The whole lifecycle - funnel, time in stage, value, go-lives and risk.
+persona: Leadership
+filters:
+  portfolio_id: $portfolio
+widgets:
+  - kind: kpi
+    title: Revenue in flight
+    size: sm
+    spec:
+      version: 2
+      entity: projects
+      measure: sum_project_field
+      measure_field_id: "$pf:Contract value"
+      filters:
+        portfolio_id: $portfolio
+        fields: [{field_id: $stagefield, op: any, value: ["$stages:Contracts..Go-live"]}]
+  - kind: funnel
+    title: Lifecycle funnel (180 days)
+    size: md
+    spec: {version: 2, entity: stage_events, portfolio_id: $portfolio, analysis: funnel,
+           window_days: 180, stages: ["$stages:Pre-sales..Live"]}
+  - kind: stage_time
+    title: Time in stage vs target
+    size: md
+    spec: {version: 2, entity: stage_events, portfolio_id: $portfolio, analysis: time_in_stage,
+           window_days: 180, stages: ["$stages:Pre-sales..Hypercare"]}
+  - kind: bar
+    title: Value by stage
+    size: md
+    spec:
+      version: 2
+      entity: projects
+      group_by: stage
+      measure: sum_project_field
+      measure_field_id: "$pf:Contract value"
+      filters: {portfolio_id: $portfolio}
+  - kind: line
+    title: Go-lives per month (12 months)
+    size: md
+    spec: {version: 2, entity: projects, time_bucket: month, time_field: stage_entered,
+           stage_option_id: "$stage:Live", window_days: 365,
+           filters: {portfolio_id: $portfolio, include_completed: true}}
+  - kind: table
+    title: Customers at risk
+    size: lg
+    spec:
+      version: 2
+      entity: projects
+      columns: [name, owner, status, stage, slip_days, "field:$pf:Target go-live"]
+      sort: slip_days:desc
+      limit: 20
+      filters: {portfolio_id: $portfolio, at_risk: true}
+  - kind: aging
+    title: All stages
+    size: md
+    spec: {version: 2, entity: stage_events, portfolio_id: $portfolio, analysis: aging,
+           stages: ["$stages:Pre-sales..Hypercare"]}
+  - kind: bar
+    title: Customers by region
+    size: md
+    spec: {version: 2, entity: projects, group_by: project_field, field_id: "$pf:Region",
+           filters: {portfolio_id: $portfolio}}

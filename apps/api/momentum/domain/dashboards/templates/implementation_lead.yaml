@@ -1,0 +1,70 @@
+# Phase 7.5 role template (spec §7.5); see sales.yaml for the "$…" bindings.
+name: Implementation lead
+description: A control tower for your implementations - slipping, blocked, waiting, and load.
+persona: Implementation lead
+filters:
+  portfolio_id: $portfolio
+  owner: [me]
+widgets:
+  - kind: kpi
+    title: Active implementations
+    size: sm
+    spec:
+      version: 2
+      entity: projects
+      filters:
+        portfolio_id: $portfolio
+        fields: [{field_id: $stagefield, op: any, value: ["$stage:Implementation"]}]
+  - kind: kpi
+    title: Slipping
+    size: sm
+    spec: {version: 2, entity: projects, filters: {portfolio_id: $portfolio, slipping: true}}
+  - kind: table
+    title: Control tower
+    size: lg
+    spec:
+      version: 2
+      entity: projects
+      columns: [name, status, progress, "field:$pf:Target go-live", forecast_date, slip_days,
+                next_milestone, blocked, waiting_on_customer, stage_age_days]
+      sort: slip_days:desc
+      limit: 20
+      filters:
+        portfolio_id: $portfolio
+        fields: [{field_id: $stagefield, op: any, value: ["$stages:Implementation..Hypercare"]}]
+  - kind: timeline
+    title: Go-lives, next 90 days
+    size: md
+    spec: {version: 2, entity: projects, ahead_days: 90, columns: ["field:$pf:Target go-live"],
+           filters: {portfolio_id: $portfolio}}
+  - kind: bar
+    title: Waiting on customer, open tasks by customer
+    size: md
+    spec:
+      version: 2
+      entity: tasks
+      group_by: project
+      filters:
+        portfolio_id: $portfolio
+        fields: [{field_id: "$tf:Waiting on", op: any, values: ["$topt:Waiting on:Customer"]}]
+  - kind: stacked_bar
+    title: Open RAID by customer, split by Severity
+    size: md
+    spec:
+      version: 2
+      entity: tasks
+      group_by: project
+      split_by: field
+      split_field_id: "$tf:Severity"
+      filters:
+        portfolio_id: $portfolio
+        fields: [{field_id: "$tf:RAID type", op: set}]
+  - kind: line
+    title: Overdue tasks per week across my implementations
+    size: md
+    spec: {version: 2, entity: snapshots, portfolio_id: $portfolio, metric: overdue,
+           time_bucket: week, window_days: 84}
+  - kind: bar
+    title: "Consultant load: open tasks by assignee"
+    size: md
+    spec: {version: 2, entity: tasks, group_by: assignee, filters: {portfolio_id: $portfolio}}

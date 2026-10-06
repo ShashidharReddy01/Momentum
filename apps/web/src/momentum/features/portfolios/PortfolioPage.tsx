@@ -1,6 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { Briefcase, Plus, Settings2, X } from 'lucide-react';
-import { useMemo, useState, type FormEvent } from 'react';
+import { lazy, Suspense, useMemo, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { EmptyState, ErrorState } from '@/components/common/States';
 import { MoMark } from '@/components/common/MoMark';
@@ -31,6 +31,11 @@ import {
   type StatusUpdateIn,
 } from './queries';
 import { PortfolioBoard } from './PortfolioBoard';
+
+// Phase 7.5: the Dashboard tab lives in the dashboards chunk
+const PortfolioDashboard = lazy(() =>
+  import('@/features/dashboards').then((m) => ({ default: m.PortfolioDashboard })),
+);
 import { PortfolioSettingsDialog } from './PortfolioSettingsDialog';
 import { PortfolioTable } from './PortfolioTable';
 import { PortfolioTimeline } from './PortfolioTimeline';
@@ -72,6 +77,7 @@ const TABS = [
   { value: 'timeline', label: 'Timeline' },
   { value: 'workload', label: 'Workload' },
   { value: 'overview', label: 'Overview' },
+  { value: 'dashboard', label: 'Dashboard' },
 ] as const;
 
 function PortfolioBody({ p }: { p: PortfolioDetail }) {
@@ -128,6 +134,13 @@ function PortfolioBody({ p }: { p: PortfolioDetail }) {
         </TabsContent>
         <TabsContent value="overview" className="pt-4">
           <PortfolioOverview p={p} />
+        </TabsContent>
+        <TabsContent value="dashboard" className="pt-4">
+          {current === 'dashboard' ? (
+            <Suspense fallback={<Skeleton className="h-64" />}>
+              <PortfolioDashboard portfolioId={p.id} portfolioName={p.name} />
+            </Suspense>
+          ) : null}
         </TabsContent>
       </Tabs>
       {settingsOpen ? <PortfolioSettingsDialog p={p} open onOpenChange={setSettingsOpen} /> : null}

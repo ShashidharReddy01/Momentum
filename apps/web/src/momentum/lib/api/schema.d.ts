@@ -996,8 +996,76 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** The tasks behind one bar, slice, point or tile, as the viewer sees them */
+        /** The tasks (or projects) behind one bar, slice, point, stage or tile, as the viewer sees them */
         post: operations["drill_api_v1_dashboards_drill_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/dashboards/from-template": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create a dashboard from a role template bound to a portfolio (undoable) */
+        post: operations["from_template_api_v1_dashboards_from_template_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/dashboards/from-template/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Bind a role template to a portfolio and show it, with what it leaves out */
+        post: operations["preview_template_api_v1_dashboards_from_template_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/dashboards/pinned": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Dashboards pinned to my Home */
+        get: operations["pinned_dashboards_api_v1_dashboards_pinned_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/dashboards/portfolio/{portfolio_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A portfolio's Dashboard tab: its dashboard, or none yet */
+        get: operations["portfolio_dashboard_api_v1_dashboards_portfolio__portfolio_id__get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1032,6 +1100,23 @@ export interface paths {
         put?: never;
         /** Run an unsaved widget spec as the viewer (previews, the starter layout) */
         post: operations["run_query_api_v1_dashboards_query_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/dashboards/templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The role dashboard templates */
+        get: operations["list_templates_api_v1_dashboards_templates_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1107,6 +1192,59 @@ export interface paths {
         head?: never;
         /** Rename or describe a dashboard */
         patch: operations["update_dashboard_api_v1_dashboards__dashboard_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/dashboards/{dashboard_id}/members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Who besides the owner edits (or is listed on) a dashboard */
+        get: operations["list_members_api_v1_dashboards__dashboard_id__members_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/dashboards/{dashboard_id}/members/{user_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Add a member or change their role (the owner or an admin) */
+        put: operations["set_member_api_v1_dashboards__dashboard_id__members__user_id__put"];
+        post?: never;
+        /** Remove a member (undoable) */
+        delete: operations["remove_member_api_v1_dashboards__dashboard_id__members__user_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/dashboards/{dashboard_id}/pin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Pin to my Home */
+        put: operations["pin_api_v1_dashboards__dashboard_id__pin_put"];
+        post?: never;
+        /** Unpin from my Home */
+        delete: operations["unpin_api_v1_dashboards__dashboard_id__pin_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/dashboards/{dashboard_id}/widgets": {
@@ -5135,6 +5273,7 @@ export interface components {
             created_at: string;
             /** Description */
             description: string | null;
+            filters?: components["schemas"]["DashboardFilters"];
             /**
              * Id
              * Format: uuid
@@ -5147,6 +5286,13 @@ export interface components {
              * Format: uuid
              */
             owner_id: string;
+            /**
+             * Pinned
+             * @default false
+             */
+            pinned: boolean;
+            /** Portfolio Id */
+            portfolio_id?: string | null;
             /** Project Id */
             project_id: string | null;
             /**
@@ -5154,6 +5300,8 @@ export interface components {
              * @enum {string}
              */
             scope: "project" | "workspace";
+            /** Template */
+            template?: string | null;
             /**
              * Updated At
              * Format: date-time
@@ -5166,12 +5314,38 @@ export interface components {
             /** Widgets */
             widgets: components["schemas"]["WidgetOut"][];
         };
+        /**
+         * DashboardFilters
+         * @description Saved on a dashboard (editors) or passed for one view (anyone): applied to every widget
+         *     whose entity supports them. ``owner: ["me"]`` makes one dashboard serve every person.
+         */
+        DashboardFilters: {
+            /** Assignee */
+            assignee?: string[];
+            /** Fields */
+            fields?: components["schemas"]["ProjectCondition"][];
+            /** Owner */
+            owner?: string[];
+            /** Period */
+            period?: ("this_week" | "this_month" | "last_30_days" | "this_quarter" | "custom") | null;
+            /** Period From */
+            period_from?: string | null;
+            /** Period To */
+            period_to?: string | null;
+            /** Portfolio Id */
+            portfolio_id?: string | null;
+        };
         /** DashboardIn */
         DashboardIn: {
             /** Description */
             description?: string | null;
             /** Name */
             name: string;
+            /**
+             * Portfolio Id
+             * @description Phase 7.5: make it this portfolio's Dashboard tab
+             */
+            portfolio_id?: string | null;
             /**
              * Project Id
              * @description Set for a project's Dashboard tab; omit for a workspace one
@@ -5195,6 +5369,7 @@ export interface components {
             created_at: string;
             /** Description */
             description: string | null;
+            filters?: components["schemas"]["DashboardFilters"];
             /**
              * Id
              * Format: uuid
@@ -5207,6 +5382,13 @@ export interface components {
              * Format: uuid
              */
             owner_id: string;
+            /**
+             * Pinned
+             * @default false
+             */
+            pinned: boolean;
+            /** Portfolio Id */
+            portfolio_id?: string | null;
             /** Project Id */
             project_id: string | null;
             /**
@@ -5214,6 +5396,8 @@ export interface components {
              * @enum {string}
              */
             scope: "project" | "workspace";
+            /** Template */
+            template?: string | null;
             /**
              * Updated At
              * Format: date-time
@@ -5228,8 +5412,23 @@ export interface components {
         DashboardPatchIn: {
             /** Description */
             description?: string | null;
+            /** @description Phase 7.5: the saved filters (editors) */
+            filters?: components["schemas"]["DashboardFilters"] | null;
             /** Name */
             name?: string | null;
+        };
+        /** DashboardTemplateOut */
+        DashboardTemplateOut: {
+            /** Description */
+            description: string;
+            /** Key */
+            key: string;
+            /** Name */
+            name: string;
+            /** Persona */
+            persona: string;
+            /** Widgets */
+            widgets: string[];
         };
         /** DateChangeOut */
         DateChangeOut: {
@@ -5341,13 +5540,14 @@ export interface components {
             title: string;
         };
         /**
-         * DrillIn
-         * @description The tasks behind one bar, slice, point or tile: the same spec narrowed to one group
-         *     (``key``) or one time bucket (``bucket_start``).
+         * DrillAnyIn
+         * @description Phase 7.5: the drill for any spec. A v1 spec (no filters) drills exactly as ``DrillIn``;
+         *     a v2 one returns tasks or projects, and ``key`` names a stage for stage analyses.
          */
-        DrillIn: {
+        DrillAnyIn: {
             /** Bucket Start */
             bucket_start?: string | null;
+            filters?: components["schemas"]["DashboardFilters"] | null;
             /** Key */
             key?: string | null;
             /**
@@ -5357,16 +5557,50 @@ export interface components {
             limit: number;
             /** Project Id */
             project_id?: string | null;
-            query_spec: components["schemas"]["QuerySpec"];
+            /** Query Spec */
+            query_spec: components["schemas"]["QuerySpec"] | (components["schemas"]["TasksSpec"] | components["schemas"]["ProjectsSpec"] | components["schemas"]["StageSpec"] | components["schemas"]["SnapshotSpec"] | components["schemas"]["NoteSpec"]);
+            /**
+             * Split Key
+             * @description A stacked bar's split value (its segment)
+             */
+            split_key?: string | null;
         };
         /** DrillOut */
         DrillOut: {
+            /**
+             * Entity
+             * @default tasks
+             */
+            entity: string;
             /** Label */
             label: string;
+            /** Projects */
+            projects?: components["schemas"]["DrillProjectOut"][];
             /** Tasks */
             tasks: components["schemas"]["TaskRowOut"][];
             /** Total */
             total: number;
+        };
+        /**
+         * DrillProjectOut
+         * @description Phase 7.5: one project behind a projects or stage widget's mark.
+         */
+        DrillProjectOut: {
+            /** Color */
+            color?: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Owner Name */
+            owner_name?: string | null;
+            /** Stage */
+            stage?: string | null;
+            /** Status */
+            status?: string | null;
         };
         /** DriverOut */
         DriverOut: {
@@ -5902,6 +6136,30 @@ export interface components {
             tasks: number;
             /** Team */
             team: string;
+        };
+        /** FromTemplateIn */
+        FromTemplateIn: {
+            /** Name */
+            name?: string | null;
+            /**
+             * Portfolio Id
+             * Format: uuid
+             */
+            portfolio_id: string;
+            /**
+             * Portfolio Tab
+             * @description Make it the portfolio's Dashboard tab (its editors)
+             * @default false
+             */
+            portfolio_tab: boolean;
+            /** Template */
+            template: string;
+        };
+        /** FromTemplateOut */
+        FromTemplateOut: {
+            dashboard: components["schemas"]["DashboardDetailOut"];
+            /** Notes */
+            notes: string[];
         };
         /** GateIn */
         GateIn: {
@@ -6480,6 +6738,13 @@ export interface components {
             /** @default {} */
             meta: components["schemas"]["ListMeta"];
         };
+        /** ListOut[DashboardTemplateOut] */
+        ListOut_DashboardTemplateOut_: {
+            /** Data */
+            data: components["schemas"]["DashboardTemplateOut"][];
+            /** @default {} */
+            meta: components["schemas"]["ListMeta"];
+        };
         /** ListOut[DependencyEdgeOut] */
         ListOut_DependencyEdgeOut_: {
             /** Data */
@@ -6519,6 +6784,13 @@ export interface components {
         ListOut_ImportJobOut_: {
             /** Data */
             data: components["schemas"]["ImportJobOut"][];
+            /** @default {} */
+            meta: components["schemas"]["ListMeta"];
+        };
+        /** ListOut[MemberOut] */
+        ListOut_MemberOut_: {
+            /** Data */
+            data: components["schemas"]["MemberOut"][];
             /** @default {} */
             meta: components["schemas"]["ListMeta"];
         };
@@ -6699,6 +6971,29 @@ export interface components {
         MeOut: {
             user: components["schemas"]["UserOut"];
             workspace: components["schemas"]["WorkspaceOut"];
+        };
+        /** MemberIn */
+        MemberIn: {
+            /**
+             * Role
+             * @enum {string}
+             */
+            role: "editor" | "viewer";
+        };
+        /** MemberOut */
+        MemberOut: {
+            /** Name */
+            name: string;
+            /**
+             * Role
+             * @enum {string}
+             */
+            role: "editor" | "viewer";
+            /**
+             * User Id
+             * Format: uuid
+             */
+            user_id: string;
         };
         /**
          * MemberPatchIn
@@ -6901,6 +7196,11 @@ export interface components {
         /** MutationOut[FormOut] */
         MutationOut_FormOut_: {
             data: components["schemas"]["FormOut"];
+            meta: components["schemas"]["MutationMeta"];
+        };
+        /** MutationOut[FromTemplateOut] */
+        MutationOut_FromTemplateOut_: {
+            data: components["schemas"]["FromTemplateOut"];
             meta: components["schemas"]["MutationMeta"];
         };
         /** MutationOut[GoalDetailOut] */
@@ -7176,6 +7476,40 @@ export interface components {
             section_id?: string | null;
             /** Title */
             title?: string | null;
+        };
+        /** NoteSpec */
+        NoteSpec: {
+            /**
+             * Compare Previous
+             * @description KPI: compare with the previous period of the same length
+             * @default false
+             */
+            compare_previous: boolean;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            entity: "note";
+            /**
+             * Period
+             * @description The window as a calendar period (a dashboard period replaces it)
+             */
+            period?: ("this_week" | "this_month" | "last_30_days" | "this_quarter") | null;
+            /**
+             * Target
+             * @description KPI: a target (progress ring)
+             */
+            target?: number | null;
+            /**
+             * Text
+             * @description Markdown, shown as text
+             */
+            text: string;
+            /**
+             * Version
+             * @constant
+             */
+            version: 2;
         };
         /** NotificationOut */
         NotificationOut: {
@@ -7495,6 +7829,16 @@ export interface components {
             stage_targets?: {
                 [key: string]: number;
             } | null;
+        };
+        /**
+         * PortfolioDashboardOut
+         * @description A portfolio's Dashboard tab: its dashboard (or none yet) and whether the viewer can make
+         *     or edit it.
+         */
+        PortfolioDashboardOut: {
+            /** Can Edit */
+            can_edit: boolean;
+            dashboard: components["schemas"]["DashboardDetailOut"] | null;
         };
         /** PortfolioDetailOut */
         PortfolioDetailOut: {
@@ -7903,6 +8247,26 @@ export interface components {
             /** Sort */
             sort?: components["schemas"]["SortIn"][] | null;
         };
+        /**
+         * ProjectCondition
+         * @description A condition on a project field (as in portfolio rules). ``value`` may be ``"me"`` for a
+         *     people field (the viewer).
+         */
+        ProjectCondition: {
+            /**
+             * Field Id
+             * Format: uuid
+             */
+            field_id: string;
+            /**
+             * Op
+             * @default is
+             * @enum {string}
+             */
+            op: "is" | "is_not" | "any" | "empty" | "set";
+            /** Value */
+            value?: unknown;
+        };
         /** ProjectCreateIn */
         ProjectCreateIn: {
             /** Color */
@@ -8104,6 +8468,56 @@ export interface components {
             /** Total */
             total: number;
         };
+        /** ProjectFilters */
+        ProjectFilters: {
+            /**
+             * Assignee
+             * @description Projects with open tasks assigned to these people (user ids or "me")
+             */
+            assignee?: string[];
+            /**
+             * At Risk
+             * @description Status at risk or off track, or slipping (any of them)
+             * @default false
+             */
+            at_risk: boolean;
+            /** Fields */
+            fields?: components["schemas"]["ProjectCondition"][];
+            /**
+             * Has Blocked
+             * @default false
+             */
+            has_blocked: boolean;
+            /**
+             * Has Waiting On Customer
+             * @default false
+             */
+            has_waiting_on_customer: boolean;
+            /**
+             * Include Completed
+             * @default false
+             */
+            include_completed: boolean;
+            /**
+             * Owner
+             * @description User ids or "me"
+             */
+            owner?: string[];
+            /** Portfolio Id */
+            portfolio_id?: string | null;
+            /**
+             * Slipping
+             * @description Forecast (P80) past the target date
+             * @default false
+             */
+            slipping: boolean;
+            /** Status */
+            status?: ("on_track" | "at_risk" | "off_track" | "on_hold" | "complete" | "none")[];
+            /** Team Ids */
+            team_ids?: string[];
+            /** Template Ids */
+            template_ids?: string[];
+        };
         /** ProjectForecastOut */
         ProjectForecastOut: {
             forecast: components["schemas"]["ForecastOut"] | null;
@@ -8267,6 +8681,85 @@ export interface components {
             /** View */
             view?: ("list" | "board" | "calendar" | "timeline" | "overview" | "files" | "dashboard") | null;
         };
+        /** ProjectsSpec */
+        ProjectsSpec: {
+            /**
+             * Ahead Days
+             * @description timeline: dates from today to today + N days
+             */
+            ahead_days?: number | null;
+            /** Columns */
+            columns?: (("name" | "owner" | "status" | "stage" | "progress" | "open" | "overdue" | "blocked" | "waiting_on_customer" | "next_milestone" | "target_date" | "forecast_date" | "slip_days" | "stage_age_days" | "latest_update") | string)[];
+            /**
+             * Compare Previous
+             * @description KPI: compare with the previous period of the same length
+             * @default false
+             */
+            compare_previous: boolean;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            entity: "projects";
+            /**
+             * Field Id
+             * @description group_by project_field
+             */
+            field_id?: string | null;
+            filters?: components["schemas"]["ProjectFilters"];
+            /** Group By */
+            group_by?: ("project_field" | "owner" | "status" | "team" | "stage") | null;
+            /**
+             * Limit
+             * @default 8
+             */
+            limit: number;
+            /**
+             * Measure
+             * @default count
+             * @enum {string}
+             */
+            measure: "count" | "sum_project_field" | "avg_project_field" | "avg_progress" | "sum_open_tasks" | "sum_overdue_tasks";
+            /** Measure Field Id */
+            measure_field_id?: string | null;
+            /**
+             * Period
+             * @description The window as a calendar period (a dashboard period replaces it)
+             */
+            period?: ("this_week" | "this_month" | "last_30_days" | "this_quarter") | null;
+            /** Sort */
+            sort?: string | null;
+            /** Stage Option Id */
+            stage_option_id?: string | null;
+            /**
+             * Target
+             * @description KPI: a target (progress ring)
+             */
+            target?: number | null;
+            /** Time Bucket */
+            time_bucket?: ("day" | "week" | "month") | null;
+            /**
+             * Time Field
+             * @default created
+             * @enum {string}
+             */
+            time_field: "created" | "project_field" | "stage_entered";
+            /**
+             * Time Field Id
+             * @description time_field project_field
+             */
+            time_field_id?: string | null;
+            /**
+             * Version
+             * @constant
+             */
+            version: 2;
+            /**
+             * Window Days
+             * @default 84
+             */
+            window_days: number;
+        };
         /** PublicFormOut */
         PublicFormOut: {
             /**
@@ -8373,6 +8866,8 @@ export interface components {
          *     or no value in the measured field (``sum_field`` / ``avg_field``).
          */
         QueryResultOut: {
+            /** Columns */
+            columns?: string[];
             /**
              * Computed At
              * Format: date-time
@@ -8380,6 +8875,11 @@ export interface components {
             computed_at: string;
             /** Description */
             description: string;
+            /**
+             * Entity
+             * @default tasks
+             */
+            entity: string;
             /** Field Name */
             field_name?: string | null;
             /** Filter Names */
@@ -8390,12 +8890,9 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "count" | "bar" | "line" | "donut" | "list";
-            /**
-             * Measure
-             * @enum {string}
-             */
-            measure: "count" | "sum_estimate" | "sum_field" | "avg_field";
+            kind: "count" | "bar" | "line" | "donut" | "list" | "kpi" | "stacked_bar" | "table" | "funnel" | "stage_time" | "aging" | "timeline" | "note";
+            /** Measure */
+            measure: string;
             /** Measure Field Name */
             measure_field_name?: string | null;
             /**
@@ -8403,12 +8900,30 @@ export interface components {
              * @default 0
              */
             more: number;
+            /** Notes */
+            notes?: string[];
+            /** Previous */
+            previous?: number | null;
+            /** Rows */
+            rows?: {
+                [key: string]: unknown;
+            }[];
             /** Series */
             series?: components["schemas"]["PointOut"][];
+            /** Stacks */
+            stacks?: components["schemas"]["StackOut"][];
+            /** Stages */
+            stages?: components["schemas"]["StageStatOut"][];
+            /** Target */
+            target?: number | null;
             /** Tasks */
             tasks?: components["schemas"]["TaskRowOut"][];
             /** Tasks Total */
             tasks_total: number;
+            /** Text */
+            text?: string | null;
+            /** Timeline */
+            timeline?: components["schemas"]["TimelineItemOut"][];
             /** Total */
             total: number;
             /**
@@ -9407,6 +9922,62 @@ export interface components {
              */
             type: "assigned" | "manual" | "mentioned";
         };
+        /** SnapshotSpec */
+        SnapshotSpec: {
+            /**
+             * Compare Previous
+             * @description KPI: compare with the previous period of the same length
+             * @default false
+             */
+            compare_previous: boolean;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            entity: "snapshots";
+            /** Field Id */
+            field_id?: string | null;
+            /** Fields */
+            fields?: components["schemas"]["ProjectCondition"][];
+            /**
+             * Metric
+             * @enum {string}
+             */
+            metric: "open" | "overdue" | "progress_avg" | "sum_project_field";
+            /** Owner */
+            owner?: string[];
+            /**
+             * Period
+             * @description The window as a calendar period (a dashboard period replaces it)
+             */
+            period?: ("this_week" | "this_month" | "last_30_days" | "this_quarter") | null;
+            /**
+             * Portfolio Id
+             * Format: uuid
+             */
+            portfolio_id: string;
+            /**
+             * Target
+             * @description KPI: a target (progress ring)
+             */
+            target?: number | null;
+            /**
+             * Time Bucket
+             * @default week
+             * @enum {string}
+             */
+            time_bucket: "day" | "week" | "month";
+            /**
+             * Version
+             * @constant
+             */
+            version: 2;
+            /**
+             * Window Days
+             * @default 84
+             */
+            window_days: number;
+        };
         /** SortIn */
         SortIn: {
             /**
@@ -9417,6 +9988,20 @@ export interface components {
             dir: "asc" | "desc";
             /** Key */
             key: string;
+        };
+        /**
+         * StackOut
+         * @description Phase 7.5: one split value of a stacked bar; ``values`` line up with ``groups``.
+         */
+        StackOut: {
+            /** Color */
+            color?: string | null;
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Values */
+            values: number[];
         };
         /** StageCount */
         StageCount: {
@@ -9444,6 +10029,97 @@ export interface components {
             /** Option Id */
             option_id: string;
         };
+        /** StageSpec */
+        StageSpec: {
+            /**
+             * Analysis
+             * @enum {string}
+             */
+            analysis: "funnel" | "time_in_stage" | "throughput" | "aging";
+            /**
+             * Compare Previous
+             * @description KPI: compare with the previous period of the same length
+             * @default false
+             */
+            compare_previous: boolean;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            entity: "stage_events";
+            /** Fields */
+            fields?: components["schemas"]["ProjectCondition"][];
+            /** Owner */
+            owner?: string[];
+            /**
+             * Period
+             * @description The window as a calendar period (a dashboard period replaces it)
+             */
+            period?: ("this_week" | "this_month" | "last_30_days" | "this_quarter") | null;
+            /**
+             * Portfolio Id
+             * Format: uuid
+             */
+            portfolio_id: string;
+            /**
+             * Stages
+             * @description Only these stage option ids (all if empty)
+             */
+            stages?: string[];
+            /**
+             * Target
+             * @description KPI: a target (progress ring)
+             */
+            target?: number | null;
+            /**
+             * Time Bucket
+             * @default month
+             * @enum {string}
+             */
+            time_bucket: "day" | "week" | "month";
+            /**
+             * Version
+             * @constant
+             */
+            version: 2;
+            /**
+             * Window Days
+             * @default 180
+             */
+            window_days: number;
+        };
+        /**
+         * StageStatOut
+         * @description Phase 7.5: one stage of a funnel, time-in-stage or aging analysis.
+         */
+        StageStatOut: {
+            /**
+             * Breaches
+             * @default 0
+             */
+            breaches: number;
+            /** Buckets */
+            buckets?: number[];
+            /** Conversion */
+            conversion?: number | null;
+            /**
+             * Count
+             * @default 0
+             */
+            count: number;
+            /** Label */
+            label: string;
+            /** Median Days */
+            median_days?: number | null;
+            /** Option Id */
+            option_id: string;
+            /** P75 Days */
+            p75_days?: number | null;
+            /** P90 Days */
+            p90_days?: number | null;
+            /** Target Days */
+            target_days?: number | null;
+        };
         /**
          * StarterWidgetOut
          * @description A widget of the starter layout, shown live before a dashboard is saved.
@@ -9453,8 +10129,9 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "count" | "bar" | "line" | "donut" | "list";
-            query_spec: components["schemas"]["QuerySpec"];
+            kind: "count" | "bar" | "line" | "donut" | "list" | "kpi" | "stacked_bar" | "table" | "funnel" | "stage_time" | "aging" | "timeline" | "note";
+            /** Query Spec */
+            query_spec: components["schemas"]["QuerySpec"] | (components["schemas"]["TasksSpec"] | components["schemas"]["ProjectsSpec"] | components["schemas"]["StageSpec"] | components["schemas"]["SnapshotSpec"] | components["schemas"]["NoteSpec"]);
             /** Title */
             title: string;
             viz: components["schemas"]["VizIn"];
@@ -9887,6 +10564,70 @@ export interface components {
             /** Start On */
             start_on?: string | null;
         };
+        /**
+         * TaskFiltersV2
+         * @description v1 task filters plus a portfolio and project-field conditions (tasks of the matching
+         *     projects the viewer can see).
+         */
+        TaskFiltersV2: {
+            /**
+             * Assignees
+             * @description User ids, "me" (whoever is viewing) or "none" (unassigned)
+             */
+            assignees?: string[];
+            /**
+             * Blocked
+             * @description Open tasks waiting on an open blocker
+             * @default false
+             */
+            blocked: boolean;
+            /**
+             * Completed Within Days
+             * @description Completed in the last N days (today included)
+             */
+            completed_within_days?: number | null;
+            /** Due From */
+            due_from?: string | null;
+            /** Due To */
+            due_to?: string | null;
+            /**
+             * Due Within Days
+             * @description Due between today and today + N days
+             */
+            due_within_days?: number | null;
+            /**
+             * Fields
+             * @description Custom-field conditions, all of which must hold (S7.4.1)
+             */
+            fields?: components["schemas"]["FieldFilter"][];
+            /**
+             * Overdue
+             * @description Open tasks due before today
+             * @default false
+             */
+            overdue: boolean;
+            /** Portfolio Id */
+            portfolio_id?: string | null;
+            /** Priorities */
+            priorities?: ("urgent" | "high" | "medium" | "low" | "none")[];
+            /** Project Fields */
+            project_fields?: components["schemas"]["ProjectCondition"][];
+            /**
+             * Project Ids
+             * @description Only these projects (workspace scope)
+             */
+            project_ids?: string[];
+            /** Section Ids */
+            section_ids?: string[];
+            /**
+             * Status
+             * @default open
+             * @enum {string}
+             */
+            status: "open" | "completed" | "all";
+            /** Tag Ids */
+            tag_ids?: string[];
+        };
         /** TaskHit */
         TaskHit: {
             /** Completed At */
@@ -10120,6 +10861,72 @@ export interface components {
              */
             task_id: string;
         };
+        /** TasksSpec */
+        TasksSpec: {
+            /**
+             * Compare Previous
+             * @description KPI: compare with the previous period of the same length
+             * @default false
+             */
+            compare_previous: boolean;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            entity: "tasks";
+            /** Field Id */
+            field_id?: string | null;
+            filters?: components["schemas"]["TaskFiltersV2"];
+            /** Group By */
+            group_by?: ("assignee" | "section" | "project" | "status" | "priority" | "tag" | "field") | null;
+            /**
+             * Limit
+             * @default 8
+             */
+            limit: number;
+            /**
+             * Measure
+             * @default count
+             * @enum {string}
+             */
+            measure: "count" | "sum_estimate" | "sum_field" | "avg_field";
+            /** Measure Field Id */
+            measure_field_id?: string | null;
+            /**
+             * Period
+             * @description The window as a calendar period (a dashboard period replaces it)
+             */
+            period?: ("this_week" | "this_month" | "last_30_days" | "this_quarter") | null;
+            /** Split By */
+            split_by?: ("field" | "priority") | null;
+            /** Split Field Id */
+            split_field_id?: string | null;
+            /**
+             * Target
+             * @description KPI: a target (progress ring)
+             */
+            target?: number | null;
+            /** Time Bucket */
+            time_bucket?: ("day" | "week" | "month") | null;
+            /**
+             * Time Field
+             * @default completed
+             * @enum {string}
+             */
+            time_field: "completed" | "created" | "due" | "field";
+            /** Time Field Id */
+            time_field_id?: string | null;
+            /**
+             * Version
+             * @constant
+             */
+            version: 2;
+            /**
+             * Window Days
+             * @default 84
+             */
+            window_days: number;
+        };
         /** TeamCreateIn */
         TeamCreateIn: {
             /** Color */
@@ -10251,6 +11058,36 @@ export interface components {
              */
             updated_at: string;
         };
+        /**
+         * TemplatePreviewOut
+         * @description A template bound to a portfolio: its widgets and what was left out (in words).
+         */
+        TemplatePreviewOut: {
+            /** Description */
+            description: string;
+            filters: components["schemas"]["DashboardFilters"];
+            /** Name */
+            name: string;
+            /** Notes */
+            notes: string[];
+            /** Template */
+            template: string;
+            /** Widgets */
+            widgets: components["schemas"]["TemplateWidgetOut"][];
+        };
+        /** TemplateWidgetOut */
+        TemplateWidgetOut: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "count" | "bar" | "line" | "donut" | "list" | "kpi" | "stacked_bar" | "table" | "funnel" | "stage_time" | "aging" | "timeline" | "note";
+            /** Query Spec */
+            query_spec: components["schemas"]["QuerySpec"] | (components["schemas"]["TasksSpec"] | components["schemas"]["ProjectsSpec"] | components["schemas"]["StageSpec"] | components["schemas"]["SnapshotSpec"] | components["schemas"]["NoteSpec"]);
+            /** Title */
+            title: string;
+            viz: components["schemas"]["VizIn"];
+        };
         /** TestChangeOut */
         TestChangeOut: {
             /** Decision */
@@ -10299,6 +11136,31 @@ export interface components {
             ok?: boolean | null;
             /** Summary */
             summary: string;
+        };
+        /**
+         * TimelineItemOut
+         * @description Phase 7.5: one dated thing on a projects timeline widget.
+         */
+        TimelineItemOut: {
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "milestone" | "target" | "go_live";
+            /**
+             * Project Id
+             * Format: uuid
+             */
+            project_id: string;
+            /** Project Name */
+            project_name: string;
+            /** Title */
+            title: string;
         };
         /** TransferIn */
         TransferIn: {
@@ -10540,8 +11402,9 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "count" | "bar" | "line" | "donut" | "list";
-            query_spec: components["schemas"]["QuerySpec"];
+            kind: "count" | "bar" | "line" | "donut" | "list" | "kpi" | "stacked_bar" | "table" | "funnel" | "stage_time" | "aging" | "timeline" | "note";
+            /** Query Spec */
+            query_spec: components["schemas"]["QuerySpec"] | (components["schemas"]["TasksSpec"] | components["schemas"]["ProjectsSpec"] | components["schemas"]["StageSpec"] | components["schemas"]["SnapshotSpec"] | components["schemas"]["NoteSpec"]);
             /** Title */
             title: string;
             viz?: components["schemas"]["VizIn"];
@@ -10566,8 +11429,9 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "count" | "bar" | "line" | "donut" | "list";
-            query_spec: components["schemas"]["QuerySpec"];
+            kind: "count" | "bar" | "line" | "donut" | "list" | "kpi" | "stacked_bar" | "table" | "funnel" | "stage_time" | "aging" | "timeline" | "note";
+            /** Query Spec */
+            query_spec: components["schemas"]["QuerySpec"] | (components["schemas"]["TasksSpec"] | components["schemas"]["ProjectsSpec"] | components["schemas"]["StageSpec"] | components["schemas"]["SnapshotSpec"] | components["schemas"]["NoteSpec"]);
             /** Title */
             title: string;
             /** Version */
@@ -10580,8 +11444,9 @@ export interface components {
          */
         WidgetPatchIn: {
             /** Kind */
-            kind?: ("count" | "bar" | "line" | "donut" | "list") | null;
-            query_spec?: components["schemas"]["QuerySpec"] | null;
+            kind?: ("count" | "bar" | "line" | "donut" | "list" | "kpi" | "stacked_bar" | "table" | "funnel" | "stage_time" | "aging" | "timeline" | "note") | null;
+            /** Query Spec */
+            query_spec?: components["schemas"]["QuerySpec"] | (components["schemas"]["TasksSpec"] | components["schemas"]["ProjectsSpec"] | components["schemas"]["StageSpec"] | components["schemas"]["SnapshotSpec"] | components["schemas"]["NoteSpec"]) | null;
             /** Title */
             title?: string | null;
             viz?: components["schemas"]["VizIn"] | null;
@@ -10591,17 +11456,20 @@ export interface components {
          * @description A spec to run without saving it (the add-chart preview, the starter dashboard).
          */
         WidgetQueryIn: {
+            /** @description Dashboard filters to apply (Phase 7.5) */
+            filters?: components["schemas"]["DashboardFilters"] | null;
             /**
              * Kind
              * @enum {string}
              */
-            kind: "count" | "bar" | "line" | "donut" | "list";
+            kind: "count" | "bar" | "line" | "donut" | "list" | "kpi" | "stacked_bar" | "table" | "funnel" | "stage_time" | "aging" | "timeline" | "note";
             /**
              * Project Id
              * @description Run inside this project, as a project dashboard would
              */
             project_id?: string | null;
-            query_spec: components["schemas"]["QuerySpec"];
+            /** Query Spec */
+            query_spec: components["schemas"]["QuerySpec"] | (components["schemas"]["TasksSpec"] | components["schemas"]["ProjectsSpec"] | components["schemas"]["StageSpec"] | components["schemas"]["SnapshotSpec"] | components["schemas"]["NoteSpec"]);
         };
         /** WorkloadOut */
         WorkloadOut: {
@@ -12812,7 +13680,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["DrillIn"];
+                "application/json": components["schemas"]["DrillAnyIn"];
             };
         };
         responses: {
@@ -12823,6 +13691,123 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DrillOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    from_template_api_v1_dashboards_from_template_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FromTemplateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationOut_FromTemplateOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_template_api_v1_dashboards_from_template_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FromTemplateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TemplatePreviewOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    pinned_dashboards_api_v1_dashboards_pinned_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListOut_DashboardOut_"];
+                };
+            };
+        };
+    };
+    portfolio_dashboard_api_v1_dashboards_portfolio__portfolio_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                portfolio_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortfolioDashboardOut"];
                 };
             };
             /** @description Validation Error */
@@ -12900,6 +13885,26 @@ export interface operations {
             };
         };
     };
+    list_templates_api_v1_dashboards_templates_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListOut_DashboardTemplateOut_"];
+                };
+            };
+        };
+    };
     remove_widget_api_v1_dashboards_widgets__widget_id__delete: {
         parameters: {
             query?: never;
@@ -12968,7 +13973,10 @@ export interface operations {
     };
     widget_data_api_v1_dashboards_widgets__widget_id__data_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The viewer's own dashboard filters for this view (JSON); the saved ones when absent */
+                filters?: string | null;
+            };
             header?: never;
             path: {
                 widget_id: string;
@@ -13116,6 +14124,167 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MutationOut_DashboardDetailOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_members_api_v1_dashboards__dashboard_id__members_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                dashboard_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListOut_MemberOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_member_api_v1_dashboards__dashboard_id__members__user_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                dashboard_id: string;
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MemberIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationOut_OkOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_member_api_v1_dashboards__dashboard_id__members__user_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                dashboard_id: string;
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationOut_OkOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    pin_api_v1_dashboards__dashboard_id__pin_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                dashboard_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OkOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unpin_api_v1_dashboards__dashboard_id__pin_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                dashboard_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OkOut"];
                 };
             };
             /** @description Validation Error */

@@ -1,5 +1,5 @@
 import { fieldFilterText, parseFieldFilter, type FieldFilter } from '@/features/fields';
-import type { GroupRow, QueryResult, QuerySpec, SeriesPoint, WidgetKind } from './queries';
+import type { AnySpec, GroupRow, QueryResult, QuerySpec, SeriesPoint, V1Kind, WidgetKind } from './queries';
 
 /**
  * Chart colour, by the job it does (design-system.md "Charts"):
@@ -18,6 +18,14 @@ const STATUS_COLOR: Record<string, string> = {
   no_date: 'var(--muted-2)',
   completed: 'var(--ok)',
 };
+// Phase 7.5: a project's status (projects grouped by status)
+const PROJECT_STATUS_COLOR: Record<string, string> = {
+  on_track: 'var(--ok)',
+  at_risk: 'var(--warn)',
+  off_track: 'var(--crit)',
+  on_hold: 'var(--muted)',
+  complete: 'var(--info)',
+};
 const PRIORITY_COLOR: Record<string, string> = {
   urgent: 'var(--crit)',
   high: 'var(--warn)',
@@ -29,6 +37,22 @@ export const OTHER_COLOR = 'var(--muted-2)';
 export const SERIES_COLOR = 'var(--chart-1)';
 const SLOTS = 8;
 
+/** What a chart reads from a spec (v1 or v2 alike). */
+export interface ChartSpec {
+  group_by?: string | null;
+  time_bucket?: QuerySpec['time_bucket'];
+  time_field?: string | null;
+}
+
+export function chartSpec(spec: AnySpec): ChartSpec {
+  const s = spec as ChartSpec;
+  return {
+    group_by: s.group_by ?? null,
+    time_bucket: s.time_bucket ?? null,
+    time_field: s.time_field ?? null,
+  };
+}
+
 /** A stored colour: a palette token (`proj-6`) or a hex value (tags, field options). */
 export function tokenColor(c: string | null | undefined): string | null {
   if (!c) return null;
@@ -36,13 +60,14 @@ export function tokenColor(c: string | null | undefined): string | null {
 }
 
 export function colorOf(
-  spec: Pick<QuerySpec, 'group_by'>,
+  spec: { group_by?: string | null },
   group: GroupRow,
   index: number,
   kind: WidgetKind,
 ): string {
   if (group.key === 'other') return OTHER_COLOR;
-  if (spec.group_by === 'status') return STATUS_COLOR[group.key] ?? OTHER_COLOR;
+  if (spec.group_by === 'status')
+    return STATUS_COLOR[group.key] ?? PROJECT_STATUS_COLOR[group.key] ?? OTHER_COLOR;
   if (spec.group_by === 'priority') return PRIORITY_COLOR[group.key] ?? OTHER_COLOR;
   if (group.key === 'none') return 'var(--hairline)';
   const own = tokenColor(group.color);
@@ -58,8 +83,16 @@ export function formatValue(result: Pick<QueryResult, 'measure'>, value: number)
     const h = value / 60;
     return `${h >= 100 ? Math.round(h).toLocaleString() : Math.round(h * 10) / 10}h`;
   }
-  if (result.measure === 'sum_field' || result.measure === 'avg_field')
+  if (
+    result.measure === 'sum_field' ||
+    result.measure === 'avg_field' ||
+    result.measure === 'sum_project_field' ||
+    result.measure === 'avg_project_field'
+  )
     return value.toLocaleString(undefined, { maximumFractionDigits: 2 });
+  if (result.measure === 'avg_progress' || result.measure === 'progress_avg')
+    return `${Math.round(value * 100)}%`;
+  if (result.measure === 'time_in_stage') return `${(Math.round(value * 10) / 10).toLocaleString()}d`;
   return Math.round(value).toLocaleString();
 }
 
@@ -70,12 +103,18 @@ export function formatAverage(result: Pick<QueryResult, 'measure'>, value: numbe
 }
 
 export function unitOf(
-  result: Pick<QueryResult, 'measure'> & { measure_field_name?: string | null },
+  result: Pick<QueryResult, 'measure'> & { measure_field_name?: string | null; entity?: string },
   value: number,
 ): string {
   if (result.measure === 'sum_estimate') return 'estimated';
   if (result.measure === 'sum_field') return `total ${result.measure_field_name ?? ''}`.trim();
   if (result.measure === 'avg_field') return `average ${result.measure_field_name ?? ''}`.trim();
+  if (result.measure === 'sum_project_field') return `total ${result.measure_field_name ?? ''}`.trim();
+  if (result.measure === 'avg_project_field') return `average ${result.measure_field_name ?? ''}`.trim();
+  if (result.measure === 'avg_progress' || result.measure === 'progress_avg') return 'average progress';
+  if (result.measure === 'time_in_stage') return 'median days in stage';
+  if (result.measure === 'throughput') return value === 1 ? 'project entered' : 'projects entered';
+  if (result.entity === 'projects') return value === 1 ? 'project' : 'projects';
   return value === 1 ? 'task' : 'tasks';
 }
 
@@ -86,7 +125,7 @@ export function share(value: number, total: number): string {
 }
 
 /** "Sep 7" for a bucket start (a YYYY-MM-DD date, read as a local date). */
-export function bucketLabel(iso: string, bucket: QuerySpec['time_bucket']): string {
+export function bucketLabel(iso: string, bucket: QuerySpec['time_bucket'] | undefined): string {
   const [y, m, d] = iso.split('-').map(Number);
   const date = new Date(y!, m! - 1, d!);
   if (bucket === 'month') return date.toLocaleDateString(undefined, { month: 'short', year: '2-digit' });
@@ -105,16 +144,30 @@ export function seriesHeadline(points: SeriesPoint[]): { latest: number; average
 }
 
 /** Count tiles that are about late work read in the critical tone when non-zero. */
-export function isAlarm(spec: Pick<QuerySpec, 'filters'>, value: number | null | undefined): boolean {
-  return !!value && !!spec.filters?.overdue;
+export function isAlarm(spec: AnySpec, value: number | null | undefined): boolean {
+  if (!value || !('filters' in spec) || !spec.filters) return false;
+  return 'overdue' in spec.filters && !!spec.filters.overdue;
 }
 
-export const KIND_LABELS: Record<WidgetKind, string> = {
+export const KIND_LABELS: Record<V1Kind, string> = {
   count: 'Number',
   bar: 'Bar chart',
   donut: 'Donut',
   line: 'Trend line',
   list: 'Task list',
+};
+
+/** Phase 7.5: every kind's name (the v2 editor, the template preview). */
+export const ANY_KIND_LABELS: Record<WidgetKind, string> = {
+  ...KIND_LABELS,
+  kpi: 'KPI',
+  stacked_bar: 'Stacked bar',
+  table: 'Table',
+  funnel: 'Funnel',
+  stage_time: 'Time in stage',
+  aging: 'Aging',
+  timeline: 'Timeline',
+  note: 'Note',
 };
 
 export const GROUP_LABELS: Record<NonNullable<QuerySpec['group_by']>, string> = {
@@ -168,7 +221,7 @@ export type NarrowKey = keyof Narrow;
 
 /** The editor's state: plain choices, turned into a spec that is valid by construction. */
 export interface Draft {
-  kind: WidgetKind;
+  kind: V1Kind;
   title: string;
   titleTouched: boolean;
   status: Status;
@@ -199,9 +252,17 @@ export const DEFAULT_SIZE: Record<WidgetKind, Draft['size']> = {
   donut: 'md',
   line: 'md',
   list: 'lg',
+  kpi: 'sm',
+  stacked_bar: 'md',
+  table: 'lg',
+  funnel: 'md',
+  stage_time: 'md',
+  aging: 'md',
+  timeline: 'md',
+  note: 'md',
 };
 
-export function newDraft(kind: WidgetKind = 'bar'): Draft {
+export function newDraft(kind: V1Kind = 'bar'): Draft {
   return {
     kind,
     title: '',
@@ -253,12 +314,7 @@ export function withoutNarrow(d: Draft, key: NarrowKey, value?: string): Draft {
   return { ...d, narrow };
 }
 
-export function draftOf(item: {
-  kind: WidgetKind;
-  title: string;
-  spec: QuerySpec;
-  size: Draft['size'];
-}): Draft {
+export function draftOf(item: { kind: V1Kind; title: string; spec: QuerySpec; size: Draft['size'] }): Draft {
   const s = item.spec;
   const f: Partial<Filters> = s.filters ?? {};
   return {

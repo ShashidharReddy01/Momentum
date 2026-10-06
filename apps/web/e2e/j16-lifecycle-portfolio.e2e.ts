@@ -51,7 +51,7 @@ test('J16: lifecycle portfolio from the onboarding template', async ({ page }) =
   await page.keyboard.press('Escape');
 
   // the board: drag a Discovery customer to Contracts; the gate shows its checklist
-  await page.getByRole('tab', { name: 'Board' }).click();
+  await page.getByRole('tab', { name: 'Board', exact: true }).click();
   const discovery = page.getByRole('listitem', { name: /^Discovery: \d+ projects?/ }); // journeys share the data
   await expect(discovery).toBeVisible();
   const card = discovery.getByRole('list').getByRole('listitem').first();

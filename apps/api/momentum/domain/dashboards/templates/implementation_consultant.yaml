@@ -1,0 +1,30 @@
+# Phase 7.5 role template (spec §7.5); see sales.yaml for the "$…" bindings.
+name: Implementation consultant
+description: Your tasks across customers - due this week, blocked, and done.
+persona: Consultant
+filters:
+  portfolio_id: $portfolio
+  assignee: [me]
+widgets:
+  - kind: kpi
+    title: Completed this week
+    size: sm
+    spec: {version: 2, entity: tasks, period: this_week, compare_previous: true,
+           filters: {portfolio_id: $portfolio, status: completed, completed_within_days: 7}}
+  - kind: list
+    title: My tasks due this week, across customers
+    size: md
+    spec: {version: 2, entity: tasks, period: this_week, limit: 10,
+           filters: {portfolio_id: $portfolio, due_within_days: 7}}
+  - kind: bar
+    title: My open tasks by customer
+    size: md
+    spec: {version: 2, entity: tasks, group_by: project, filters: {portfolio_id: $portfolio}}
+  - kind: list
+    title: My blocked tasks
+    size: md
+    spec: {version: 2, entity: tasks, limit: 10, filters: {portfolio_id: $portfolio, blocked: true}}
+  - kind: timeline
+    title: Milestones in my projects, next 30 days
+    size: md
+    spec: {version: 2, entity: projects, ahead_days: 30, filters: {portfolio_id: $portfolio}}

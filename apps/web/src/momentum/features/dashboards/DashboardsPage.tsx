@@ -1,4 +1,4 @@
-import { LayoutDashboard, Plus } from 'lucide-react';
+import { LayoutDashboard, LayoutTemplate, Pin, Plus } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { EmptyState, ErrorState } from '@/components/common/States';
@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/Input';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { formatRelative } from '@/lib/dates';
 import { useCreateDashboard, useDashboards } from './queries';
+import { TemplateGallery } from './TemplateGallery';
 
 /** S6.5.1: the workspace's dashboards. Every member sees them; numbers inside are theirs. */
 export function DashboardsPage() {
@@ -16,6 +17,7 @@ export function DashboardsPage() {
   const navigate = useNavigate();
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState('');
+  const [gallery, setGallery] = useState(false);
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
@@ -28,10 +30,21 @@ export function DashboardsPage() {
     <div className="mx-auto max-w-5xl px-4 py-6 md:px-8">
       <header className="mb-6 flex items-center gap-3">
         <h1 className="flex-1 page-title">Dashboards</h1>
+        <Button onClick={() => setGallery(true)}>
+          <Icon icon={LayoutTemplate} size={15} /> From a template
+        </Button>
         <Button variant="primary" onClick={() => setAdding(true)}>
           <Icon icon={Plus} size={15} /> New dashboard
         </Button>
       </header>
+      <TemplateGallery
+        open={gallery}
+        onOpenChange={setGallery}
+        onCreated={(d) => {
+          setGallery(false);
+          navigate(`/dashboards/${d.id}`);
+        }}
+      />
       {adding ? (
         <form onSubmit={submit} className="mb-6 flex gap-2">
           <Input
@@ -81,6 +94,14 @@ export function DashboardsPage() {
                 <span className="flex items-center gap-2 font-medium">
                   <Icon icon={LayoutDashboard} size={15} className="text-muted" />
                   <span className="truncate">{d.name}</span>
+                  {d.pinned ? (
+                    <Icon
+                      icon={Pin}
+                      size={12}
+                      className="ml-auto shrink-0 text-muted"
+                      aria-label="Pinned to your Home"
+                    />
+                  ) : null}
                 </span>
                 {d.description ? (
                   <span className="line-clamp-2 text-sm text-muted">{d.description}</span>

@@ -1,0 +1,73 @@
+# Phase 7.5 role template (spec §7.5). "$…" strings are bound to ids by name when the template
+# is used (see ../templates.py); a widget whose names can't be bound is dropped with a note.
+name: Sales
+description: Your pipeline and accounts, by stage, from pre-sales to go-live.
+persona: Sales AE
+filters:
+  portfolio_id: $portfolio
+  fields:
+    - {field_id: "$pf:Account owner", op: any, value: [me]}
+widgets:
+  - kind: kpi
+    title: My pipeline value
+    size: sm
+    spec:
+      version: 2
+      entity: projects
+      measure: sum_project_field
+      measure_field_id: "$pf:Contract value"
+      filters:
+        portfolio_id: $portfolio
+        fields: [{field_id: $stagefield, op: any, value: ["$stages:Pre-sales..Contracts"]}]
+  - kind: kpi
+    title: Accounts in flight
+    size: sm
+    spec:
+      version: 2
+      entity: projects
+      filters:
+        portfolio_id: $portfolio
+        fields:
+          - {field_id: $stagefield, op: is_not, value: "$stage:Live"}
+          - {field_id: $stagefield, op: is_not, value: "$stage:Lost"}
+  - kind: kpi
+    title: Went live this quarter
+    size: sm
+    spec: {version: 2, entity: stage_events, portfolio_id: $portfolio, analysis: throughput,
+           stages: ["$stage:Live"], period: this_quarter, compare_previous: true}
+  - kind: bar
+    title: Value by stage
+    size: md
+    spec:
+      version: 2
+      entity: projects
+      group_by: stage
+      measure: sum_project_field
+      measure_field_id: "$pf:Contract value"
+      filters: {portfolio_id: $portfolio}
+  - kind: aging
+    title: Deal aging
+    size: md
+    spec: {version: 2, entity: stage_events, portfolio_id: $portfolio, analysis: aging,
+           stages: ["$stages:Pre-sales..Contracts"]}
+  - kind: table
+    title: My accounts
+    size: lg
+    spec:
+      version: 2
+      entity: projects
+      columns: [name, stage, stage_age_days, next_milestone, "field:$pf:Target go-live",
+                "field:$pf:Contract value", status]
+      sort: stage_age_days:desc
+      limit: 20
+      filters: {portfolio_id: $portfolio}
+  - kind: timeline
+    title: Go-lives, next 90 days
+    size: md
+    spec: {version: 2, entity: projects, ahead_days: 90, columns: ["field:$pf:Target go-live"],
+           filters: {portfolio_id: $portfolio}}
+  - kind: list
+    title: My tasks due in 14 days
+    size: md
+    spec: {version: 2, entity: tasks, limit: 10,
+           filters: {portfolio_id: $portfolio, assignees: [me], due_within_days: 14}}

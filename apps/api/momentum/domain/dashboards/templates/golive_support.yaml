@@ -1,0 +1,44 @@
+# Phase 7.5 role template (spec §7.5); see sales.yaml for the "$…" bindings.
+name: Go-live & support
+description: What goes live soon, whether it's ready, and hypercare.
+persona: Go-live and support
+filters:
+  portfolio_id: $portfolio
+widgets:
+  - kind: kpi
+    title: Went live this month
+    size: sm
+    spec: {version: 2, entity: stage_events, portfolio_id: $portfolio, analysis: throughput,
+           stages: ["$stage:Live"], period: this_month, compare_previous: true}
+  - kind: timeline
+    title: Go-lives, next 30 days
+    size: md
+    spec: {version: 2, entity: projects, ahead_days: 30, columns: ["field:$pf:Target go-live"],
+           filters: {portfolio_id: $portfolio}}
+  - kind: table
+    title: Go-live readiness
+    size: lg
+    spec:
+      version: 2
+      entity: projects
+      columns: [name, "field:$pf:Target go-live", progress, blocked, next_milestone]
+      limit: 20
+      filters:
+        portfolio_id: $portfolio
+        fields: [{field_id: $stagefield, op: any, value: ["$stage:Go-live"]}]
+  - kind: bar
+    title: Hypercare issues by customer
+    size: md
+    spec:
+      version: 2
+      entity: tasks
+      group_by: project
+      filters:
+        portfolio_id: $portfolio
+        fields: [{field_id: "$tf:RAID type", op: any, values: ["$topt:RAID type:Issue"]}]
+        project_fields: [{field_id: $stagefield, op: any, value: ["$stage:Hypercare"]}]
+  - kind: aging
+    title: Hypercare aging vs 30 days
+    size: md
+    spec: {version: 2, entity: stage_events, portfolio_id: $portfolio, analysis: aging,
+           stages: ["$stage:Hypercare"]}

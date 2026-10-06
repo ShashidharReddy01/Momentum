@@ -16,6 +16,7 @@ from sqlalchemy import (
     String,
     Text,
     func,
+    text,
 )
 from sqlalchemy.dialects.postgresql import JSONB, TSVECTOR
 from sqlalchemy.orm import Mapped, mapped_column
@@ -75,6 +76,11 @@ class Project(IdMixin, TimestampMixin, SoftDeleteMixin, Base):
             name="status",
         ),
         Index("ix_projects_search", "search_tsv", postgresql_using="gin"),
+        Index(
+            "ix_projects_template",
+            "template_id",
+            postgresql_where=text("template_id is not null"),
+        ),
         Index(
             "ix_projects_name_trgm",
             "name",

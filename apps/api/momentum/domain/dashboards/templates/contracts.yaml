@@ -1,0 +1,53 @@
+# Phase 7.5 role template (spec §7.5); see sales.yaml for the "$…" bindings.
+name: Contracts
+description: The contracts queue, what it waits on, and how fast contracts get signed.
+persona: Contracts manager
+filters:
+  portfolio_id: $portfolio
+widgets:
+  - kind: kpi
+    title: Signed this month
+    size: sm
+    spec: {version: 2, entity: stage_events, portfolio_id: $portfolio, analysis: throughput,
+           stages: ["$stage:Implementation"], period: this_month, compare_previous: true}
+  - kind: kpi
+    title: Value awaiting signature
+    size: sm
+    spec:
+      version: 2
+      entity: projects
+      measure: sum_project_field
+      measure_field_id: "$pf:Contract value"
+      filters:
+        portfolio_id: $portfolio
+        fields: [{field_id: $stagefield, op: any, value: ["$stage:Contracts"]}]
+  - kind: table
+    title: Contracts queue
+    size: lg
+    spec:
+      version: 2
+      entity: projects
+      columns: [name, "field:$pf:Account owner", stage_age_days, "field:$pf:Contract value",
+                waiting_on_customer]
+      sort: stage_age_days:desc
+      limit: 20
+      filters:
+        portfolio_id: $portfolio
+        fields: [{field_id: $stagefield, op: any, value: ["$stage:Contracts"]}]
+  - kind: stacked_bar
+    title: Contract tasks by customer, split by Waiting on
+    size: md
+    spec:
+      version: 2
+      entity: tasks
+      group_by: project
+      split_by: field
+      split_field_id: "$tf:Waiting on"
+      filters:
+        portfolio_id: $portfolio
+        project_fields: [{field_id: $stagefield, op: any, value: ["$stage:Contracts"]}]
+  - kind: stage_time
+    title: Time to signature vs 14 days
+    size: md
+    spec: {version: 2, entity: stage_events, portfolio_id: $portfolio, analysis: time_in_stage,
+           stages: ["$stage:Contracts"]}

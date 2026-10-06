@@ -9,7 +9,7 @@ import {
   ListChecks,
   X,
 } from 'lucide-react';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link } from 'react-router';
 import { CompleteCheck } from '@/components/common/CompleteCheck';
 import { DueText } from '@/components/common/DueText';
@@ -30,6 +30,11 @@ import { cn } from '@/lib/cn';
 import { applyUserChannelEvent, useChannel } from '@/lib/realtime';
 import { useUi } from '@/stores/ui';
 import { homeKey, useCompleteFromHome, useHome, type HomeProject, type HomeTask } from './queries';
+
+// Phase 7.5: pinned dashboards (the dashboards chunk loads only when someone has pinned one)
+const PinnedDashboards = lazy(() =>
+  import('@/features/dashboards').then((m) => ({ default: m.PinnedDashboards })),
+);
 
 function greeting(date: Date): string {
   const h = date.getHours();
@@ -162,6 +167,9 @@ function HomeContent() {
           <RecentProjects projects={home.data.recent_projects} onNew={() => setNewProject(true)} />
         </div>
       )}
+      <Suspense fallback={null}>
+        <PinnedDashboards />
+      </Suspense>
       <NewProjectDialog open={newProject} onOpenChange={setNewProject} />
     </div>
   );

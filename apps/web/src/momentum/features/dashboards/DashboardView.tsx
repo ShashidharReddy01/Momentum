@@ -1,11 +1,12 @@
 import { EyeOff, X } from 'lucide-react';
+import { Link } from 'react-router';
 import { useEffect, type ReactNode } from 'react';
 import { cn } from '@/lib/cn';
 import { Icon } from '@/components/ui/Icon';
 import { IconButton } from '@/components/ui/IconButton';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { formatValue } from './model';
-import { useDrill, type DrillPoint } from './queries';
+import { useDrill, type DashboardFilters, type DrillPoint } from './queries';
 import { TaskLine, WidgetCard, type Mark, type WidgetItem } from './WidgetCard';
 
 export interface DrillState extends DrillPoint {
@@ -31,8 +32,11 @@ export function DashboardView({
   banner,
   paneOpen = false,
   onOrder,
+  filters = null,
 }: {
   items: WidgetItem[];
+  /** the viewer's own filters for this view (null: the saved ones) */
+  filters?: DashboardFilters | null;
   projectId: string | null;
   editable: boolean;
   drill: DrillState | null;
@@ -53,6 +57,8 @@ export function DashboardView({
       projectId,
       key: mark.key ?? null,
       bucketStart: mark.bucketStart ?? null,
+      splitKey: mark.splitKey ?? null,
+      filters,
       title: item.title,
       label: mark.label,
     });
@@ -67,6 +73,7 @@ export function DashboardView({
               item={item}
               projectId={projectId}
               editable={editable}
+              filters={filters}
               onDrill={open}
               onOpenTask={onOpenTask}
               onEdit={onEdit ? () => onEdit(item, i) : undefined}
@@ -77,7 +84,8 @@ export function DashboardView({
         </div>
         <p className="flex items-center gap-1.5 text-xs text-muted">
           <Icon icon={EyeOff} size={12} aria-hidden />
-          Numbers count top-level tasks in projects you can see, so a teammate may see different numbers here.
+          Numbers count top-level tasks in projects you can see (and only projects you can open), so a
+          teammate may see different numbers here.
         </p>
       </div>
       {drill ? (
@@ -108,13 +116,15 @@ function DrillPanel({
 }) {
   const q = useDrill(drill);
   const ids = q.data?.tasks.map((t) => t.id).join(',') ?? '';
+  const projects = q.data?.entity === 'projects';
+  const unit = projects ? ['project', 'projects'] : ['task', 'tasks'];
   useEffect(() => {
     if (ids) onOrder?.(ids.split(','));
   }, [ids, onOrder]);
   const heading = drill.label ?? q.data?.label;
   return (
     <aside
-      aria-label="Tasks behind this number"
+      aria-label={projects ? 'Projects behind this number' : 'Tasks behind this number'}
       className={cn(
         'flex shrink-0 flex-col rounded-xl border border-hair-soft bg-surface max-md:fixed max-md:inset-x-2 max-md:bottom-2 max-md:z-30 max-md:max-h-[70vh] max-md:shadow-pop md:sticky md:top-0 md:max-h-[calc(100vh-var(--topbar-h)-120px)] md:w-[min(360px,36vw)]',
         floating && 'md:absolute md:right-0 md:top-0 md:z-20 md:shadow-pop',
@@ -124,10 +134,14 @@ function DrillPanel({
         <div className="min-w-0 flex-1">
           <p className="truncate text-xs text-muted">{drill.title}</p>
           <h2 className="truncate text-sm font-semibold">
-            {heading && heading !== 'Tasks' ? heading : 'All matching tasks'}
+            {heading && heading !== 'Tasks' && heading !== 'Projects'
+              ? heading
+              : projects
+                ? 'All matching projects'
+                : 'All matching tasks'}
             {q.data ? (
               <span className="ml-2 font-normal text-muted">
-                {formatValue({ measure: 'count' }, q.data.total)} {q.data.total === 1 ? 'task' : 'tasks'}
+                {formatValue({ measure: 'count' }, q.data.total)} {q.data.total === 1 ? unit[0] : unit[1]}
               </span>
             ) : null}
           </h2>
@@ -145,6 +159,27 @@ function DrillPanel({
           <p role="alert" className="py-6 text-center text-sm text-muted">
             We couldn&apos;t load these tasks.
           </p>
+        ) : projects ? (
+          (q.data.projects ?? []).length === 0 ? (
+            <p className="py-6 text-center text-sm text-muted">No projects here.</p>
+          ) : (
+            <ul className="divide-y divide-hair-soft">
+              {(q.data.projects ?? []).map((p) => (
+                <li key={p.id}>
+                  <Link
+                    to={`/projects/${p.id}`}
+                    className="flex items-center gap-2 rounded-md px-1 py-2 text-sm hover:bg-surface-2"
+                  >
+                    <span className="min-w-0 flex-1 truncate">{p.name}</span>
+                    {p.stage ? <span className="shrink-0 text-xs text-muted">{p.stage}</span> : null}
+                    {p.owner_name ? (
+                      <span className="shrink-0 text-xs text-muted">{p.owner_name}</span>
+                    ) : null}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )
         ) : q.data.tasks.length === 0 ? (
           <p className="py-6 text-center text-sm text-muted">No tasks here.</p>
         ) : (

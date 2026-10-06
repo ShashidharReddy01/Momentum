@@ -57,6 +57,13 @@ for (const scheme of ['light', 'dark'] as const) {
       ).toBeVisible();
       found.push(...(await serious(page)).map((v) => `Portfolio ${tab}: ${v}`));
     }
+    // S75-08: a role dashboard (the seed pins Leadership to the admin's Home)
+    const pinned = (await (await page.request.get('/api/v1/dashboards/pinned')).json()).data as {
+      id: string;
+    }[];
+    await page.goto(`/dashboards/${pinned[0]!.id}`);
+    await expect(page.getByRole('region', { name: 'Lifecycle funnel' })).toBeVisible();
+    found.push(...(await serious(page)).map((v) => `Role dashboard: ${v}`));
 
     await page.goto('/');
     await page

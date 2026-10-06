@@ -34,7 +34,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 import momentum.models  # noqa: F401 - every model registered, so foreign keys resolve
 from momentum.core.context import Actor, Ctx
 from momentum.core.settings import Settings
-from momentum.domain.fields.models import FieldDef, ProjectFieldEvent
+from momentum.domain.fields.models import FieldDef, ProjectFieldEvent, ProjectFieldValue
 from momentum.domain.projects.models import Project
 from momentum.domain.rules.models import Rule
 from momentum.domain.tasks.models import Task, TaskProject
@@ -859,6 +859,7 @@ async def seed_onboarding(
     files: bool = True,
     backfill_days: int = 180,
     quiet: tuple[str, ...] = (),
+    dashboards: bool = True,
 ) -> dict[str, int]:
     """The customer lifecycle demo on top of the base seed. Re-running adds nothing."""
     from momentum.domain.forecasts.service import store
@@ -907,7 +908,10 @@ async def seed_onboarding(
     system = Ctx(actor=Actor(id=None, workspace_id=ws.id), settings=settings, via="system")
     for p in made:
         await store(session, system, p)
+    await _persona_touches(w, pfields, made)
     snapshots = await backfill(session, backfill_days) if backfill_days else 0
+    if dashboards and portfolio is not None:
+        await _role_dashboards(w, portfolio)
     # fresh statistics for the tables the seed filled: before autovacuum gets to them the
     # planner guesses, and the portfolio's rows took ~4 s instead of ~30 ms (measured)
     for table in ANALYZE_TABLES:
@@ -917,6 +921,119 @@ async def seed_onboarding(
         "onboarding_portfolio": 1 if portfolio else 0,
         "onboarding_snapshots": snapshots,
     }
+
+
+# Phase 7.5 S75-08 (D75-40): each persona's role dashboard, pinned to their Home
+ROLE_DASHBOARDS = {
+    "sales": "sofia",
+    "discovery": "dev",
+    "contracts": "lena",
+    "implementation_lead": "ravi",
+    "implementation_consultant": "mei",
+    "golive_support": "sam",
+    "leadership": "admin",
+}
+
+
+async def _persona_touches(w: _Seeder, pfields: dict[str, FieldDef], made: list[Project]) -> None:
+    """Make sure each persona's own widgets have something to show: Sofia owns a customer that
+    went live, has work due in the next two weeks on one of her accounts, and one of Mei's tasks
+    waits on another."""
+    from momentum.domain.fields.project_values import set_project_field_value
+    from momentum.domain.tasks.service import add_dependency
+
+    ids = [p.id for p in made]
+    if not ids:
+        return
+    sofia = w.users[w.person("sofia")].id
+    owner_field = pfields["Account owner"]
+    live = option_id(pfields["Stage"], "Live")
+    live_ids = [
+        pid
+        for pid, value in (
+            await w.s.execute(
+                select(ProjectFieldValue.project_id, ProjectFieldValue.value)
+                .join(Project, Project.id == ProjectFieldValue.project_id)
+                .where(
+                    ProjectFieldValue.field_id == pfields["Stage"].id,
+                    ProjectFieldValue.project_id.in_(ids),
+                )
+                .order_by(Project.name)
+            )
+        ).tuples()
+        if value == live
+    ]
+    if live_ids:
+        have = await w.s.get(ProjectFieldValue, (live_ids[0], owner_field.id))
+        people = list(have.value) if have is not None and isinstance(have.value, list) else []
+        if str(sofia) not in people:
+            await set_project_field_value(
+                w.s, w.ctx("ravi"), live_ids[0], owner_field.id, [*people, str(sofia)]
+            )
+    mine = (
+        await w.s.execute(
+            select(ProjectFieldValue.project_id).where(
+                ProjectFieldValue.field_id == pfields["Account owner"].id,
+                ProjectFieldValue.project_id.in_(ids),
+                ProjectFieldValue.value.contains([str(sofia)]),
+            )
+        )
+    ).scalars()
+    open_sofia = list(
+        (
+            await w.s.execute(
+                select(Task)
+                .join(TaskProject, TaskProject.task_id == Task.id)
+                .where(
+                    TaskProject.project_id.in_(list(mine)),
+                    Task.assignee_id == sofia,
+                    Task.completed_at.is_(None),
+                    Task.deleted_at.is_(None),
+                )
+                .order_by(Task.title, Task.id)
+            )
+        ).scalars()
+    )
+    soon = w.today + timedelta(days=14)
+    if open_sofia and not any(t.due_on and w.today <= t.due_on <= soon for t in open_sofia):
+        await w.s.execute(
+            update(Task)
+            .where(Task.id == open_sofia[0].id)
+            .values(due_on=w.today + timedelta(days=6))
+        )
+    mei = w.users[w.person("mei")].id
+    rows = (
+        await w.s.execute(
+            select(Task, TaskProject.project_id)
+            .join(TaskProject, TaskProject.task_id == Task.id)
+            .where(
+                TaskProject.project_id.in_(ids),
+                Task.completed_at.is_(None),
+                Task.deleted_at.is_(None),
+                Task.parent_id.is_(None),
+                Task.type == "task",
+            )
+            .order_by(TaskProject.project_id, Task.title, Task.id)
+        )
+    ).all()
+    by_project: dict[uuid.UUID, list[Task]] = {}
+    for t, pid in rows:
+        by_project.setdefault(pid, []).append(t)
+    for tasks in by_project.values():
+        waits = next((t for t in tasks if t.assignee_id == mei), None)
+        on = next((t for t in tasks if t.assignee_id not in (mei, None)), None)
+        if waits is not None and on is not None:
+            await add_dependency(w.s, w.ctx("ravi"), waits.id, on.id)
+            return
+
+
+async def _role_dashboards(w: _Seeder, portfolio: Any) -> None:
+    from momentum.domain.dashboards.service import create_from_template, pin
+
+    for key, local in ROLE_DASHBOARDS.items():
+        ctx = w.ctx(w.person(local))
+        m, _notes = await create_from_template(w.s, ctx, key, portfolio.id)
+        await pin(w.s, ctx, m.entity.id, True)
 
 
 async def _home_project(w: _Seeder, team: Team) -> Project:

@@ -92,8 +92,11 @@ async function screens(page) {
   const folios = await page.evaluate(async () => (await (await fetch('/api/v1/portfolios')).json()).data);
   const onboarding = folios.find((f) => f.name === 'Customer onboarding')?.id;
   if (onboarding)
-    for (const v of ['table', 'board', 'timeline', 'workload', 'overview'])
+    for (const v of ['table', 'board', 'timeline', 'workload', 'overview', 'dashboard'])
       list.push([`onboarding-${v}`, `/portfolios/${onboarding}/${v}`]);
+  // S75-08: the role dashboards the seed pins to each persona's Home
+  const pinned = await page.evaluate(async () => (await (await fetch('/api/v1/dashboards/pinned')).json()).data);
+  if (pinned?.[0]) list.push(['role-dashboard', `/dashboards/${pinned[0].id}`]);
   return list;
 }
 

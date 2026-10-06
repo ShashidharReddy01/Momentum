@@ -8,7 +8,13 @@ from momentum.core.idempotency import IdempotencyKey
 from momentum.domain.agents.models import Agent, AgentRun
 from momentum.domain.attachments.models import Attachment
 from momentum.domain.comments.models import Comment, Mention, Reaction
-from momentum.domain.dashboards.models import Dashboard, DashboardWidget
+from momentum.domain.dashboards.models import (
+    Dashboard,
+    DashboardMember,
+    DashboardPin,
+    DashboardWidget,
+    UserVisit,
+)
 from momentum.domain.fields.models import (
     FieldDef,
     FieldValue,
@@ -56,6 +62,8 @@ __all__ = [
     "Comment",
     "ConversationFile",
     "Dashboard",
+    "DashboardMember",
+    "DashboardPin",
     "DashboardWidget",
     "Embedding",
     "ExternalLink",
@@ -101,6 +109,7 @@ __all__ = [
     "Template",
     "User",
     "UserIdentity",
+    "UserVisit",
     "Workspace",
     "metadata",
 ]

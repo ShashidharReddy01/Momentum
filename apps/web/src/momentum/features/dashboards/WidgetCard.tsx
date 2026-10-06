@@ -8,7 +8,8 @@ import {
   Table2,
   Trash2,
 } from 'lucide-react';
-import { lazy, Suspense, useState, type ReactNode } from 'react';
+import { lazy, Suspense, useMemo, useState, type ReactNode } from 'react';
+import { useNavigate } from 'react-router';
 import { DueText } from '@/components/common/DueText';
 import { MoMark } from '@/components/common/MoMark';
 import { Avatar } from '@/components/ui/Avatar';
@@ -23,16 +24,20 @@ import {
 import { Icon } from '@/components/ui/Icon';
 import { IconButton } from '@/components/ui/IconButton';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { useProjectFieldDefs } from '@/features/fields';
 import { cn } from '@/lib/cn';
-import { colorOf, formatValue, isAlarm, share, tokenColor, unitOf } from './model';
+import { chartSpec, colorOf, formatValue, isAlarm, share, tokenColor, unitOf } from './model';
 import {
+  isV1,
   useSpecData,
   useWidgetData,
+  type AnySpec,
+  type DashboardFilters,
   type QueryResult,
-  type QuerySpec,
   type TaskRow,
   type WidgetKind,
 } from './queries';
+import { Aging, Funnel, Kpi, Note, ProjectTable, StackedBars, StageTime, Timeline } from './widgets2';
 
 // Recharts lives in its own chunk, fetched the first time a chart widget renders.
 const Chart = lazy(() => import('./charts'));
@@ -42,7 +47,7 @@ export interface WidgetItem {
   id: string | null;
   kind: WidgetKind;
   title: string;
-  spec: QuerySpec;
+  spec: AnySpec;
   size: 'sm' | 'md' | 'lg';
   version: number;
   /** the question Mo drafted this chart from (S6.5.2) */
@@ -53,8 +58,13 @@ export interface WidgetItem {
 export interface Mark {
   key?: string | null;
   bucketStart?: string | null;
+  /** a stacked bar's segment (Phase 7.5) */
+  splitKey?: string | null;
   label?: string;
 }
+
+/** Number tiles: one column, the title above the value. */
+const TILE_KINDS: WidgetKind[] = ['count', 'kpi'];
 
 export const SPAN: Record<WidgetItem['size'], string> = {
   sm: 'col-span-1',
@@ -71,10 +81,13 @@ export function WidgetCard({
   onEdit,
   onRemove,
   onMove,
+  filters = null,
 }: {
   item: WidgetItem;
   projectId: string | null;
   editable: boolean;
+  /** the viewer's own dashboard filters for this view (null: the saved ones) */
+  filters?: DashboardFilters | null;
   onDrill: (item: WidgetItem, mark: Mark) => void;
   onOpenTask: (taskId: string) => void;
   onEdit?: () => void;
@@ -82,8 +95,8 @@ export function WidgetCard({
   onMove?: (dir: -1 | 1) => void;
 }) {
   // a saved widget runs its stored spec; a starter or preview widget runs the spec it carries
-  const saved = useWidgetData(item.id ?? '', item.version, item.id !== null);
-  const unsaved = useSpecData(item.kind, item.spec, projectId, item.id === null);
+  const saved = useWidgetData(item.id ?? '', item.version, item.id !== null, filters);
+  const unsaved = useSpecData(item.kind, item.spec, projectId, item.id === null, filters);
   const q = item.id ? saved : unsaved;
   const [asTable, setAsTable] = useState(false);
   const canTable = item.kind === 'bar' || item.kind === 'donut' || item.kind === 'line';
@@ -124,7 +137,7 @@ export function WidgetCard({
 
   const data = q.data;
   const body: ReactNode = q.isPending ? (
-    <Skeleton className={item.kind === 'count' ? 'h-10 w-24' : 'h-40'} />
+    <Skeleton className={TILE_KINDS.includes(item.kind) ? 'h-10 w-24' : 'h-40'} />
   ) : q.isError ? (
     <div role="alert" className="flex flex-col items-start gap-2 text-sm text-muted">
       <span>We couldn&apos;t load these numbers.</span>
@@ -144,7 +157,7 @@ export function WidgetCard({
     </div>
   ) : null;
 
-  if (item.kind === 'count') {
+  if (TILE_KINDS.includes(item.kind)) {
     return (
       <section
         aria-label={item.title}
@@ -227,17 +240,40 @@ function WidgetBody({
   onDrill: (mark: Mark) => void;
   onOpenTask: (taskId: string) => void;
 }) {
-  if (item.kind === 'count') return <CountValue item={item} data={data} onDrill={onDrill} />;
-  if (item.kind === 'list')
+  const navigate = useNavigate();
+  const openProject = (id: string) => navigate(`/projects/${id}`);
+  const spec = item.spec;
+  const v2 = !isV1(spec);
+  if (item.kind === 'count' && !v2) return <CountValue item={item} data={data} onDrill={onDrill} />;
+  if (item.kind === 'count' || item.kind === 'kpi') return <Kpi data={data} onDrill={onDrill} />;
+  if (item.kind === 'note') return <Note text={data.text ?? ''} />;
+  if (item.kind === 'list' || (item.kind === 'table' && data.entity === 'tasks'))
     return <TaskList data={data} onOpenTask={onOpenTask} onMore={() => onDrill({})} />;
+  if (item.kind === 'table') return <ProjectColumns data={data} onOpenProject={openProject} />;
+  if (item.kind === 'stacked_bar') return <StackedBars item={item} data={data} onDrill={onDrill} />;
+  if (item.kind === 'funnel') return <Funnel data={data} onDrill={onDrill} />;
+  if (item.kind === 'stage_time') return <StageTime data={data} onDrill={onDrill} />;
+  if (item.kind === 'aging') return <Aging data={data} onDrill={onDrill} />;
+  if (item.kind === 'timeline') return <Timeline data={data} onOpenProject={openProject} />;
   if (asTable) return <DataTable item={item} data={data} onDrill={onDrill} />;
   if (item.kind !== 'line' && (data.groups ?? []).length === 0)
     return <Quiet>Nothing matches yet. {data.description}.</Quiet>;
   return (
     <Suspense fallback={<Skeleton className="h-40" />}>
-      <Chart kind={item.kind} spec={item.spec} data={data} onDrill={onDrill} />
+      <Chart kind={item.kind} spec={chartSpec(item.spec)} data={data} onDrill={onDrill} />
     </Suspense>
   );
+}
+
+/** A projects table, with project fields' names for their columns. */
+function ProjectColumns({ data, onOpenProject }: { data: QueryResult; onOpenProject: (id: string) => void }) {
+  const fieldCols = (data.columns ?? []).some((c) => c.startsWith('field:'));
+  const defs = useProjectFieldDefs(fieldCols);
+  const names = useMemo(
+    () => Object.fromEntries((defs.data ?? []).map((f) => [`field:${f.id}`, f.name])),
+    [defs.data],
+  );
+  return <ProjectTable data={data} columnNames={names} onOpenProject={onOpenProject} />;
 }
 
 function Quiet({ children }: { children: ReactNode }) {
@@ -412,7 +448,7 @@ function DataTable({
           label: g.label,
           value: g.value,
           mark: { key: g.key, label: g.label } as Mark,
-          color: colorOf(item.spec, g, i, item.kind),
+          color: colorOf(chartSpec(item.spec), g, i, item.kind),
         }));
   const total = item.kind === 'line' ? rows.reduce((a, r) => a + r.value, 0) : data.total;
   return (

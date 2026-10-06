@@ -1,4 +1,4 @@
-import { MoreHorizontal, Trash2 } from 'lucide-react';
+import { MoreHorizontal, Pin, PinOff, Trash2 } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router';
 import { InlineText } from '@/components/common/InlineText';
 import { ErrorState } from '@/components/common/States';
@@ -8,13 +8,15 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/DropdownMenu';
+import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
 import { IconButton } from '@/components/ui/IconButton';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { TaskNavProvider, TaskPane, useTaskNav } from '@/features/tasks';
 import { useCrumbs } from '@/lib/crumbs';
 import { Board } from './Board';
-import { useDashboard, useDashboardMutations } from './queries';
+import { FilterBar, useViewFilters } from './FilterBar';
+import { activeFilters, useDashboard, useDashboardMutations, usePin, type DashboardDetail } from './queries';
 
 /** S6.5.1: one workspace dashboard, with the task pane for whatever a chart opens. */
 export function DashboardPage() {
@@ -31,6 +33,8 @@ function DashboardBody() {
   const navigate = useNavigate();
   const q = useDashboard(dashboardId);
   const m = useDashboardMutations(dashboardId);
+  const pin = usePin(dashboardId);
+  const [view, setView] = useViewFilters();
   useCrumbs(q.data ? ['Dashboards', q.data.name] : null);
 
   if (q.isPending) {
@@ -56,6 +60,20 @@ function DashboardBody() {
             onOpenTask={(id) => nav.open(id)}
             paneOpen={!!nav.openId}
             onOrder={nav.setOrder}
+            filters={view}
+            filterBar={
+              <FilterBar
+                saved={activeFilters(d.filters)}
+                view={view}
+                onView={setView}
+                canSave={d.can_edit}
+                onSave={(filters) =>
+                  m.rename.mutate({ filters: filters ?? {} } as { filters: DashboardDetail['filters'] }, {
+                    onSuccess: () => setView(null),
+                  })
+                }
+              />
+            }
             title={
               d.can_edit ? (
                 <InlineText
@@ -69,23 +87,26 @@ function DashboardBody() {
               )
             }
             actions={
-              d.can_edit ? (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <IconButton icon={MoreHorizontal} label="Dashboard options" />
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem
-                      className="text-crit"
-                      onSelect={() =>
-                        m.remove.mutate(undefined, { onSuccess: () => navigate('/dashboards') })
-                      }
-                    >
-                      <Icon icon={Trash2} size={14} /> Delete dashboard
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              ) : null
+              <>
+                <PinButton pinned={!!d.pinned} onToggle={() => pin.mutate(!d.pinned)} />
+                {d.can_edit ? (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <IconButton icon={MoreHorizontal} label="Dashboard options" />
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem
+                        className="text-crit"
+                        onSelect={() =>
+                          m.remove.mutate(undefined, { onSuccess: () => navigate('/dashboards') })
+                        }
+                      >
+                        <Icon icon={Trash2} size={14} /> Delete dashboard
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                ) : null}
+              </>
             }
           />
         </div>
@@ -99,5 +120,14 @@ function DashboardBody() {
         />
       ) : null}
     </div>
+  );
+}
+
+/** Pin to my Home (per person). */
+export function PinButton({ pinned, onToggle }: { pinned: boolean; onToggle: () => void }) {
+  return (
+    <Button variant="text" aria-pressed={pinned} onClick={onToggle}>
+      <Icon icon={pinned ? PinOff : Pin} size={14} /> {pinned ? 'Unpin from Home' : 'Pin to Home'}
+    </Button>
   );
 }

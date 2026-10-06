@@ -31,8 +31,9 @@ import {
   seriesHeadline,
   share,
   unitOf,
+  type ChartSpec,
 } from './model';
-import type { GroupRow, QueryResult, QuerySpec, SeriesPoint, WidgetKind } from './queries';
+import type { GroupRow, QueryResult, SeriesPoint, WidgetKind } from './queries';
 import type { Mark } from './WidgetCard';
 
 const AXIS = { fill: 'var(--muted)', fontSize: 12 };
@@ -45,7 +46,7 @@ export default function Chart({
   onDrill,
 }: {
   kind: WidgetKind;
-  spec: QuerySpec;
+  spec: ChartSpec;
   data: QueryResult;
   onDrill: (mark: Mark) => void;
 }) {
@@ -70,7 +71,7 @@ function Tip({ title, lines }: { title: string; lines: string[] }) {
 
 // ---------- bars: horizontal, so every label reads in full ----------
 
-function Bars({ spec, data, onDrill }: { spec: QuerySpec; data: QueryResult; onDrill: (m: Mark) => void }) {
+function Bars({ spec, data, onDrill }: { spec: ChartSpec; data: QueryResult; onDrill: (m: Mark) => void }) {
   const rows = (data.groups ?? []).map((g, i) => ({ ...g, fill: colorOf(spec, g, i, 'bar') }));
   const longest = Math.max(...rows.map((r) => r.label.length), 4);
   const labelWidth = Math.min(180, 16 + longest * 7);
@@ -145,7 +146,7 @@ function Bars({ spec, data, onDrill }: { spec: QuerySpec; data: QueryResult; onD
 
 // ---------- donut: the total in the middle, a legend that is also the table ----------
 
-function Donut({ spec, data, onDrill }: { spec: QuerySpec; data: QueryResult; onDrill: (m: Mark) => void }) {
+function Donut({ spec, data, onDrill }: { spec: ChartSpec; data: QueryResult; onDrill: (m: Mark) => void }) {
   const [hover, setHover] = useState<string | null>(null);
   const rows = (data.groups ?? []).map((g, i) => ({ ...g, fill: colorOf(spec, g, i, 'donut') }));
   const sum = rows.reduce((a, r) => a + r.value, 0);
@@ -216,7 +217,7 @@ function Donut({ spec, data, onDrill }: { spec: QuerySpec; data: QueryResult; on
 
 // ---------- trend: a line with a wash, the latest bucket against the average ----------
 
-function Trend({ spec, data, onDrill }: { spec: QuerySpec; data: QueryResult; onDrill: (m: Mark) => void }) {
+function Trend({ spec, data, onDrill }: { spec: ChartSpec; data: QueryResult; onDrill: (m: Mark) => void }) {
   const points = data.series ?? [];
   const { latest, average } = seriesHeadline(points);
   const bucket = spec.time_bucket ?? 'week';

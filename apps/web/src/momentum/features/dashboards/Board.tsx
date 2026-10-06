@@ -11,6 +11,7 @@ import {
   dashboardKeys,
   useDashboardMutations,
   type DashboardDetail,
+  type DashboardFilters,
   type Widget,
   type WidgetIn,
 } from './queries';
@@ -46,6 +47,8 @@ export function Board({
   banner,
   paneOpen,
   onOrder,
+  filters = null,
+  filterBar,
 }: {
   dashboard: DashboardDetail | null;
   starter?: WidgetItem[];
@@ -58,6 +61,9 @@ export function Board({
   banner?: ReactNode;
   paneOpen?: boolean;
   onOrder?: (ids: string[]) => void;
+  /** Phase 7.5: the viewer's own dashboard filters, and the bar that sets them */
+  filters?: DashboardFilters | null;
+  filterBar?: ReactNode;
 }) {
   const qc = useQueryClient();
   const m = useDashboardMutations(dashboard?.id ?? null);
@@ -133,6 +139,7 @@ export function Board({
           </Button>
         ) : null}
       </header>
+      {filterBar}
       <DashboardView
         items={items}
         projectId={projectId}
@@ -146,6 +153,7 @@ export function Board({
         banner={banner}
         paneOpen={paneOpen}
         onOrder={onOrder}
+        filters={filters}
       />
       <AskChart
         open={asking}

@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 from momentum.core.settings import Settings
+from momentum.domain.dashboards.cache import ResultCache
 
 if TYPE_CHECKING:
     from momentum.ai.llm import LLM
@@ -44,3 +45,5 @@ class MomentumRuntime:
     # S5.1.5: host handler agents by name (code-backed agents, ADR-0009)
     agent_handlers: dict[str, Any] = field(default_factory=dict)
     extras: dict[str, Any] = field(default_factory=dict)
+    # Phase 7.5 (spec §7.6): dashboard widget results, 60 s, keyed by the newest outbox id
+    dashboard_cache: ResultCache = field(default_factory=ResultCache)

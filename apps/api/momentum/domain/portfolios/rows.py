@@ -219,6 +219,165 @@ async def portfolio_rows_v2(
     if not ids:
         return Rows([], hidden, [] if spec.group_by else None, defs)
 
+    rows = await compute_rows(
+        session,
+        ctx,
+        projects,
+        stage_field=stage_field,
+        stage_targets=p.stage_targets or {},
+        columns=p.columns or [],
+        today=today,
+        live_fields=set(by_id),
+    )
+    if (spec.filters or {}).get("overdue_only"):
+        rows = [r for r in rows if r["overdue"]]
+    rows = _sorted(rows, spec.sort, by_id, stage_field)
+    groups = _grouped(rows, spec.group_by, by_id, stage_field) if spec.group_by else None
+    return Rows(rows, hidden, groups, defs)
+
+
+def sort_value(row: dict[str, Any], key: str, stage_field: FieldDef | None) -> Any:
+    if key == "owner":
+        return (row["owner_name"] or "").lower() or None
+    if key == "status":
+        return SEVERITY.index(row["status"]) if row["status"] in SEVERITY else None
+    if key == "stage":
+        order = _option_order(stage_field)
+        st = row["stage"]
+        return order.index(st["option_id"]) if st and st["option_id"] in order else None
+    if key == "next_milestone":
+        m = row["next_milestone"]
+        return m["due_on"] if m else None
+    if key == "latest_update":
+        u = row["latest_update"]
+        return u["at"] if u else None
+    if key == "name":
+        return row["name"].lower()
+    if key.startswith("field:"):
+        v = row["fields"].get(key.removeprefix("field:"))
+        return v if isinstance(v, int | float | str) and not isinstance(v, bool) else None
+    if key == "open":
+        return row["open"]
+    if key == "overdue":
+        return row["overdue"]
+    return row.get(key)
+
+
+def _sorted(
+    rows: list[dict[str, Any]],
+    sort: list[dict[str, Any]],
+    fields: dict[uuid.UUID, FieldDef],
+    stage_field: FieldDef | None,
+) -> list[dict[str, Any]]:
+    for s in reversed(sort or []):
+        key = str(s.get("key", ""))
+        if not column_key_ok(key, fields):
+            raise ValidationFailed(f"Can't sort by {key}", code="invalid_sort")
+        desc = s.get("dir") == "desc"
+        present = [r for r in rows if sort_value(r, key, stage_field) is not None]
+        missing = [r for r in rows if sort_value(r, key, stage_field) is None]
+        present.sort(key=lambda r: sort_value(r, key, stage_field), reverse=desc)
+        rows = present + missing  # empty values last, whichever direction
+    return rows
+
+
+def _rollup(rows: list[dict[str, Any]], fields: dict[uuid.UUID, FieldDef]) -> dict[str, Any]:
+    progress = [r["progress"] for r in rows if r["progress"] is not None]
+    sums: dict[str, float] = {}
+    avgs: dict[str, float] = {}
+    for fid, f in fields.items():
+        if f.type not in NUMERIC:
+            continue
+        nums = [
+            r["fields"][str(fid)]
+            for r in rows
+            if isinstance(r["fields"].get(str(fid)), int | float)
+            and not isinstance(r["fields"].get(str(fid)), bool)
+        ]
+        if nums:
+            sums[str(fid)] = sum(nums)
+            avgs[str(fid)] = round(sum(nums) / len(nums), 4)
+    return {
+        "count": len(rows),
+        "progress_avg": round(sum(progress) / len(progress), 4) if progress else None,
+        "overdue_total": sum(r["overdue"] for r in rows),
+        "sums": sums,
+        "avgs": avgs,
+    }
+
+
+def _grouped(
+    rows: list[dict[str, Any]],
+    group_by: str,
+    fields: dict[uuid.UUID, FieldDef],
+    stage_field: FieldDef | None,
+) -> list[Group]:
+    buckets: dict[str | None, list[dict[str, Any]]] = defaultdict(list)
+    order: list[str | None]
+    labels: dict[str | None, str] = {None: "None"}
+    if group_by == "status":
+        for r in rows:
+            buckets[r["status"]].append(r)
+        order = [*SEVERITY, None]
+        labels.update({s: s.replace("_", " ").capitalize() for s in SEVERITY})
+        labels[None] = "No status"
+    elif group_by == "owner":
+        for r in rows:
+            buckets[str(r["owner_id"]) if r["owner_id"] else None].append(r)
+            if r["owner_id"]:
+                labels[str(r["owner_id"])] = r["owner_name"] or "Unknown"
+        order = [*sorted((k for k in buckets if k), key=lambda k: labels[k].lower()), None]
+        labels[None] = "No owner"
+    elif group_by == "stage" or group_by.startswith("field:"):
+        f = (
+            stage_field
+            if group_by == "stage"
+            else fields.get(_uuid(group_by.removeprefix("field:")) or uuid.UUID(int=0))
+        )
+        if f is None or f.type not in ("single_select", "checkbox", "text"):
+            raise ValidationFailed(f"Can't group by {group_by}", code="invalid_group")
+        fid = str(f.id)
+        for r in rows:
+            v = r["fields"].get(fid)
+            buckets[str(v) if v is not None else None].append(r)
+        if f.type == "single_select":
+            order = [*_option_order(f), None]
+            labels.update({k: _label(f, k) or k for k in order if k})
+        else:
+            order = [*sorted(k for k in buckets if k is not None), None]
+            labels.update({k: k for k in order if k})
+        labels[None] = f"No {f.name}"
+    else:
+        raise ValidationFailed(f"Can't group by {group_by}", code="invalid_group")
+    out = []
+    for k in order:
+        members = buckets.get(k, [])
+        if k is not None or members:  # every stage shows, even empty; "None" only when used
+            out.append(
+                Group(
+                    k, labels.get(k, str(k)), [r["id"] for r in members], _rollup(members, fields)
+                )
+            )
+    return out
+
+
+async def compute_rows(
+    session: AsyncSession,
+    ctx: Ctx,
+    projects: list[Project],
+    *,
+    stage_field: FieldDef | None,
+    stage_targets: dict[str, Any],
+    columns: list[dict[str, Any]],
+    today: date,
+    live_fields: set[uuid.UUID],
+) -> list[dict[str, Any]]:
+    """Every built-in column for these projects (already visible to the viewer), one SQL query
+    per column family. Shared by portfolio rows and dashboard ``projects`` queries (S75-08)."""
+    ids = [x.id for x in projects]
+    if not ids:
+        return []
+    by_id = dict.fromkeys(live_fields)
     counts: dict[uuid.UUID, tuple[int, int, int]] = {}
     for pid, total, done, overdue in (
         await session.execute(
@@ -263,7 +422,7 @@ async def portfolio_rows_v2(
 
     # waiting on customer: the task field "Waiting on" = "Customer", matched by name and label
     # (a portfolio may name another field and choice in its waiting_on_customer column)
-    meta = next((c for c in p.columns or [] if c.get("key") == "waiting_on_customer"), {})
+    meta = next((c for c in columns or [] if c.get("key") == "waiting_on_customer"), {})
     waiting_field = str(meta.get("field_name") or WAITING_FIELD).strip().lower()
     waiting_option = str(meta.get("option_label") or WAITING_OPTION).strip().lower()
     waiting_pairs = [
@@ -396,7 +555,7 @@ async def portfolio_rows_v2(
 
     roles = await project_roles(session, ctx, projects)
     rows: list[dict[str, Any]] = []
-    targets = p.stage_targets or {}
+    targets = stage_targets or {}
     for x in projects:
         total, done, overdue = counts.get(x.id, (0, 0, 0))
         fields = values.get(x.id, {})
@@ -447,133 +606,4 @@ async def portfolio_rows_v2(
             }
         )
 
-    if (spec.filters or {}).get("overdue_only"):
-        rows = [r for r in rows if r["overdue"]]
-    rows = _sorted(rows, spec.sort, by_id, stage_field)
-    groups = _grouped(rows, spec.group_by, by_id, stage_field) if spec.group_by else None
-    return Rows(rows, hidden, groups, defs)
-
-
-def sort_value(row: dict[str, Any], key: str, stage_field: FieldDef | None) -> Any:
-    if key == "owner":
-        return (row["owner_name"] or "").lower() or None
-    if key == "status":
-        return SEVERITY.index(row["status"]) if row["status"] in SEVERITY else None
-    if key == "stage":
-        order = _option_order(stage_field)
-        st = row["stage"]
-        return order.index(st["option_id"]) if st and st["option_id"] in order else None
-    if key == "next_milestone":
-        m = row["next_milestone"]
-        return m["due_on"] if m else None
-    if key == "latest_update":
-        u = row["latest_update"]
-        return u["at"] if u else None
-    if key == "name":
-        return row["name"].lower()
-    if key.startswith("field:"):
-        v = row["fields"].get(key.removeprefix("field:"))
-        return v if isinstance(v, int | float | str) and not isinstance(v, bool) else None
-    if key == "open":
-        return row["open"]
-    if key == "overdue":
-        return row["overdue"]
-    return row.get(key)
-
-
-def _sorted(
-    rows: list[dict[str, Any]],
-    sort: list[dict[str, Any]],
-    fields: dict[uuid.UUID, FieldDef],
-    stage_field: FieldDef | None,
-) -> list[dict[str, Any]]:
-    for s in reversed(sort or []):
-        key = str(s.get("key", ""))
-        if not column_key_ok(key, fields):
-            raise ValidationFailed(f"Can't sort by {key}", code="invalid_sort")
-        desc = s.get("dir") == "desc"
-        present = [r for r in rows if sort_value(r, key, stage_field) is not None]
-        missing = [r for r in rows if sort_value(r, key, stage_field) is None]
-        present.sort(key=lambda r: sort_value(r, key, stage_field), reverse=desc)
-        rows = present + missing  # empty values last, whichever direction
     return rows
-
-
-def _rollup(rows: list[dict[str, Any]], fields: dict[uuid.UUID, FieldDef]) -> dict[str, Any]:
-    progress = [r["progress"] for r in rows if r["progress"] is not None]
-    sums: dict[str, float] = {}
-    avgs: dict[str, float] = {}
-    for fid, f in fields.items():
-        if f.type not in NUMERIC:
-            continue
-        nums = [
-            r["fields"][str(fid)]
-            for r in rows
-            if isinstance(r["fields"].get(str(fid)), int | float)
-            and not isinstance(r["fields"].get(str(fid)), bool)
-        ]
-        if nums:
-            sums[str(fid)] = sum(nums)
-            avgs[str(fid)] = round(sum(nums) / len(nums), 4)
-    return {
-        "count": len(rows),
-        "progress_avg": round(sum(progress) / len(progress), 4) if progress else None,
-        "overdue_total": sum(r["overdue"] for r in rows),
-        "sums": sums,
-        "avgs": avgs,
-    }
-
-
-def _grouped(
-    rows: list[dict[str, Any]],
-    group_by: str,
-    fields: dict[uuid.UUID, FieldDef],
-    stage_field: FieldDef | None,
-) -> list[Group]:
-    buckets: dict[str | None, list[dict[str, Any]]] = defaultdict(list)
-    order: list[str | None]
-    labels: dict[str | None, str] = {None: "None"}
-    if group_by == "status":
-        for r in rows:
-            buckets[r["status"]].append(r)
-        order = [*SEVERITY, None]
-        labels.update({s: s.replace("_", " ").capitalize() for s in SEVERITY})
-        labels[None] = "No status"
-    elif group_by == "owner":
-        for r in rows:
-            buckets[str(r["owner_id"]) if r["owner_id"] else None].append(r)
-            if r["owner_id"]:
-                labels[str(r["owner_id"])] = r["owner_name"] or "Unknown"
-        order = [*sorted((k for k in buckets if k), key=lambda k: labels[k].lower()), None]
-        labels[None] = "No owner"
-    elif group_by == "stage" or group_by.startswith("field:"):
-        f = (
-            stage_field
-            if group_by == "stage"
-            else fields.get(_uuid(group_by.removeprefix("field:")) or uuid.UUID(int=0))
-        )
-        if f is None or f.type not in ("single_select", "checkbox", "text"):
-            raise ValidationFailed(f"Can't group by {group_by}", code="invalid_group")
-        fid = str(f.id)
-        for r in rows:
-            v = r["fields"].get(fid)
-            buckets[str(v) if v is not None else None].append(r)
-        if f.type == "single_select":
-            order = [*_option_order(f), None]
-            labels.update({k: _label(f, k) or k for k in order if k})
-        else:
-            order = [*sorted(k for k in buckets if k is not None), None]
-            labels.update({k: k for k in order if k})
-        labels[None] = f"No {f.name}"
-    else:
-        raise ValidationFailed(f"Can't group by {group_by}", code="invalid_group")
-    out = []
-    for k in order:
-        members = buckets.get(k, [])
-        if k is not None or members:  # every stage shows, even empty; "None" only when used
-            out.append(
-                Group(
-                    k, labels.get(k, str(k)), [r["id"] for r in members], _rollup(members, fields)
-                )
-            )
-    return out
