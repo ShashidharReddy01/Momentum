@@ -104,3 +104,60 @@ async def test_task_permission_matrix(as_user: Clients) -> None:
         got[kind] = row
     for kind in EXPECTED:
         assert got[kind] == EXPECTED[kind], f"{kind}: {got[kind]}"
+
+
+# Phase 7.5 S75-01: a project's own files (spec §3.2) on the same private project. Viewers list
+# and download; editors upload and add versions; the uploader or a project admin deletes.
+FILE_ACTIONS = ["list", "download", "upload", "version", "delete_own_upload", "delete_others"]
+FILE_EXPECTED: dict[str, dict[str, int]] = {
+    #               list download upload version del_own del_others
+    "admin":     dict(zip(FILE_ACTIONS, [200, 200, 201, 201, 200, 200], strict=True)),
+    "editor":    dict(zip(FILE_ACTIONS, [200, 200, 201, 201, 200, 403], strict=True)),
+    "commenter": dict(zip(FILE_ACTIONS, [200, 200, 403, 403, 403, 403], strict=True)),
+    "viewer":    dict(zip(FILE_ACTIONS, [200, 200, 403, 403, 403, 403], strict=True)),
+    "outsider":  dict(zip(FILE_ACTIONS, [404, 404, 404, 404, 404, 404], strict=True)),
+}  # fmt: skip
+
+
+async def test_project_files_permission_matrix(as_user: Clients) -> None:
+    priya = await as_user("priya")
+    users = {
+        u["email"].split("@")[0]: u["id"] for u in (await priya.get(f"{BASE}/users")).json()["data"]
+    }
+    pid = next(
+        p["id"]
+        for p in (await priya.get(f"{BASE}/projects")).json()["data"]
+        if p["name"] == "Mobile App v2"
+    )
+    for local, role in (("mei", "editor"), ("sam", "commenter"), ("kim", "viewer")):
+        await priya.post(
+            f"{BASE}/projects/{pid}/members", json={"user_id": users[local], "role": role}
+        )
+
+    async def upload(c: Any, **form: str) -> Any:
+        return await c.post(
+            f"{BASE}/projects/{pid}/files", files={"file": ("f.txt", b"x", "text/plain")}, data=form
+        )
+
+    got: dict[str, dict[str, int]] = {}
+    for kind, local in {k: WHO[k] for k in FILE_EXPECTED}.items():
+        c = await as_user(local)
+        mine = (await upload(priya)).json()["data"]["id"]
+        theirs = (await upload(priya)).json()["data"]["id"]
+        row: dict[str, int] = {
+            "list": (await c.get(f"{BASE}/projects/{pid}/files")).status_code,
+            "download": (await c.get(f"{BASE}/attachments/{mine}/download")).status_code,
+        }
+        up = await upload(c)
+        row["upload"] = up.status_code
+        row["version"] = (await upload(c, replace_id=mine)).status_code
+        own = up.json()["data"]["id"] if up.status_code == 201 else theirs
+        row["delete_own_upload"] = (
+            (await c.delete(f"{BASE}/attachments/{own}")).status_code
+            if up.status_code == 201
+            else row["upload"]
+        )
+        row["delete_others"] = (await c.delete(f"{BASE}/attachments/{theirs}")).status_code
+        got[kind] = row
+    for kind in FILE_EXPECTED:
+        assert got[kind] == FILE_EXPECTED[kind], f"{kind}: {got[kind]}"

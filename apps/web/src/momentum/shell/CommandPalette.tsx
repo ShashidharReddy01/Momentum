@@ -9,6 +9,7 @@ import {
   ListChecks,
   LogOut,
   MessageSquare,
+  Paperclip,
   Moon,
   PanelLeft,
   Search,
@@ -142,7 +143,12 @@ export function CommandPalette() {
 
   const data = results.data;
   const hasSearchResults =
-    !!data && (data.tasks.length || data.projects.length || data.people.length || data.comments.length);
+    !!data &&
+    (data.tasks.length ||
+      data.projects.length ||
+      data.people.length ||
+      data.comments.length ||
+      (data.files ?? []).length);
 
   return (
     <Dialog
@@ -297,6 +303,30 @@ export function CommandPalette() {
                   <span className="min-w-0 flex-1">
                     <span className="block truncate">{c.snippet}</span>
                     <span className="block truncate text-xs text-muted-2">{c.task_title}</span>
+                  </span>
+                </Command.Item>
+              ))}
+            </Command.Group>
+          ) : null}
+
+          {data?.files?.length ? (
+            <Command.Group
+              heading="Files"
+              className="[&_[cmdk-group-heading]]:section-label [&_[cmdk-group-heading]]:px-2.5 [&_[cmdk-group-heading]]:py-1.5"
+            >
+              {data.files.map((f) => (
+                <Command.Item
+                  key={f.id}
+                  value={`file-${f.id}`}
+                  onSelect={go(f.task_id ? `/task/${f.task_id}` : `/projects/${f.project_id}/files`)}
+                  className="flex h-9 cursor-pointer items-center gap-2.5 rounded-md px-2.5 text-sm data-[selected=true]:bg-surface-2"
+                >
+                  <Icon icon={Paperclip} className="text-muted" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate">{f.filename}</span>
+                    <span className="block truncate text-xs text-muted-2">
+                      {f.task_title ?? f.project_name}
+                    </span>
                   </span>
                 </Command.Item>
               ))}

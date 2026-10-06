@@ -75,7 +75,8 @@ Event payloads share an envelope:
 | `field.created` / `field.attached` / `field.updated` / `field.moved` / `field.detached` / `field.archived` / `field.restored` | 2 | `project_id` (attached, moved, detached; `position` on moved); channel `project:<id>` of every project using the field (S2.3.1; `restored` is an undone archive, E7.0 H55). Field reorder, show / hide and remove record activity since E7.0 |
 | `task.tagged` / `task.untagged` | 2 | `tag_id`; the task's channels (S2.3.3) |
 | `tag.created` / `tag.updated` / `tag.deleted` / `tag.restored` | 2 | none; channel `workspace:<id>` (S2.3.3; `restored` is an undone delete, E7.0 H53) |
-| `attachment.added` / `attachment.deleted` | 2 | |
+| `attachment.created` / `attachment.deleted` / `attachment.restored` | 2 | `task_id` for task and comment files, `project_id` for project files (Phase 7.5), `portfolio_id` for portfolio reports; `version_group`, `version` (Phase 7.5). Channel `task:<id>`, `project:<id>` or `portfolio:<id>` (the catalog called it `attachment.added` until Phase 7.5; the code has always emitted `attachment.created`) |
+| `attachment.version_added` | 7.5 | Same data as `attachment.created`, for a new version of an existing file (S75-01) |
 | `status_update.created` | 3 | `project_id`, `status`, `version` (S3.4.3; channel `project:<id>`) |
 | `status_update.withdrawn` | 3 | `project_id`, `status` (the restored one), `version`: an undone update (S3.4.3) |
 | `ai_action.proposed` / `ai_action.applied` / `ai_action.rejected` / `ai_action.undone` | 3 | ai_action_id, summary |

@@ -11,6 +11,7 @@ from decimal import Decimal
 from typing import Any
 
 from sqlalchemy import (
+    BigInteger,
     CheckConstraint,
     DateTime,
     ForeignKey,
@@ -266,3 +267,25 @@ class Feedback(IdMixin, Base):
         CheckConstraint("rating in (-1, 1)", name="rating"),
         UniqueConstraint("user_id", "target_type", "target_id"),
     )
+
+
+class ConversationFile(IdMixin, Base):
+    """Phase 7.5 (spec §4.8): a file attached to an Ask Mo chat where the person can't (or didn't)
+    put it on a task or project. Visible only to the conversation's owner; deleted with the
+    conversation. Read by Mo only when a message is sent (D1)."""
+
+    __tablename__ = "ai_conversation_files"
+
+    workspace_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("workspaces.id"))
+    conversation_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("ai_conversations.id", ondelete="CASCADE")
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"))
+    storage_key: Mapped[str] = mapped_column(String(300))
+    filename: Mapped[str] = mapped_column(String(300))
+    mime: Mapped[str] = mapped_column(String(150))
+    size_bytes: Mapped[int] = mapped_column(BigInteger)
+    sha256: Mapped[str] = mapped_column(String(64))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (Index("ix_ai_conversation_files_conversation", "conversation_id"),)

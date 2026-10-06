@@ -181,3 +181,11 @@ def test_extract_text_from_docx_bytes() -> None:
     doc.save(buf)
     mime = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
     assert extract_text_from_bytes(buf.getvalue(), mime) == "Hello from a docx."
+
+
+def test_the_extraction_job_name_matches_the_job_app(settings) -> None:  # type: ignore[no-untyped-def]
+    """H64: the upload routes defer `extract_text` by name; the name must exist in the job app."""
+    from momentum.jobs.app import build_job_app
+
+    tasks = build_job_app(settings).tasks
+    assert "momentum:extract_text" in tasks or "momentum.extract_text" in tasks

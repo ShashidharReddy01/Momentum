@@ -61,7 +61,7 @@ class Project(IdMixin, TimestampMixin, SoftDeleteMixin, Base):
     __table_args__ = (
         CheckConstraint("privacy in ('team','private')", name="privacy"),
         CheckConstraint(
-            "default_view in ('list','board','calendar','timeline','overview','dashboard')",
+            "default_view in ('list','board','calendar','timeline','overview','files','dashboard')",
             name="default_view",
         ),
         CheckConstraint(

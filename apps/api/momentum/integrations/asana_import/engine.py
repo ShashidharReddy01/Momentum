@@ -833,6 +833,7 @@ class _Run:
                     sha256=hashlib.sha256(data).hexdigest(),
                     extract_status="pending",
                     uploaded_by=self.ctx.actor.id,
+                    source="import",
                 )
                 when = _datetime(a.get("created_at"))
                 if when:

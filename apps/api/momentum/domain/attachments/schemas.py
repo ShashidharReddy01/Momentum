@@ -14,6 +14,8 @@ class AttachmentOut(BaseModel):
     id: uuid.UUID
     task_id: uuid.UUID | None
     comment_id: uuid.UUID | None
+    project_id: uuid.UUID | None = None
+    portfolio_id: uuid.UUID | None = None
     filename: str
     mime: str
     size_bytes: int
@@ -21,3 +23,7 @@ class AttachmentOut(BaseModel):
     extract_status: ExtractStatus
     uploaded_by: uuid.UUID
     created_at: datetime
+    source: str = "upload"
+    version_group: uuid.UUID | None = None
+    version: int = 1
+    is_current: bool = True

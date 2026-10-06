@@ -139,4 +139,4 @@ async def test_blank_query_returns_nothing(as_user: Clients) -> None:
     ravi = await as_user("ravi")
     r = await ravi.get("/api/v1/search", params={"q": "   "})
     body = r.json()
-    assert body == {"tasks": [], "projects": [], "people": [], "comments": []}
+    assert body == {"tasks": [], "projects": [], "people": [], "comments": [], "files": []}

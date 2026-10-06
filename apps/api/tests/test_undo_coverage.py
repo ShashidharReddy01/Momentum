@@ -140,6 +140,18 @@ async def test_undo_restores_every_phase_1_mutation(as_user: Clients) -> None:
         "content": [{"type": "paragraph", "content": [{"type": "text", "text": "Text"}]}],
     }
     comment = (await ravi.post(f"{task_url}/comments", json={"body": doc})).json()["data"]
+    project_file = (
+        await ravi.post(
+            f"{BASE}/projects/{pid}/files", files={"file": ("plan.txt", b"v1", "text/plain")}
+        )
+    ).json()["data"]
+
+    async def files_snap() -> Any:
+        return [
+            await get(f"{BASE}/projects/{pid}/files"),
+            await get(f"{BASE}/attachments/{project_file['id']}/versions"),
+        ]
+
     cases: list[
         tuple[str, Callable[[], Awaitable[Any]], Callable[[], Awaitable[httpx.Response]]]
     ] = [
@@ -344,6 +356,28 @@ async def test_undo_restores_every_phase_1_mutation(as_user: Clients) -> None:
             ),
         ),
         ("comment delete", task_snap, lambda: ravi.delete(f"{BASE}/comments/{comment['id']}")),
+        # Phase 7.5 S75-01: project files and versions
+        (
+            "project file upload",
+            files_snap,
+            lambda: ravi.post(
+                f"{BASE}/projects/{pid}/files", files={"file": ("a.txt", b"a", "text/plain")}
+            ),
+        ),
+        (
+            "project file new version",
+            files_snap,
+            lambda: ravi.post(
+                f"{BASE}/projects/{pid}/files",
+                files={"file": ("plan.txt", b"v2", "text/plain")},
+                data={"replace_id": project_file["id"]},
+            ),
+        ),
+        (
+            "project file delete",
+            files_snap,
+            lambda: ravi.delete(f"{BASE}/attachments/{project_file['id']}"),
+        ),
     ]
     for label, snap, action in cases:
         await _roundtrip(ravi, snap, action, label)

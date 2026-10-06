@@ -10,7 +10,7 @@ from momentum.domain.teams.schemas import COLOR_PATTERN
 from momentum.domain.users.schemas import UserOut
 
 Privacy = Literal["team", "private"]
-View = Literal["list", "board", "calendar", "timeline", "overview", "dashboard"]
+View = Literal["list", "board", "calendar", "timeline", "overview", "files", "dashboard"]
 
 
 class ProjectCreateIn(BaseModel):

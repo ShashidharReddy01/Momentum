@@ -1,6 +1,6 @@
 """Import every ORM model so ``metadata`` is complete (used by Alembic and tests)."""
 
-from momentum.ai.models import AiAction, AiMemory, AiSummary, Embedding, LlmCall
+from momentum.ai.models import AiAction, AiMemory, AiSummary, ConversationFile, Embedding, LlmCall
 from momentum.core.activity import Activity
 from momentum.core.db import Base
 from momentum.core.events import OutboxEvent
@@ -28,6 +28,7 @@ from momentum.domain.templates.models import Template
 from momentum.domain.users.models import ApiToken, User, UserIdentity
 from momentum.domain.workload.models import Capacity
 from momentum.domain.workspace.models import Workspace
+from momentum.files.models import FileParse
 
 metadata = Base.metadata
 
@@ -42,6 +43,7 @@ __all__ = [
     "Attachment",
     "Capacity",
     "Comment",
+    "ConversationFile",
     "Dashboard",
     "DashboardWidget",
     "Embedding",
@@ -49,6 +51,7 @@ __all__ = [
     "Favorite",
     "FieldDef",
     "FieldValue",
+    "FileParse",
     "Follower",
     "Forecast",
     "Form",

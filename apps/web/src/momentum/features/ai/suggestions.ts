@@ -8,6 +8,12 @@ export function suggestionsFor(screen: Screen, context: MoContext | null): strin
   switch (kind) {
     case 'task':
       return ['Summarize this task', "What's left to do here?", 'What is this task waiting on?'];
+    case 'file':
+      return [
+        'Summarize this file',
+        'What are the key dates and numbers?',
+        'Does it have anything I should act on?',
+      ];
     case 'selection':
       return ['Summarize these tasks', 'Which of these are at risk?', 'Who is working on these?'];
     case 'project':
@@ -27,6 +33,9 @@ export function suggestionsFor(screen: Screen, context: MoContext | null): strin
 export function contextScreen(c: MoContext): Screen {
   if (c.kind === 'task') return { kind: 'task', task_id: c.taskId };
   if (c.kind === 'project') return { kind: 'project', project_id: c.projectId };
+  // the file itself travels with the message from S75-03 on (file context); the chip shows it now
+  if (c.kind === 'file')
+    return c.projectId ? { kind: 'project', project_id: c.projectId } : { kind: 'other' };
   return {
     kind: 'project',
     ...(c.projectId ? { project_id: c.projectId } : {}),

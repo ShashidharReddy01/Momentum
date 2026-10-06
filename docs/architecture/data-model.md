@@ -71,6 +71,7 @@ id, workspace_id, name (≤120), description, color (token `proj-1`…`proj-12`)
 team_id, user_id, role check in (`lead`,`member`), pk (team_id, user_id).
 
 ### `projects`
+- **Phase 7.5 (migration 0042):** `default_view` may also be `files` (the Files tab).
 | Column | Type | Notes |
 |---|---|---|
 | id | uuid pk | |
@@ -176,6 +177,10 @@ id, workspace_id, source_type (`comment`,`task_description`), source_id, target_
 
 ### `attachments`
 id, workspace_id, task_id null, comment_id null, storage_key, filename, mime, size_bytes, sha256, text_extract text null, extract_status (`pending`,`done`,`skipped`,`failed`), uploaded_by, created_at, deleted_at.
+- **Phase 7.5 (S75-01, migration 0042):** new owners `project_id` null (FK projects: a file uploaded straight to a project, D3) and `portfolio_id` null (FK portfolios: a generated portfolio report); the check is now **exactly one** of task, comment, project, portfolio (`ck_attachments_one_owner`; a legacy row with both a task and a comment keeps the comment). `source` (`upload`,`generated`,`agent`,`import`; backfilled `agent` where an agent uploaded). Versions: `version_group` uuid (the first version's id; every version of one file shares it), `version` int (1, 2, 3…), `is_current` bool (exactly the newest live version of a group, recomputed after every add, delete and restore, so deleting the current version promotes the previous one and undo in any order stays consistent). `generated_spec` jsonb null (the report spec, for `source='generated'`). Indexes: `(project_id)` and `(portfolio_id)` where `deleted_at is null`, `(version_group, version)`. Lists, search, Mo's task-file tools and the inventory show current versions only; older ones stay downloadable from the versions list.
+
+### `file_parses` (Phase 7.5, S75-01 table, used from S75-02)
+id, workspace_id, attachment_id null (FK attachments, on delete cascade) **or** conversation_file_id null (FK ai_conversation_files, on delete cascade) (exactly one), parser_version int, status (`ok`,`failed`,`unsupported`,`encrypted`), model jsonb (the DocumentModel without sheet rows), rows_key null (storage key of the gzipped JSON rows per sheet), error null, parsed_at. Unique (attachment_id, parser_version) and (conversation_file_id, parser_version). A cache, like `text_extract`: written the first time Mo needs the file, reused until the parser version changes, **no activity row** (it changes no one's data).
 
 ### `status_updates`
 id, workspace_id, entity_type (`project`,`portfolio`,`goal`), entity_id, status (as project.status), title, body jsonb, body_text, author_id, generated_by_ai bool, ai_action_id null, created_at.
@@ -241,6 +246,9 @@ key text, user_id, method, path, response_status, response_body jsonb, created_a
 - conversations: id, workspace_id, user_id, context_type (`global`,`task`,`project`), context_id null, title, created_at, updated_at.
 - messages: id, conversation_id, role (`user`,`assistant`,`tool`), content jsonb (text parts, tool calls, citations), tokens_in, tokens_out, llm_call_id, created_at.
 - **As built (S3.3.1, migration 0019):** both carry `workspace_id`. Conversations: `context_type` in (`global`,`task`,`project`) set from the screen the chat started on (only if the user can see it), `title` = the first question (80 chars), index (user_id, updated_at). Messages: `role` in (`user`,`assistant`) only (tool traffic is not stored: it is re-derivable and could hold content the user later loses access to); `content` = `{text}` for the user, `{text, steps[{name, ok, summary, preview}], citations[{ref, type, valid, id, key, title}], action_id, candidates, grounded, retrieved}` for Mo; `tokens_in/out` = the turn's totals over all its model calls (so `llm_call_id` stays null: a turn makes several `llm_calls` rows, written in their own transaction); `ON DELETE CASCADE` from the conversation; index (conversation_id, created_at). Private to the owner. They record **no `activity`/outbox rows** (personal records like AI prefs, the same choice as `ai_actions`); changes Mo proposes are audited when applied.
+
+### `ai_conversation_files` (Phase 7.5, S75-01 table, used from S75-03)
+id, workspace_id, conversation_id (FK ai_conversations, on delete cascade), user_id, storage_key, filename, mime, size_bytes, sha256, created_at. A file attached to an Ask Mo chat where the person can't (or chose not to) put it on a task or project. Private to the conversation's owner and deleted with it; parsed only when a message is sent (D1). Like conversations, no activity rows.
 
 ### `ai_actions`
 | Column | Type | Notes |

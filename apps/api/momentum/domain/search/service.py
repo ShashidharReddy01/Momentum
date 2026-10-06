@@ -19,12 +19,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from momentum.core.context import Ctx
 from momentum.domain.access import visible_projects_clause
+from momentum.domain.attachments.inventory import kind_expr
+from momentum.domain.attachments.models import Attachment
 from momentum.domain.comments.models import Comment
 from momentum.domain.fields.filters import FieldFilter, field_conditions
 from momentum.domain.projects.models import Project
 from momentum.domain.search.schemas import (
     ALL_TYPES,
     CommentHit,
+    FileHit,
     PersonHit,
     ProjectHit,
     SearchResultsOut,
@@ -160,6 +163,70 @@ async def _search_comments(
     ]
 
 
+async def _search_files(
+    session: AsyncSession, ctx: Ctx, q: str, *, project_id: str | None, limit: int
+) -> list[FileHit]:
+    """Current files whose name or extracted text matches, on visible projects or on tasks (and
+    their comments) placed in visible projects. Filtered in SQL like the other groups."""
+    escaped = q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    like = f"%{escaped}%"
+    owning_task = func.coalesce(Attachment.task_id, Comment.task_id)
+    visible = or_(
+        Attachment.project_id.in_(_visible_project_ids(ctx)),
+        owning_task.in_(
+            select(TaskProject.task_id).where(TaskProject.project_id.in_(_visible_project_ids(ctx)))
+        ),
+    )
+    query = (
+        select(Attachment, kind_expr(), Task.id, Task.title, Project.id, Project.name)
+        .outerjoin(Comment, Comment.id == Attachment.comment_id)
+        .outerjoin(Task, Task.id == owning_task)
+        .outerjoin(
+            TaskProject,
+            (TaskProject.task_id == Task.id)
+            & TaskProject.project_id.in_(_visible_project_ids(ctx)),
+        )
+        .outerjoin(
+            Project, Project.id == func.coalesce(Attachment.project_id, TaskProject.project_id)
+        )
+        .where(
+            Attachment.workspace_id == ctx.workspace_id,
+            Attachment.deleted_at.is_(None),
+            Attachment.is_current.is_(True),
+            Attachment.portfolio_id.is_(None),
+            or_(Comment.id.is_(None), Comment.deleted_at.is_(None)),
+            or_(Task.id.is_(None), Task.deleted_at.is_(None)),
+            visible,
+            or_(Attachment.filename.ilike(like), Attachment.text_extract.ilike(like)),
+        )
+    )
+    if project_id:
+        query = query.where(Project.id == project_id)
+    rows = (
+        await session.execute(
+            query.order_by(Attachment.created_at.desc(), Attachment.id).limit(limit * 3)
+        )
+    ).all()
+    hits: list[FileHit] = []
+    seen: set[str] = set()
+    for att, kind, task_id, task_title, pid, pname in rows:
+        if str(att.id) in seen:
+            continue  # a multi-homed task's file: listed once
+        seen.add(str(att.id))
+        hits.append(
+            FileHit(
+                id=att.id,
+                filename=att.filename,
+                kind=kind,
+                project_id=pid,
+                project_name=pname,
+                task_id=task_id,
+                task_title=task_title,
+            )
+        )
+    return hits[:limit]
+
+
 async def search(
     session: AsyncSession,
     ctx: Ctx,
@@ -208,4 +275,11 @@ async def search(
         if "comment" in types
         else []
     )
-    return SearchResultsOut(tasks=tasks, projects=projects, people=people, comments=comments)
+    files = (
+        await _search_files(session, ctx, clean, project_id=project_id, limit=limit)
+        if "file" in types
+        else []
+    )
+    return SearchResultsOut(
+        tasks=tasks, projects=projects, people=people, comments=comments, files=files
+    )

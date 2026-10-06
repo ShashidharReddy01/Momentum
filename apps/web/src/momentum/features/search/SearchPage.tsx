@@ -1,4 +1,5 @@
 import {
+  Paperclip,
   FolderKanban,
   ListChecks,
   ListFilter,
@@ -91,7 +92,12 @@ function SearchPageBody() {
 
   const data = results.data;
   const noResults =
-    !!data && !data.tasks.length && !data.projects.length && !data.people.length && !data.comments.length;
+    !!data &&
+    !data.tasks.length &&
+    !data.projects.length &&
+    !data.people.length &&
+    !data.comments.length &&
+    !(data.files ?? []).length;
 
   return (
     <div className="flex h-full min-h-0">
@@ -104,7 +110,7 @@ function SearchPageBody() {
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Search tasks, projects, people, comments…"
+            placeholder="Search tasks, projects, people, comments, files…"
             className="h-10 w-full max-w-lg rounded-md border border-hair bg-surface px-3 text-sm"
           />
         </form>
@@ -271,6 +277,42 @@ function SearchPageBody() {
                         </span>
                         <span className="truncate">{c.snippet}</span>
                       </button>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ) : null}
+
+            {data && (data.files ?? []).length ? (
+              <section>
+                <h2 className="section-label mb-1.5">Files</h2>
+                <ul className="flex flex-col gap-0.5">
+                  {(data.files ?? []).map((f) => (
+                    <li key={f.id}>
+                      {f.task_id ? (
+                        <button
+                          type="button"
+                          onClick={() => nav.open(f.task_id!)}
+                          className="flex h-auto w-full flex-col items-start gap-0.5 rounded-md px-2 py-1.5 text-left text-sm hover:bg-surface-2"
+                        >
+                          <span className="flex items-center gap-2">
+                            <Icon icon={Paperclip} size={13} className="text-muted" /> {f.filename}
+                          </span>
+                          <span className="truncate text-xs text-muted-2">
+                            {f.task_title} · {f.project_name}
+                          </span>
+                        </button>
+                      ) : (
+                        <Link
+                          to={`/projects/${f.project_id}/files`}
+                          className="flex h-auto w-full flex-col items-start gap-0.5 rounded-md px-2 py-1.5 text-left text-sm hover:bg-surface-2"
+                        >
+                          <span className="flex items-center gap-2">
+                            <Icon icon={Paperclip} size={13} className="text-muted" /> {f.filename}
+                          </span>
+                          <span className="truncate text-xs text-muted-2">{f.project_name} · Files</span>
+                        </Link>
+                      )}
                     </li>
                   ))}
                 </ul>

@@ -74,6 +74,7 @@ const RulesDialog = lazy(async () => ({ default: (await import('@/features/rules
 const FormsDialog = lazy(async () => ({ default: (await import('@/features/forms')).FormsDialog }));
 const TimelineView = lazy(() => import('@/features/timeline').then((m) => ({ default: m.TimelineView })));
 // Lazy too: dashboards and their charts (Recharts) load only when the tab opens.
+const FilesView = lazy(() => import('@/features/files').then((m) => ({ default: m.FilesView })));
 const ProjectDashboard = lazy(() =>
   import('@/features/dashboards').then((m) => ({ default: m.ProjectDashboard })),
 );
@@ -84,6 +85,7 @@ const VIEWS = [
   { key: 'calendar', label: 'Calendar' },
   { key: 'timeline', label: 'Timeline' },
   { key: 'overview', label: 'Overview' },
+  { key: 'files', label: 'Files' },
   { key: 'dashboard', label: 'Dashboard' },
 ] as const;
 type LiveView = Exclude<(typeof VIEWS)[number], { phase: number }>['key'];
@@ -405,6 +407,15 @@ function ProjectBody({
         ) : view === 'dashboard' ? (
           <Suspense fallback={<Skeleton className="h-64" />}>
             <ProjectDashboard key={projectId} projectId={projectId} projectName={project.name} />
+          </Suspense>
+        ) : view === 'files' ? (
+          <Suspense fallback={<Skeleton className="h-64" />}>
+            <FilesView
+              key={projectId}
+              projectId={projectId}
+              canEdit={canEdit}
+              isAdmin={project.my_role === 'admin'}
+            />
           </Suspense>
         ) : view === 'overview' ? (
           <Suspense fallback={<Skeleton className="h-64" />}>

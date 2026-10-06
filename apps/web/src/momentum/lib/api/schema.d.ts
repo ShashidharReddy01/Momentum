@@ -827,6 +827,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/attachments/{attachment_id}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Every version of a file, newest first */
+        get: operations["list_versions_api_v1_attachments__attachment_id__versions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/logout": {
         parameters: {
             query?: never;
@@ -2065,6 +2082,24 @@ export interface paths {
         patch: operations["set_field_visibility_api_v1_projects__project_id__fields__field_id__visibility_patch"];
         trace?: never;
     };
+    "/api/v1/projects/{project_id}/files": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Every file in a project the caller can see (project, tasks, comments) */
+        get: operations["list_project_files_api_v1_projects__project_id__files_get"];
+        put?: never;
+        /** Upload a file to a project (or a new version of one of its files) */
+        post: operations["upload_project_file_api_v1_projects__project_id__files_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/{project_id}/forecast": {
         parameters: {
             query?: never;
@@ -2632,7 +2667,10 @@ export interface paths {
         /** A task's files */
         get: operations["list_task_attachments_api_v1_tasks__task_id__attachments_get"];
         put?: never;
-        /** Attach a file to a task */
+        /**
+         * Attach a file to a task
+         * @description With ``replace_id``, the upload becomes the next version of that file (Phase 7.5).
+         */
         post: operations["upload_task_attachment_api_v1_tasks__task_id__attachments_post"];
         delete?: never;
         options?: never;
@@ -4264,12 +4302,26 @@ export interface components {
              * Format: uuid
              */
             id: string;
+            /**
+             * Is Current
+             * @default true
+             */
+            is_current: boolean;
             /** Mime */
             mime: string;
+            /** Portfolio Id */
+            portfolio_id?: string | null;
+            /** Project Id */
+            project_id?: string | null;
             /** Sha256 */
             sha256: string;
             /** Size Bytes */
             size_bytes: number;
+            /**
+             * Source
+             * @default upload
+             */
+            source: string;
             /** Task Id */
             task_id: string | null;
             /**
@@ -4277,6 +4329,13 @@ export interface components {
              * Format: uuid
              */
             uploaded_by: string;
+            /**
+             * Version
+             * @default 1
+             */
+            version: number;
+            /** Version Group */
+            version_group?: string | null;
         };
         /** AuditEntry */
         AuditEntry: {
@@ -4349,11 +4408,22 @@ export interface components {
         Body_upload_comment_attachment_api_v1_comments__comment_id__attachments_post: {
             /** File */
             file: string;
+            /** Replace Id */
+            replace_id?: string | null;
+        };
+        /** Body_upload_project_file_api_v1_projects__project_id__files_post */
+        Body_upload_project_file_api_v1_projects__project_id__files_post: {
+            /** File */
+            file: string;
+            /** Replace Id */
+            replace_id?: string | null;
         };
         /** Body_upload_task_attachment_api_v1_tasks__task_id__attachments_post */
         Body_upload_task_attachment_api_v1_tasks__task_id__attachments_post: {
             /** File */
             file: string;
+            /** Replace Id */
+            replace_id?: string | null;
         };
         /** BreakdownIn */
         BreakdownIn: {
@@ -5141,6 +5211,45 @@ export interface components {
         FieldValuesLookupIn: {
             /** Task Ids */
             task_ids: string[];
+        };
+        /**
+         * FileHit
+         * @description Phase 7.5: a file matched by name or extracted text.
+         */
+        FileHit: {
+            /** Filename */
+            filename: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Kind */
+            kind: string;
+            /** Project Id */
+            project_id: string | null;
+            /** Project Name */
+            project_name: string | null;
+            /** Task Id */
+            task_id: string | null;
+            /** Task Title */
+            task_title: string | null;
+        };
+        /** FileLocation */
+        FileLocation: {
+            /** Comment Id */
+            comment_id?: string | null;
+            /** Task Id */
+            task_id?: string | null;
+            /** Task Key */
+            task_key?: string | null;
+            /** Task Title */
+            task_title?: string | null;
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "project" | "task" | "comment" | "portfolio";
         };
         /**
          * FilterNameOut
@@ -7082,6 +7191,60 @@ export interface components {
             /** Is Visible */
             is_visible: boolean;
         };
+        /** ProjectFileOut */
+        ProjectFileOut: {
+            /** Ai Drafted */
+            ai_drafted: boolean;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Filename */
+            filename: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "document" | "spreadsheet" | "presentation" | "pdf" | "image" | "text" | "email" | "archive" | "other";
+            location: components["schemas"]["FileLocation"];
+            /** Mime */
+            mime: string;
+            /** Size Bytes */
+            size_bytes: number;
+            /** Source */
+            source: string;
+            /**
+             * Uploaded By
+             * Format: uuid
+             */
+            uploaded_by: string;
+            /** Uploaded By Name */
+            uploaded_by_name: string;
+            /** Version */
+            version: number;
+            /**
+             * Version Group
+             * Format: uuid
+             */
+            version_group: string;
+            /** Versions Count */
+            versions_count: number;
+        };
+        /** ProjectFilesPage */
+        ProjectFilesPage: {
+            /** Data */
+            data: components["schemas"]["ProjectFileOut"][];
+            /** Next Cursor */
+            next_cursor: string | null;
+            /** Total */
+            total: number;
+        };
         /** ProjectForecastOut */
         ProjectForecastOut: {
             forecast: components["schemas"]["ForecastOut"] | null;
@@ -7186,7 +7349,7 @@ export interface components {
             /** Color */
             color?: string | null;
             /** Default View */
-            default_view?: ("list" | "board" | "calendar" | "timeline" | "overview" | "dashboard") | null;
+            default_view?: ("list" | "board" | "calendar" | "timeline" | "overview" | "files" | "dashboard") | null;
             /** Due On */
             due_on?: string | null;
             /** Name */
@@ -7243,7 +7406,7 @@ export interface components {
             /** Tags */
             tags?: string[];
             /** View */
-            view?: ("list" | "board" | "calendar" | "timeline" | "overview" | "dashboard") | null;
+            view?: ("list" | "board" | "calendar" | "timeline" | "overview" | "files" | "dashboard") | null;
         };
         /** PublicFormOut */
         PublicFormOut: {
@@ -8248,6 +8411,11 @@ export interface components {
         SearchResultsOut: {
             /** Comments */
             comments: components["schemas"]["CommentHit"][];
+            /**
+             * Files
+             * @default []
+             */
+            files: components["schemas"]["FileHit"][];
             /** People */
             people: components["schemas"]["PersonHit"][];
             /** Projects */
@@ -11351,6 +11519,37 @@ export interface operations {
             };
         };
     };
+    list_versions_api_v1_attachments__attachment_id__versions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                attachment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListOut_AttachmentOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     logout_api_v1_auth_logout_post: {
         parameters: {
             query?: never;
@@ -14395,6 +14594,80 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MutationOut_FieldOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_project_files_api_v1_projects__project_id__files_get: {
+        parameters: {
+            query?: {
+                q?: string | null;
+                kind?: ("document" | "spreadsheet" | "presentation" | "pdf" | "image" | "text" | "email" | "archive" | "other") | null;
+                source?: string | null;
+                uploaded_by?: string | null;
+                where?: "project" | "tasks" | "comments" | "all";
+                sort?: "newest" | "name" | "size";
+                cursor?: string | null;
+            };
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectFilesPage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upload_project_file_api_v1_projects__project_id__files_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_upload_project_file_api_v1_projects__project_id__files_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationOut_AttachmentOut_"];
                 };
             };
             /** @description Validation Error */

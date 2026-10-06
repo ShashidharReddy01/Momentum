@@ -6,12 +6,14 @@ export type Theme = 'light' | 'dark';
 /** What an "Ask Mo about this" button pinned the chat to (S3.3.2). */
 export interface MoContext {
   id: number;
-  kind: 'task' | 'project' | 'selection';
+  kind: 'task' | 'project' | 'selection' | 'file';
   /** Shown on the chip: "T-12 Draft pricing copy", "Website Revamp", "3 selected tasks". */
   label: string;
   projectId?: string;
   taskId?: string;
   taskIds?: string[];
+  /** Phase 7.5: "Ask Mo about this file" (an attachment id). */
+  fileId?: string;
 }
 export interface MoRequest {
   id: number;

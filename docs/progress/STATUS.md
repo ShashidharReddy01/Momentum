@@ -114,7 +114,7 @@ Tracked in their phase files; copy the slice list here at each phase kickoff.
 ### Phase 7.5: Files, reports, lifecycle portfolios and dashboards, and Mo
 Decisions D1–D8 in the spec. Built in a browser session in mock mode; live verification after the pull.
 - [x] S75-00 Kickoff and foundations (2026-10-06; ADR-0011; 11 runtime dependencies locked, pip-audit clean; 9 settings; `files`/`reports` packages and import contracts, a deliberate bad import fails lint-imports)
-- [ ] S75-01 Files: data model, inventory, project uploads, versions (J15 part 1)
+- [x] S75-01 Files: data model, inventory, project uploads, versions (J15 part 1) (2026-10-06; migration 0042; project Files tab, versions, search files group; H64 upload 500 fixed; J15 part 1 green)
 - [ ] S75-02 File parsing: DocumentModel, parsers, cache, safety (no AI)
 - [ ] S75-03 Mo reads files: tools, table queries, vision, conversation files (J15)
 - [ ] S75-04 Project fields, template lineage, field history, rules action
@@ -128,12 +128,19 @@ Decisions D1–D8 in the spec. Built in a browser session in mock mode; live ver
 - [ ] S75-12 Smart task creation and project close-out (J19 part 3)
 - [ ] S75-13 Exit (J14 extended, UI audit, live verification list, docs)
 
-**Next up:** S75-01 Files: data model, inventory, project uploads, versions.
+**Next up:** S75-02 File parsing: DocumentModel, parsers, cache, safety (no AI).
 
 **Decisions (Phase 7.5, delegated):** (the build session records its own calls here)
 - D75-1 (S75-00): `momentum.files` may import only `core`; `momentum.reports` may import `core`, `files` and `domain`, never `ai`/`agents`/`integrations`. Enforced by two new import-linter contracts.
 - D75-2 (S75-00): mypy treats the new third-party libraries as untyped (`ignore_missing_imports`), like `docx` and `pypdf` already were; our own wrappers are fully typed.
 - D75-3 (S75-00): the DejaVu Sans fonts are copied from the Debian `fonts-dejavu-core` package with its copyright file (`reports/fonts/LICENSE-DejaVu.txt`).
+- D75-4 (S75-01): adding a version needs the same role as uploading to that place: commenter on a task or comment (as attaching already did), editor on a project or portfolio. Deleting stays the uploader or a project admin.
+- D75-5 (S75-01): `file_parses` and `ai_conversation_files` are created in migration 0042 with the other file tables, not in 0044: 0044 can't run before 0043, and the parse cache needs a foreign key to both kinds of file (exactly one). `file_parses` has `attachment_id` **or** `conversation_file_id`. Migration plan from here: 0043 = project fields, portfolios v2, snapshots (S75-04/05); 0044 = dashboards v2 members/filters and `user_visits` (S75-08/11).
+- D75-6 (S75-01): a new file's `version_group` is its own id, set in the service and, as a safety net for other creators (Asana import, tests), by a `before_insert` listener.
+- D75-7 (S75-01): the Files tab can be a project's default view (`projects.default_view` check widened).
+- D75-8 (S75-01): files on a task still announce on the task's channel only; the Files tab refreshes when opened, after its own changes and on undo, not live for other people's task uploads (low value, avoids fanning every task attachment out to the project channel).
+- D75-9 (S75-01): the search `files` group covers project files, files on top-level tasks placed in visible projects and their comments (subtask files aren't searched, consistent with task search); the Files tab covers every depth.
+- D75-10 (S75-01): the inventory cursor is an offset (stable for a given filter; a file added mid-browse can shift a page, acceptable for a 50-row listing).
 
 ### Phase 7: Hardening and Asana-ready
 - [x] E7.0 audit register started (`hardening-register.md`; H1–H44 so far, all fixed)
@@ -166,6 +173,7 @@ Decisions D1–D8 in the spec. Built in a browser session in mock mode; live ver
 ## Plan changes log
 | Date | Change | Reason |
 |---|---|---|
+| 2026-10-06 | S75-01: `file_parses` and `ai_conversation_files` moved into migration 0042 (D75-5); the event catalog now names the real `attachment.created` (it said `attachment.added`) | Migration order; doc matched to code |
 | 2026-10-06 | **Phase 7.5 build started** (S75-00): ADR-0011, new dependencies and settings, `files`/`reports` packages | Phase 7.5 kickoff per `phase-7.5.md` |
 | 2026-10-06 | **Phase 7.5 added** between Phase 7 and Phase 8: files (project Files tab, Mo reads every common file type on request), reports from work data (Word/Excel/PDF), lifecycle portfolios and dashboards v2 with role templates, catch-me-up, plain-English filters, smart task creation, close-out | Product owner: AI focus before go-live; dashboards and portfolios were too basic for the onboarding lifecycle (pre-sales → go-live); built in a browser session without a gateway |
 | 2026-09-23 | Backend tests use a real Postgres via `MOMENTUM_TEST_DATABASE_URL` + truncate-per-test, instead of testcontainers + SAVEPOINT | Build environment has no Docker; services commit normally, which keeps tests realistic |

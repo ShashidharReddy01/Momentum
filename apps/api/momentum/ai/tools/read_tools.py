@@ -659,6 +659,7 @@ async def _task_attachments(tc: ToolContext, task: Task) -> list[Attachment]:
         .outerjoin(Comment, Comment.id == Attachment.comment_id)
         .where(
             Attachment.deleted_at.is_(None),
+            Attachment.is_current.is_(True),
             or_(
                 Attachment.task_id == task.id,
                 and_(Comment.task_id == task.id, Comment.deleted_at.is_(None)),

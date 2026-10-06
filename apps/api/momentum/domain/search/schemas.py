@@ -5,8 +5,8 @@ from typing import Literal
 
 from pydantic import BaseModel
 
-SearchType = Literal["task", "project", "person", "comment"]
-ALL_TYPES: tuple[SearchType, ...] = ("task", "project", "person", "comment")
+SearchType = Literal["task", "project", "person", "comment", "file"]
+ALL_TYPES: tuple[SearchType, ...] = ("task", "project", "person", "comment", "file")
 
 
 class TaskHit(BaseModel):
@@ -38,8 +38,21 @@ class CommentHit(BaseModel):
     snippet: str
 
 
+class FileHit(BaseModel):
+    """Phase 7.5: a file matched by name or extracted text."""
+
+    id: uuid.UUID
+    filename: str
+    kind: str
+    project_id: uuid.UUID | None
+    project_name: str | None
+    task_id: uuid.UUID | None
+    task_title: str | None
+
+
 class SearchResultsOut(BaseModel):
     tasks: list[TaskHit]
     projects: list[ProjectHit]
     people: list[PersonHit]
     comments: list[CommentHit]
+    files: list[FileHit] = []
