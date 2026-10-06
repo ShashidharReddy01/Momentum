@@ -56,6 +56,8 @@
 | J10 | Assign task to Teammate agent → result comment → review | 5 |
 | J11 | Timeline: drag a task that has a dependent → ghost bars + cascade preview → apply → undo restores both (`j11-timeline-cascade.e2e.ts` moves the bar with the keyboard nudge, the same preview → confirm path as a drag and steadier headless; the ghost bars themselves are covered in `timeline.test.tsx`) | 6 |
 | J12 | Ask for a chart → preview → add to a project dashboard → it shows on reload (`j12-ask-chart.e2e.ts`, mock fixtures) | 6 |
+| J13 | Custom-field reporting: filter, sort and group a list by a field; a dashboard widget summing a number field (`j13-field-reporting.e2e.ts`) | 7 |
+| J14 | Accessibility: axe (WCAG 2.2 A/AA) finds no serious or critical violation on the key pages, admin pages and Asana pages in light and dark; list → pane → Escape returns focus to the row (`j14-accessibility.e2e.ts`) | 7 |
 
 **Running them:** `make e2e` builds the SPA and runs `apps/web/e2e/*.e2e.ts` with Playwright against a real API and Postgres. `tools/e2e/serve.sh` recreates a throwaway database whose name must end in `_e2e` (default `momentum_e2e`; override with `MOMENTUM_E2E_DATABASE_URL`), migrates, seeds the synthetic workspace, and serves on port 8123 (`E2E_PORT`). Set `MOMENTUM_E2E_CHROMIUM` to use an already-installed Chromium instead of `playwright install chromium`. Journeys run serially because they share the one seeded database. Phase 1 status: J1 and J3 pass; J2 passes up to inbox delivery (Phase 2), checking instead that the mentioned person follows the task and sees the comment.
 

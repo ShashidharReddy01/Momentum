@@ -19,7 +19,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -29,6 +29,9 @@ from momentum.domain.agents.models import Agent, AgentRun
 CLAIM_BATCH = 10
 # a run left `running` longer than its own timeout plus this margin died with its worker
 STALE_MARGIN = timedelta(minutes=2)
+# S7.3.1: claimers take turns (a transaction-scoped advisory lock), so a second worker sees the
+# runs the first just started and never starts the same agent on the same entity beside it.
+CLAIM_LOCK = 0x4D6F_0001
 
 
 @dataclass(frozen=True)
@@ -75,9 +78,10 @@ def run_entity(run: AgentRun) -> str | None:
 
 async def claim_runs(session: AsyncSession, *, timeout_s: int, limit: int = CLAIM_BATCH) -> Claimed:
     """Mark the oldest queued runs ``running`` and return their ids (the caller commits, so a
-    second worker can't take them). A run is held back while the same agent is already running
-    on the same entity. Runs stuck in ``running`` past the timeout are failed, never retried
-    blind: a run may have written already."""
+    second worker can't take them; claimers take turns). A run is held back while the same agent
+    is already running on the same entity. Runs stuck in ``running`` past the timeout are failed,
+    never retried blind: a run may have written already."""
+    await session.execute(select(func.pg_advisory_xact_lock(CLAIM_LOCK)))
     now = datetime.now(UTC)
     timed_out = await session.execute(
         update(AgentRun)

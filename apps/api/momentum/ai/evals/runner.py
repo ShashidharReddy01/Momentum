@@ -146,21 +146,33 @@ class Verdict(BaseModel):
 
 # An agent's source (the task context plus every tool result) runs longer than a feature's facts
 SOURCE_CHARS = 16000
+_UUID = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
 
 
 async def judge(
-    llm: LLM, settings: Settings, world: EvalWorld, case: dict[str, Any], obs: Observation
+    llm: LLM,
+    settings: Settings,
+    world: EvalWorld,
+    case: dict[str, Any],
+    obs: Observation,
+    today: date,
 ) -> Check:
-    """LLM-as-judge (live only, ``smart`` alias): scores the output 1 to 5 by the rubric."""
+    """LLM-as-judge (live only, ``smart`` alias): scores the output 1 to 5 by the rubric. It is
+    told today's date (relative deadlines, "half the period gone") and sees people by name, not
+    id (S7.3.2: without these it marked correct plans and check-ins down)."""
     spec = case["judge"]
     prompt = prompts.load("judge")
     cited = ", ".join(
         f"{c.get('ref')} {c.get('title') or ''}".strip() for c in obs.citations if c.get("valid")
     )
     # Breakdown and brief answer with a previewed action, not text: show what it would change.
-    changes = "\n".join(
-        f"{op.get('tool')}: {json.dumps(op.get('args') or {}, ensure_ascii=False)}"
-        for op in obs.operations
+    names = {str(u.id): u.name for u in world.users.values()}
+    changes = _UUID.sub(
+        lambda m: names.get(m.group(0), m.group(0)),
+        "\n".join(
+            f"{op.get('tool')}: {json.dumps(op.get('args') or {}, ensure_ascii=False)}"
+            for op in obs.operations
+        ),
     )[:6000]
     # A plan is judged against its dates, which live outside the operations' text.
     plan_facts = (
@@ -183,6 +195,7 @@ async def judge(
     )
     body = "\n".join(
         [
+            f"Today: {today.isoformat()} ({today:%A})",
             f"Request: {case.get('input') or case.get('task') or case.get('project') or ''}",
             f"Output:\n{obs.text or '(none)'}",
             f"Proposed changes:\n{changes or '(none)'}",
@@ -254,7 +267,7 @@ async def run_evals(
                         asked=str(filled.get("input") or ""),
                     )
                     if live and filled.get("judge") and obs.error is None:
-                        checks.append(await judge(llm, settings, world, filled, obs))
+                        checks.append(await judge(llm, settings, world, filled, obs, today))
                 finally:
                     await session.rollback()
             tokens_in, tokens_out, cost = await _usage(session_factory, since)

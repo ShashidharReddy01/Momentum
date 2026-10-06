@@ -31,15 +31,21 @@ export function TaskNavProvider({ children }: { children: ReactNode }) {
       ),
     [setParams],
   );
-  const close = useCallback(
-    () =>
-      setParams((p) => {
-        const n = new URLSearchParams(p);
-        n.delete('task');
-        return n;
-      }),
-    [setParams],
-  );
+  const close = useCallback(() => {
+    setParams((p) => {
+      const n = new URLSearchParams(p);
+      n.delete('task');
+      return n;
+    });
+    // S7.5.3: focus that was in the pane goes back to the task's row (or card), not to the top
+    // of the page, so a keyboard user carries on where they were.
+    if (!openId) return;
+    requestAnimationFrame(() => {
+      const active = document.activeElement;
+      if (active && active !== document.body && active.isConnected) return;
+      document.querySelector<HTMLElement>(`[data-task-id="${CSS.escape(openId)}"]`)?.focus();
+    });
+  }, [setParams, openId]);
   const setOrder = useCallback((ids: readonly string[]) => {
     order.current = ids;
   }, []);

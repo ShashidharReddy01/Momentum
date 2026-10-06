@@ -40,6 +40,7 @@ KNOWN = frozenset(
         "nudged_exclude",
         "sorter_priority_in",
         "sorter_priority_none",
+        "sorter_priority_not_in",
         "sorter_field_in",
         "sorter_duplicate_of",
         "sorter_no_duplicate",
@@ -295,6 +296,9 @@ def score(obs: Observation, expect: dict[str, Any], *, today: date, asked: str =
         add(Check("sorter_priority_in", ok, f"priority: {priorities}"))
     if expect.get("sorter_priority_none"):
         add(Check("sorter_priority_none", not priorities, f"priority: {priorities}"))
+    if "sorter_priority_not_in" in expect:
+        ok = not any(p in expect["sorter_priority_not_in"] for p in priorities)
+        add(Check("sorter_priority_not_in", ok, f"priority: {priorities}"))
     for name, allowed in (expect.get("sorter_field_in") or {}).items():
         got_values = [
             a.get("value")
