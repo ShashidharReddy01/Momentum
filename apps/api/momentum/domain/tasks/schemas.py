@@ -169,6 +169,7 @@ class TaskDetailOut(TaskOut):
 
     parent: NamedRef | None = None
     followers: list[uuid.UUID] = Field(default_factory=list)
+    likes: list[uuid.UUID] = Field(default_factory=list, description="Who liked the task")
     my_role: str | None = Field(
         default=None, description="The caller's access: admin, editor, commenter or viewer"
     )

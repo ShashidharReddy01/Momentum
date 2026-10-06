@@ -142,7 +142,34 @@ export function useTaskDetailMutations(taskId: string) {
     },
   });
 
-  return { update, setCompleted, remove, convert, decideApproval };
+  // E7.4: Asana's "Duplicate task": a copy right below, with subtasks, fields and tags (one undo)
+  const duplicate = useMutation({
+    mutationFn: async () =>
+      (await api.POST('/api/v1/tasks/{task_id}/duplicate', { params: { path: { task_id: taskId } } })).data!,
+    onSuccess: (res) => {
+      refetch();
+      undoToast('Task duplicated', res.meta, refetch);
+    },
+    onError: (e) => toastError(e, "Couldn't duplicate the task"),
+  });
+
+  // E7.4: like a task (Asana's heart); imported Asana likes show here too
+  const like = useMutation({
+    mutationFn: async (active: boolean) =>
+      (
+        await api.POST('/api/v1/tasks/{task_id}/likes', {
+          params: { path: { task_id: taskId } },
+          body: { active },
+        })
+      ).data!,
+    onSuccess: (res) => {
+      syncTask(qc, taskId, { likes: res.data.likes } as Partial<TaskDetail>);
+      record('Like', res.meta);
+    },
+    onError: (e) => toastError(e, "Couldn't update your like"),
+  });
+
+  return { update, setCompleted, remove, convert, decideApproval, duplicate, like };
 }
 
 /** S5.3.4: snooze Nudge's reminders on one of my tasks until a date (null resumes them). */

@@ -4,6 +4,7 @@ import {
   BookmarkPlus,
   ClipboardList,
   Download,
+  FileSpreadsheet,
   Lock,
   MoreHorizontal,
   SlidersHorizontal,
@@ -103,7 +104,7 @@ export function ProjectPage() {
   const favorite = useToggleFavorite();
   const { lastView, ready: lastViewReady, save: saveLastView } = useLastView(projectId);
   const navigate = useNavigate();
-  const aiEnabled = useMomentumConfig().ai_enabled;
+  const { ai_enabled: aiEnabled, api_base } = useMomentumConfig();
   const [share, setShare] = useState(false);
   const [fieldsOpen, setFieldsOpen] = useState(false);
   const [rulesOpen, setRulesOpen] = useState(false);
@@ -239,6 +240,14 @@ export function ProjectPage() {
                   </DropdownMenuItem>
                   <DropdownMenuItem onSelect={() => setCsvImportOpen(true)}>
                     <Icon icon={Download} /> Import from CSV
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onSelect={() => {
+                      // a plain download (the response is an attachment): the browser's own save
+                      window.location.href = `${api_base}/projects/${p.id}/export/csv`;
+                    }}
+                  >
+                    <Icon icon={FileSpreadsheet} /> Export to CSV
                   </DropdownMenuItem>
                   <DropdownMenuItem onSelect={() => archive.mutate(!p.archived_at)}>
                     <Icon icon={p.archived_at ? ArchiveRestore : Archive} />

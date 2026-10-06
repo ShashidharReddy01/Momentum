@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, File, Form, UploadFile
+from fastapi import APIRouter, File, Form, Response, UploadFile
 
 from momentum.api.deps import CtxDep, UowDep
 from momentum.domain.access import get_visible_project
+from momentum.domain.attachments.router import content_disposition
+from momentum.domain.tasks.csv_export import export_project_csv
 from momentum.domain.tasks.csv_import import (
     CsvColumnMapping,
     CsvImportResult,
@@ -54,3 +56,20 @@ async def commit_csv_import(
     text = await _read_text(file)
     async with uow.transaction() as s:
         return await import_csv(s, ctx, project_id, text, parsed)
+
+
+@router.get(
+    "/projects/{project_id}/export/csv",
+    response_class=Response,
+    responses={200: {"content": {"text/csv": {}}}},
+    summary="Every task and subtask you can see in the project, as CSV (Asana's columns)",
+)
+async def export_csv(project_id: uuid.UUID, ctx: CtxDep, uow: UowDep) -> Response:
+    async with uow.transaction() as s:
+        project, text = await export_project_csv(s, ctx, project_id)
+    return Response(
+        # a BOM so Excel reads the file as UTF-8 (names with accents, emoji)
+        content="﻿" + text,
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": content_disposition("attachment", f"{project.name}.csv")},
+    )

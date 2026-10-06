@@ -827,6 +827,24 @@ async def test_schedules_in_workspace_fixed_and_personal_timezones(
     assert agent.enabled
 
 
+async def test_a_schedule_in_the_repeated_hour_runs_once_when_the_clocks_go_back(
+    make_env: Callable[..., Env],
+) -> None:
+    """H62: on 25 Oct 2026 London goes from BST to GMT at 02:00, so 01:30 happens twice."""
+    env = make_env()
+    await env.install(
+        _defn(triggers=[{"type": "schedule", "cron": "30 1 * * *", "timezone": "Europe/London"}])
+    )
+
+    async def at(iso: str) -> int:
+        async with env.uow.transaction() as s:
+            return (await evaluate_schedules(s, env.settings, datetime.fromisoformat(iso))).queued
+
+    assert await at("2026-10-25T00:30:00+00:00") == 1  # 01:30 BST
+    assert await at("2026-10-25T01:30:00+00:00") == 0  # 01:30 GMT, the same wall-clock time
+    assert await at("2026-10-26T01:30:00+00:00") == 1  # the next day, as usual
+
+
 # ---------- service guards ----------
 
 

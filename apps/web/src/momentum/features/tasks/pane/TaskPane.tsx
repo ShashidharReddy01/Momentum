@@ -12,6 +12,7 @@ import {
   MoreHorizontal,
   Repeat,
   ShieldCheck,
+  ThumbsUp,
   Trash2,
   UserRound,
   X,
@@ -346,6 +347,13 @@ function PaneBody({
           <Icon icon={done ? CircleCheck : Check} /> {done ? 'Completed' : 'Mark complete'}
         </Button>
         <span className="flex-1" />
+        <LikeButton
+          likes={task.likes ?? []}
+          meId={meId}
+          nameOf={nameOf}
+          disabled={task.my_role === 'viewer'}
+          onToggle={(active) => m.like.mutate(active)}
+        />
         <span className="mr-1 font-mono text-[11px] text-muted-2">{task.key}</span>
         <AskMoButton about={{ kind: 'task', taskId: task.id, label: `${task.key} ${task.title}` }} label="" />
         <IconButton icon={Copy} label="Copy task link" size="icon-sm" onClick={() => void copyLink()} />
@@ -401,6 +409,13 @@ function PaneBody({
                 </>
               ) : null}
               <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onSelect={() =>
+                  m.duplicate.mutate(undefined, { onSuccess: (res) => onOpenTask?.(res.data.id) })
+                }
+              >
+                <Icon icon={Copy} /> Duplicate task
+              </DropdownMenuItem>
               <DropdownMenuItem
                 className="text-crit"
                 onSelect={() => {
@@ -912,4 +927,39 @@ function daysFromToday(n: number): string {
   const d = new Date();
   d.setDate(d.getDate() + n);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/** E7.4: like a task, with how many did and who (hover / screen reader). */
+function LikeButton({
+  likes,
+  meId,
+  nameOf,
+  disabled,
+  onToggle,
+}: {
+  likes: readonly string[];
+  meId: string | undefined;
+  nameOf: (id: string) => string | undefined;
+  disabled: boolean;
+  onToggle: (active: boolean) => void;
+}) {
+  const liked = !!meId && likes.includes(meId);
+  const who = likes.map((id) => nameOf(id) ?? 'Someone').join(', ');
+  return (
+    <button
+      type="button"
+      aria-pressed={liked}
+      aria-label={likes.length ? `Like task (${likes.length}: ${who})` : 'Like task'}
+      title={who || 'Like task'}
+      disabled={disabled}
+      onClick={() => onToggle(!liked)}
+      className={cn(
+        'inline-flex h-7 items-center gap-1 rounded-md px-1.5 text-muted hover:bg-surface-2 hover:text-ink disabled:opacity-50',
+        liked && 'text-accent',
+      )}
+    >
+      <Icon icon={ThumbsUp} size={15} />
+      {likes.length ? <span className="text-xs tabular-nums">{likes.length}</span> : null}
+    </button>
+  );
 }

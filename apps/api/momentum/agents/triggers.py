@@ -165,7 +165,7 @@ async def _per_project(
         owner = await session.get(User, project.owner_id) if project.owner_id else None
         if owner is not None and owner.status == "active" and not owner.is_agent:
             trigger["requested_by"] = str(owner.id)
-        key = f"schedule:{index}:p{project.id}:{minute.isoformat()}"
+        key = f"schedule:{index}:p{project.id}:{_wall(minute, zone)}"
         queued += int(await enqueue_run(session, agent, trigger, key) is not None)
     return queued
 
@@ -187,6 +187,13 @@ def personal_cron(cron: str, person: User | None, at: str | None) -> str:
 
 def _minute(dt: datetime) -> datetime:
     return dt.replace(second=0, microsecond=0)
+
+
+def _wall(minute: datetime, zone: str) -> str:
+    """The local wall-clock minute a schedule fired for, as its dedupe key (E7.0, H62): when the
+    clocks go back, 01:30 happens twice and must still run once. (When they go forward, a time
+    inside the skipped hour doesn't happen that day, as with cron.)"""
+    return f"{zone}:{minute.astimezone(ZoneInfo(zone)).replace(tzinfo=None).isoformat()}"
 
 
 async def evaluate_schedules(
@@ -238,7 +245,7 @@ async def evaluate_schedules(
                         trigger["for_user_id"] = str(person.id)
                         trigger["requested_by"] = str(person.id)
                     who = str(person.id) if person is not None else "-"
-                    key = f"schedule:{index}:{who}:{minute.isoformat()}"
+                    key = f"schedule:{index}:{who}:{_wall(minute, zone)}"
                     if await enqueue_run(session, agent, trigger, key) is not None:
                         stats.queued += 1
     return stats

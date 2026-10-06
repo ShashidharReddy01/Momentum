@@ -385,6 +385,79 @@ async def set_reaction(
     return Mutation(comment, act.id)
 
 
+LIKE = "👍"  # the Asana import maps its hearts to this too (S7.4.2)
+
+
+async def task_likers(session: AsyncSession, task_id: uuid.UUID) -> list[uuid.UUID]:
+    rows = await session.execute(
+        select(Reaction.user_id)
+        .where(
+            Reaction.entity_type == "task", Reaction.entity_id == task_id, Reaction.emoji == LIKE
+        )
+        .order_by(Reaction.created_at)
+    )
+    return list(rows.scalars())
+
+
+async def set_task_like(
+    session: AsyncSession, ctx: Ctx, task_id: uuid.UUID, active: bool
+) -> Mutation[list[uuid.UUID]]:
+    """E7.4 parity: like a task (Asana's heart). Anyone who can comment on it can like it; the
+    pane shows who did. Liking twice is a no-op."""
+    task, _, role = await get_visible_task(session, ctx, task_id)
+    require_project_role(role, "commenter", "like this task")
+    assert ctx.actor.id is not None
+    existing = (
+        await session.execute(
+            select(Reaction).where(
+                Reaction.entity_type == "task",
+                Reaction.entity_id == task.id,
+                Reaction.user_id == ctx.actor.id,
+                Reaction.emoji == LIKE,
+            )
+        )
+    ).scalar_one_or_none()
+    if (existing is not None) == active:
+        return Mutation(await task_likers(session, task.id))
+    if active:
+        session.add(
+            Reaction(
+                workspace_id=ctx.workspace_id,
+                entity_type="task",
+                entity_id=task.id,
+                user_id=ctx.actor.id,
+                emoji=LIKE,
+            )
+        )
+    else:
+        await session.delete(existing)
+    await session.flush()
+    act = await record_activity(
+        session,
+        ctx,
+        entity_type="task",
+        entity_id=task.id,
+        verb="task.liked" if active else "task.unliked",
+        undo=undo_op("comments.like_task", task_id=task.id, active=not active),
+    )
+    await emit(
+        session,
+        ctx,
+        type="reaction.added" if active else "reaction.removed",
+        entity_type="task",
+        entity_id=task.id,
+        data={"task_id": str(task.id), "emoji": LIKE},
+        channels=[f"task:{task.id}"],
+        activity_id=act.id,
+    )
+    return Mutation(await task_likers(session, task.id), act.id)
+
+
+@undo_handler("comments.like_task")
+async def _undo_like(session: AsyncSession, ctx: Ctx, args: dict[str, Any]) -> None:
+    await set_task_like(session, ctx, uuid.UUID(str(args["task_id"])), bool(args["active"]))
+
+
 # ---------- undo ----------
 
 
@@ -433,7 +506,13 @@ async def _undo_edit(session: AsyncSession, ctx: Ctx, args: dict[str, Any]) -> N
 
 FEED_LIMIT = 300
 # Activity that isn't worth a line in the feed (comments show as themselves; reorders are noise).
-HIDDEN_VERBS = {"comment.created", "comment.edited", "comment.deleted"}
+HIDDEN_VERBS = {
+    "comment.created",
+    "comment.edited",
+    "comment.deleted",
+    "task.liked",  # likes show as the count on the task, not as feed lines (Asana does the same)
+    "task.unliked",
+}
 CHILD_VERBS = {"task.created", "task.completed", "task.uncompleted", "task.deleted"}
 
 

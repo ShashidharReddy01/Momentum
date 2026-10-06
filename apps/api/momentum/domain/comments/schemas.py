@@ -36,6 +36,15 @@ class ReactionIn(BaseModel):
     active: bool = True
 
 
+class TaskLikeIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    active: bool = True
+
+
+class TaskLikesOut(BaseModel):
+    likes: list[uuid.UUID] = Field(description="Who liked the task, earliest first")
+
+
 class MentionUser(BaseModel):
     id: uuid.UUID
     name: str

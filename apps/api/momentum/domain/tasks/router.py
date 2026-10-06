@@ -11,11 +11,12 @@ from momentum.api.schemas import ListOut, MutationMeta, MutationOut, OkOut
 from momentum.core.errors import ValidationFailed
 from momentum.core.ids import task_key
 from momentum.core.richtext import doc_hash
+from momentum.domain.comments.service import task_likers
 from momentum.domain.mytasks.models import MyTaskPlacement
 from momentum.domain.projects.models import Project
 from momentum.domain.projects.schemas import MilestoneOut, ProjectOverviewOut
 from momentum.domain.sections.models import Section
-from momentum.domain.tasks import service
+from momentum.domain.tasks import duplicate, service
 from momentum.domain.tasks.models import Task, TaskProject
 from momentum.domain.tasks.schemas import (
     ApprovalDecisionIn,
@@ -187,6 +188,7 @@ async def detail_out(
         **task_out(t, p, counts).model_dump(),
         parent=NamedRef(id=parent.id, name=parent.title) if parent else None,
         followers=await service.list_followers(s, t.id),
+        likes=await task_likers(s, t.id),
         my_role=role,
         description=t.description,
         description_hash=doc_hash(t.description),
@@ -396,6 +398,19 @@ async def move_subtask(
             data=task_out(m.entity, p),
             meta=MutationMeta(activity_id=m.activity_id, version=m.version),
         )
+
+
+@router.post(
+    "/tasks/{task_id}/duplicate",
+    response_model=MutationOut[TaskOut],
+    status_code=status.HTTP_201_CREATED,
+    summary="Duplicate a task, with its subtasks, fields and tags, right below it (one undo)",
+)
+async def duplicate_task(task_id: uuid.UUID, ctx: CtxDep, uow: UowDep) -> MutationOut[TaskOut]:
+    async with uow.transaction() as s:
+        m = await duplicate.duplicate_task(s, ctx, task_id)
+        t, p = m.entity
+        return MutationOut(data=task_out(t, p), meta=MutationMeta(batch_id=m.batch_id))
 
 
 @router.post(

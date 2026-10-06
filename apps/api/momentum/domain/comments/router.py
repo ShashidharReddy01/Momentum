@@ -26,6 +26,8 @@ from momentum.domain.comments.schemas import (
     MentionUser,
     ReactionIn,
     ReactionOut,
+    TaskLikeIn,
+    TaskLikesOut,
 )
 from momentum.domain.projects.models import Project
 from momentum.domain.tasks.models import Task, TaskProject
@@ -117,6 +119,21 @@ async def react(
         m = await service.set_reaction(s, ctx, comment_id, body.emoji, body.active)
         return MutationOut(
             data=await _one(s, ctx, comment_id), meta=MutationMeta(activity_id=m.activity_id)
+        )
+
+
+@router.post(
+    "/tasks/{task_id}/likes",
+    response_model=MutationOut[TaskLikesOut],
+    summary="Like a task, or take your like back (active: false)",
+)
+async def like_task(
+    task_id: uuid.UUID, body: TaskLikeIn, ctx: CtxDep, uow: UowDep
+) -> MutationOut[TaskLikesOut]:
+    async with uow.transaction() as s:
+        m = await service.set_task_like(s, ctx, task_id, body.active)
+        return MutationOut(
+            data=TaskLikesOut(likes=m.entity), meta=MutationMeta(activity_id=m.activity_id)
         )
 
 

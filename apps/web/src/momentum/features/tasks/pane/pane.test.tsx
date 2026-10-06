@@ -128,6 +128,33 @@ describe('Task pane', () => {
     expect(await screen.findByText('Task deleted')).toBeInTheDocument();
   });
 
+  it('duplicate from the pane puts the copy below and opens it (with undo)', async () => {
+    const user = await boot();
+    await user.click(await screen.findByRole('button', { name: 'Open details for Second' }));
+    await waitFor(() => expect(paneTitle()).toHaveValue('Second'));
+    await user.click(within(pane()).getByRole('button', { name: 'More actions' }));
+    await user.click(await screen.findByRole('menuitem', { name: /Duplicate task/ }));
+    await waitFor(() => expect(paneTitle()).toHaveValue('Copy of Second'));
+    expect(await screen.findByText('Task duplicated')).toBeInTheDocument();
+    const rows = (await screen.findAllByRole('listitem')).map((r) => r.getAttribute('aria-label'));
+    expect(rows.indexOf('Copy of Second')).toBe(rows.indexOf('Second') + 1);
+  });
+
+  it('like a task and take it back (E7.4)', async () => {
+    const user = await boot();
+    await user.click(await screen.findByRole('button', { name: 'Open details for First' }));
+    const like = await within(pane()).findByRole('button', { name: 'Like task' });
+    expect(like).toHaveAttribute('aria-pressed', 'false');
+    await user.click(like);
+    const liked = await within(pane()).findByRole('button', { name: /^Like task \(1: / });
+    expect(liked).toHaveAttribute('aria-pressed', 'true');
+    await user.click(liked);
+    expect(await within(pane()).findByRole('button', { name: 'Like task' })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    );
+  });
+
   it('collaborators: stop and restart following, add and remove someone', async () => {
     const user = await boot();
     await user.click(await screen.findByRole('button', { name: 'Open details for First' }));

@@ -73,6 +73,10 @@ Every register finding (P0 first, then P1, P2, P3), grouped by area into slices.
 
 **S7.4.4 as built (2026-10-05).** **Shortcuts:** Asana's Tab-prefixed keys work without Tab (Tab stays focus navigation, which the keyboard pass requires): Q add, M assign to me, A assign, D due date (already ours), and new: **C** comments on the open task and **F** follows or stops following it (from anywhere, e.g. the list row you opened it from, unless typing or a dialog is open), **/** opens search (the ⌘K palette), **⌘/** opens the shortcut sheet; the sheet lists them. **Terms:** a "Words that differ" table (Reporting → Dashboards, Asana AI → Ask Mo and agents, board columns → sections, Do today/next week/later → Today/This week/Later, waiting on → blocked by…; where we already use Asana's word, e.g. Collaborators, nothing changes), and ⌘K finds pages by Asana's words (reporting, import, hotkeys). **Onboarding:** `/welcome/asana` ("Coming from Asana?": what carries over and how to import, the words, the keys), linked from Home's header and from ⌘K. Tests: `onboarding.test.tsx` (Home → page → ⌘/ sheet), a pane test (C and F with focus on the list; typing c/f in a comment is text).
 
+**Parity gaps closed (2026-10-06, E7.0 parity checklist).** The checklist in `docs/product/asana-vs-momentum.md` lists every Asana feature with have / partial / missing and a decision. Closed here: **Duplicate task** (`POST /tasks/{id}/duplicate`, `domain/tasks/duplicate.py`: the copy goes right below, with description, dates, assignee, priority, estimate, fields, tags and the subtask tree, one undo), **Export to CSV** (`GET /projects/{id}/export/csv`, `domain/tasks/csv_export.py`: Asana's column names, subtasks after their parent, custom fields as columns, a leading `'` on cells a spreadsheet would run as a formula) and **likes on tasks** (`POST /tasks/{id}/likes`, `TaskDetailOut.likes`; imported Asana likes now show). Left for later with a reason: mobile apps, integrations (Phase 9), saved searches, actual-time tracking, out of office, mark as duplicate, proofing. Tests: `test_asana_parity.py`, web `pane.test.tsx`.
+
+**E7.0 edge-case review as built (2026-10-06).** The per-feature matrix is `docs/progress/edge-case-matrix.md`: sweeps that cover every feature (robustness, anonymous access, permission matrix, guests, undo, activity trail, deleted parents, load, keyboard, axe, realtime, concurrency) and, per feature, the tests for each edge case. Found and fixed: H53–H63 (undo gaps, a 500 on reusing a deleted tag's name, invisible restored tasks, forms broken by a deleted section, guests seeing everything, a DST double run, Asana parity).
+
 ## E7.5 Production quality (was Phase 8)
 
 | Slice | Scope | AC | Size |
@@ -94,6 +98,21 @@ Every register finding (P0 first, then P1, P2, P3), grouped by area into slices.
 **S7.5.4 as built (2026-10-06).** **Members:** an admin changes roles and disables / re-enables people (undoable; never themselves or the last active admin; a disabled person can't sign in or use tokens and any open tab is disconnected; re-enabling someone who never signed in makes them invited again; invitations are now in the activity trail), finds people in a 150-person roster, and **hands on a member's work** (open tasks and owned projects to someone else, through the task and project services; tasks in private projects the admin can't see stay and are counted: privacy isn't overridden). Project owners are now editable by project admins (`owner_id`). **Background jobs** (Settings → Background jobs: counts per status, the latest failed / waiting / running / done, retry a failed one, recorded as `job.retried`). **Audit trail** (Settings → Audit trail: every change newest first, by person, kind and dates; Mo, agents, rules and imports marked; tasks and projects named only when the admin can see them). Teams were already admin-manageable; AI settings and agents policy exist (S3.5.2, S5.1.2); integrations status is the Asana import list (Slack is Phase 9). API: `PATCH /users/{id}`, `POST /users/{id}/transfer`, `GET /admin/jobs`, `POST /admin/jobs/{id}/retry`, `GET /admin/activity`. Tests: `test_admin.py` (5), web `admin.test.tsx`, `members.test.tsx`. Note shown on the page: the Entra admin role re-promotes at sign-in, so removing admin from such a person is done in Entra.
 
 ## Order and models
+
+## Phase 7 exit (2026-10-06)
+
+| Exit criterion | Result |
+|---|---|
+| Zero open findings in the hardening register (P0–P3) | **Met**: 63 findings (H1–H63, 3 P0, 18 P1, the rest P2/P3), every one fixed with the test that proves it |
+| Journeys J1–J12 pass, plus journeys for the Asana import and custom-field reporting | **Met**: e2e 17/17 (J1–J14; J6 Asana import, J13 custom-field reporting, J14 accessibility) |
+| 150-user load test within the E7.1 budgets | **Met** (S7.1.2): 75 concurrent on 50,000 tasks, aggregate p95 190 ms, realtime p95 193 ms |
+| axe: no serious violations on key pages | **Met**: J14 (15 pages × 2 themes) and the UI audit (188 screens, 0 findings); keyboard pass 0 findings |
+| Live evals: every bucket at threshold, incl. edge-case and injection cases | **Met** (S7.3.2): nothing obeyed injected text |
+| Export → import lossless; backup restore rehearsed | **Met** (S7.5.1, S7.5.5) |
+| Edge-case matrix per feature, backed by tests | **Met**: `docs/progress/edge-case-matrix.md` |
+| Asana parity checklist | **Done**: `docs/product/asana-vs-momentum.md`; gaps closed (duplicate task, export to CSV, likes) or recorded with a reason (mobile, integrations, saved searches, time tracking, out of office). Sign-off: the product owner's, at their review |
+
+Final gate: backend 872 passed, web 440 passed, e2e 17/17, ruff / mypy --strict / import contracts / prettier / eslint / tsc clean. Review decisions delegated to the AI (product owner, 2026-10-04) are recorded in the register and STATUS for later review: the most consequential are H61 (guests see only shared projects, the documented rule now enforced) and the parity "later" list.
 
 Kickoff + E7.0 (Opus) → register review with the product owner → E7.1 (Opus) → E7.2 P0 fixes (Opus) → E7.4 (Sonnet; the importer on Opus) → E7.2 P1/P2 (Sonnet) → E7.3 (Opus) → E7.5 (mixed) → exit (Opus). Live checkpoints on the product owner's machine: after the audit, after E7.3, at exit.
 

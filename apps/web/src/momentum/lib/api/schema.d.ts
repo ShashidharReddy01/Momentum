@@ -1927,6 +1927,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/{project_id}/export/csv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Every task and subtask you can see in the project, as CSV (Asana's columns) */
+        get: operations["export_csv_api_v1_projects__project_id__export_csv_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/{project_id}/field-values": {
         parameters: {
             query?: never;
@@ -2710,6 +2727,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/tasks/{task_id}/duplicate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Duplicate a task, with its subtasks, fields and tags, right below it (one undo) */
+        post: operations["duplicate_task_api_v1_tasks__task_id__duplicate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tasks/{task_id}/feed": {
         parameters: {
             query?: never;
@@ -2790,6 +2824,23 @@ export interface paths {
         post?: never;
         /** Stop following (yourself, or remove a collaborator) */
         delete: operations["remove_follower_api_v1_tasks__task_id__followers__user_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tasks/{task_id}/likes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Like a task, or take your like back (active: false) */
+        post: operations["like_task_api_v1_tasks__task_id__likes_post"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -6297,6 +6348,11 @@ export interface components {
             data: components["schemas"]["TaskDetailOut"];
             meta: components["schemas"]["MutationMeta"];
         };
+        /** MutationOut[TaskLikesOut] */
+        MutationOut_TaskLikesOut_: {
+            data: components["schemas"]["TaskLikesOut"];
+            meta: components["schemas"]["MutationMeta"];
+        };
         /** MutationOut[TaskOut] */
         MutationOut_TaskOut_: {
             data: components["schemas"]["TaskOut"];
@@ -8660,6 +8716,11 @@ export interface components {
             /** Key */
             key: string;
             /**
+             * Likes
+             * @description Who liked the task
+             */
+            likes?: string[];
+            /**
              * My Nudge Snoozed Until
              * @description S5.3.4: Nudge leaves this task alone for me until this date
              */
@@ -8766,6 +8827,22 @@ export interface components {
             title: string;
             /** Type */
             type: string;
+        };
+        /** TaskLikeIn */
+        TaskLikeIn: {
+            /**
+             * Active
+             * @default true
+             */
+            active: boolean;
+        };
+        /** TaskLikesOut */
+        TaskLikesOut: {
+            /**
+             * Likes
+             * @description Who liked the task, earliest first
+             */
+            likes: string[];
         };
         /** TaskMoveIn */
         TaskMoveIn: {
@@ -13996,6 +14073,37 @@ export interface operations {
             };
         };
     };
+    export_csv_api_v1_projects__project_id__export_csv_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_project_field_values_api_v1_projects__project_id__field_values_get: {
         parameters: {
             query?: never;
@@ -16087,6 +16195,37 @@ export interface operations {
             };
         };
     };
+    duplicate_task_api_v1_tasks__task_id__duplicate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationOut_TaskOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     task_feed_api_v1_tasks__task_id__feed_get: {
         parameters: {
             query?: never;
@@ -16239,6 +16378,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MutationOut_FollowersOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    like_task_api_v1_tasks__task_id__likes_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TaskLikeIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationOut_TaskLikesOut_"];
                 };
             };
             /** @description Validation Error */

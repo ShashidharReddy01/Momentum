@@ -429,6 +429,27 @@ export function taskHandlers(
       t.version += 1;
       return HttpResponse.json({ data: detail(t), meta });
     }),
+    http.post(`*${base}/api/v1/tasks/:id/likes`, async ({ params, request }) => {
+      const t = tasks.find((x) => x.id === params.id)! as T & { likes?: string[] };
+      const { active = true } = (await request.json()) as { active?: boolean };
+      const me = '01a0ccaf-8f68-77d2-a888-584ea1e80ea8';
+      const rest = (t.likes ?? []).filter((id) => id !== me);
+      t.likes = active ? [...rest, me] : rest;
+      return HttpResponse.json({ data: { likes: t.likes }, meta });
+    }),
+    http.post(`*${base}/api/v1/tasks/:id/duplicate`, ({ params }) => {
+      const t = tasks.find((x) => x.id === params.id)!;
+      const copy = {
+        ...make(t.project_id, t.section_id, `Copy of ${t.title}`, t.position),
+        parent_id: t.parent_id,
+      };
+      tasks.push(copy);
+      if (!t.parent_id) place(copy, t.id);
+      return HttpResponse.json(
+        { data: copy, meta: { ...meta, activity_id: null, batch_id: 'b-dup' } },
+        { status: 201 },
+      );
+    }),
     http.post(`*${base}/api/v1/tasks/:id/complete`, ({ params }) => {
       const t = tasks.find((x) => x.id === params.id)!;
       t.completed_at = new Date().toISOString();
