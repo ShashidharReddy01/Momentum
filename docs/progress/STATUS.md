@@ -119,7 +119,7 @@ Decisions D1–D8 in the spec. Built in a browser session in mock mode; live ver
 - [x] S75-03 Mo reads files: tools, table queries, vision, conversation files (J15) (2026-10-06; 8 file tools; vision through look_at with caps; chat file chips and paperclip; 4 eval features, 45 mock cases at 1.0, 21 live-only; J15 green)
 - [x] S75-04 Project fields, template lineage, field history, rules action (2026-10-06; migration 0043 (all lifecycle tables); project fields API, Details card, "Applies to"; rule action `set_project_field` + title/type conditions, gate-aware; Mo tool `set_project_field`; `nl_rule/v6`; 11 backend tests)
 - [x] S75-05 Portfolio v2 backend: rules, stage, columns, views, gates, snapshots (2026-10-06; rows with every built-in column in 13 queries (40 projects: ~30 ms); views, members, settings, manual ↔ rule, readiness, stage moves with gate override; snapshots job + backfill CLI; workload by portfolio; portfolio permission matrix)
-- [ ] S75-06 Customer onboarding template, `seed --onboarding`, eval workspace
+- [x] S75-06 Customer onboarding template, `seed --onboarding`, eval workspace (2026-10-06; template with milestones, RAID, task and project fields, 5 stage rules; 40 customers in the spec's stage counts with ~6 months of history, gates consistent; rule portfolio with targets, gates, columns; 12-customer eval draw; fresh DB → portfolio rows in 30–60 ms; re-run adds nothing)
 - [ ] S75-07 Portfolio v2 web (J16)
 - [ ] S75-08 Dashboards v2: query, widgets, filters, role templates (J17)
 - [ ] S75-09 Reports engine (J18)
@@ -128,7 +128,7 @@ Decisions D1–D8 in the spec. Built in a browser session in mock mode; live ver
 - [ ] S75-12 Smart task creation and project close-out (J19 part 3)
 - [ ] S75-13 Exit (J14 extended, UI audit, live verification list, docs)
 
-**Next up:** S75-06 Customer onboarding template, `seed --onboarding`, eval workspace.
+**Next up:** S75-07 Portfolio v2 web (J16).
 
 **Decisions (Phase 7.5, delegated):** (the build session records its own calls here)
 - D75-1 (S75-00): `momentum.files` may import only `core`; `momentum.reports` may import `core`, `files` and `domain`, never `ai`/`agents`/`integrations`. Enforced by two new import-linter contracts.
@@ -165,6 +165,11 @@ Decisions D1–D8 in the spec. Built in a browser session in mock mode; live ver
 - D75-33 (S75-05): a board move is `POST /portfolios/{id}/projects/{pid}/stage {to, override}`. It needs project editor (it is a project field change), answers 409 `gate_not_met` with the checklist in the body when the gate isn't met, and with `override: true` records `gate_override: "moved to <stage> without …"` in the activity.
 - D75-34 (S75-05): snapshots have no API yet (S75-08's trend widgets read them through the dashboard query); the CLI also has `momentum snapshots today`. The backfill counts a task as done from its `completed_at` (an earlier completion of a reopened task is lost) and never overwrites a real snapshot.
 - D75-35 (S75-05): the workload grid takes `portfolio_id` (the service takes `project_ids`); scoped to a portfolio, it leaves out the "hidden work" counts, as it does for one project.
+- D75-36 (S75-06): the template is built as a payload (`save_template_payload`), not from a source project; its task fields are born on an archived "Customer onboarding (fields)" project of the new **Customer Success** team. Templates now keep a task's type (`type` in the payload): milestones stay milestones when saved and instantiated (they were silently turned into plain tasks before).
+- D75-37 (S75-06): the seeded portfolio's rule sets `include_completed: true`, so Live and Lost customers (status complete) stay on the lifecycle board.
+- D75-38 (S75-06): the seed backdates directly (project and task creation, completions, stage history) and then moves the template rules' `created_at` past the seeded history, so the rules executor never replays the seed; it runs `ANALYZE` on the tables it filled (before that, the portfolio rows took ~4 s instead of ~30 ms on a fresh database). Forecasts are computed for real (`forecasts.store`) from the seeded work, not invented.
+- D75-39 (S75-06): the eval workspace draws 12 customers from the same generator (`SMALL_DISTRIBUTION`) and keeps Lena out of them (`quiet`), because the launch cases expect her inbox and digest to be empty. Installing only the template into a live workspace (without the demo) isn't built: the template ships with the demo seed and then appears in New project → From template; a standalone installer goes on the Later list.
+- D75-40 (S75-06): the seven role dashboards pinned to the personas' Home are added to this seed by S75-08, which builds those dashboards.
 - D75-21 (S75-03): the four file eval features run through the real chat loop with file chips (fixtures live in `mock_responses/chat.yaml`); `momentum evals` and the eval test build `onboarding_v1` beside `launch_v1`.
 
 ### Phase 7: Hardening and Asana-ready

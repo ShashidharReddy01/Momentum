@@ -89,6 +89,11 @@ def seed(
     scale: bool = typer.Option(
         False, "--scale", help="Also add the load-test workspace (~150 people, 50k tasks)"
     ),
+    onboarding: bool = typer.Option(
+        False,
+        "--onboarding",
+        help="Also add the customer lifecycle demo (template, 40 customers, portfolio; P7.5)",
+    ),
 ) -> None:
     """Load the synthetic demo workspace (safe to re-run)."""
     from momentum.core.db import UnitOfWork, create_engine, create_session_factory
@@ -102,6 +107,10 @@ def seed(
         uow = UnitOfWork(create_session_factory(engine)())
         try:
             async with uow.transaction() as session:
+                if onboarding:
+                    from momentum.seed_onboarding import seed_onboarding
+
+                    return await seed_onboarding(session, settings)
                 if scale:
                     from momentum.seed_scale import seed_scale
 

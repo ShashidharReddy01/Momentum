@@ -140,6 +140,16 @@ async def _upload(
 
 async def _build_one(session: AsyncSession, settings: Settings, name: str) -> None:
     spec: dict[str, Any] = yaml.safe_load((WORKSPACES / f"{name}.yaml").read_text(encoding="utf-8"))
+    if spec.get("onboarding"):  # Phase 7.5 S75-06: customers from the seed's own generator
+        from momentum.seed_onboarding import SMALL_DISTRIBUTION, seed_onboarding
+
+        await seed_onboarding(
+            session,
+            settings,
+            distribution=SMALL_DISTRIBUTION,
+            backfill_days=int(spec["onboarding"].get("backfill_days", 30)),
+            quiet=tuple(spec["onboarding"].get("quiet", [])),
+        )
     world = EvalWorld(users=await _users(session))
     for tag_name in spec.get("tags", []):  # workspace tags the rules cases refer to by name
         exists = (

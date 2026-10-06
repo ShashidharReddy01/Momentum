@@ -46,6 +46,7 @@ from momentum.domain.sections.service import create_section, rename_section
 from momentum.domain.tasks.models import Task, TaskDependency, TaskProject
 from momentum.domain.tasks.service import (
     add_dependency,
+    convert_task_type,
     create_subtask,
     create_task,
     update_task,
@@ -164,6 +165,8 @@ async def _capture_task(
         "start_offset_days": _offset(reference, task.start_on),
         "role_id": roles.for_user(users.get(task.assignee_id) if task.assignee_id else None),
         "field_values": field_values.get(task.id, {}),
+        # Phase 7.5: milestones stay milestones (the onboarding template's rules key on them)
+        "type": task.type,
         "subtasks": [
             await _capture_task(session, child, roles, users, field_values, reference)
             for child in children
@@ -440,6 +443,10 @@ async def _instantiate_task(
             patch["priority"] = spec["priority"]
         if patch:
             await update_task(session, ctx, task_id, patch)
+
+    if spec.get("type") in ("milestone", "approval"):
+        with contextlib.suppress(DomainError):
+            await convert_task_type(session, ctx, task_id, str(spec["type"]))
 
     patch2: dict[str, Any] = {}
     if start_days is not None:
