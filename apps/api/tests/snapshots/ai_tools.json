@@ -849,7 +849,7 @@
   },
   {
     "function": {
-      "description": "The text of a file attached to a task (PDF, Word or text), for reading or extracting details from it. Long files are cut at 20,000 characters.",
+      "description": "Plain text only of a file attached to a task (PDF, Word or text), cut at 20,000 characters. Prefer read_file (structure, tables, locators) and query_table (numbers).",
       "name": "get_attachment_text",
       "parameters": {
         "additionalProperties": false,
@@ -930,6 +930,1289 @@
         },
         "required": [
           "task"
+        ],
+        "type": "object"
+      }
+    },
+    "type": "function"
+  },
+  {
+    "function": {
+      "description": "Files the user can see, with where each lives: the files in this conversation, on a task, in a project, or matching a name. Use it to find 'the contract' or 'the attached workbook' before reading.",
+      "name": "list_files",
+      "parameters": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "One of document, spreadsheet, presentation, pdf, image, text, email, archive, other"
+          },
+          "project": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Project name or id"
+          },
+          "q": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Part of the file name"
+          },
+          "task": {
+            "anyOf": [
+              {
+                "additionalProperties": false,
+                "description": "Exactly one of ``id``, ``key`` or ``title_query``. A bare string is accepted too:\n``\"T-12\"`` is read as a key, a UUID as an id, anything else as a title query.",
+                "properties": {
+                  "id": {
+                    "anyOf": [
+                      {
+                        "format": "uuid",
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "default": null,
+                    "description": "Task id, when known exactly"
+                  },
+                  "key": {
+                    "anyOf": [
+                      {
+                        "pattern": "^[Tt]-\\d{1,9}$",
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "default": null,
+                    "description": "Task key such as \"T-123\""
+                  },
+                  "project": {
+                    "anyOf": [
+                      {
+                        "maxLength": 200,
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "default": null,
+                    "description": "Project name or id to narrow a title_query"
+                  },
+                  "title_query": {
+                    "anyOf": [
+                      {
+                        "maxLength": 200,
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "default": null,
+                    "description": "Words from the task title, when neither the id nor the key is known"
+                  }
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          }
+        },
+        "type": "object"
+      }
+    },
+    "type": "function"
+  },
+  {
+    "function": {
+      "description": "What a file contains, without its full text: headings, pages, sheets (columns, types, row counts), slides, whether it has macros (and what they do), email headers, warnings. Call it first on a file you haven't read.",
+      "name": "file_outline",
+      "parameters": {
+        "additionalProperties": false,
+        "properties": {
+          "file": {
+            "additionalProperties": false,
+            "description": "A file by id, or by (part of) its name, optionally within a task or a project. A bare\nstring works too: a UUID is read as an id, anything else as a name.",
+            "properties": {
+              "id": {
+                "anyOf": [
+                  {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "maxLength": 300,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "project": {
+                "anyOf": [
+                  {
+                    "maxLength": 200,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "task": {
+                "anyOf": [
+                  {
+                    "additionalProperties": false,
+                    "description": "Exactly one of ``id``, ``key`` or ``title_query``. A bare string is accepted too:\n``\"T-12\"`` is read as a key, a UUID as an id, anything else as a title query.",
+                    "properties": {
+                      "id": {
+                        "anyOf": [
+                          {
+                            "format": "uuid",
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "default": null,
+                        "description": "Task id, when known exactly"
+                      },
+                      "key": {
+                        "anyOf": [
+                          {
+                            "pattern": "^[Tt]-\\d{1,9}$",
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "default": null,
+                        "description": "Task key such as \"T-123\""
+                      },
+                      "project": {
+                        "anyOf": [
+                          {
+                            "maxLength": 200,
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "default": null,
+                        "description": "Project name or id to narrow a title_query"
+                      },
+                      "title_query": {
+                        "anyOf": [
+                          {
+                            "maxLength": 200,
+                            "minLength": 1,
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "default": null,
+                        "description": "Words from the task title, when neither the id nor the key is known"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              }
+            },
+            "type": "object"
+          }
+        },
+        "required": [
+          "file"
+        ],
+        "type": "object"
+      }
+    },
+    "type": "function"
+  },
+  {
+    "function": {
+      "description": "Read the text and tables of a file (or one part of it, by locator), with locators to cite. Long files come back in parts: it says what's left. For spreadsheets use read_sheet / query_table instead.",
+      "name": "read_file",
+      "parameters": {
+        "additionalProperties": false,
+        "properties": {
+          "file": {
+            "additionalProperties": false,
+            "description": "A file by id, or by (part of) its name, optionally within a task or a project. A bare\nstring works too: a UUID is read as an id, anything else as a name.",
+            "properties": {
+              "id": {
+                "anyOf": [
+                  {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "maxLength": 300,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "project": {
+                "anyOf": [
+                  {
+                    "maxLength": 200,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "task": {
+                "anyOf": [
+                  {
+                    "additionalProperties": false,
+                    "description": "Exactly one of ``id``, ``key`` or ``title_query``. A bare string is accepted too:\n``\"T-12\"`` is read as a key, a UUID as an id, anything else as a title query.",
+                    "properties": {
+                      "id": {
+                        "anyOf": [
+                          {
+                            "format": "uuid",
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "default": null,
+                        "description": "Task id, when known exactly"
+                      },
+                      "key": {
+                        "anyOf": [
+                          {
+                            "pattern": "^[Tt]-\\d{1,9}$",
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "default": null,
+                        "description": "Task key such as \"T-123\""
+                      },
+                      "project": {
+                        "anyOf": [
+                          {
+                            "maxLength": 200,
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "default": null,
+                        "description": "Project name or id to narrow a title_query"
+                      },
+                      "title_query": {
+                        "anyOf": [
+                          {
+                            "maxLength": 200,
+                            "minLength": 1,
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "default": null,
+                        "description": "Words from the task title, when neither the id nor the key is known"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              }
+            },
+            "type": "object"
+          },
+          "locator": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Which part: a page range (\"p3\", \"p2-5\", up to 10 pages), \"slide 4\" or \"slides 2-3\", a section (\"§ Scope\"), \"table 2\", a sheet (\"s:Budget\"). Omit to read from the start."
+          },
+          "max_chars": {
+            "default": 8000,
+            "maximum": 20000,
+            "minimum": 500,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "file"
+        ],
+        "type": "object"
+      }
+    },
+    "type": "function"
+  },
+  {
+    "function": {
+      "description": "Cells of a spreadsheet sheet (values as saved; formulas on request), with row numbers and column letters. At most 500 rows by 50 columns per call.",
+      "name": "read_sheet",
+      "parameters": {
+        "additionalProperties": false,
+        "properties": {
+          "file": {
+            "additionalProperties": false,
+            "description": "A file by id, or by (part of) its name, optionally within a task or a project. A bare\nstring works too: a UUID is read as an id, anything else as a name.",
+            "properties": {
+              "id": {
+                "anyOf": [
+                  {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "maxLength": 300,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "project": {
+                "anyOf": [
+                  {
+                    "maxLength": 200,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "task": {
+                "anyOf": [
+                  {
+                    "additionalProperties": false,
+                    "description": "Exactly one of ``id``, ``key`` or ``title_query``. A bare string is accepted too:\n``\"T-12\"`` is read as a key, a UUID as an id, anything else as a title query.",
+                    "properties": {
+                      "id": {
+                        "anyOf": [
+                          {
+                            "format": "uuid",
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "default": null,
+                        "description": "Task id, when known exactly"
+                      },
+                      "key": {
+                        "anyOf": [
+                          {
+                            "pattern": "^[Tt]-\\d{1,9}$",
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "default": null,
+                        "description": "Task key such as \"T-123\""
+                      },
+                      "project": {
+                        "anyOf": [
+                          {
+                            "maxLength": 200,
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "default": null,
+                        "description": "Project name or id to narrow a title_query"
+                      },
+                      "title_query": {
+                        "anyOf": [
+                          {
+                            "maxLength": 200,
+                            "minLength": 1,
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "default": null,
+                        "description": "Words from the task title, when neither the id nor the key is known"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              }
+            },
+            "type": "object"
+          },
+          "formulas": {
+            "default": false,
+            "description": "Also return the formulas in the range",
+            "type": "boolean"
+          },
+          "range": {
+            "anyOf": [
+              {
+                "maxLength": 30,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "A1 notation (\"A1:F40\", \"B:D\"); at most 500 rows and 50 columns"
+          },
+          "sheet": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Sheet name; omit if one"
+          }
+        },
+        "required": [
+          "file"
+        ],
+        "type": "object"
+      }
+    },
+    "type": "function"
+  },
+  {
+    "function": {
+      "description": "Exact totals, counts, averages, min/max, groupings and filtered rows from a sheet (or a table in a document), computed by the server. Use it for every number you state about spreadsheet data. Columns by header name or letter.",
+      "name": "query_table",
+      "parameters": {
+        "additionalProperties": false,
+        "properties": {
+          "file": {
+            "additionalProperties": false,
+            "description": "A file by id, or by (part of) its name, optionally within a task or a project. A bare\nstring works too: a UUID is read as an id, anything else as a name.",
+            "properties": {
+              "id": {
+                "anyOf": [
+                  {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "maxLength": 300,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "project": {
+                "anyOf": [
+                  {
+                    "maxLength": 200,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "task": {
+                "anyOf": [
+                  {
+                    "additionalProperties": false,
+                    "description": "Exactly one of ``id``, ``key`` or ``title_query``. A bare string is accepted too:\n``\"T-12\"`` is read as a key, a UUID as an id, anything else as a title query.",
+                    "properties": {
+                      "id": {
+                        "anyOf": [
+                          {
+                            "format": "uuid",
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "default": null,
+                        "description": "Task id, when known exactly"
+                      },
+                      "key": {
+                        "anyOf": [
+                          {
+                            "pattern": "^[Tt]-\\d{1,9}$",
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "default": null,
+                        "description": "Task key such as \"T-123\""
+                      },
+                      "project": {
+                        "anyOf": [
+                          {
+                            "maxLength": 200,
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "default": null,
+                        "description": "Project name or id to narrow a title_query"
+                      },
+                      "title_query": {
+                        "anyOf": [
+                          {
+                            "maxLength": 200,
+                            "minLength": 1,
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "default": null,
+                        "description": "Words from the task title, when neither the id nor the key is known"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              }
+            },
+            "type": "object"
+          },
+          "query": {
+            "additionalProperties": false,
+            "properties": {
+              "aggregates": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "as": {
+                      "anyOf": [
+                        {
+                          "maxLength": 60,
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "default": null
+                    },
+                    "column": {
+                      "anyOf": [
+                        {
+                          "maxLength": 200,
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "default": null
+                    },
+                    "fn": {
+                      "enum": [
+                        "count",
+                        "sum",
+                        "avg",
+                        "min",
+                        "max",
+                        "distinct_count"
+                      ],
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "fn"
+                  ],
+                  "type": "object"
+                },
+                "maxItems": 10,
+                "type": "array"
+              },
+              "filters": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "column": {
+                      "maxLength": 200,
+                      "type": "string"
+                    },
+                    "op": {
+                      "enum": [
+                        "eq",
+                        "ne",
+                        "lt",
+                        "lte",
+                        "gt",
+                        "gte",
+                        "contains",
+                        "in",
+                        "empty",
+                        "not_empty"
+                      ],
+                      "type": "string"
+                    },
+                    "value": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "integer"
+                        },
+                        {
+                          "type": "boolean"
+                        },
+                        {
+                          "items": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "integer"
+                              }
+                            ]
+                          },
+                          "type": "array"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "default": null
+                    }
+                  },
+                  "required": [
+                    "column",
+                    "op"
+                  ],
+                  "type": "object"
+                },
+                "maxItems": 20,
+                "type": "array"
+              },
+              "group_by": {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 2,
+                "type": "array"
+              },
+              "limit": {
+                "default": 50,
+                "maximum": 200,
+                "minimum": 1,
+                "type": "integer"
+              },
+              "sort": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "by": {
+                      "maxLength": 200,
+                      "type": "string"
+                    },
+                    "dir": {
+                      "default": "asc",
+                      "enum": [
+                        "asc",
+                        "desc"
+                      ],
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "by"
+                  ],
+                  "type": "object"
+                },
+                "maxItems": 5,
+                "type": "array"
+              }
+            },
+            "type": "object"
+          },
+          "sheet": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Sheet name"
+          },
+          "table": {
+            "anyOf": [
+              {
+                "maxLength": 60,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "A table in a document: \"table 2\", \"p3 table 1\""
+          }
+        },
+        "required": [
+          "file",
+          "query"
+        ],
+        "type": "object"
+      }
+    },
+    "type": "function"
+  },
+  {
+    "function": {
+      "description": "Find words in a file (exact, then close spellings): up to 20 matches with their locators and the text around them, including spreadsheet cells.",
+      "name": "search_in_file",
+      "parameters": {
+        "additionalProperties": false,
+        "properties": {
+          "file": {
+            "additionalProperties": false,
+            "description": "A file by id, or by (part of) its name, optionally within a task or a project. A bare\nstring works too: a UUID is read as an id, anything else as a name.",
+            "properties": {
+              "id": {
+                "anyOf": [
+                  {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "maxLength": 300,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "project": {
+                "anyOf": [
+                  {
+                    "maxLength": 200,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "task": {
+                "anyOf": [
+                  {
+                    "additionalProperties": false,
+                    "description": "Exactly one of ``id``, ``key`` or ``title_query``. A bare string is accepted too:\n``\"T-12\"`` is read as a key, a UUID as an id, anything else as a title query.",
+                    "properties": {
+                      "id": {
+                        "anyOf": [
+                          {
+                            "format": "uuid",
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "default": null,
+                        "description": "Task id, when known exactly"
+                      },
+                      "key": {
+                        "anyOf": [
+                          {
+                            "pattern": "^[Tt]-\\d{1,9}$",
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "default": null,
+                        "description": "Task key such as \"T-123\""
+                      },
+                      "project": {
+                        "anyOf": [
+                          {
+                            "maxLength": 200,
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "default": null,
+                        "description": "Project name or id to narrow a title_query"
+                      },
+                      "title_query": {
+                        "anyOf": [
+                          {
+                            "maxLength": 200,
+                            "minLength": 1,
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "default": null,
+                        "description": "Words from the task title, when neither the id nor the key is known"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              }
+            },
+            "type": "object"
+          },
+          "query": {
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "file",
+          "query"
+        ],
+        "type": "object"
+      }
+    },
+    "type": "function"
+  },
+  {
+    "function": {
+      "description": "Look at a picture, a scanned PDF page, or the pictures on a slide or in a document: the images are attached to your next step (at most 3 per call). Use it for screenshots, scans and photos; read_file is better for pages with text.",
+      "name": "look_at",
+      "parameters": {
+        "additionalProperties": false,
+        "properties": {
+          "file": {
+            "additionalProperties": false,
+            "description": "A file by id, or by (part of) its name, optionally within a task or a project. A bare\nstring works too: a UUID is read as an id, anything else as a name.",
+            "properties": {
+              "id": {
+                "anyOf": [
+                  {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "maxLength": 300,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "project": {
+                "anyOf": [
+                  {
+                    "maxLength": 200,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "task": {
+                "anyOf": [
+                  {
+                    "additionalProperties": false,
+                    "description": "Exactly one of ``id``, ``key`` or ``title_query``. A bare string is accepted too:\n``\"T-12\"`` is read as a key, a UUID as an id, anything else as a title query.",
+                    "properties": {
+                      "id": {
+                        "anyOf": [
+                          {
+                            "format": "uuid",
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "default": null,
+                        "description": "Task id, when known exactly"
+                      },
+                      "key": {
+                        "anyOf": [
+                          {
+                            "pattern": "^[Tt]-\\d{1,9}$",
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "default": null,
+                        "description": "Task key such as \"T-123\""
+                      },
+                      "project": {
+                        "anyOf": [
+                          {
+                            "maxLength": 200,
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "default": null,
+                        "description": "Project name or id to narrow a title_query"
+                      },
+                      "title_query": {
+                        "anyOf": [
+                          {
+                            "maxLength": 200,
+                            "minLength": 1,
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "default": null,
+                        "description": "Words from the task title, when neither the id nor the key is known"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              }
+            },
+            "type": "object"
+          },
+          "image_index": {
+            "description": "Pictures in a document, 1-based",
+            "items": {
+              "type": "integer"
+            },
+            "maxItems": 3,
+            "type": "array"
+          },
+          "pages": {
+            "description": "PDF pages, 1-based",
+            "items": {
+              "type": "integer"
+            },
+            "maxItems": 3,
+            "type": "array"
+          },
+          "slides": {
+            "description": "Slides, 1-based",
+            "items": {
+              "type": "integer"
+            },
+            "maxItems": 3,
+            "type": "array"
+          }
+        },
+        "required": [
+          "file"
+        ],
+        "type": "object"
+      }
+    },
+    "type": "function"
+  },
+  {
+    "function": {
+      "description": "The macros (VBA) in a Word or Excel file: modules, code excerpts and what they do in plain words. Macros are only read, never run.",
+      "name": "describe_macros",
+      "parameters": {
+        "additionalProperties": false,
+        "properties": {
+          "file": {
+            "additionalProperties": false,
+            "description": "A file by id, or by (part of) its name, optionally within a task or a project. A bare\nstring works too: a UUID is read as an id, anything else as a name.",
+            "properties": {
+              "id": {
+                "anyOf": [
+                  {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "maxLength": 300,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "project": {
+                "anyOf": [
+                  {
+                    "maxLength": 200,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "task": {
+                "anyOf": [
+                  {
+                    "additionalProperties": false,
+                    "description": "Exactly one of ``id``, ``key`` or ``title_query``. A bare string is accepted too:\n``\"T-12\"`` is read as a key, a UUID as an id, anything else as a title query.",
+                    "properties": {
+                      "id": {
+                        "anyOf": [
+                          {
+                            "format": "uuid",
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "default": null,
+                        "description": "Task id, when known exactly"
+                      },
+                      "key": {
+                        "anyOf": [
+                          {
+                            "pattern": "^[Tt]-\\d{1,9}$",
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "default": null,
+                        "description": "Task key such as \"T-123\""
+                      },
+                      "project": {
+                        "anyOf": [
+                          {
+                            "maxLength": 200,
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "default": null,
+                        "description": "Project name or id to narrow a title_query"
+                      },
+                      "title_query": {
+                        "anyOf": [
+                          {
+                            "maxLength": 200,
+                            "minLength": 1,
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "default": null,
+                        "description": "Words from the task title, when neither the id nor the key is known"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              }
+            },
+            "type": "object"
+          }
+        },
+        "required": [
+          "file"
         ],
         "type": "object"
       }

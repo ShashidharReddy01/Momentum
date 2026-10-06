@@ -26,7 +26,7 @@ export interface Candidate {
 export interface Citation {
   ref: string;
   /** `comment`: a `[C3]` label in a thread summary (S3.4.1): `title` is the author. */
-  type: 'task' | 'project' | 'comment';
+  type: 'task' | 'project' | 'comment' | 'file';
   created_at?: string | null;
   valid: boolean;
   id?: string | null;
@@ -114,6 +114,8 @@ export interface Screen {
   task_id?: string;
   view?: string;
   selected_task_ids?: string[];
+  /** Phase 7.5: files the question is about (attachment ids). */
+  file_ids?: string[];
 }
 
 export function useScreen(): Screen {
@@ -146,6 +148,15 @@ const TOOL_WORDS: Record<string, string> = {
   list_user_tasks: "Read someone's tasks",
   get_project_activity: 'Read project activity',
   list_people: 'Looked up people',
+  list_files: 'Looked for files',
+  file_outline: 'Read a file outline',
+  read_file: 'Read a file',
+  read_sheet: 'Read a sheet',
+  query_table: 'Queried a table',
+  search_in_file: 'Searched a file',
+  look_at: 'Looked at an image',
+  describe_macros: 'Read macros (never run)',
+  get_attachment_text: 'Read a file',
 };
 
 /** "Searched tasks · Previewed bulk update tasks" for the compact activity line. */
@@ -278,6 +289,11 @@ export function useMoRuns(opts: { screen?: Screen | null } = {}) {
     setRuns(stored);
   }, []);
   const rate = useCallback((runId: string, rating: -1 | 1) => update(runId, (r) => ({ ...r, rating })), []);
+  /** Phase 7.5: a file attached to a new chat started one; the next question continues it. */
+  const adopt = useCallback((id: string) => {
+    convRef.current = id;
+    setConversationId(id);
+  }, []);
 
-  return { runs, run, ask, newChat, open, rate, conversationId };
+  return { runs, run, ask, newChat, open, rate, adopt, conversationId };
 }

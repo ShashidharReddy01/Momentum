@@ -33,6 +33,7 @@ import { Icon } from '@/components/ui/Icon';
 import { IconButton } from '@/components/ui/IconButton';
 import { Input } from '@/components/ui/Input';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { FILE_DRAG_TYPE } from '@/features/ai';
 import { useMe } from '@/features/auth';
 import { usePeople } from '@/features/people';
 import { useTaskNav } from '@/features/tasks';
@@ -290,6 +291,7 @@ export function FilesView({
               actions={(f) => (
                 <RowMenu
                   file={f}
+                  projectId={projectId}
                   canEdit={canEdit}
                   canDelete={isAdmin || f.uploaded_by === me.data?.user.id}
                   onPreview={() => setPreview(f)}
@@ -315,7 +317,9 @@ export function FilesView({
               </div>
             ) : null}
           </div>
-          {preview ? <PreviewPanel file={preview} onClose={() => setPreview(null)} /> : null}
+          {preview ? (
+            <PreviewPanel file={preview} projectId={projectId} onClose={() => setPreview(null)} />
+          ) : null}
           {versionsOf ? <VersionsPanel file={versionsOf} onClose={() => setVersionsOf(null)} /> : null}
         </div>
       )}
@@ -415,6 +419,12 @@ function FilesGrid({
           onFocus={() => setActive(i)}
           onKeyDown={(e) => onKey(e, i)}
           onDoubleClick={() => onPreview(f)}
+          // drag a row into Ask Mo's composer to ask about it (Phase 7.5)
+          draggable
+          onDragStart={(e) => {
+            e.dataTransfer.setData(FILE_DRAG_TYPE, JSON.stringify({ id: f.id, name: f.filename }));
+            e.dataTransfer.effectAllowed = 'copy';
+          }}
           className="grid grid-cols-[minmax(0,2.4fr)_minmax(0,1.6fr)_minmax(0,1fr)_88px_72px_40px] items-center gap-x-2 border-b border-hair-soft px-3 py-1.5 text-sm last:border-b-0 hover:bg-surface-2 focus:bg-surface-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus max-md:grid-cols-[minmax(0,1fr)_40px]"
         >
           <div role="gridcell" className="flex min-w-0 items-center gap-2">
@@ -487,6 +497,7 @@ function FilesGrid({
 
 function RowMenu({
   file,
+  projectId,
   canEdit,
   canDelete,
   onPreview,
@@ -495,6 +506,7 @@ function RowMenu({
   onDelete,
 }: {
   file: ProjectFile;
+  projectId: string;
   canEdit: boolean;
   canDelete: boolean;
   onPreview: () => void;
@@ -541,7 +553,7 @@ function RowMenu({
         ) : null}
         {ai_enabled ? (
           <DropdownMenuItem
-            onSelect={() => askAbout({ kind: 'file', fileId: file.id, label: file.filename })}
+            onSelect={() => askAbout({ kind: 'file', fileId: file.id, label: file.filename, projectId })}
           >
             <MoMark size={13} /> Ask Mo about this file
           </DropdownMenuItem>
@@ -611,7 +623,15 @@ function TextPreview({ url }: { url: string }) {
 }
 
 /** Spec §3.3: images inline, PDFs in a sandboxed frame, text as plain text, the rest as details. */
-function PreviewPanel({ file, onClose }: { file: ProjectFile; onClose: () => void }) {
+function PreviewPanel({
+  file,
+  projectId,
+  onClose,
+}: {
+  file: ProjectFile;
+  projectId: string;
+  onClose: () => void;
+}) {
   const { api_base, ai_enabled } = useMomentumConfig();
   const askAbout = useUi((s) => s.askAbout);
   const url = `${api_base}/attachments/${file.id}/download`;
@@ -654,7 +674,7 @@ function PreviewPanel({ file, onClose }: { file: ProjectFile; onClose: () => voi
           <Button
             size="sm"
             variant="ghost"
-            onClick={() => askAbout({ kind: 'file', fileId: file.id, label: file.filename })}
+            onClick={() => askAbout({ kind: 'file', fileId: file.id, label: file.filename, projectId })}
           >
             <MoMark size={13} /> Ask Mo about this file
           </Button>

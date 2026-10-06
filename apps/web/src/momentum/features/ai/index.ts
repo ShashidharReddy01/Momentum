@@ -6,7 +6,8 @@ export { SummaryButton } from './Summaries';
 export { errorText } from './errors';
 export { BreakDownButton } from './BreakDown';
 export { PlanMyDayButton } from './PlanMyDay';
-export { MoComposer, MoText, MoThread } from './MoThread';
+export { FILE_DRAG_TYPE, MoComposer, MoText, MoThread } from './MoThread';
+export { useMoFiles, type MoFileChip } from './useMoFiles';
 export {
   aiKeys,
   chatKeys,

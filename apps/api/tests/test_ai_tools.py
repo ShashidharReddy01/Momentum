@@ -97,6 +97,15 @@ def test_catalog_covers_phase_1_2_tools_with_their_risks() -> None:
         "get_project_activity": "read",
         "list_people": "read",
         "get_attachment_text": "read",  # S5.1.5
+        # Phase 7.5 S75-03: file tools
+        "list_files": "read",
+        "file_outline": "read",
+        "read_file": "read",
+        "read_sheet": "read",
+        "query_table": "read",
+        "search_in_file": "read",
+        "look_at": "read",
+        "describe_macros": "read",
         "create_task": "low",
         "update_task": "low",
         "reschedule_task": "medium",  # S6.1.2

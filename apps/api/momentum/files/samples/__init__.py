@@ -704,7 +704,13 @@ SAMPLES: dict[str, tuple[Callable[[], bytes], str]] = {
     "customer-email.eml": (eml_customer, "message/rfc822"),
     "customer-email.msg": (msg_customer, "application/vnd.ms-outlook"),
     "bundle.zip": (zip_bundle, "application/zip"),
-    "zenith-pricing.docx": (docx_zenith_pricing, "application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
+    "zenith-pricing.docx": (
+        docx_zenith_pricing,
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ),
     "old.doc": (legacy_doc, "application/msword"),
-    "locked.xlsx": (lambda: xlsx_encrypted(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
+    "locked.xlsx": (
+        lambda: xlsx_encrypted(),
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    ),
 }

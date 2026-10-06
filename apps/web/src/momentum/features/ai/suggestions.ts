@@ -33,9 +33,12 @@ export function suggestionsFor(screen: Screen, context: MoContext | null): strin
 export function contextScreen(c: MoContext): Screen {
   if (c.kind === 'task') return { kind: 'task', task_id: c.taskId };
   if (c.kind === 'project') return { kind: 'project', project_id: c.projectId };
-  // the file itself travels with the message from S75-03 on (file context); the chip shows it now
+  // the file travels with every question of the chat (Phase 7.5); Mo reads it only when asked
   if (c.kind === 'file')
-    return c.projectId ? { kind: 'project', project_id: c.projectId } : { kind: 'other' };
+    return {
+      ...(c.projectId ? { kind: 'project', project_id: c.projectId } : { kind: 'other' }),
+      file_ids: c.fileId ? [c.fileId] : [],
+    };
   return {
     kind: 'project',
     ...(c.projectId ? { project_id: c.projectId } : {}),

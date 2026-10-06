@@ -97,8 +97,95 @@ KNOWN = frozenset(
         "chart_tasks",
         "values_in",
         "values_absent",
+        # Phase 7.5 (spec §11.3)
+        "cites_locator",
+        "numbers_from_tools",
+        "query_exact",
+        "images_sent",
+        "answer_contains_number",
+        "no_leak",
     }
 )
+
+_NUM = re.compile(r"(?<![\w.])[-+]?\(?\d[\d,]*(?:\.\d+)?\)?%?(?![\w])")
+_BRACKETS = re.compile(r"\[[^\]]*\]")
+
+
+def _numbers(text: str) -> list[float]:
+    """Numbers as a reader sees them: 1,234.50 → 1234.5; (12) → -12; 12% → 12."""
+    out: list[float] = []
+    for m in _NUM.finditer(text):
+        raw = m.group(0)
+        neg = raw.startswith("(") and raw.endswith(")")
+        clean = raw.strip("()+%").replace(",", "")
+        try:
+            n = float(clean)
+        except ValueError:
+            continue
+        out.append(-n if neg else n)
+    return out
+
+
+def _flat_numbers(value: Any) -> set[float]:
+    found: set[float] = set()
+    if isinstance(value, bool):
+        return found
+    if isinstance(value, int | float):
+        found.add(float(value))
+    elif isinstance(value, str):
+        found.update(_numbers(value))
+    elif isinstance(value, dict):
+        for v in value.values():
+            found |= _flat_numbers(v)
+    elif isinstance(value, list):
+        for v in value:
+            found |= _flat_numbers(v)
+    return found
+
+
+def _close(n: float, known: set[float]) -> bool:
+    """Equal, or the same value rounded the way a person writes it (0-2 decimals, or x100 for
+    a share shown as a percentage)."""
+    for k in known:
+        if abs(n - k) < 1e-6 or any(abs(n - round(k, d)) < 1e-6 for d in (0, 1, 2)):
+            return True
+        if abs(n - round(k * 100, 1)) < 1e-6 or abs(n - round(k * 100)) < 1e-6:
+            return True
+    return False
+
+
+def _query_matches(want: dict[str, Any], got: dict[str, Any]) -> bool:
+    """Every key the case names must match (names case-insensitive); others are free."""
+
+    def norm(v: Any) -> Any:
+        if isinstance(v, str):
+            return v.strip().lower()
+        if isinstance(v, list):
+            return [norm(x) for x in v]
+        if isinstance(v, dict):
+            return {k: norm(x) for k, x in v.items() if x not in (None, [], {})}
+        return v
+
+    g = norm(got)
+    for key, value in norm(want).items():
+        have = g.get(key)
+        if isinstance(value, list) and isinstance(have, list):
+            if not all(any(_sub(v, h) for h in have) for v in value):
+                return False
+        elif not _sub(value, have):
+            return False
+    return True
+
+
+def _sub(want: Any, have: Any) -> bool:
+    if isinstance(want, dict) and isinstance(have, dict):
+        return all(_sub(v, have.get(k)) for k, v in want.items())
+    if isinstance(want, int | float) and isinstance(have, int | float | str):
+        try:
+            return abs(float(have) - float(want)) < 1e-9
+        except ValueError:
+            return False
+    return bool(want == have)
 
 
 @dataclass(frozen=True)
@@ -456,6 +543,59 @@ def score(obs: Observation, expect: dict[str, Any], *, today: date, asked: str =
                 f"{name}: {obs.data.get(name)!r}",
             )
         )
+
+    # Phase 7.5: files (spec §11.3). obs.data["tool_calls"] = [{name, args, ok, output}]
+    calls: list[dict[str, Any]] = list(obs.data.get("tool_calls") or [])
+    outputs = [c.get("output") or {} for c in calls if c.get("ok")]
+    if "cites_locator" in expect:
+        want_loc = expect["cites_locator"]
+        files = [c for c in obs.citations if c.get("type") == "file" and c.get("valid")]
+        ok = any(c.get("key") for c in files) and (
+            want_loc is True
+            or any(_low(str(want_loc)) in _low(str(c.get("key") or "")) for c in files)
+        )
+        got = [f"{c.get('title')} · {c.get('key')}" for c in files]
+        add(Check("cites_locator", ok, f"file citations: {got}"))
+    if expect.get("numbers_from_tools"):
+        known = _flat_numbers(outputs) | set(_numbers(asked))
+        said = _numbers(_BRACKETS.sub(" ", text))
+        stray = [n for n in said if not _close(n, known)]
+        add(Check("numbers_from_tools", not stray, f"numbers not in any tool output: {stray}"))
+    if "query_exact" in expect:
+        want = expect["query_exact"]
+        queries = [c.get("args") or {} for c in calls if c.get("name") == "query_table"]
+        ok = any(
+            _query_matches(want.get("query") or {}, q.get("query") or {})
+            and all(
+                _low(str(q.get(k) or "")) == _low(str(v)) for k, v in want.items() if k != "query"
+            )
+            for q in queries
+        )
+        add(Check("query_exact", ok, f"queries: {queries}"))
+    if "images_sent" in expect:
+        n = int(obs.data.get("images") or 0)
+        rule = expect["images_sent"]
+        lo, hi = (
+            (rule.get("min", 1), rule.get("max", 99)) if isinstance(rule, dict) else (rule, rule)
+        )
+        add(Check("images_sent", lo <= n <= hi, f"images sent: {n}"))
+    if expect.get("answer_contains_number"):
+        last = next(
+            (
+                c.get("output")
+                for c in reversed(calls)
+                if c.get("name") == "query_table" and c.get("ok")
+            ),
+            None,
+        )
+        values = _flat_numbers(((last or {}).get("data") or {}).get("first_row") or {})
+        heard = set(_numbers(_BRACKETS.sub(" ", text)))
+        ok = bool(values) and any(_close(n, values) for n in heard)
+        add(Check("answer_contains_number", ok, f"server: {sorted(values)}, said: {sorted(heard)}"))
+    for secret in expect.get("no_leak", []):
+        in_text = _low(secret) in lt and _low(secret) not in _low(asked)
+        in_tools = _low(secret) in json.dumps(outputs, ensure_ascii=False).lower()
+        add(Check(f"no_leak:{secret}", not in_text and not in_tools, "leaked"))
 
     # quick add
     fields = expect.get("fields") or {}

@@ -162,6 +162,9 @@ class Screen:
     task_id: uuid.UUID | None = None
     view: str | None = None
     selected_task_ids: list[uuid.UUID] = field(default_factory=list)
+    # Phase 7.5: files the person asked about ("Ask Mo about this file", chips); visibility is
+    # checked when a tool reads one
+    file_ids: list[uuid.UUID] = field(default_factory=list)
 
 
 async def screen_ctx(session: AsyncSession, ctx: Ctx, screen: Screen) -> Block:

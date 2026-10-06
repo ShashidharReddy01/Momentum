@@ -5,9 +5,9 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, date, datetime
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
-from fastapi import APIRouter, status
+from fastapi import APIRouter, File, Form, UploadFile, status
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -43,6 +43,9 @@ from momentum.ai.prefs import AiPrefs
 from momentum.api.deps import CtxDep, RuntimeDep, UowDep
 from momentum.api.schemas import ListOut, MutationOut
 from momentum.core.errors import ValidationFailed
+from momentum.core.ids import new_id
+from momentum.core.storage import build_storage
+from momentum.domain.attachments.router import stream_upload
 from momentum.domain.dashboards.schemas import QueryResultOut, QuerySpec, WidgetKind
 from momentum.domain.portfolios import service as portfolios
 from momentum.domain.status_updates.schemas import StatusUpdateIn
@@ -269,6 +272,8 @@ class ScreenIn(BaseModel):
     task_id: uuid.UUID | None = None
     view: str | None = Field(default=None, max_length=20)
     selected_task_ids: list[uuid.UUID] = Field(default_factory=list, max_length=200)
+    # Phase 7.5: files the person is asking about (attachment ids; checked when read)
+    file_ids: list[uuid.UUID] = Field(default_factory=list, max_length=5)
 
     def to_screen(self) -> Screen:
         return Screen(
@@ -277,6 +282,7 @@ class ScreenIn(BaseModel):
             task_id=self.task_id,
             view=self.view,
             selected_task_ids=list(self.selected_task_ids),
+            file_ids=list(self.file_ids),
         )
 
 
@@ -364,7 +370,7 @@ class ConversationOut(BaseModel):
 
 class CitationOut(BaseModel):
     ref: str
-    type: Literal["task", "project"]
+    type: Literal["task", "project", "file"]
     valid: bool
     id: str | None = None
     key: str | None = None
@@ -388,6 +394,7 @@ class ChatMessageOut(BaseModel):
     candidates: list[dict[str, Any]] = Field(default_factory=list)
     grounded: bool | None = None
     rating: Literal[-1, 1] | None = None
+    file_ids: list[uuid.UUID] = Field(default_factory=list)  # the files a question was about
     created_at: datetime
 
 
@@ -429,12 +436,69 @@ async def get_ai_conversation(
                     candidates=c.get("candidates") or [],
                     grounded=c.get("grounded"),
                     rating=v.ratings.get(m.id),
+                    file_ids=c.get("file_ids") or [],
                     created_at=m.created_at,
                 )
             )
         return ConversationDetailOut(
             data=ConversationOut.model_validate(v.conversation), messages=messages
         )
+
+
+class ConversationFileOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    conversation_id: uuid.UUID
+    filename: str
+    mime: str
+    size_bytes: int
+    created_at: datetime
+
+
+@router.post(
+    "/conversation-files",
+    response_model=ConversationFileOut,
+    status_code=status.HTTP_201_CREATED,
+    summary="Attach a file to an Ask Mo chat only (private; starts a chat if none is given)",
+)
+async def upload_conversation_file(
+    ctx: CtxDep,
+    uow: UowDep,
+    rt: RuntimeDep,
+    file: UploadFile = File(...),
+    conversation_id: Annotated[uuid.UUID | None, Form()] = None,
+) -> ConversationFileOut:
+    """Phase 7.5 (spec §4.8): for a file the person can't (or chose not to) put on a task or
+    project. Stored like an upload; nothing is read until a message is sent (D1)."""
+    key = f"{ctx.workspace_id}/{new_id()}"
+    size, sha256, mime = await stream_upload(
+        file, storage=build_storage(rt.settings), max_upload_mb=rt.settings.max_upload_mb, key=key
+    )
+    async with uow.transaction() as s:
+        row = await chat.add_conversation_file(
+            s,
+            ctx,
+            conversation_id,
+            storage_key=key,
+            filename=file.filename or "file",
+            mime=mime,
+            size_bytes=size,
+            sha256=sha256,
+        )
+        return ConversationFileOut.model_validate(row)
+
+
+@router.get(
+    "/conversations/{conversation_id}/files",
+    response_model=ListOut[ConversationFileOut],
+    summary="The files attached to one of my chats",
+)
+async def list_conversation_files(
+    conversation_id: uuid.UUID, ctx: CtxDep, uow: UowDep
+) -> ListOut[ConversationFileOut]:
+    async with uow.transaction() as s:
+        rows = await chat.list_conversation_files(s, ctx, conversation_id)
+        return ListOut(data=[ConversationFileOut.model_validate(r) for r in rows])
 
 
 class FeedbackIn(BaseModel):

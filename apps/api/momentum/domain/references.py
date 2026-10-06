@@ -1,4 +1,5 @@
-"""References in text: ``[T-123]`` for tasks, ``[P:Project name]`` for projects.
+"""References in text: ``[T-123]`` for tasks, ``[P:Project name]`` for projects, and (Phase 7.5)
+``[F:file name · locator]`` for a place in a file (``[F:contract.pdf · p7]``).
 
 Written by Mo (S3.3.1 citations) and by people (S3.4.3 status updates). Nothing written is
 trusted: every reference is resolved here **as the reader**. Only a task or project that exists
@@ -21,14 +22,16 @@ from momentum.domain.access import get_visible_task, visible_projects_clause
 from momentum.domain.projects.models import Project
 from momentum.domain.tasks.models import Task
 
-CITE = re.compile(r"\[(T-(\d{1,9}))\]|\[P:([^\]\n]{1,200})\]")
+CITE = re.compile(
+    r"\[(T-(\d{1,9}))\]|\[P:([^\]\n]{1,200})\]|\[F:([^\]\n·]{1,300}?)\s*(?:·\s*([^\]\n]{1,120}))?\]"
+)
 MAX_CITATIONS = 40
 
 
 @dataclass(frozen=True)
 class Citation:
-    ref: str  # exactly as written: "[T-12]" or "[P:Website Revamp]"
-    type: str  # "task" | "project"
+    ref: str  # exactly as written: "[T-12]", "[P:Website Revamp]", "[F:sow.docx · p2]"
+    type: str  # "task" | "project" | "file" (key = the locator, title = the file name)
     valid: bool
     id: str | None = None
     key: str | None = None
@@ -60,9 +63,41 @@ async def resolve(session: AsyncSession, ctx: Ctx, text: str) -> list[Citation]:
         assert m is not None
         if m.group(1):
             out.append(await _task(session, ctx, ref, m.group(1), int(m.group(2))))
-        else:
+        elif m.group(3) is not None:
             out.append(await _project(session, ctx, ref, m.group(3).strip()))
+        else:
+            locator = (m.group(5) or "").strip() or None
+            out.append(await _file(session, ctx, ref, m.group(4).strip(), locator))
     return out
+
+
+async def _file(
+    session: AsyncSession, ctx: Ctx, ref: str, name: str, locator: str | None
+) -> Citation:
+    """The newest current file with that name the reader can open (the download gate)."""
+    from momentum.domain.attachments.models import Attachment
+    from momentum.domain.attachments.service import get_visible_attachment
+
+    rows = (
+        await session.execute(
+            select(Attachment.id)
+            .where(
+                Attachment.workspace_id == ctx.workspace_id,
+                Attachment.deleted_at.is_(None),
+                Attachment.is_current.is_(True),
+                func.lower(Attachment.filename) == name.lower(),
+            )
+            .order_by(Attachment.created_at.desc())
+            .limit(10)
+        )
+    ).scalars()
+    for att_id in rows:
+        try:
+            att = await get_visible_attachment(session, ctx, att_id)
+        except NotFound:
+            continue
+        return Citation(ref, "file", True, str(att.id), locator, att.filename)
+    return Citation(ref, "file", False, key=locator, title=name)
 
 
 async def _task(session: AsyncSession, ctx: Ctx, ref: str, key: str, number: int) -> Citation:

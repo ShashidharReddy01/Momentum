@@ -1,5 +1,5 @@
-import { Loader2, ThumbsDown, ThumbsUp } from 'lucide-react';
-import { Fragment, useState, type FormEvent, type ReactNode } from 'react';
+import { Loader2, Paperclip, ThumbsDown, ThumbsUp } from 'lucide-react';
+import { Fragment, useRef, useState, type DragEvent, type FormEvent, type ReactNode } from 'react';
 import { Link } from 'react-router';
 import { toast } from 'sonner';
 import { AICallout } from '@/components/common/AI';
@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
 import { IconButton } from '@/components/ui/IconButton';
 import { cn } from '@/lib/cn';
+import { useMomentumConfig } from '@/lib/config';
 import { PreviewCard } from './PreviewCard';
 import { useAiActionMutations, useFeedback } from './queries';
 import { describeStep, type Citation, type MoRun } from './useMoRuns';
@@ -179,7 +180,7 @@ function AutoApplied({ actionId }: { actionId: string }) {
   );
 }
 
-const INLINE = /(\[T-\d+\]|\[C\d+\]|\[P:[^\]\n]+\]|\*\*[^*\n]+\*\*)/g;
+const INLINE = /(\[T-\d+\]|\[C\d+\]|\[P:[^\]\n]+\]|\[F:[^\]\n]+\]|\*\*[^*\n]+\*\*)/g;
 
 /**
  * Mo's text as a small safe subset of Markdown (paragraphs, `- ` bullets, **bold**), built as
@@ -227,8 +228,43 @@ function inline(line: string, byRef: Map<string, Citation>): ReactNode {
   });
 }
 
+function FileCite({ refText, citation }: { refText: string; citation: Citation }) {
+  const { api_base } = useMomentumConfig();
+  const label = [citation.title, citation.key].filter(Boolean).join(' · ');
+  const chip =
+    'mx-0.5 inline-flex max-w-[22rem] items-center gap-1 rounded border border-hair-soft bg-surface-2 px-1 text-[12px] text-ink';
+  if (!citation.valid)
+    return (
+      <span title="Mo cited this file, but it isn't one you can open" className="text-muted">
+        {refText}
+      </span>
+    );
+  const body = (
+    <>
+      <Icon icon={Paperclip} size={11} className="shrink-0 text-muted" />
+      <span className="truncate">{label || refText}</span>
+    </>
+  );
+  // a file only in this chat has no download link of its own: the chip names the place
+  return citation.id ? (
+    <a
+      href={`${api_base}/attachments/${citation.id}/download`}
+      title={`Open ${citation.title ?? 'the file'}${citation.key ? ` (at ${citation.key})` : ''}`}
+      aria-label={`File ${label}`}
+      className={cn(chip, 'hover:border-hairline')}
+    >
+      {body}
+    </a>
+  ) : (
+    <span aria-label={`File ${label}`} className={chip}>
+      {body}
+    </span>
+  );
+}
+
 function Cite({ refText, citation }: { refText: string; citation?: Citation }) {
   if (!citation) return <>{refText}</>; // not resolved (yet): plain text while streaming
+  if (citation.type === 'file') return <FileCite refText={refText} citation={citation} />;
   if (citation.type === 'comment') {
     const when = citation.created_at
       ? new Date(citation.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
@@ -268,16 +304,27 @@ function Cite({ refText, citation }: { refText: string; citation?: Citation }) {
 }
 
 /** The message box under a thread. */
+/** A file dragged from the Files tab (or a task's files) onto the composer. */
+export const FILE_DRAG_TYPE = 'application/x-momentum-file';
+
 export function MoComposer({
   onSend,
   busy,
   placeholder = 'Ask Mo anything about your work…',
+  onAttach,
+  onFileChip,
 }: {
   onSend: (text: string) => void;
   busy: boolean;
   placeholder?: string;
+  /** Phase 7.5: the paperclip (and files dropped from the computer). */
+  onAttach?: (files: File[]) => void;
+  /** Phase 7.5: a Momentum file dragged in from the Files tab. */
+  onFileChip?: (file: { id: string; name: string }) => void;
 }) {
   const [draft, setDraft] = useState('');
+  const [over, setOver] = useState(false);
+  const picker = useRef<HTMLInputElement>(null);
   const submit = (e: FormEvent) => {
     e.preventDefault();
     const text = draft.trim();
@@ -285,8 +332,60 @@ export function MoComposer({
     setDraft('');
     onSend(text);
   };
+  const droppable = !!(onAttach || onFileChip);
+  const onDrop = (e: DragEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setOver(false);
+    const chip = e.dataTransfer.getData(FILE_DRAG_TYPE);
+    if (chip && onFileChip) {
+      try {
+        const parsed = JSON.parse(chip) as { id?: unknown; name?: unknown };
+        if (typeof parsed.id === 'string' && typeof parsed.name === 'string')
+          onFileChip({ id: parsed.id, name: parsed.name });
+      } catch {
+        /* not ours: ignore */
+      }
+      return;
+    }
+    if (onAttach && e.dataTransfer.files.length) onAttach(Array.from(e.dataTransfer.files));
+  };
   return (
-    <form onSubmit={submit} className="flex gap-2 border-t border-hair-soft p-3">
+    <form
+      onSubmit={submit}
+      onDragOver={
+        droppable
+          ? (e) => {
+              e.preventDefault();
+              setOver(true);
+            }
+          : undefined
+      }
+      onDragLeave={droppable ? () => setOver(false) : undefined}
+      onDrop={droppable ? onDrop : undefined}
+      className={cn('flex gap-2 border-t border-hair-soft p-3', over && 'ring-2 ring-inset ring-accent')}
+    >
+      {onAttach ? (
+        <>
+          <IconButton
+            icon={Paperclip}
+            label="Attach a file"
+            type="button"
+            onClick={() => picker.current?.click()}
+            disabled={busy}
+          />
+          <input
+            ref={picker}
+            type="file"
+            multiple
+            hidden
+            data-testid="mo-attach-input"
+            onChange={(e) => {
+              if (e.target.files?.length) onAttach(Array.from(e.target.files));
+              e.target.value = '';
+            }}
+          />
+        </>
+      ) : null}
       <input
         aria-label="Message Mo"
         placeholder={placeholder}

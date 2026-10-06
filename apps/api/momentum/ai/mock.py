@@ -29,7 +29,9 @@ are computed (see ``mock_embedding``), so fixtures would add nothing.
 
 from __future__ import annotations
 
+import base64
 import hashlib
+import io
 import json
 import math
 import re
@@ -65,12 +67,51 @@ def fixtures_dir(settings: Settings) -> Path:
     return Path(settings.llm_fixtures_dir) if settings.llm_fixtures_dir else PACKAGED_FIXTURES
 
 
+def image_size(part: dict[str, Any]) -> tuple[int, int] | None:
+    """Width and height of a data-URL image part (from the image header, never the pixels)."""
+    url = str((part.get("image_url") or {}).get("url") or "")
+    if not url.startswith("data:") or "," not in url:
+        return None
+    from PIL import Image
+
+    try:
+        with Image.open(io.BytesIO(base64.b64decode(url.split(",", 1)[1]))) as im:
+            return int(im.size[0]), int(im.size[1])
+    except (OSError, ValueError):
+        return None
+
+
 def _content_text(content: Any) -> str:
+    """Text of a message. Image parts (Phase 7.5 vision) count by their size only, so a request
+    key and a fixture match never depend on image bytes."""
     if isinstance(content, str):
         return content
     if isinstance(content, list):  # multi-part content: keep the text parts
-        return "".join(p.get("text", "") for p in content if isinstance(p, dict))
+        out = []
+        for p in content:
+            if not isinstance(p, dict):
+                continue
+            if p.get("type") == "image_url":
+                size = image_size(p)
+                out.append(f"[image {size[0]}x{size[1]}]" if size else "[image]")
+            else:
+                out.append(str(p.get("text", "")))
+        return "".join(out)
     return "" if content is None else json.dumps(content, sort_keys=True)
+
+
+def image_tokens(messages: list[Msg]) -> int:
+    """Spec §4.7: each image counts (w*h)/750 input tokens."""
+    total = 0
+    for m in messages:
+        content = m.get("content")
+        if isinstance(content, list):
+            for p in content:
+                if isinstance(p, dict) and p.get("type") == "image_url":
+                    size = image_size(p)
+                    if size:
+                        total += (size[0] * size[1]) // 750
+    return total
 
 
 def request_key(messages: list[Msg], tools: list[dict[str, Any]] | None) -> str:
@@ -103,9 +144,23 @@ def _without_last_step(messages: list[Msg]) -> list[Msg]:
     return out
 
 
+def is_images_message(m: Msg) -> bool:
+    """The user message the tool loop adds to carry look_at's images: part of the same turn,
+    not a new question."""
+    content = m.get("content")
+    return (
+        m.get("role") == "user"
+        and isinstance(content, list)
+        and any(
+            isinstance(p, dict) and str(p.get("text", "")).startswith('<data source="look_at">')
+            for p in content
+        )
+    )
+
+
 def _last_user_text(messages: list[Msg]) -> str:
     for m in reversed(messages):
-        if m.get("role") == "user":
+        if m.get("role") == "user" and not is_images_message(m):
             return _content_text(m.get("content"))
     return ""
 
@@ -136,7 +191,7 @@ def _turn(messages: list[Msg]) -> int:
     (so a chat's earlier turns don't shift the numbering of a new question)."""
     turn = 1
     for m in reversed(messages):
-        if m.get("role") == "user":
+        if m.get("role") == "user" and not is_images_message(m):
             break
         if m.get("role") == "assistant":
             turn += 1
@@ -244,7 +299,7 @@ def _entry_to_completion(entry: dict[str, Any], req: ChatRequest) -> RawCompleti
         text=text,
         tool_calls=calls,
         finish_reason="tool_calls" if calls else "stop",
-        tokens_in=estimate_tokens(prompt),
+        tokens_in=estimate_tokens(prompt) + image_tokens(req.messages),
         tokens_out=estimate_tokens(text + "".join(c.arguments for c in calls)),
         model=f"mock/{req.alias}",
     )

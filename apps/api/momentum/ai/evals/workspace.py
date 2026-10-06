@@ -20,6 +20,7 @@ from momentum.ai.tools.write_tools import text_doc
 from momentum.core.context import Actor, Ctx
 from momentum.core.ids import task_key
 from momentum.core.settings import Settings
+from momentum.domain.attachments.models import Attachment
 from momentum.domain.comments.service import create_comment
 from momentum.domain.fields.models import FieldDef
 from momentum.domain.fields.schemas import FieldCreateIn, SelectOptionIn
@@ -46,6 +47,7 @@ class EvalWorld:
     task_ids: dict[str, uuid.UUID] = field(default_factory=dict)
     projects: dict[str, uuid.UUID] = field(default_factory=dict)
     fields: dict[str, uuid.UUID] = field(default_factory=dict)  # custom field name → id
+    files: dict[str, uuid.UUID] = field(default_factory=dict)  # file name → attachment id
 
     def ctx(self, local: str, settings: Settings) -> Ctx:
         u = self.users[local]
@@ -79,20 +81,71 @@ async def load_world(session: AsyncSession) -> EvalWorld:
         )
     ).tuples():
         world.fields.setdefault(fname, fid)
+    for aid, aname in (
+        await session.execute(
+            select(Attachment.id, Attachment.filename).where(
+                Attachment.deleted_at.is_(None), Attachment.is_current.is_(True)
+            )
+        )
+    ).tuples():
+        world.files.setdefault(aname, aid)
     return world
 
 
+DEFAULT_WORKSPACES = ("launch_v1", "onboarding_v1")
+
+
 async def build_workspace(
-    session: AsyncSession, settings: Settings, name: str = "launch_v1"
+    session: AsyncSession,
+    settings: Settings,
+    names: tuple[str, ...] = DEFAULT_WORKSPACES,
 ) -> EvalWorld:
+    for name in names:
+        await _build_one(session, settings, name)
+    await session.flush()
+    return await load_world(session)
+
+
+async def _upload(
+    session: AsyncSession, settings: Settings, owner: Ctx, sample: str, **where: uuid.UUID
+) -> None:
+    """Phase 7.5: a sample file (``momentum.files.samples``) stored and attached like an upload."""
+    import hashlib
+
+    from momentum.core.ids import new_id
+    from momentum.core.storage import build_storage
+    from momentum.domain.attachments.service import create_attachment
+    from momentum.files.samples import SAMPLES
+
+    builder, mime = SAMPLES[sample]
+    data = builder()
+    key = f"{owner.workspace_id}/{new_id()}"
+
+    async def one() -> Any:
+        yield data
+
+    await build_storage(settings).save_stream(key, one())
+    await create_attachment(
+        session,
+        owner,
+        storage_key=key,
+        filename=sample,
+        mime=mime,
+        size_bytes=len(data),
+        sha256=hashlib.sha256(data).hexdigest(),
+        **where,  # type: ignore[arg-type]
+    )
+
+
+async def _build_one(session: AsyncSession, settings: Settings, name: str) -> None:
     spec: dict[str, Any] = yaml.safe_load((WORKSPACES / f"{name}.yaml").read_text(encoding="utf-8"))
     world = EvalWorld(users=await _users(session))
-    for name in spec.get("tags", []):  # workspace tags the rules cases refer to by name
+    for tag_name in spec.get("tags", []):  # workspace tags the rules cases refer to by name
         exists = (
-            await session.execute(select(Tag.id).where(Tag.name == name))
+            await session.execute(select(Tag.id).where(Tag.name == tag_name))
         ).scalar_one_or_none()
         if exists is None:
-            await create_tag(session, world.ctx("ravi", settings), TagCreateIn(name=name))
+            await create_tag(session, world.ctx("ravi", settings), TagCreateIn(name=tag_name))
     for p in spec["projects"]:
         exists = (
             await session.execute(select(Project.id).where(Project.name == p["name"]))
@@ -131,6 +184,11 @@ async def build_workspace(
         for t in p["tasks"]:
             if t.get("completed"):
                 await tasks.set_completed(session, owner, created[t["title"]], True)
+        for f in p.get("files", []):
+            await _upload(session, settings, owner, f["sample"], project_id=project.id)
+        for t in p["tasks"]:
+            for f in t.get("files", []):
+                await _upload(session, settings, owner, f["sample"], task_id=created[t["title"]])
     # Custom fields are created outside the project loop (like tags) so that an eval database
     # built by an earlier version gets them too: the project itself is only created once.
     for f in spec.get("fields", []):  # S4.1.5: the fields an AI step fills in
@@ -155,8 +213,6 @@ async def build_workspace(
                 description=f.get("description"),
             ),
         )
-    await session.flush()
-    return await load_world(session)
 
 
 async def _task(

@@ -5,6 +5,7 @@ which is how the report counts tokens and cost)."""
 
 from __future__ import annotations
 
+import json
 import time
 import uuid
 from dataclasses import dataclass, field
@@ -86,7 +87,31 @@ FEATURES = (
     "goal_check_in",
     "workload_rebalance",
     "chart",
+    *("file_qa", "file_tables", "file_vision", "file_injection"),
 )
+# Phase 7.5 (spec §11.3): Ask Mo about files, on the onboarding_v1 eval workspace
+FILE_FEATURES = ("file_qa", "file_tables", "file_vision", "file_injection")
+
+
+class RecordingRegistry(ToolRegistry):
+    """The real registry, also keeping each call's name, arguments and output, so the file
+    scorers can check that numbers came from tools and which queries ran."""
+
+    def __init__(self, inner: ToolRegistry) -> None:
+        super().__init__([t for n in inner.names if (t := inner.get(n)) is not None])
+        self.calls: list[dict[str, Any]] = []
+
+    async def invoke(self, *args: Any, **kwargs: Any) -> Any:
+        out = await super().invoke(*args, **kwargs)
+        raw = args[3] if len(args) > 3 else kwargs.get("arguments")
+        try:
+            parsed = json.loads(raw) if isinstance(raw, str) else (raw or {})
+        except ValueError:
+            parsed = {}
+        self.calls.append(
+            {"name": out.tool, "args": parsed, "ok": out.ok, "output": out.result.to_json()}
+        )
+        return out
 
 
 @dataclass
@@ -173,6 +198,7 @@ async def run_case(
             obs.operations, obs.risk = await _operations(session, data["action_id"])
         elif kind == "done" and "grounded" in data:
             obs.grounded = bool(data["grounded"])
+            obs.data.setdefault("images", int(data.get("images") or 0))
         elif kind == "error":
             obs.error = str(data.get("reason"))
     return obs
@@ -191,7 +217,28 @@ async def _run(
     obs: Observation,
 ) -> None:
     inp = case.get("input", "")
-    if feature == "command":
+    if feature in FILE_FEATURES:
+        screen = screen_for(case.get("screen"), world)
+        screen = Screen(
+            kind=screen.kind,
+            project_id=screen.project_id,
+            task_id=screen.task_id,
+            file_ids=[world.files[f] for f in case.get("files", [])],
+        )
+        recording = RecordingRegistry(registry)
+        turn = await start_turn(session, ctx, inp, conversation_id=None, screen=screen)
+        await run_chat(
+            session,
+            llm,
+            ctx,
+            recording,
+            (turn.conversation.id, turn.message.id),
+            screen=screen,
+            now=now,
+            emit=emit,
+        )
+        obs.data["tool_calls"] = recording.calls
+    elif feature == "command":
         await run_command(
             session,
             llm,

@@ -433,6 +433,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/ai/conversation-files": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Attach a file to an Ask Mo chat only (private; starts a chat if none is given)
+         * @description Phase 7.5 (spec §4.8): for a file the person can't (or chose not to) put on a task or
+         *     project. Stored like an upload; nothing is read until a message is sent (D1).
+         */
+        post: operations["upload_conversation_file_api_v1_ai_conversation_files_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/ai/conversations": {
         parameters: {
             query?: never;
@@ -459,6 +480,23 @@ export interface paths {
         };
         /** One of my conversations, with its messages (citations checked for me now) */
         get: operations["get_ai_conversation_api_v1_ai_conversations__conversation_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ai/conversations/{conversation_id}/files": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The files attached to one of my chats */
+        get: operations["list_conversation_files_api_v1_ai_conversations__conversation_id__files_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -4411,6 +4449,13 @@ export interface components {
             /** Replace Id */
             replace_id?: string | null;
         };
+        /** Body_upload_conversation_file_api_v1_ai_conversation_files_post */
+        Body_upload_conversation_file_api_v1_ai_conversation_files_post: {
+            /** Conversation Id */
+            conversation_id?: string | null;
+            /** File */
+            file: string;
+        };
         /** Body_upload_project_file_api_v1_projects__project_id__files_post */
         Body_upload_project_file_api_v1_projects__project_id__files_post: {
             /** File */
@@ -4500,6 +4545,8 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+            /** File Ids */
+            file_ids?: string[];
             /** Grounded */
             grounded?: boolean | null;
             /**
@@ -4544,7 +4591,7 @@ export interface components {
              * Type
              * @enum {string}
              */
-            type: "task" | "project";
+            type: "task" | "project" | "file";
             /** Valid */
             valid: boolean;
         };
@@ -4629,6 +4676,30 @@ export interface components {
             data: components["schemas"]["ConversationOut"];
             /** Messages */
             messages: components["schemas"]["ChatMessageOut"][];
+        };
+        /** ConversationFileOut */
+        ConversationFileOut: {
+            /**
+             * Conversation Id
+             * Format: uuid
+             */
+            conversation_id: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Filename */
+            filename: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Mime */
+            mime: string;
+            /** Size Bytes */
+            size_bytes: number;
         };
         /** ConversationMessage */
         ConversationMessage: {
@@ -5992,6 +6063,13 @@ export interface components {
         ListOut_CommentOut_: {
             /** Data */
             data: components["schemas"]["CommentOut"][];
+            /** @default {} */
+            meta: components["schemas"]["ListMeta"];
+        };
+        /** ListOut[ConversationFileOut] */
+        ListOut_ConversationFileOut_: {
+            /** Data */
+            data: components["schemas"]["ConversationFileOut"][];
             /** @default {} */
             meta: components["schemas"]["ListMeta"];
         };
@@ -8392,6 +8470,8 @@ export interface components {
         };
         /** ScreenIn */
         ScreenIn: {
+            /** File Ids */
+            file_ids?: string[];
             /**
              * Kind
              * @default other
@@ -10709,6 +10789,39 @@ export interface operations {
             };
         };
     };
+    upload_conversation_file_api_v1_ai_conversation_files_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_upload_conversation_file_api_v1_ai_conversation_files_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationFileOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_ai_conversations_api_v1_ai_conversations_get: {
         parameters: {
             query?: never;
@@ -10747,6 +10860,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ConversationDetailOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_conversation_files_api_v1_ai_conversations__conversation_id__files_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListOut_ConversationFileOut_"];
                 };
             };
             /** @description Validation Error */

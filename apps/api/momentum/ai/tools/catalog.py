@@ -5,11 +5,11 @@ registry with a subset or with its own tools added."""
 
 from __future__ import annotations
 
-from momentum.ai.tools import read_tools, write_tools
+from momentum.ai.tools import file_tools, read_tools, write_tools
 from momentum.ai.tools.base import Tool
 from momentum.ai.tools.registry import ToolRegistry
 
-CATALOG: tuple[Tool, ...] = (*read_tools.TOOLS, *write_tools.TOOLS)
+CATALOG: tuple[Tool, ...] = (*read_tools.TOOLS, *file_tools.TOOLS, *write_tools.TOOLS)
 
 
 def build_registry(*extra: Tool) -> ToolRegistry:

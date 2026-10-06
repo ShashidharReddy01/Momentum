@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from momentum.ai import prompts
 from momentum.ai.context import Screen, screen_ctx, system_base, user_ctx
 from momentum.ai.context.tokens import safe
+from momentum.ai.file_context import FileSession
 from momentum.ai.llm import LLM
 from momentum.ai.loop import Emit, emit_proposals, run_tool_loop
 from momentum.ai.memory import memory_for
@@ -63,6 +64,12 @@ async def run_command(
         max_steps=MAX_STEPS,
         prompt_version=prompt.version,
         max_tokens=prompt.max_tokens,
+        # Phase 7.5: file tools know what's on screen; no conversation, so no images cap carried
+        files=FileSession(
+            attachment_ids=list(screen.file_ids),
+            project_id=screen.project_id,
+            task_id=screen.task_id,
+        ),
     )
     if result.text:
         await emit("token", {"text": result.text})

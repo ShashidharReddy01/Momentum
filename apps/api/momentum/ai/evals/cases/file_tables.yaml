@@ -1,0 +1,113 @@
+# Phase 7.5 (spec §4.5, §11.3): numbers from spreadsheets come from query_table, computed by the
+# server. `query_exact` checks the query (names case-insensitive; keys not named are free) and
+# `answer_contains_number` checks the answer states the server's result.
+feature: file_tables
+cases:
+  - id: overdue_total
+    mock: true
+    input: "What's the total of Amount where Status is Overdue in the invoice sheet?"
+    files: ["invoices.xlsx"]
+    expect:
+      query_exact: {sheet: Invoices, query: {filters: [{column: status, op: eq, value: overdue}], aggregates: [{fn: sum, column: amount}]}}
+      answer_contains_number: true
+      numbers_from_tools: true
+      cites_locator: "s:Invoices"
+  - id: paid_count
+    mock: true
+    input: "How many invoices are paid?"
+    files: ["invoices.xlsx"]
+    expect:
+      query_exact: {sheet: Invoices, query: {filters: [{column: status, op: eq, value: paid}], aggregates: [{fn: count}]}}
+      answer_contains_number: true
+      numbers_from_tools: true
+  - id: average_amount
+    mock: true
+    input: "What's the average invoice amount?"
+    files: ["invoices.xlsx"]
+    expect:
+      query_exact: {sheet: Invoices, query: {aggregates: [{fn: avg, column: amount}]}}
+      answer_contains_number: true
+      numbers_from_tools: true
+  - id: largest_invoice
+    mock: true
+    input: "Which invoice has the largest amount?"
+    files: ["invoices.xlsx"]
+    expect:
+      query_exact: {sheet: Invoices, query: {sort: [{by: amount, dir: desc}], limit: 1}}
+      numbers_from_tools: true
+      text_include_any: ["INV-"]
+  - id: due_before_march
+    mock: true
+    input: "How many invoices are due before March 2026?"
+    files: ["invoices.xlsx"]
+    expect:
+      query_exact: {sheet: Invoices, query: {filters: [{column: due, op: lt, value: "2026-03-01"}], aggregates: [{fn: count}]}}
+      answer_contains_number: true
+      numbers_from_tools: true
+  - id: distinct_customers
+    mock: true
+    input: "How many different customers are in the invoice workbook?"
+    files: ["invoices.xlsx"]
+    expect:
+      query_exact: {sheet: Invoices, query: {aggregates: [{fn: distinct_count, column: customer}]}}
+      answer_contains_number: true
+  - id: top_customer_by_total
+    mock: true
+    input: "Which customer has the highest invoice total?"
+    files: ["invoices.xlsx"]
+    expect:
+      query_exact: {sheet: Invoices, query: {group_by: [customer], aggregates: [{fn: sum, column: amount}], sort: [{by: total, dir: desc}], limit: 1}}
+      answer_contains_number: true
+      numbers_from_tools: true
+  - id: contoso_overdue
+    mock: true
+    input: "How many Contoso invoices are overdue?"
+    files: ["invoices.xlsx"]
+    expect:
+      query_exact: {sheet: Invoices, query: {filters: [{column: customer, op: eq, value: contoso}, {column: status, op: eq, value: overdue}], aggregates: [{fn: count}]}}
+      answer_contains_number: true
+  - id: quote_total
+    mock: true
+    input: "What's the total of the quote's line items?"
+    files: ["quote.xlsx"]
+    expect:
+      query_exact: {sheet: Quote, query: {filters: [{column: item, op: ne, value: total}], aggregates: [{fn: sum, column: line total}]}}
+      answer_contains_number: true
+      numbers_from_tools: true
+  - id: unpaid_payments_csv
+    mock: true
+    input: "What do the unpaid rows in payments.csv add up to?"
+    files: ["payments.csv"]
+    expect:
+      query_exact: {query: {filters: [{column: paid, op: eq, value: "no"}], aggregates: [{fn: sum, column: amount}]}}
+      answer_contains_number: true
+      numbers_from_tools: true
+  - id: approved_budget_xls
+    mock: true
+    input: "How much of the legacy budget is approved?"
+    files: ["budget.xls"]
+    expect:
+      query_exact: {sheet: Budget, query: {filters: [{column: status, op: eq, value: approved}], aggregates: [{fn: sum, column: amount}]}}
+      answer_contains_number: true
+      numbers_from_tools: true
+  # live-only
+  - id: overdue_by_customer_live
+    input: "Break down the overdue invoice amounts by customer"
+    files: ["invoices.xlsx"]
+    expect: {tools_include: [query_table], numbers_from_tools: true, cites_locator: true}
+  - id: open_invoices_live
+    input: "What's the open (not paid, not overdue) total in the invoices?"
+    files: ["invoices.xlsx"]
+    expect: {tools_include: [query_table], answer_contains_number: true, numbers_from_tools: true}
+  - id: summary_formula_live
+    input: "How is the total on the Summary sheet calculated, and what does it show?"
+    files: ["invoices.xlsx"]
+    expect: {tools_any: [read_sheet, file_outline], text_include_any: ["SUM"], numbers_from_tools: true}
+  - id: biggest_quote_line_live
+    input: "Which quote line costs the most?"
+    files: ["quote.xlsx"]
+    expect: {tools_any: [query_table, read_sheet], text_include_any: ["Implementation services", "licence"], numbers_from_tools: true}
+  - id: negative_rows_csv_live
+    input: "Are there any credit notes (negative amounts) in payments.csv?"
+    files: ["payments.csv"]
+    expect: {tools_any: [query_table, read_sheet], text_include_any: ["Fabrikam"], numbers_from_tools: true}

@@ -20,6 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from momentum.core.context import Ctx
 
 if typing.TYPE_CHECKING:
+    from momentum.ai.file_context import FileSession
     from momentum.ai.llm import LLM
 
 Risk = Literal["read", "low", "medium", "high"]
@@ -90,6 +91,8 @@ class ToolContext:
     mode: Mode
     batch_id: uuid.UUID | None = None
     llm: LLM | None = None  # for tools that call the gateway themselves (semantic_search)
+    # Phase 7.5: the conversation's files and the images look_at rendered for the next call
+    files: FileSession | None = None
 
     @property
     def preview(self) -> bool:

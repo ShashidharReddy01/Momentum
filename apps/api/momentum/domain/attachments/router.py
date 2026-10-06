@@ -43,7 +43,7 @@ INLINE_MIMES = frozenset(
 DOWNLOAD_CSP = "default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'; sandbox"
 
 
-async def _stream_upload(
+async def stream_upload(
     file: UploadFile, *, storage: StorageBackend, max_upload_mb: int, key: str
 ) -> tuple[int, str, str]:
     max_bytes = max_upload_mb * 1024 * 1024
@@ -96,7 +96,7 @@ async def upload_task_attachment(
 ) -> MutationOut[AttachmentOut]:
     """With ``replace_id``, the upload becomes the next version of that file (Phase 7.5)."""
     key = f"{ctx.workspace_id}/{new_id()}"
-    size, sha256, mime = await _stream_upload(
+    size, sha256, mime = await stream_upload(
         file,
         storage=build_storage(runtime.settings),
         max_upload_mb=runtime.settings.max_upload_mb,
@@ -134,7 +134,7 @@ async def upload_comment_attachment(
     replace_id: Annotated[uuid.UUID | None, Form()] = None,
 ) -> MutationOut[AttachmentOut]:
     key = f"{ctx.workspace_id}/{new_id()}"
-    size, sha256, mime = await _stream_upload(
+    size, sha256, mime = await stream_upload(
         file,
         storage=build_storage(runtime.settings),
         max_upload_mb=runtime.settings.max_upload_mb,
@@ -192,7 +192,7 @@ async def upload_project_file(
     replace_id: Annotated[uuid.UUID | None, Form()] = None,
 ) -> MutationOut[AttachmentOut]:
     key = f"{ctx.workspace_id}/{new_id()}"
-    size, sha256, mime = await _stream_upload(
+    size, sha256, mime = await stream_upload(
         file,
         storage=build_storage(runtime.settings),
         max_upload_mb=runtime.settings.max_upload_mb,

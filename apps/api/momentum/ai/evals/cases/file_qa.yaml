@@ -1,0 +1,97 @@
+# Phase 7.5 (spec §4.4, §11.3): Ask Mo about files on the onboarding_v1 workspace. Mock cases
+# have handwritten fixtures in mock_responses/chat.yaml (the chat loop); live-only cases run on
+# the product owner's gateway. Checks: the right file tools ran, every fact cites a locator, every
+# number came from a tool, and nothing was proposed unless asked.
+feature: file_qa
+cases:
+  - id: sow_deliverables_with_dates
+    mock: true
+    input: "Summarise the SOW and list the deliverables with their dates"
+    files: ["statement-of-work.docx"]
+    expect: {tools_any: [read_file], cites_locator: "table 1", numbers_from_tools: true, proposes_nothing: true}
+  - id: contract_renewal
+    mock: true
+    input: "What does the contract say about renewal?"
+    files: ["contract-signed.pdf"]
+    expect: {tools_any: [search_in_file, read_file], cites_locator: "p1", numbers_from_tools: true, text_include_any: ["12 months"]}
+  - id: contract_signatures
+    mock: true
+    input: "Who signed the master services agreement, and when?"
+    files: ["contract-signed.pdf"]
+    expect: {tools_any: [search_in_file, read_file], cites_locator: "p1", text_include_all: ["Jane Synthetic", "Lena Novak"], numbers_from_tools: true}
+  - id: kickoff_go_live
+    mock: true
+    input: "What go-live date is on the kickoff deck?"
+    files: ["kickoff.pptx"]
+    expect: {tools_any: [read_file], cites_locator: "slide 2", text_include_any: ["2027-02-03", "3 February 2027"]}
+  - id: customer_email
+    mock: true
+    input: "What does the customer's UAT email say?"
+    files: ["customer-email.eml"]
+    expect: {tools_any: [read_file], cites_locator: "body", text_include_any: ["12 January"], numbers_from_tools: true}
+  - id: outlook_message
+    mock: true
+    input: "Summarise the Outlook message about migration"
+    files: ["customer-email.msg"]
+    expect: {tools_any: [read_file], cites_locator: "body", text_include_any: ["3 February"]}
+  - id: workbook_macros
+    mock: true
+    input: "Does this workbook have macros, and what do they do?"
+    files: ["invoices-macro.xlsm"]
+    expect: {tools_include: [describe_macros], text_include_all: ["opened", "never run"], proposes_nothing: true}
+  - id: password_protected
+    mock: true
+    input: "What is in locked.xlsx?"
+    files: ["locked.xlsx"]
+    expect: {tools_any: [file_outline, read_sheet, read_file], text_include_any: ["without a password"], text_exclude: ["what is the password", "send me the password"]}
+  - id: legacy_doc
+    mock: true
+    input: "Can you read old.doc for me?"
+    files: ["old.doc"]
+    expect: {tools_any: [file_outline, read_file], text_include_any: [".docx"]}
+  - id: zip_contents
+    mock: true
+    input: "What's inside bundle.zip?"
+    files: ["bundle.zip"]
+    expect: {tools_any: [file_outline], text_include_all: ["msa.pdf", "readme.txt"], text_include_any: ["on its own"]}
+  - id: quote_vs_sow
+    mock: true
+    input: "Compare the quote's line items with the SOW scope"
+    files: ["quote.xlsx", "statement-of-work.docx"]
+    expect: {tools_include: [read_sheet, read_file], cites_locator: true, numbers_from_tools: true, proposes_nothing: true}
+  - id: notes_into_tasks
+    mock: true
+    input: "Turn the action items in these meeting notes into tasks in Northwind onboarding"
+    files: ["meeting-notes.docx"]
+    expect: {tools_include: [read_file], proposes: [create_task], targets_include: ["data migration template"]}
+  - id: find_the_contract_by_name
+    mock: true
+    input: "Find the signed contract in Northwind onboarding and tell me the fee"
+    screen: {kind: project, project: "Northwind onboarding"}
+    expect: {tools_include: [list_files], cites_locator: true, numbers_from_tools: true, text_include_any: ["48,000", "48000"]}
+  # live-only
+  - id: sow_out_of_scope_live
+    input: "What's out of scope in the statement of work?"
+    files: ["statement-of-work.docx"]
+    expect: {cites_locator: true, text_include_any: ["reporting", "mobile"], proposes_nothing: true}
+    judge: {rubric: "Says custom reporting and mobile apps are out of scope, citing the SOW section; invents nothing."}
+  - id: liability_cap_live
+    input: "What is the liability cap in the contract?"
+    files: ["contract-signed.pdf"]
+    expect: {cites_locator: true, text_include_any: ["12 months"]}
+  - id: email_attachments_live
+    input: "Does the customer's email have attachments? What are they?"
+    files: ["customer-email.eml"]
+    expect: {text_include_any: ["uat-plan.txt"]}
+  - id: rtf_requirements_live
+    input: "List the requirements in requirements.rtf"
+    files: ["requirements.rtf"]
+    expect: {text_include_all: ["sign-on", "export"], cites_locator: true}
+  - id: deck_next_steps_live
+    input: "What are the next steps on the last slide of the kickoff deck?"
+    files: ["kickoff.pptx"]
+    expect: {cites_locator: "slide 4", text_include_any: ["migration template", "workshop"]}
+  - id: notes_tasks_live
+    input: "Make tasks in Northwind onboarding from the action items in meeting-notes.docx"
+    files: ["meeting-notes.docx"]
+    expect: {proposes: [create_task]}

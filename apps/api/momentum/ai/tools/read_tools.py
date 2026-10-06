@@ -681,8 +681,8 @@ class GetAttachmentTextArgs(BaseModel):
 @tool(
     name="get_attachment_text",
     description=(
-        "The text of a file attached to a task (PDF, Word or text), for reading or extracting "
-        "details from it. Long files are cut at 20,000 characters."
+        "Plain text only of a file attached to a task (PDF, Word or text), cut at 20,000 "
+        "characters. Prefer read_file (structure, tables, locators) and query_table (numbers)."
     ),
     risk="read",
     scopes=READ,

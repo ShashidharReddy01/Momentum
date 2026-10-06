@@ -1,10 +1,12 @@
-import { Download, Paperclip, Trash2, Upload } from 'lucide-react';
+import { Download, MessageCircleQuestion, Paperclip, Trash2, Upload } from 'lucide-react';
 import { useRef, useState, type DragEvent } from 'react';
 import { IconButton } from '@/components/ui/IconButton';
 import { Icon } from '@/components/ui/Icon';
+import { FILE_DRAG_TYPE } from '@/features/ai';
 import { useAttachmentMutations, useTaskAttachments, type Attachment } from '@/features/attachments';
 import { cn } from '@/lib/cn';
 import { useMomentumConfig } from '@/lib/config';
+import { useUi } from '@/stores/ui';
 
 function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -21,10 +23,17 @@ function AttachmentRow({
   canEdit: boolean;
   onRemove: () => void;
 }) {
-  const { api_base } = useMomentumConfig();
+  const { api_base, ai_enabled } = useMomentumConfig();
+  const askAbout = useUi((s) => s.askAbout);
   const href = `${api_base}/attachments/${att.id}/download`;
   return (
-    <li className="flex h-8 items-center gap-2 text-sm">
+    <li
+      className="flex h-8 items-center gap-2 text-sm"
+      draggable
+      onDragStart={(e) =>
+        e.dataTransfer.setData(FILE_DRAG_TYPE, JSON.stringify({ id: att.id, name: att.filename }))
+      }
+    >
       <Icon icon={Paperclip} size={13} className="shrink-0 text-muted" />
       <a
         href={href}
@@ -38,6 +47,14 @@ function AttachmentRow({
       <a href={href} target="_blank" rel="noopener noreferrer" aria-label={`Download ${att.filename}`}>
         <IconButton icon={Download} label={`Download ${att.filename}`} size="icon-sm" />
       </a>
+      {ai_enabled ? (
+        <IconButton
+          icon={MessageCircleQuestion}
+          label={`Ask Mo about ${att.filename}`}
+          size="icon-sm"
+          onClick={() => askAbout({ kind: 'file', fileId: att.id, label: att.filename })}
+        />
+      ) : null}
       {canEdit ? (
         <IconButton icon={Trash2} label={`Remove ${att.filename}`} size="icon-sm" onClick={onRemove} />
       ) : null}

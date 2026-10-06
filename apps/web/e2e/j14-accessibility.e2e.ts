@@ -78,6 +78,8 @@ test('J14: list → pane → back to the row, from the keyboard', async ({ page 
   // into the pane, out of the field, then the pane closes and focus is back on the row
   await pane.getByRole('textbox', { name: 'Task name' }).focus();
   await page.keyboard.press('Escape');
+  // the first Escape leaves the field; wait for it, or under load the second lands in the field
+  await expect(pane.getByRole('textbox', { name: 'Task name' })).not.toBeFocused();
   await page.keyboard.press('Escape');
   await expect(pane).toBeHidden();
   await expect(taskRow).toBeFocused();

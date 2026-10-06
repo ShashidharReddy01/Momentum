@@ -74,3 +74,37 @@ test('J15: project files, versions, delete and undo', async ({ page }) => {
   await page.getByRole('button', { name: 'Undo' }).last().click();
   await expect(grid.getByText('Quote.csv')).toBeVisible();
 });
+
+test('J15 part 2: ask Mo about a workbook from the Files tab', async ({ page }) => {
+  await login(page);
+  const api = page.request;
+  const teams = (await json(await api.get('/api/v1/teams'))).data as { id: string; name: string }[];
+  const team = teams.find((t) => t.name === 'Product')!.id;
+  const pid = (
+    await json(await api.post('/api/v1/projects', { headers: H, data: { team_id: team, name: 'J15 Mo' } }))
+  ).data.id as string;
+  await json(
+    await api.post(`/api/v1/projects/${pid}/files`, {
+      headers: H,
+      multipart: {
+        file: {
+          name: 'J15 invoices.csv',
+          mimeType: 'text/csv',
+          buffer: Buffer.from('item,amount\nA,10\nB,32.5\n'),
+        },
+      },
+    }),
+  );
+  await page.goto(`/projects/${pid}/files`);
+  await page.getByRole('button', { name: 'Actions for J15 invoices.csv' }).click();
+  await page.getByRole('menuitem', { name: /Ask Mo about this file/ }).click();
+  const mo = page.getByRole('complementary', { name: 'Ask Mo' });
+  await expect(mo.getByLabel('Chat is about J15 invoices.csv')).toBeVisible();
+  await mo.getByRole('textbox', { name: 'Message Mo' }).fill("What's the total amount in this workbook?");
+  await mo.getByRole('textbox', { name: 'Message Mo' }).press('Enter');
+  // the mock answer cites the sheet; the number comes from the server's query (10 + 32.5)
+  const chip = mo.getByRole('link', { name: 'File J15 invoices.csv · s:J15 invoices' });
+  await expect(chip).toBeVisible();
+  await expect(mo.getByText(/42\.5/)).toBeVisible();
+  await expect(mo.getByText(/Queried a table/)).toBeVisible();
+});

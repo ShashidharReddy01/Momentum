@@ -1,12 +1,21 @@
-import { Maximize2, SquarePen, X } from 'lucide-react';
-import { useEffect, useMemo, useRef } from 'react';
+import { Maximize2, Paperclip, SquarePen, X } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { AICallout } from '@/components/common/AI';
 import { MoMark } from '@/components/common/MoMark';
 import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
 import { IconButton } from '@/components/ui/IconButton';
-import { contextScreen, MoComposer, MoThread, suggestionsFor, useMoRuns, useScreen } from '@/features/ai';
+import {
+  contextScreen,
+  MoComposer,
+  MoThread,
+  suggestionsFor,
+  useMoFiles,
+  useMoRuns,
+  useScreen,
+  type Screen,
+} from '@/features/ai';
 import { useMomentumConfig } from '@/lib/config';
 import { useUi } from '@/stores/ui';
 
@@ -30,9 +39,23 @@ export function AskMoPanel() {
   const aiEnabled = useMomentumConfig().ai_enabled;
   const navigate = useNavigate();
   const pinned = useMemo(() => (moContext ? contextScreen(moContext) : null), [moContext]);
-  const mo = useMoRuns({ screen: pinned });
-  const { run, ask, newChat } = mo;
   const routeScreen = useScreen();
+  const [conv, setConv] = useState<{ conversationId: string | null; adopt: (id: string) => void }>({
+    conversationId: null,
+    adopt: () => {},
+  });
+  const files = useMoFiles(pinned ?? routeScreen, conv);
+  // Phase 7.5: the files added to this chat go with every question (ids of task/project files)
+  const screen = useMemo<Screen | null>(() => {
+    if (!files.fileIds.length) return pinned;
+    const base = pinned ?? routeScreen;
+    return { ...base, file_ids: [...new Set([...(base.file_ids ?? []), ...files.fileIds])].slice(0, 5) };
+  }, [pinned, routeScreen, files.fileIds]);
+  const mo = useMoRuns({ screen });
+  const { run, ask, newChat } = mo;
+  useEffect(() => {
+    setConv({ conversationId: mo.conversationId, adopt: mo.adopt });
+  }, [mo.conversationId, mo.adopt]);
   const end = useRef<HTMLDivElement>(null);
 
   // a request sent from elsewhere (⌘K) starts a run here
@@ -45,7 +68,10 @@ export function AskMoPanel() {
   }, [moRequest, takeMoRequest, run, ask]);
   // "Ask Mo about this": a new chat about it
   useEffect(() => {
-    if (moContext) newChat();
+    if (moContext) {
+      newChat();
+      files.clear();
+    }
   }, [moContext?.id, newChat]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     end.current?.scrollIntoView?.({ block: 'end' });
@@ -73,6 +99,7 @@ export function AskMoPanel() {
               onClick={() => {
                 clearMoContext();
                 newChat();
+                files.clear();
               }}
             />
             <IconButton
@@ -149,7 +176,41 @@ export function AskMoPanel() {
             />
             <div ref={end} />
           </div>
-          <MoComposer onSend={(text) => void ask(text)} busy={busy} />
+          {files.chips.length || files.uploading ? (
+            <div
+              role="group"
+              aria-label="Files in this chat"
+              className="flex flex-wrap items-center gap-1.5 border-t border-hair-soft px-3 pt-2 text-xs"
+            >
+              {files.chips.map((c) => (
+                <span
+                  key={c.id}
+                  className="inline-flex min-w-0 items-center gap-1 rounded-full border border-hairline bg-surface-2 py-0.5 pl-2 pr-1 text-ink"
+                  title={c.where === 'chat' ? 'Only in this chat' : undefined}
+                >
+                  <Icon icon={Paperclip} size={11} className="shrink-0 text-muted" />
+                  <span className="max-w-[12rem] truncate">{c.name}</span>
+                  {c.where === 'file' ? (
+                    <button
+                      type="button"
+                      aria-label={`Remove ${c.name} from this chat`}
+                      onClick={() => files.remove(c.id)}
+                      className="grid h-4 w-4 place-items-center rounded-full text-muted hover:bg-surface hover:text-ink"
+                    >
+                      <Icon icon={X} size={11} />
+                    </button>
+                  ) : null}
+                </span>
+              ))}
+              {files.uploading ? <span className="text-muted">Attaching…</span> : null}
+            </div>
+          ) : null}
+          <MoComposer
+            onSend={(text) => void ask(text)}
+            busy={busy || files.uploading}
+            onAttach={(list) => void files.attach(list)}
+            onFileChip={(f) => files.add({ ...f, where: 'file' })}
+          />
         </>
       )}
     </aside>
