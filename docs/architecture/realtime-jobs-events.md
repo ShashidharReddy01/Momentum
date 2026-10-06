@@ -72,6 +72,9 @@ Event payloads share an envelope:
 | `task.follower_added` / `task.follower_removed` | 1 | `user_id` |
 | `reaction.added` / `reaction.removed` | 1 | |
 | `field_value.changed` | 2 | field_id, old/new |
+| `field.created` / `field.attached` / `field.updated` / `field.moved` / `field.detached` / `field.archived` / `field.restored` | 2 | `project_id` (attached, moved, detached; `position` on moved); channel `project:<id>` of every project using the field (S2.3.1; `restored` is an undone archive, E7.0 H55). Field reorder, show / hide and remove record activity since E7.0 |
+| `task.tagged` / `task.untagged` | 2 | `tag_id`; the task's channels (S2.3.3) |
+| `tag.created` / `tag.updated` / `tag.deleted` / `tag.restored` | 2 | none; channel `workspace:<id>` (S2.3.3; `restored` is an undone delete, E7.0 H53) |
 | `attachment.added` / `attachment.deleted` | 2 | |
 | `status_update.created` | 3 | `project_id`, `status`, `version` (S3.4.3; channel `project:<id>`) |
 | `status_update.withdrawn` | 3 | `project_id`, `status` (the restored one), `version`: an undone update (S3.4.3) |
@@ -79,12 +82,12 @@ Event payloads share an envelope:
 | `approval.requested` | 4 | `state="pending"` (S4.4.1; emitted by `convert_task_type` when a task becomes type `approval`, alongside `task.type_changed`; channel = the task's own channels) |
 | `approval.decided` | 4 | `state` (`approved`/`changes_requested`/`rejected`); a new rules trigger with an optional `decision` filter (S4.4.1; frontend handler in `lib/realtime/handlers.ts` refetches the task detail and any open task list) |
 | `form.submitted` | 4 | `entity_type="task"`, `form_id`, `project_id` (S4.2.1; emitted alongside the ordinary `task.created`/`task.assigned` events after a submission's task is created, so it reaches the rules executor's task-only event filter; channel `project:<id>`) |
-| `form.created` / `form.updated` / `form.deleted` | 4 | `project_id` (created, deleted); `changes`, `version` (updated); channel `project:<id>` (S4.2.1) |
+| `form.created` / `form.updated` / `form.deleted` / `form.restored` | 4 | `project_id` (created, deleted); `changes`, `version` (updated); channel `project:<id>` (S4.2.1) |
 | `api_token.created` / `api_token.revoked` | 5 | `user_id` (the token's owner: a person or an agent account); channel `user:<owner>` (S5.1.6). Never the secret |
 | `agent_run.finished` | 5 | `agent_id`, `status` (`succeeded`,`failed`,`cancelled`,`budget_exceeded`), `task_id`; channels `workspace:<id>` and `user:<requested_by>` (S5.1.2). Actor is the agent, so it never triggers agents |
 | `workspace.settings_changed` | 5 | `timezone`; channel `workspace:<id>` (S5.1.2) |
 | `agent.created` / `agent.updated` | 5 | `key`, `source` (created); `changes` (field names), `version` (updated); channel `workspace:<id>` (S5.1.1). No frontend handler yet (the agents pages arrive in S5.1.3/S5.2.3) |
-| `rule.created` / `rule.updated` / `rule.deleted` | 4 | `project_id` (created, deleted); `changes` (names), `version` (updated); channel `project:<id>` or `workspace:<id>` (S4.1.1; frontend handler in `lib/realtime/handlers.ts` since S4.1.3) |
+| `rule.created` / `rule.updated` / `rule.deleted` / `rule.restored` | 4 | `project_id` (created, deleted); `changes` (names), `version` (updated); channel `project:<id>` or `workspace:<id>` (S4.1.1; frontend handler in `lib/realtime/handlers.ts` since S4.1.3) |
 | `rule.ran` | 4 | rule_id, status (`success`/`skipped`/`failed`), task_id (S4.1.1; carries the run's depth) |
 | `portfolio.created` / `portfolio.updated` / `portfolio.deleted` / `portfolio.restored` / `portfolio.project_added` / `portfolio.project_removed` / `portfolio.status_updated` / `portfolio.status_withdrawn` | 6 | `version` only (S6.2.2); channel `portfolio:<id>` (new channel kind: any workspace member may subscribe; rows are re-read with the viewer's visibility, so events never carry project names) |
 | `goal.created` / `goal.updated` / `goal.deleted` / `goal.restored` / `goal.linked` / `goal.unlinked` / `goal.checked_in` / `goal.check_in_withdrawn` | 6 | `version` only (S6.3.1); channel `goal:<id>` (any member may subscribe; progress is re-read per viewer) |

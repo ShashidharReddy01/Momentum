@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { components } from '@/lib/api/schema';
 import { toastError } from '@/lib/toast';
+import { useRecordUndo, useUndoToast } from '@/lib/undo';
 import { useApi } from '@/providers/api';
 
 export type Field = components['schemas']['FieldOut'];
@@ -47,6 +48,8 @@ export function useProjectFields(projectId: string, enabled = true) {
 export function useFieldMutations(projectId: string) {
   const api = useApi();
   const qc = useQueryClient();
+  const record = useRecordUndo();
+  const undoToast = useUndoToast();
   const key = fieldKeys.byProject(projectId);
   const settle = () => {
     void qc.invalidateQueries({ queryKey: key });
@@ -96,15 +99,19 @@ export function useFieldMutations(projectId: string) {
           params: { path: { project_id: projectId, field_id: id } },
         })
       ).data!,
+    onSuccess: (res) => undoToast(`${res.data.name} archived in every project`, res.meta),
     onError: (e) => toastError(e, "Couldn't archive the field"),
     onSettled: settle,
   });
 
   const detach = useMutation({
     mutationFn: async (id: string) =>
-      await api.DELETE('/api/v1/projects/{project_id}/fields/{field_id}', {
-        params: { path: { project_id: projectId, field_id: id } },
-      }),
+      (
+        await api.DELETE('/api/v1/projects/{project_id}/fields/{field_id}', {
+          params: { path: { project_id: projectId, field_id: id } },
+        })
+      ).data!,
+    onSuccess: (res) => undoToast('Field removed from this project', res.meta),
     onError: (e) => toastError(e, "Couldn't remove the field"),
     onSettled: settle,
   });
@@ -117,6 +124,7 @@ export function useFieldMutations(projectId: string) {
           body: { after_id: v.afterId ?? null, before_id: v.beforeId ?? null },
         })
       ).data!,
+    onSuccess: (res) => record('Reordered fields', res.meta),
     onError: (e) => toastError(e, "Couldn't reorder the fields"),
     onSettled: settle,
   });
@@ -129,6 +137,7 @@ export function useFieldMutations(projectId: string) {
           body: { is_visible: v.visible },
         })
       ).data!,
+    onSuccess: (res, v) => record(`${v.visible ? 'Showed' : 'Hid'} ${res.data.name}`, res.meta),
     onError: (e) => toastError(e, "Couldn't update the field"),
     onSettled: settle,
   });

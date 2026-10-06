@@ -138,7 +138,7 @@ task_id (the blocked task), depends_on_id (the blocker), created_by, created_at.
 task_id, user_id, pk. (Assignee and creator are auto-followers.)
 
 ### `tags`, `task_tags`
-tags: id, workspace_id, name (unique per workspace, case-insensitive), color. task_tags: task_id, tag_id pk.
+tags: id, workspace_id, name (unique per workspace among live tags, case-insensitive: a deleted tag frees its name, migration 0041), color, deleted_at. task_tags: task_id, tag_id pk.
 
 ### `reactions`
 id, workspace_id, entity_type (`task`,`comment`), entity_id, user_id, emoji. Unique (entity_type, entity_id, user_id, emoji).

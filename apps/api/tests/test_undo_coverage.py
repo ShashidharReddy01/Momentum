@@ -6,6 +6,7 @@ code records has a registered handler."""
 
 from __future__ import annotations
 
+import ast
 import importlib
 import pkgutil
 import re
@@ -353,3 +354,175 @@ async def test_undo_restores_every_phase_1_mutation(as_user: Clients) -> None:
         lambda: ravi.delete(f"{BASE}/projects/{pid}"),
         "project delete",
     )
+
+
+async def test_undo_restores_tags_fields_rules_forms_and_reactions(as_user: Clients) -> None:
+    """Phase 7 E7.0 undo audit: tagging (H53), field management (H55), deleting a rule or a form
+    (H56) and reactions (H57) are undoable and restore the exact state."""
+    ravi = await as_user("ravi")
+    pid = next(
+        p["id"]
+        for p in (await ravi.get(f"{BASE}/projects")).json()["data"]
+        if p["name"] == "Website Revamp"
+    )
+    t = (await ravi.post(f"{BASE}/projects/{pid}/tasks", json={"title": "Undo tags"})).json()[
+        "data"
+    ]
+    task_url = f"{BASE}/tasks/{t['id']}"
+
+    async def get(url: str) -> Any:
+        r = await ravi.get(url)
+        return r.json() if r.status_code == 200 else r.status_code
+
+    tag = (await ravi.post(f"{BASE}/tags", json={"name": "Undo tag"})).json()["data"]["id"]
+    spare = (await ravi.post(f"{BASE}/tags", json={"name": "Spare tag"})).json()["data"]["id"]
+    await ravi.post(f"{task_url}/tags", json={"tag_id": tag})
+    fields_url = f"{BASE}/projects/{pid}/fields"
+    effort = (await ravi.post(fields_url, json={"name": "Effort", "type": "number"})).json()[
+        "data"
+    ]["id"]
+    notes = (await ravi.post(fields_url, json={"name": "Notes", "type": "text"})).json()["data"][
+        "id"
+    ]
+    await ravi.put(f"{task_url}/fields/{effort}", json={"value": 5})
+    rule = (
+        await ravi.post(
+            f"{BASE}/rules",
+            json={
+                "name": "R",
+                "project_id": pid,
+                "trigger": {"type": "task.completed"},
+                "actions": [{"type": "add_comment", "text": "hi"}],
+            },
+        )
+    ).json()["data"]["id"]
+    form = (
+        await ravi.post(
+            f"{BASE}/forms",
+            json={
+                "project_id": pid,
+                "name": "Requests",
+                "public_enabled": True,
+                "questions": [
+                    {"id": "q_title", "label": "Title", "required": True, "maps_to": "title"}
+                ],
+            },
+        )
+    ).json()["data"]
+    doc = {
+        "type": "doc",
+        "content": [{"type": "paragraph", "content": [{"type": "text", "text": "Nice"}]}],
+    }
+    comment = (await ravi.post(f"{task_url}/comments", json={"body": doc})).json()["data"]
+
+    async def tags() -> Any:
+        return [
+            await get(f"{BASE}/tags"),
+            await get(f"{task_url}/tags"),
+            await get(f"{BASE}/tags/{tag}/tasks"),
+        ]
+
+    async def fields() -> Any:
+        return [await get(fields_url), await get(f"{task_url}/fields"), await get(f"{BASE}/fields")]
+
+    cases: list[
+        tuple[str, Callable[[], Awaitable[Any]], Callable[[], Awaitable[httpx.Response]]]
+    ] = [
+        ("tag a task", tags, lambda: ravi.post(f"{task_url}/tags", json={"tag_id": spare})),
+        ("untag a task", tags, lambda: ravi.delete(f"{task_url}/tags/{tag}")),
+        ("tag create", tags, lambda: ravi.post(f"{BASE}/tags", json={"name": "Another"})),
+        (
+            "tag rename",
+            tags,
+            lambda: ravi.patch(f"{BASE}/tags/{tag}", json={"name": "Renamed", "color": "#ef4444"}),
+        ),
+        ("tag delete", tags, lambda: ravi.delete(f"{BASE}/tags/{tag}")),
+        (
+            "field hide",
+            fields,
+            lambda: ravi.patch(f"{fields_url}/{effort}/visibility", json={"is_visible": False}),
+        ),
+        (
+            "field move",
+            fields,
+            lambda: ravi.post(f"{fields_url}/{notes}/move", json={"before_id": effort}),
+        ),
+        ("field remove from project", fields, lambda: ravi.delete(f"{fields_url}/{effort}")),
+        ("field archive", fields, lambda: ravi.post(f"{fields_url}/{effort}/archive")),
+        (
+            "rule delete",
+            lambda: get(f"{BASE}/rules?project_id={pid}"),
+            lambda: ravi.delete(f"{BASE}/rules/{rule}"),
+        ),
+        (
+            "form delete",
+            lambda: get(f"{BASE}/forms?project_id={pid}"),
+            lambda: ravi.delete(f"{BASE}/forms/{form['id']}"),
+        ),
+        (
+            "reaction",
+            lambda: get(f"{task_url}/comments"),
+            lambda: ravi.post(f"{BASE}/comments/{comment['id']}/reactions", json={"emoji": "🎉"}),
+        ),
+    ]
+    for label, snap, action in cases:
+        await _roundtrip(ravi, snap, action, label)
+    # the restored form's public link works again
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=as_user.app), base_url="http://testserver"
+    ) as anon:
+        r = await anon.get(f"{BASE}/public/forms/{form['public_token']}")
+    assert r.status_code == 200, r.text
+
+
+async def test_a_deleted_tags_name_can_be_used_again(as_user: Clients) -> None:
+    """H54: deleting a tag frees its name (creating it again used to fail with a 500); undoing
+    the delete is then refused instead of making two tags with one name."""
+    ravi = await as_user("ravi")
+    first = (await ravi.post(f"{BASE}/tags", json={"name": "Blocked"})).json()["data"]["id"]
+    deleted = await ravi.delete(f"{BASE}/tags/{first}")
+    again = await ravi.post(f"{BASE}/tags", json={"name": "blocked"})
+    assert again.status_code == 201, again.text
+    u = await ravi.post(f"{BASE}/undo", json={"activity_id": deleted.json()["meta"]["activity_id"]})
+    assert u.status_code == 409
+    assert "Blocked" in u.json()["detail"]
+
+
+def test_every_mutation_records_activity() -> None:
+    """CLAUDE.md: every mutation records an activity row. A service function that emits an event
+    must also record activity, except the reviewed ones below (system events, computed data, AI
+    streaming). Found field detach / reorder / show-hide and reactions without any (H55, H57)."""
+    allowed = {
+        "agents/runtime.py:execute_run",  # agent_run.finished: the run row is the record
+        "ai/chat.py:run_chat",  # SSE stream events, not the outbox
+        "ai/chat.py:tracked",
+        "ai/command.py:run_command",
+        "ai/loop.py:run_tool_loop",
+        "ai/loop.py:_stream_text",
+        "ai/loop.py:_streamed_step",
+        "ai/loop.py:emit_proposals",  # proposals: the ai_actions row is the record
+        "domain/forecasts/service.py:store",  # computed data (realtime catalog: no activity)
+        "domain/forms/service.py:submit_form",  # create_task records the task's activity
+        "domain/notifications/service.py:_create_or_coalesce",  # a notification is the record
+        "domain/rules/due_scan.py:scan_due_approaching",  # a system trigger, not a change
+        "domain/rules/engine.py:_fire",  # rule_runs is the record; actions go through services
+        "domain/tasks/service.py:_hand_off",  # task.unblocked: a trigger, nothing changed
+    }
+    root = Path(momentum.__file__).parent
+    found = set()
+    for path in sorted(root.rglob("*.py")):
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for fn in ast.walk(tree):
+            if not isinstance(fn, ast.AsyncFunctionDef):
+                continue
+            if any("undo_handler" in ast.unparse(d) for d in fn.decorator_list):
+                continue
+            calls = {
+                getattr(n.func, "id", getattr(n.func, "attr", ""))
+                for n in ast.walk(fn)
+                if isinstance(n, ast.Call)
+            }
+            if "emit" in calls and "record_activity" not in calls:
+                found.add(f"{path.relative_to(root).as_posix()}:{fn.name}")
+    assert found - allowed == set(), "mutations without an activity row"
+    assert allowed - found == set(), "stale allowlist entries"

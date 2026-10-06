@@ -114,8 +114,10 @@ async def react(
     comment_id: uuid.UUID, body: ReactionIn, ctx: CtxDep, uow: UowDep
 ) -> MutationOut[CommentOut]:
     async with uow.transaction() as s:
-        await service.set_reaction(s, ctx, comment_id, body.emoji, body.active)
-        return MutationOut(data=await _one(s, ctx, comment_id), meta=MutationMeta())
+        m = await service.set_reaction(s, ctx, comment_id, body.emoji, body.active)
+        return MutationOut(
+            data=await _one(s, ctx, comment_id), meta=MutationMeta(activity_id=m.activity_id)
+        )
 
 
 @router.get(

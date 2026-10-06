@@ -31,7 +31,11 @@ from momentum.core.events import emit
 from momentum.core.mutation import Mutation
 from momentum.core.settings import Settings
 from momentum.core.undo import undo_handler, undo_op
-from momentum.domain.access import get_visible_project, visible_projects_clause
+from momentum.domain.access import (
+    get_visible_project,
+    visible_people_clause,
+    visible_projects_clause,
+)
 from momentum.domain.projects.models import Project
 from momentum.domain.tasks.models import Task, TaskProject
 from momentum.domain.users.models import User
@@ -213,15 +217,16 @@ async def _overrides(
     return {(c.user_id, c.week_start): c.capacity_minutes for c in rows.scalars()}
 
 
-async def _people(session: AsyncSession, workspace_id: uuid.UUID) -> list[User]:
+async def _people(session: AsyncSession, ctx: Ctx) -> list[User]:
     return list(
         (
             await session.execute(
                 select(User)
                 .where(
-                    User.workspace_id == workspace_id,
+                    User.workspace_id == ctx.workspace_id,
                     User.status == "active",
                     User.is_agent.is_(False),
+                    visible_people_clause(ctx, User.id),
                 )
                 .order_by(User.name)
             )
@@ -289,7 +294,7 @@ async def workload(
             p.weeks[w] = WeekLoad(w, weekly if o is None else o, override=o is not None)
         return p
 
-    people = {u.id: row(u) for u in await _people(session, ctx.workspace_id)}
+    people = {u.id: row(u) for u in await _people(session, ctx)}
     unassigned = row(None)
 
     # every open top-level task in a project you can see, due by the window's end: only the

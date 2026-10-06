@@ -5,8 +5,9 @@ Who may manage rules: a project's admins for its rules, workspace admins for wor
 (auth-and-permissions.md lists editors as "✓ (setting)"; there is no such setting yet, so the
 stricter default applies). Viewing rules and their runs needs editor on the project.
 
-Rule changes are configuration, not task data: they record activity and events but no undo
-payload (like tags and fields).
+Rule changes are configuration, not task data: they record activity and events, and only a
+delete can be undone (H56: a deleted rule had no way back; an edit or a disable is changed back
+the same way it was made).
 """
 
 from __future__ import annotations
@@ -24,6 +25,7 @@ from momentum.core.errors import Forbidden, NotFound, ValidationFailed, VersionC
 from momentum.core.events import emit
 from momentum.core.mutation import Mutation
 from momentum.core.permissions import Action, can
+from momentum.core.undo import undo_handler, undo_op
 from momentum.domain.access import (
     forbid_agent,
     get_visible_project,
@@ -305,7 +307,12 @@ async def delete_rule(session: AsyncSession, ctx: Ctx, rule_id: uuid.UUID) -> Mu
     rule.deleted_at = datetime.now(UTC)
     rule.version += 1
     act = await record_activity(
-        session, ctx, entity_type="rule", entity_id=rule.id, verb="rule.deleted"
+        session,
+        ctx,
+        entity_type="rule",
+        entity_id=rule.id,
+        verb="rule.deleted",
+        undo=undo_op("rules.restore", rule_id=rule.id),
     )
     await emit(
         session,
@@ -318,3 +325,29 @@ async def delete_rule(session: AsyncSession, ctx: Ctx, rule_id: uuid.UUID) -> Mu
         activity_id=act.id,
     )
     return Mutation(rule, act.id, version=rule.version)
+
+
+@undo_handler("rules.restore")
+async def _undo_delete(session: AsyncSession, ctx: Ctx, args: dict[str, Any]) -> None:
+    rule = await session.get(Rule, uuid.UUID(str(args["rule_id"])))
+    if rule is None or rule.workspace_id != ctx.workspace_id:
+        raise NotFound("Rule not found")
+    await _authorize(session, ctx, rule.project_id, "admin", "manage rules")
+    if rule.deleted_at is None:
+        return
+    rule.deleted_at = None
+    rule.version += 1
+    rule.updated_at = datetime.now(UTC)
+    act = await record_activity(
+        session, ctx, entity_type="rule", entity_id=rule.id, verb="rule.restored"
+    )
+    await emit(
+        session,
+        ctx,
+        type="rule.restored",
+        entity_type="rule",
+        entity_id=rule.id,
+        data={"project_id": str(rule.project_id) if rule.project_id else None},
+        channels=_channels(rule.project_id, ctx),
+        activity_id=act.id,
+    )

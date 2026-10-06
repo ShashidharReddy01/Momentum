@@ -11,15 +11,17 @@ Two permission paths, both reusing checks that already exist rather than adding 
   `require_project_role`), same as fields' values. A member who can edit a task can tag it even
   if they couldn't create a team or project on their own.
 
-Unlike fields, tag mutations go through the normal activity trail and are ordinary, frequent
-actions — there's no per-project fan-out to design an undo payload around here, so nothing about
-tags is called out as an exception the way field management is.
+Tag mutations are ordinary, frequent actions and every one of them can be undone (E7.0, H53:
+until Phase 7 none could): tagging and untagging a task, creating, renaming, recolouring and
+deleting a tag. A deleted tag frees its name (H54), so restoring it is refused while another tag
+uses the name.
 """
 
 from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime
+from typing import Any
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -30,6 +32,7 @@ from momentum.core.errors import Conflict, NotFound, ValidationFailed
 from momentum.core.events import emit
 from momentum.core.mutation import Mutation
 from momentum.core.permissions import Action, require
+from momentum.core.undo import UndoConflict, undo_handler, undo_op
 from momentum.domain.access import (
     forbid_agent,
     get_visible_project,
@@ -88,6 +91,7 @@ async def create_tag(session: AsyncSession, ctx: Ctx, data: TagCreateIn) -> Muta
         entity_id=tag.id,
         verb="tag.created",
         changes={"name": (None, tag.name)},
+        undo=undo_op("tags.delete", tag_id=tag.id),
     )
     await emit(
         session,
@@ -124,7 +128,13 @@ async def patch_tag(
     if not changed:
         return Mutation(tag)
     act = await record_activity(
-        session, ctx, entity_type="tag", entity_id=tag.id, verb="tag.updated", changes=changed
+        session,
+        ctx,
+        entity_type="tag",
+        entity_id=tag.id,
+        verb="tag.updated",
+        changes=changed,
+        undo=undo_op("tags.patch", tag_id=tag.id, before={k: v[0] for k, v in changed.items()}),
     )
     await emit(
         session,
@@ -139,14 +149,21 @@ async def patch_tag(
     return Mutation(tag, act.id)
 
 
-async def delete_tag(session: AsyncSession, ctx: Ctx, tag_id: uuid.UUID) -> None:
+async def delete_tag(session: AsyncSession, ctx: Ctx, tag_id: uuid.UUID) -> Mutation[Tag]:
     """Soft-delete the tag everywhere (its `task_tags` rows are left as-is; a deleted tag just
-    stops showing up, same as an archived field)."""
+    stops showing up, and undo brings it back on the same tasks)."""
     forbid_agent(ctx, "delete tags")
     require(ctx, Action.PROJECT_CREATE)
     tag = await _get_tag(session, ctx, tag_id)
     tag.deleted_at = datetime.now(UTC)
-    await record_activity(session, ctx, entity_type="tag", entity_id=tag.id, verb="tag.deleted")
+    act = await record_activity(
+        session,
+        ctx,
+        entity_type="tag",
+        entity_id=tag.id,
+        verb="tag.deleted",
+        undo=undo_op("tags.restore", tag_id=tag.id),
+    )
     await emit(
         session,
         ctx,
@@ -155,7 +172,9 @@ async def delete_tag(session: AsyncSession, ctx: Ctx, tag_id: uuid.UUID) -> None
         entity_id=tag.id,
         data={},
         channels=[f"workspace:{ctx.workspace_id}"],
+        activity_id=act.id,
     )
+    return Mutation(tag, act.id)
 
 
 # ---------------- task tags ----------------
@@ -222,6 +241,7 @@ async def add_task_tag(
             entity_id=task_id,
             verb="task.tagged",
             changes={"tag": (None, tag.name)},
+            undo=undo_op("tags.untag", task_id=task_id, tag_id=tag.id),
         )
         channels = [f"task:{task_id}"]
         if placement is not None:
@@ -242,7 +262,7 @@ async def add_task_tag(
 
 async def remove_task_tag(
     session: AsyncSession, ctx: Ctx, task_id: uuid.UUID, tag_id: uuid.UUID
-) -> None:
+) -> Mutation[Tag | None]:
     _, placement, role = await get_visible_task(session, ctx, task_id)
     require_project_role(role, "editor", "untag this task")
     link = await session.get(TaskTag, (task_id, tag_id))
@@ -257,6 +277,7 @@ async def remove_task_tag(
         entity_id=task_id,
         verb="task.untagged",
         changes={"tag": (tag.name if tag else None, None)},
+        undo=undo_op("tags.retag", task_id=task_id, tag_id=tag_id),
     )
     channels = [f"task:{task_id}"]
     if placement is not None:
@@ -271,6 +292,7 @@ async def remove_task_tag(
         channels=channels,
         activity_id=act.id,
     )
+    return Mutation(tag, act.id)
 
 
 async def list_tag_tasks(
@@ -295,3 +317,61 @@ async def list_tag_tasks(
         .order_by(Task.created_at.desc())
     )
     return [(t, p) for t, p in rows.all()]
+
+
+# ---------------- undo ----------------
+
+
+def _id(args: dict[str, Any], key: str) -> uuid.UUID:
+    return uuid.UUID(str(args[key]))
+
+
+@undo_handler("tags.untag")
+async def _undo_tag(session: AsyncSession, ctx: Ctx, args: dict[str, Any]) -> None:
+    task_id, tag_id = _id(args, "task_id"), _id(args, "tag_id")
+    if await session.get(TaskTag, (task_id, tag_id)) is not None:
+        await remove_task_tag(session, ctx, task_id, tag_id)
+
+
+@undo_handler("tags.retag")
+async def _undo_untag(session: AsyncSession, ctx: Ctx, args: dict[str, Any]) -> None:
+    tag = await session.get(Tag, _id(args, "tag_id"))
+    if tag is None or tag.workspace_id != ctx.workspace_id or tag.deleted_at is not None:
+        raise UndoConflict("That tag was deleted")
+    await add_task_tag(session, ctx, _id(args, "task_id"), tag.id, None)
+
+
+@undo_handler("tags.patch")
+async def _undo_patch(session: AsyncSession, ctx: Ctx, args: dict[str, Any]) -> None:
+    await patch_tag(session, ctx, _id(args, "tag_id"), TagPatchIn(**dict(args["before"])))
+
+
+@undo_handler("tags.delete")
+async def _undo_create(session: AsyncSession, ctx: Ctx, args: dict[str, Any]) -> None:
+    await delete_tag(session, ctx, _id(args, "tag_id"))
+
+
+@undo_handler("tags.restore")
+async def _undo_delete(session: AsyncSession, ctx: Ctx, args: dict[str, Any]) -> None:
+    require(ctx, Action.PROJECT_CREATE)
+    tag = await session.get(Tag, _id(args, "tag_id"))
+    if tag is None or tag.workspace_id != ctx.workspace_id:
+        raise NotFound("Tag not found")
+    if tag.deleted_at is None:
+        return
+    if await _find_by_name(session, ctx, tag.name) is not None:
+        raise UndoConflict(f"Another tag is now called {tag.name}")
+    tag.deleted_at = None
+    act = await record_activity(
+        session, ctx, entity_type="tag", entity_id=tag.id, verb="tag.restored"
+    )
+    await emit(
+        session,
+        ctx,
+        type="tag.restored",
+        entity_type="tag",
+        entity_id=tag.id,
+        data={},
+        channels=[f"workspace:{ctx.workspace_id}"],
+        activity_id=act.id,
+    )

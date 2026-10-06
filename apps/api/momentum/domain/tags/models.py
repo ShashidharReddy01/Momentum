@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 
-from sqlalchemy import ForeignKey, Index, String, func
+from sqlalchemy import ForeignKey, Index, String, func, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from momentum.core.db import Base, IdMixin, SoftDeleteMixin, TimestampMixin
@@ -26,6 +26,7 @@ class Tag(IdMixin, TimestampMixin, SoftDeleteMixin, Base):
             "workspace_id",
             func.lower(name),
             unique=True,
+            postgresql_where=text("deleted_at is null"),
         ),
     )
 

@@ -139,4 +139,18 @@ describe('Fields in views (S2.3.2)', () => {
     await user.click(within(chips).getByRole('button', { name: 'Remove filter: Priority: High' }));
     expect(await screen.findByRole('listitem', { name: 'Second' })).toBeInTheDocument();
   });
+
+  it('archiving or removing a field offers Undo (E7.0, H55)', async () => {
+    const user = await boot();
+    await addField(user, 'Effort', 'text');
+    await addField(user, 'Notes', 'text');
+    await user.click(screen.getByRole('button', { name: 'Fields' }));
+    await user.click(await screen.findByRole('button', { name: 'Effort actions' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Archive everywhere' }));
+    expect(await screen.findByText('Effort archived in every project')).toBeInTheDocument();
+    await user.click(await screen.findByRole('button', { name: 'Notes actions' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Remove from this project' }));
+    expect(await screen.findByText('Field removed from this project')).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Undo' }).length).toBeGreaterThan(0);
+  });
 });

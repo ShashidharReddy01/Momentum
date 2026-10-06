@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { components } from '@/lib/api/schema';
 import { toastError } from '@/lib/toast';
+import { useUndoToast } from '@/lib/undo';
 import { useApi } from '@/providers/api';
 
 /** The stored shape is looser than the write schema (`RuleOut.trigger`/`conditions`/`actions`
@@ -96,6 +97,7 @@ export function useRuleRuns(ruleId: string, enabled: boolean) {
 export function useRuleMutations(projectId: string) {
   const api = useApi();
   const qc = useQueryClient();
+  const undoToast = useUndoToast();
   const key = ruleKeys.byProject(projectId);
   const settle = () => void qc.invalidateQueries({ queryKey: key });
 
@@ -132,7 +134,8 @@ export function useRuleMutations(projectId: string) {
 
   const remove = useMutation({
     mutationFn: async (id: string) =>
-      await api.DELETE('/api/v1/rules/{rule_id}', { params: { path: { rule_id: id } } }),
+      (await api.DELETE('/api/v1/rules/{rule_id}', { params: { path: { rule_id: id } } })).data!,
+    onSuccess: (res) => undoToast('Rule deleted', res.meta),
     onError: (e) => toastError(e, "Couldn't delete the rule"),
     onSettled: settle,
   });

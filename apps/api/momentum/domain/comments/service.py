@@ -363,6 +363,15 @@ async def set_reaction(
     else:
         await session.delete(existing)
     await session.flush()
+    act = await record_activity(
+        session,
+        ctx,
+        entity_type="comment",
+        entity_id=comment.id,
+        verb="comment.reacted" if active else "comment.unreacted",
+        changes={"reaction": (None, emoji) if active else (emoji, None)},
+        undo=undo_op("comments.react", comment_id=comment.id, emoji=emoji, active=not active),
+    )
     await emit(
         session,
         ctx,
@@ -371,8 +380,9 @@ async def set_reaction(
         entity_id=comment.id,
         data={"task_id": str(task.id), "emoji": emoji},
         channels=[f"task:{task.id}"],
+        activity_id=act.id,
     )
-    return Mutation(comment)
+    return Mutation(comment, act.id)
 
 
 # ---------- undo ----------
@@ -380,6 +390,11 @@ async def set_reaction(
 
 def _cid(args: dict[str, Any]) -> uuid.UUID:
     return uuid.UUID(str(args["comment_id"]))
+
+
+@undo_handler("comments.react")
+async def _undo_reaction(session: AsyncSession, ctx: Ctx, args: dict[str, Any]) -> None:
+    await set_reaction(session, ctx, _cid(args), str(args["emoji"]), bool(args["active"]))
 
 
 @undo_handler("comments.delete")

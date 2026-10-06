@@ -5,7 +5,7 @@ import uuid
 from fastapi import APIRouter, status
 
 from momentum.api.deps import CtxDep, UowDep
-from momentum.api.schemas import ListOut, MutationOut, OkOut
+from momentum.api.schemas import ListOut, MutationMeta, MutationOut, OkOut
 from momentum.domain.tags import service
 from momentum.domain.tags.schemas import TagCreateIn, TagOut, TagPatchIn, TaskTagIn, TaskTagOut
 from momentum.domain.tasks.router import task_out
@@ -44,11 +44,11 @@ async def patch_tag(
         return MutationOut.of(m, TagOut)
 
 
-@router.delete("/tags/{tag_id}", response_model=OkOut, summary="Delete a tag")
-async def delete_tag(tag_id: uuid.UUID, ctx: CtxDep, uow: UowDep) -> OkOut:
+@router.delete("/tags/{tag_id}", response_model=MutationOut[OkOut], summary="Delete a tag")
+async def delete_tag(tag_id: uuid.UUID, ctx: CtxDep, uow: UowDep) -> MutationOut[OkOut]:
     async with uow.transaction() as s:
-        await service.delete_tag(s, ctx, tag_id)
-    return OkOut()
+        m = await service.delete_tag(s, ctx, tag_id)
+    return MutationOut(data=OkOut(), meta=MutationMeta(activity_id=m.activity_id))
 
 
 @router.get(
@@ -101,9 +101,13 @@ async def add_task_tag(
 
 
 @router.delete(
-    "/tasks/{task_id}/tags/{tag_id}", response_model=OkOut, summary="Remove a tag from a task"
+    "/tasks/{task_id}/tags/{tag_id}",
+    response_model=MutationOut[OkOut],
+    summary="Remove a tag from a task",
 )
-async def remove_task_tag(task_id: uuid.UUID, tag_id: uuid.UUID, ctx: CtxDep, uow: UowDep) -> OkOut:
+async def remove_task_tag(
+    task_id: uuid.UUID, tag_id: uuid.UUID, ctx: CtxDep, uow: UowDep
+) -> MutationOut[OkOut]:
     async with uow.transaction() as s:
-        await service.remove_task_tag(s, ctx, task_id, tag_id)
-    return OkOut()
+        m = await service.remove_task_tag(s, ctx, task_id, tag_id)
+    return MutationOut(data=OkOut(), meta=MutationMeta(activity_id=m.activity_id))

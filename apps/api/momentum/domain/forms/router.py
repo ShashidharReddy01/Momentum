@@ -11,7 +11,7 @@ import uuid
 from fastapi import APIRouter, Request, status
 
 from momentum.api.deps import CtxDep, RuntimeDep, UowDep, client_ip
-from momentum.api.schemas import ListOut, MutationOut, OkOut
+from momentum.api.schemas import ListOut, MutationMeta, MutationOut, OkOut
 from momentum.domain.forms import service
 from momentum.domain.forms.schemas import (
     FormIn,
@@ -63,11 +63,11 @@ async def patch_form(
         return MutationOut.of(m, FormOut)
 
 
-@router.delete("/forms/{form_id}", response_model=OkOut, summary="Delete a form")
-async def delete_form(form_id: uuid.UUID, ctx: CtxDep, uow: UowDep) -> OkOut:
+@router.delete("/forms/{form_id}", response_model=MutationOut[OkOut], summary="Delete a form")
+async def delete_form(form_id: uuid.UUID, ctx: CtxDep, uow: UowDep) -> MutationOut[OkOut]:
     async with uow.transaction() as s:
-        await service.delete_form(s, ctx, form_id)
-    return OkOut()
+        m = await service.delete_form(s, ctx, form_id)
+    return MutationOut(data=OkOut(), meta=MutationMeta(activity_id=m.activity_id))
 
 
 @router.post(

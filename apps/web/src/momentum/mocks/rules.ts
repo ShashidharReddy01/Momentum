@@ -98,7 +98,7 @@ export function ruleHandlers(base = '', seedRuns: Record<string, Run[]> = {}) {
     http.delete(`*${base}/api/v1/rules/:id`, ({ params }) => {
       const i = rules.findIndex((r) => r.id === params.id);
       if (i >= 0) rules.splice(i, 1);
-      return HttpResponse.json({ ok: true });
+      return HttpResponse.json({ data: { ok: true }, meta: { activity_id: null } });
     }),
     http.get(`*${base}/api/v1/rules/:id/runs`, ({ params }) =>
       HttpResponse.json({ data: runs[String(params.id)] ?? [], meta: { next_cursor: null } }),

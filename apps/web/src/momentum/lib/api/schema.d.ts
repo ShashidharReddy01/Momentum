@@ -12201,7 +12201,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["OkOut"];
+                    "application/json": components["schemas"]["MutationOut_OkOut_"];
                 };
             };
             /** @description Validation Error */
@@ -14146,7 +14146,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["OkOut"];
+                    "application/json": components["schemas"]["MutationOut_OkOut_"];
                 };
             };
             /** @description Validation Error */
@@ -15213,7 +15213,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["OkOut"];
+                    "application/json": components["schemas"]["MutationOut_OkOut_"];
                 };
             };
             /** @description Validation Error */
@@ -15541,7 +15541,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["OkOut"];
+                    "application/json": components["schemas"]["MutationOut_OkOut_"];
                 };
             };
             /** @description Validation Error */
@@ -16671,7 +16671,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["OkOut"];
+                    "application/json": components["schemas"]["MutationOut_OkOut_"];
                 };
             };
             /** @description Validation Error */

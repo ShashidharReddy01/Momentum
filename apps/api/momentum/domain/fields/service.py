@@ -1,11 +1,9 @@
 """S2.3.1/S2.3.2: custom field definitions, the workspace library, per-project attachment, and
 field values (get/set on a task, or in bulk for a whole project's list/board view).
 
-Field management (create/edit/archive/attach/detach/reorder) is deliberately **not undoable** in
-this slice (unlike almost everything else in Momentum): each of those needs its own restore
-payload design, and none of them are the kind of frequent, easy-to-fat-finger action (like a
-rename or a drag) that undo mainly protects against. Documented here rather than silently
-different from the rest of the app.
+Every field change records activity. Creating and editing a field definition aren't undoable
+(edit it back); what hides data or layout is (Phase 7 E7.0, H55): archiving a field (it vanishes
+from every project that uses it), removing it from a project, reordering and showing / hiding it.
 """
 
 from __future__ import annotations
@@ -287,12 +285,16 @@ async def archive_field(
     session: AsyncSession, ctx: Ctx, project_id: uuid.UUID, field_id: uuid.UUID
 ) -> Mutation[FieldDef]:
     """Archive the field def entirely (hides it from every project that has it, not just this
-    one). Its values aren't deleted, so it isn't a destructive action — just not visible without
-    a (future) unarchive."""
+    one). Its values are kept, and undo brings it back everywhere."""
     _, field = await _get_attached(session, ctx, project_id, field_id)
     field.deleted_at = datetime.now(UTC)
     act = await record_activity(
-        session, ctx, entity_type="field", entity_id=field.id, verb="field.archived"
+        session,
+        ctx,
+        entity_type="field",
+        entity_id=field.id,
+        verb="field.archived",
+        undo=undo_op("fields.unarchive", project_id=project_id, field_id=field.id),
     )
     other_projects = await _project_ids_using(session, field.id)
     await emit(
@@ -310,10 +312,27 @@ async def archive_field(
 
 async def detach_field(
     session: AsyncSession, ctx: Ctx, project_id: uuid.UUID, field_id: uuid.UUID
-) -> None:
-    """Remove a field from just this project (the def and its values elsewhere are untouched)."""
+) -> Mutation[FieldDef]:
+    """Remove a field from just this project (the def and its values are untouched, so undo
+    puts it back where it was with its values)."""
     pf, field = await _get_attached(session, ctx, project_id, field_id)
+    position, visible = pf.position, pf.is_visible
     await session.delete(pf)
+    act = await record_activity(
+        session,
+        ctx,
+        entity_type="field",
+        entity_id=field.id,
+        verb="field.detached",
+        changes={"project_id": (str(project_id), None)},
+        undo=undo_op(
+            "fields.reattach",
+            project_id=project_id,
+            field_id=field.id,
+            position=position,
+            is_visible=visible,
+        ),
+    )
     await emit(
         session,
         ctx,
@@ -322,7 +341,9 @@ async def detach_field(
         entity_id=field.id,
         data={"project_id": str(project_id)},
         channels=_channels(project_id),
+        activity_id=act.id,
     )
+    return Mutation(field, act.id)
 
 
 async def move_project_field(
@@ -337,7 +358,19 @@ async def move_project_field(
     if field_id in (after_id, before_id):
         raise ValidationFailed("Can't move a field next to itself")
     a, b = await _neighbor_positions(session, project_id, after_id, before_id, exclude=field_id)
+    before = pf.position
     pf.position = key_between(a, b)
+    act = await record_activity(
+        session,
+        ctx,
+        entity_type="field",
+        entity_id=field.id,
+        verb="field.moved",
+        changes={"position": (before, pf.position)},
+        undo=undo_op(
+            "fields.reposition", project_id=project_id, field_id=field.id, position=before
+        ),
+    )
     await emit(
         session,
         ctx,
@@ -346,15 +379,32 @@ async def move_project_field(
         entity_id=field.id,
         data={"project_id": str(project_id), "position": pf.position},
         channels=_channels(project_id),
+        activity_id=act.id,
     )
-    return Mutation(field)
+    return Mutation(field, act.id)
 
 
 async def set_field_visibility(
     session: AsyncSession, ctx: Ctx, project_id: uuid.UUID, field_id: uuid.UUID, is_visible: bool
 ) -> Mutation[FieldDef]:
     pf, field = await _get_attached(session, ctx, project_id, field_id)
+    if pf.is_visible == is_visible:
+        return Mutation(field)
     pf.is_visible = is_visible
+    act = await record_activity(
+        session,
+        ctx,
+        entity_type="field",
+        entity_id=field.id,
+        verb="field.shown" if is_visible else "field.hidden",
+        changes={"is_visible": (not is_visible, is_visible)},
+        undo=undo_op(
+            "fields.set_visibility",
+            project_id=project_id,
+            field_id=field.id,
+            is_visible=not is_visible,
+        ),
+    )
     await emit(
         session,
         ctx,
@@ -363,8 +413,9 @@ async def set_field_visibility(
         entity_id=field.id,
         data={"project_id": str(project_id)},
         channels=_channels(project_id),
+        activity_id=act.id,
     )
-    return Mutation(field)
+    return Mutation(field, act.id)
 
 
 async def _project_ids_using(session: AsyncSession, field_id: uuid.UUID) -> list[uuid.UUID]:
@@ -562,3 +613,96 @@ async def _undo_set_value(session: AsyncSession, ctx: Ctx, args: dict[str, Any])
     await set_task_field_value(
         session, ctx, task_id, field_id, args.get("value"), record_undo=False
     )
+
+
+# ---------------- undo of field management (H55) ----------------
+
+
+def _ids(args: dict[str, Any]) -> tuple[uuid.UUID, uuid.UUID]:
+    return uuid.UUID(str(args["project_id"])), uuid.UUID(str(args["field_id"]))
+
+
+@undo_handler("fields.unarchive")
+async def _undo_archive(session: AsyncSession, ctx: Ctx, args: dict[str, Any]) -> None:
+    project_id, field_id = _ids(args)
+    _, role = await get_visible_project(session, ctx, project_id)
+    require_project_role(role, "editor", "manage fields")
+    field = await session.get(FieldDef, field_id)
+    if field is None or field.workspace_id != ctx.workspace_id:
+        raise NotFound("Field not found")
+    if field.deleted_at is None:
+        return
+    field.deleted_at = None
+    act = await record_activity(
+        session, ctx, entity_type="field", entity_id=field.id, verb="field.restored"
+    )
+    await emit(
+        session,
+        ctx,
+        type="field.restored",
+        entity_type="field",
+        entity_id=field.id,
+        data={},
+        channels=[c for pid in await _project_ids_using(session, field.id) for c in _channels(pid)],
+        activity_id=act.id,
+    )
+
+
+@undo_handler("fields.reattach")
+async def _undo_detach(session: AsyncSession, ctx: Ctx, args: dict[str, Any]) -> None:
+    project_id, field_id = _ids(args)
+    _, role = await get_visible_project(session, ctx, project_id)
+    require_project_role(role, "editor", "manage fields")
+    field = await session.get(FieldDef, field_id)
+    if field is None or field.workspace_id != ctx.workspace_id or field.deleted_at is not None:
+        raise UndoConflict("That field was archived")
+    if await session.get(ProjectField, (project_id, field_id)) is not None:
+        return
+    session.add(
+        ProjectField(
+            project_id=project_id,
+            field_id=field_id,
+            position=str(args["position"]),
+            is_visible=bool(args["is_visible"]),
+        )
+    )
+    act = await record_activity(
+        session,
+        ctx,
+        entity_type="field",
+        entity_id=field_id,
+        verb="field.attached",
+        changes={"project_id": (None, str(project_id))},
+    )
+    await emit(
+        session,
+        ctx,
+        type="field.attached",
+        entity_type="field",
+        entity_id=field_id,
+        data={"project_id": str(project_id)},
+        channels=_channels(project_id),
+        activity_id=act.id,
+    )
+
+
+@undo_handler("fields.reposition")
+async def _undo_move(session: AsyncSession, ctx: Ctx, args: dict[str, Any]) -> None:
+    project_id, field_id = _ids(args)
+    pf, field = await _get_attached(session, ctx, project_id, field_id)
+    pf.position = str(args["position"])
+    await emit(
+        session,
+        ctx,
+        type="field.moved",
+        entity_type="field",
+        entity_id=field.id,
+        data={"project_id": str(project_id), "position": pf.position},
+        channels=_channels(project_id),
+    )
+
+
+@undo_handler("fields.set_visibility")
+async def _undo_visibility(session: AsyncSession, ctx: Ctx, args: dict[str, Any]) -> None:
+    project_id, field_id = _ids(args)
+    await set_field_visibility(session, ctx, project_id, field_id, bool(args["is_visible"]))

@@ -35,6 +35,7 @@ from momentum.core.errors import (
 from momentum.core.events import emit
 from momentum.core.mutation import Mutation
 from momentum.core.settings import Settings
+from momentum.core.undo import undo_handler, undo_op
 from momentum.domain.access import forbid_agent, get_visible_project, require_project_role
 from momentum.domain.comments.service import create_comment
 from momentum.domain.fields.models import FieldDef, ProjectField
@@ -262,7 +263,12 @@ async def delete_form(session: AsyncSession, ctx: Ctx, form_id: uuid.UUID) -> Mu
     form.deleted_at = datetime.now(UTC)
     form.version += 1
     act = await record_activity(
-        session, ctx, entity_type="form", entity_id=form.id, verb="form.deleted"
+        session,
+        ctx,
+        entity_type="form",
+        entity_id=form.id,
+        verb="form.deleted",
+        undo=undo_op("forms.restore", form_id=form.id),
     )
     await emit(
         session,
@@ -275,6 +281,35 @@ async def delete_form(session: AsyncSession, ctx: Ctx, form_id: uuid.UUID) -> Mu
         activity_id=act.id,
     )
     return Mutation(form, act.id, version=form.version)
+
+
+@undo_handler("forms.restore")
+async def _undo_delete(session: AsyncSession, ctx: Ctx, args: dict[str, Any]) -> None:
+    """H56: a deleted form (and its public link, which may be out in the world) comes back as it
+    was, same link."""
+    form = await session.get(Form, uuid.UUID(str(args["form_id"])))
+    if form is None or form.workspace_id != ctx.workspace_id:
+        raise NotFound("Form not found")
+    _project, role = await get_visible_project(session, ctx, form.project_id)
+    require_project_role(role, "admin", "manage forms")
+    if form.deleted_at is None:
+        return
+    form.deleted_at = None
+    form.version += 1
+    form.updated_at = datetime.now(UTC)
+    act = await record_activity(
+        session, ctx, entity_type="form", entity_id=form.id, verb="form.restored"
+    )
+    await emit(
+        session,
+        ctx,
+        type="form.restored",
+        entity_type="form",
+        entity_id=form.id,
+        data={"project_id": str(form.project_id)},
+        channels=_channels(form.project_id),
+        activity_id=act.id,
+    )
 
 
 # ---------------- public view ----------------
@@ -520,12 +555,15 @@ async def submit_form(
         if assignee_id not in {u.id for u in await _assignable(session, form.project_id)}:
             raise ValidationFailed("Invalid assignee")
 
+    # E7.0 (H59): if the form's section was deleted, submissions land in the project's first
+    # section instead of failing (a public link can't tell anyone its section is gone)
+    section = await session.get(Section, form.section_id) if form.section_id else None
     m = await create_task(
         session,
         ctx,
         form.project_id,
         title,
-        section_id=form.section_id,
+        section_id=form.section_id if section is not None and section.deleted_at is None else None,
         assignee_id=assignee_id,
         due_on=due_on,
         priority=answer("priority"),

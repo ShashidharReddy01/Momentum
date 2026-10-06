@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { components } from '@/lib/api/schema';
 import { toastError } from '@/lib/toast';
+import { useRecordUndo, useUndoToast } from '@/lib/undo';
 import { useApi } from '@/providers/api';
 
 export type Tag = components['schemas']['TagOut'];
@@ -28,10 +29,13 @@ export function useTagLibrary(enabled = true) {
 export function useTagMutations() {
   const api = useApi();
   const qc = useQueryClient();
+  const record = useRecordUndo();
+  const undoToast = useUndoToast();
   const settle = () => void qc.invalidateQueries({ queryKey: tagKeys.library });
 
   const create = useMutation({
     mutationFn: async (v: TagCreate) => (await api.POST('/api/v1/tags', { body: v })).data!,
+    onSuccess: (res) => record(`Created tag ${res.data.name}`, res.meta),
     onError: (e) => toastError(e, "Couldn't create the tag"),
     onSettled: settle,
   });
@@ -39,13 +43,15 @@ export function useTagMutations() {
   const update = useMutation({
     mutationFn: async (v: { id: string; patch: TagPatch }) =>
       (await api.PATCH('/api/v1/tags/{tag_id}', { params: { path: { tag_id: v.id } }, body: v.patch })).data!,
+    onSuccess: (res) => record(`Changed tag ${res.data.name}`, res.meta),
     onError: (e) => toastError(e, "Couldn't update the tag"),
     onSettled: settle,
   });
 
   const remove = useMutation({
     mutationFn: async (id: string) =>
-      await api.DELETE('/api/v1/tags/{tag_id}', { params: { path: { tag_id: id } } }),
+      (await api.DELETE('/api/v1/tags/{tag_id}', { params: { path: { tag_id: id } } })).data!,
+    onSuccess: (res) => undoToast('Tag deleted', res.meta),
     onError: (e) => toastError(e, "Couldn't delete the tag"),
     onSettled: settle,
   });
@@ -106,6 +112,8 @@ export function useTagTasks(tagId: string, enabled = true) {
 export function useTaskTagMutations(taskId: string) {
   const api = useApi();
   const qc = useQueryClient();
+  const record = useRecordUndo();
+  const undoToast = useUndoToast();
   const settle = () => {
     void qc.invalidateQueries({ queryKey: tagKeys.byTask(taskId) });
     void qc.invalidateQueries({ queryKey: tagKeys.library });
@@ -120,15 +128,19 @@ export function useTaskTagMutations(taskId: string) {
           body: { tag_id: v.tagId ?? null, name: v.name ?? null },
         })
       ).data!,
+    onSuccess: (res) => record(`Tagged ${res.data.name}`, res.meta),
     onError: (e) => toastError(e, "Couldn't tag the task"),
     onSettled: settle,
   });
 
   const remove = useMutation({
     mutationFn: async (tagId: string) =>
-      await api.DELETE('/api/v1/tasks/{task_id}/tags/{tag_id}', {
-        params: { path: { task_id: taskId, tag_id: tagId } },
-      }),
+      (
+        await api.DELETE('/api/v1/tasks/{task_id}/tags/{tag_id}', {
+          params: { path: { task_id: taskId, tag_id: tagId } },
+        })
+      ).data!,
+    onSuccess: (res) => undoToast('Tag removed', res.meta),
     onError: (e) => toastError(e, "Couldn't remove the tag"),
     onSettled: settle,
   });

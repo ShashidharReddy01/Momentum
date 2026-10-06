@@ -74,7 +74,7 @@ export function formHandlers(base = '') {
     http.delete(`*${base}/api/v1/forms/:id`, ({ params }) => {
       const i = forms.findIndex((f) => f.id === params.id);
       if (i >= 0) forms.splice(i, 1);
-      return HttpResponse.json({ ok: true });
+      return HttpResponse.json({ data: { ok: true }, meta: { activity_id: null } });
     }),
     http.post(`*${base}/api/v1/forms/:id/submit`, () => HttpResponse.json({ ok: true })),
     http.get(`*${base}/api/v1/public/forms/:token`, ({ params }) => {

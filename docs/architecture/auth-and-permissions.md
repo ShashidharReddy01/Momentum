@@ -77,14 +77,17 @@ resolve_user(principal):
 
 ## 4. Workspace roles
 
-| Capability | Admin | Member | Guest (later) |
+| Capability | Admin | Member | Guest |
 |---|---|---|---|
 | See all `team`-privacy projects of teams they belong to | ✓ (all teams) | ✓ | Only explicitly shared projects |
+| See people (pickers, @mentions, directory, workload) | ✓ | ✓ | Only themselves and the people of their shared projects (explicit members, and the team of a team-visible one) |
 | Create teams | ✓ | ✓ | ✗ |
 | Create projects | ✓ | ✓ (in their teams) | ✗ |
 | Manage users/roles, AI settings, budgets, integrations | ✓ | ✗ | ✗ |
 | Create/edit agents | ✓ | Personal/project agents (Phase 5 setting) | ✗ |
 | See private projects they aren't a member of | ✗ (admins can see *that it exists* in admin settings, not content) | ✗ | ✗ |
+
+Guests (E7.0, H61; enforced in `domain/access.py`: `_explicit_only`, `visible_people_clause`) reach a project only through explicit project membership, like agents; adding a guest to a team doesn't open the team's projects to them. Workspace-level pages (goals, portfolios, workspace dashboards) stay visible, and every number on them is computed with the guest's own project visibility, so nothing from an unshared project shows. A guest's API tokens are read-only (S5.1.6).
 
 ## 4a. Team rules (implemented in `momentum/domain/access.py`)
 

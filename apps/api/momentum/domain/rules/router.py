@@ -7,7 +7,7 @@ import uuid
 from fastapi import APIRouter, status
 
 from momentum.api.deps import CtxDep, UowDep
-from momentum.api.schemas import ListOut, MutationOut, OkOut
+from momentum.api.schemas import ListOut, MutationMeta, MutationOut, OkOut
 from momentum.domain.rules import service
 from momentum.domain.rules.schemas import (
     ActionResultOut,
@@ -67,11 +67,13 @@ async def patch_rule(
         return MutationOut.of(m, RuleOut)
 
 
-@router.delete("/rules/{rule_id}", response_model=OkOut, summary="Delete a rule (history stays)")
-async def delete_rule(rule_id: uuid.UUID, ctx: CtxDep, uow: UowDep) -> OkOut:
+@router.delete(
+    "/rules/{rule_id}", response_model=MutationOut[OkOut], summary="Delete a rule (history stays)"
+)
+async def delete_rule(rule_id: uuid.UUID, ctx: CtxDep, uow: UowDep) -> MutationOut[OkOut]:
     async with uow.transaction() as s:
-        await service.delete_rule(s, ctx, rule_id)
-    return OkOut()
+        m = await service.delete_rule(s, ctx, rule_id)
+    return MutationOut(data=OkOut(), meta=MutationMeta(activity_id=m.activity_id))
 
 
 @router.get(

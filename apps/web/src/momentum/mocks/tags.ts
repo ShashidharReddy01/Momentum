@@ -37,7 +37,7 @@ export function tagHandlers(base = '') {
     http.delete(`*${base}/api/v1/tags/:id`, ({ params }) => {
       const i = tags.findIndex((t) => t.id === params.id);
       if (i >= 0) tags.splice(i, 1);
-      return HttpResponse.json({ ok: true });
+      return HttpResponse.json({ data: { ok: true }, meta: { activity_id: null } });
     }),
     http.get(`*${base}/api/v1/tags/:id/tasks`, ({ params }) => {
       const ids = new Set(taskTags.filter((tt) => tt.tag_id === params.id).map((tt) => tt.task_id));
@@ -71,7 +71,7 @@ export function tagHandlers(base = '') {
     http.delete(`*${base}/api/v1/tasks/:tid/tags/:tagId`, ({ params }) => {
       const i = taskTags.findIndex((tt) => tt.task_id === params.tid && tt.tag_id === params.tagId);
       if (i >= 0) taskTags.splice(i, 1);
-      return HttpResponse.json({ ok: true });
+      return HttpResponse.json({ data: { ok: true }, meta: { activity_id: null } });
     }),
   ];
 }

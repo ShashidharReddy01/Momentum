@@ -11,6 +11,7 @@ from typing import Literal
 
 from sqlalchemy import ColumnElement, and_, or_, select, true
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import InstrumentedAttribute
 
 from momentum.core.context import Ctx
 from momentum.core.errors import Forbidden, NotFound
@@ -95,9 +96,10 @@ async def _own_project_role(session: AsyncSession, ctx: Ctx, project: Project) -
     ).scalar_one_or_none()
     if explicit is not None:
         return explicit
-    if ctx.actor.is_agent:
+    if _explicit_only(ctx):
         # S5.1.1 (kickoff Q1): an agent sees only projects its account was explicitly given,
-        # never through team membership or an admin role.
+        # never through team membership or an admin role. So does a guest (E7.0, H61:
+        # auth-and-permissions.md §4 "only explicitly shared projects").
         return None
     if project.privacy == "team":
         if ctx.actor.is_admin:
@@ -130,11 +132,33 @@ def _own_projects_clause(ctx: Ctx) -> ColumnElement[bool]:
         Project.workspace_id == ctx.workspace_id,
         Project.deleted_at.is_(None),
         Project.team_id.in_(live_teams),
-        # agents: explicit membership only (project_role says the same)
+        # agents and guests: explicit membership only (project_role says the same)
         Project.id.in_(explicit)
-        if ctx.actor.is_agent
+        if _explicit_only(ctx)
         else or_(Project.id.in_(explicit), team_visible),
     )
+
+
+def _explicit_only(ctx: Ctx) -> bool:
+    return ctx.actor.is_agent or ctx.actor.role == "guest"
+
+
+def visible_people_clause(
+    ctx: Ctx, user_id: ColumnElement[uuid.UUID] | InstrumentedAttribute[uuid.UUID]
+) -> ColumnElement[bool]:
+    """People the caller may see in pickers, the directory, @mentions and workload: everyone for
+    members and admins; for a guest (E7.0, H61) only themselves and the people of the projects
+    shared with them (explicit members, and the team of a team-visible one)."""
+    if ctx.actor.role != "guest":
+        return true()
+    shared = select(ProjectMember.project_id).where(ProjectMember.user_id == ctx.actor.id)
+    members = select(ProjectMember.user_id).where(ProjectMember.project_id.in_(shared))
+    teams = (
+        select(TeamMember.user_id)
+        .join(Project, Project.team_id == TeamMember.team_id)
+        .where(Project.id.in_(shared), Project.privacy == "team")
+    )
+    return or_(user_id == ctx.actor.id, user_id.in_(members), user_id.in_(teams))
 
 
 async def get_visible_project(

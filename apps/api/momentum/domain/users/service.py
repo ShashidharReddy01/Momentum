@@ -15,6 +15,7 @@ from momentum.core.ids import new_id
 from momentum.core.mutation import Mutation
 from momentum.core.permissions import Action, require
 from momentum.core.undo import undo_handler, undo_op
+from momentum.domain.access import visible_people_clause
 from momentum.domain.agents.models import Agent
 from momentum.domain.integrations.models import ImportJob
 from momentum.domain.projects.models import Project
@@ -56,7 +57,11 @@ async def list_users(
     ``agents`` (S5.2.1) adds agent accounts: ``assigned``/``mentioned`` the enabled agents that
     act on that trigger (the assignee picker, @mentions), ``all`` every agent (to show the names
     of agents already on a task)."""
-    query = select(User).where(User.workspace_id == ctx.workspace_id, User.status != "disabled")
+    query = select(User).where(
+        User.workspace_id == ctx.workspace_id,
+        User.status != "disabled",
+        visible_people_clause(ctx, User.id),
+    )
     if agents is None:
         query = query.where(User.is_agent.is_(False))
     elif agents != "all":

@@ -286,10 +286,12 @@ def _local_date(dt: datetime, tz: str) -> date:
         return dt.astimezone(UTC).date()
 
 
-async def _require_assignable(session: AsyncSession, ctx: Ctx, user_id: uuid.UUID) -> None:
+async def _require_assignable(
+    session: AsyncSession, ctx: Ctx, user_id: uuid.UUID, what: str = "assigned"
+) -> None:
     user = await session.get(User, user_id)
     if user is None or user.workspace_id != ctx.workspace_id or user.status == "disabled":
-        raise ValidationFailed("That person can't be assigned", code="invalid_assignee")
+        raise ValidationFailed(f"That person can't be {what}", code="invalid_assignee")
 
 
 async def _follow(session: AsyncSession, task_id: uuid.UUID, user_id: uuid.UUID | None) -> None:
@@ -1599,7 +1601,7 @@ async def set_following(
     else:
         require_project_role(role, "editor", "change who follows this task")
         if follow:
-            await _require_assignable(session, ctx, user_id)
+            await _require_assignable(session, ctx, user_id, "added as a follower")
     existing = await session.get(Follower, (task.id, user_id))
     if (existing is not None) == follow:
         return Mutation(await list_followers(session, task.id))
@@ -2502,6 +2504,15 @@ async def _undo_delete(session: AsyncSession, ctx: Ctx, args: dict[str, Any]) ->
     require_project_role(role, "editor", "restore this task")
     task.deleted_at = None
     task.version += 1
+    if placement is not None:
+        # E7.0 (H58): its section may have been deleted since; it comes back at the end of the
+        # project's first section instead of into a section nobody can see
+        section = await session.get(Section, placement.section_id)
+        if section is None or section.deleted_at is not None:
+            first = await _section_for(session, placement.project_id, None)
+            last = (await _ordered_placements(session, placement.project_id, first.id))[-1:]
+            placement.section_id = first.id
+            placement.position = key_between(last[0].position if last else None, None)
     await record_activity(session, ctx, entity_type="task", entity_id=task.id, verb="task.restored")
     await emit(
         session,

@@ -5,7 +5,7 @@ import uuid
 from fastapi import APIRouter, status
 
 from momentum.api.deps import CtxDep, UowDep
-from momentum.api.schemas import ListOut, MutationOut, OkOut
+from momentum.api.schemas import ListOut, MutationMeta, MutationOut, OkOut
 from momentum.domain.fields import service
 from momentum.domain.fields.schemas import (
     FieldAttachIn,
@@ -134,15 +134,15 @@ async def archive_field(
 
 @router.delete(
     "/projects/{project_id}/fields/{field_id}",
-    response_model=OkOut,
+    response_model=MutationOut[OkOut],
     summary="Remove a field from this project only",
 )
 async def detach_field(
     project_id: uuid.UUID, field_id: uuid.UUID, ctx: CtxDep, uow: UowDep
-) -> OkOut:
+) -> MutationOut[OkOut]:
     async with uow.transaction() as s:
-        await service.detach_field(s, ctx, project_id, field_id)
-    return OkOut()
+        m = await service.detach_field(s, ctx, project_id, field_id)
+    return MutationOut(data=OkOut(), meta=MutationMeta(activity_id=m.activity_id))
 
 
 @router.post(

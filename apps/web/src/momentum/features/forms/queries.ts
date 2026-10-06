@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { components } from '@/lib/api/schema';
 import { toastError } from '@/lib/toast';
+import { useUndoToast } from '@/lib/undo';
 import { useApi } from '@/providers/api';
 
 export interface ShowIf {
@@ -70,6 +71,7 @@ export function useForm(formId: string, enabled = true) {
 export function useFormMutations(projectId: string) {
   const api = useApi();
   const qc = useQueryClient();
+  const undoToast = useUndoToast();
   const key = formKeys.byProject(projectId);
   const settle = () => void qc.invalidateQueries({ queryKey: key });
 
@@ -94,7 +96,8 @@ export function useFormMutations(projectId: string) {
 
   const remove = useMutation({
     mutationFn: async (id: string) =>
-      await api.DELETE('/api/v1/forms/{form_id}', { params: { path: { form_id: id } } }),
+      (await api.DELETE('/api/v1/forms/{form_id}', { params: { path: { form_id: id } } })).data!,
+    onSuccess: (res) => undoToast('Form deleted', res.meta),
     onError: (e) => toastError(e, "Couldn't delete the form"),
     onSettled: settle,
   });

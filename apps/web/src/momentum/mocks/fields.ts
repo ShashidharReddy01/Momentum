@@ -125,7 +125,7 @@ export function fieldHandlers(base = '') {
     http.delete(`*${base}/api/v1/projects/:pid/fields/:fid`, ({ params }) => {
       const i = projectFields.findIndex((pf) => pf.project_id === params.pid && pf.field_id === params.fid);
       if (i >= 0) projectFields.splice(i, 1);
-      return HttpResponse.json({ ok: true });
+      return HttpResponse.json({ data: { ok: true }, meta });
     }),
     http.post(`*${base}/api/v1/projects/:pid/fields/:fid/move`, async ({ params, request }) => {
       const b = (await request.json()) as { after_id?: string | null; before_id?: string | null };
