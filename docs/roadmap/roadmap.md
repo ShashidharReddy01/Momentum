@@ -15,6 +15,7 @@ Local-only through Phase 7. Azure deployment and go-live in Phase 8; integration
 | 6 | Planning and insight | Timeline, overview, portfolios, goals, workload, dashboards, forecasting | Phase-6 journeys | 3–4 weeks |
 | 6.5 | UI/UX revamp | Light theme redesign (Wayfinding), shell that fits scaled laptops, task list and pane, every screen to the Linear / Height bar (added 2026-10-01 by the product owner) | Visual audit at 5 viewports × 2 themes, axe, e2e | 1–2 weeks |
 | 7 | Hardening and Asana-ready | Audit-first edge-case register (zero open P0/P1), 150-user scale, AI/agent hardening, custom-field reporting, full Asana import, security, a11y, export/import, admin | Register clean, 150-user load test, journeys incl. Asana import, live evals | 3–4 weeks |
+| 7.5 | Files, reports, lifecycle portfolios and dashboards, Mo | Project Files tab, Mo reads every common file type on request (spreadsheets, macros, scans, images), reports (Word/Excel/PDF) from work data, lifecycle portfolios (stages, gates, time in stage), dashboards v2 with role templates, catch-me-up, plain-English filters, smart task creation, close-out (added 2026-10-06 by the product owner) | J15–J19, mock evals at 1.0 (live after pull), UI audit 0 | 2–3 weeks |
 | 8 | Azure and go-live | Adapters, Bicep, Easy Auth, pipeline, office LiteLLM check, mail relay, import real data | Go-live checklist | 1–2 weeks |
 | 9 | Integrations (after go-live) | Slack first; then Outlook calendar, email-to-task, outgoing webhooks on demand | Slack create-task + digest | 2–3 weeks |
 
@@ -28,7 +29,7 @@ flowchart LR
   P6 --> P65[P6.5]
   P65 --> P7
   P5 --> P7
-  P7 --> P8 --> P9
+  P7 --> P75[P7.5] --> P8 --> P9
 ```
 
 Phase 8 can be pulled forward after Phase 2 or 3 if the team needs Momentum sooner. Everything Azure-specific is already behind interfaces.

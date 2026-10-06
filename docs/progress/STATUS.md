@@ -8,7 +8,7 @@
 - **Phase:** 6: Planning and Insight — **complete** (exit criteria met 2026-10-01; one live check left for the product owner: `momentum evals --live --feature chart`). Phase 5: Agents v1 — complete and verified live (2026-09-30).
 - **Plan change (product owner, 2026-10-01):** Momentum will serve **~150 people in one workspace**, many moving off Asana. After Phase 6.5: **Phase 7 Hardening and Asana-ready** (audit-first edge-case register reviewed by the product owner, zero open P0/P1, 150-user load test, AI/agent hardening, custom-field reporting, full Asana import, security, a11y, admin) → **Phase 8 Azure go-live** → **Phase 9 Integrations after go-live** (Slack first). Phases renumbered (old 8 → 7, old 9 → 8, old 7 → 9); mobile/PWA moved to Later. Design: `docs/superpowers/specs/2026-10-01-phase-7-hardening-design.md`; phase files `phase-7.md` to `phase-9.md`.
 - **Working mode (product owner, 2026-10-04):** one branch only (`main`); sessions run one at a time (a new session may start in another account when tokens run out), so **fetch before starting and before every push**. The product owner asked this session to finish Phase 6.5 (UX8) and all of Phase 7 without checking in: "fix everything" (P3 included), review gates delegated to the AI (decisions recorded here and in the register), live gateway approved, dev deps locust + security tools approved, email notifications moved to Later. Leftover from the old parallel session: the folder `Momentum-bohr` and its dev servers (API :8000, Vite :5173) still run; the product owner can stop them and delete the folder.
-- **Now (2026-10-06): Phase 7 Hardening and Asana-ready — complete** (exit criteria met; see `phase-7.md` "Phase 7 exit"). For the product owner: review the delegated decisions (hardening register H1–H63, guests H61, the Asana parity checklist's "later" list in `asana-vs-momentum.md`) and the laptop sign-off of Phase 6.5. **Next: Phase 8 Azure go-live** (`phase-8.md`), which needs the product owner's Azure access.
+- **Now (2026-10-06): Phase 7 complete. Next: Phase 7.5 Files, reports, lifecycle portfolios and dashboards, and Mo** (`docs/roadmap/phase-7.5.md`, spec `docs/superpowers/specs/2026-10-06-phase-7-5-ai-files-insight-design.md`), added by the product owner before Phase 8. It is built in a separate browser session with **no AI gateway** (mock mode throughout; the build prompt is at the end of `phase-7.5.md`), then pulled here for the live verification listed there. For the product owner meanwhile: review the Phase 7 delegated decisions (register H1–H63, guests H61, the parity "later" list) and the Phase 6.5 laptop sign-off. Phase 8 Azure go-live follows Phase 7.5.
 - **Product-owner instruction (2026-09-26):** finish all remaining slices, then one big local test run against the real gateway (100+ questions/actions covering edge cases), then fix from that run.
 - **Scope note (product owner, 2026-09-26):** the customer-operations capabilities (SQQ, pricing, contracts, invoices, pushes to internal systems as tools and assignable agents) will be done later in the product owner's own codebase, **not in this repo**. Finish the roadmap as written.
 - **Branch:** Phases 3–4 are on `claude/clever-hopper-pbv7yr` (ahead of `main`). Phase 5 continues on `claude/intelligent-meitner-9ne4e8`, which starts from that branch's Phase 4 exit commit.
@@ -118,6 +118,25 @@ Tracked in their phase files; copy the slice list here at each phase kickoff.
 - [x] UX1 Foundations (2026-10-01) · [x] UX2 Shell (2026-10-01) · [x] UX3 List columns (2026-10-01) · [x] UX4 Board/Calendar/Timeline (2026-10-01)
 - [x] UX5 Home/Tasks/Inbox (2026-10-01) · [x] UX6 Planning (2026-10-01) · [x] UX7 AI/agents/overlays (2026-10-01) · [x] UX8 Exit (2026-10-05; audit 0 findings on 188 screens, keyboard pass 0, e2e 13/13 twice, initial JS 294 KB; product owner's laptop sign-off still open, not blocking)
 
+### Phase 7.5: Files, reports, lifecycle portfolios and dashboards, and Mo
+Decisions D1–D8 in the spec. Built in a browser session in mock mode; live verification after the pull.
+- [ ] S75-00 Kickoff and foundations (ADR-0011, dependencies, settings, import contracts)
+- [ ] S75-01 Files: data model, inventory, project uploads, versions (J15 part 1)
+- [ ] S75-02 File parsing: DocumentModel, parsers, cache, safety (no AI)
+- [ ] S75-03 Mo reads files: tools, table queries, vision, conversation files (J15)
+- [ ] S75-04 Project fields, template lineage, field history, rules action
+- [ ] S75-05 Portfolio v2 backend: rules, stage, columns, views, gates, snapshots
+- [ ] S75-06 Customer onboarding template, `seed --onboarding`, eval workspace
+- [ ] S75-07 Portfolio v2 web (J16)
+- [ ] S75-08 Dashboards v2: query, widgets, filters, role templates (J17)
+- [ ] S75-09 Reports engine (J18)
+- [ ] S75-10 Mo on portfolios and dashboards
+- [ ] S75-11 Catch me up and Plain-English filters (J19 parts 1–2)
+- [ ] S75-12 Smart task creation and project close-out (J19 part 3)
+- [ ] S75-13 Exit (J14 extended, UI audit, live verification list, docs)
+
+**Decisions (Phase 7.5, delegated):** (the build session records its own calls here)
+
 ### Phase 7: Hardening and Asana-ready
 - [x] E7.0 audit register started (`hardening-register.md`; H1–H44 so far, all fixed)
 - [x] S7.1.1 Scale ADR (ADR-0010, 2026-10-05) · [x] S7.1.2 Load test and fixes (2026-10-05; 75 concurrent on 50k tasks: aggregate p95 190 ms, every endpoint class within budget, realtime 400/400 at p95 193 ms; H35–H40, including lost live events, H39)
@@ -149,6 +168,7 @@ Tracked in their phase files; copy the slice list here at each phase kickoff.
 ## Plan changes log
 | Date | Change | Reason |
 |---|---|---|
+| 2026-10-06 | **Phase 7.5 added** between Phase 7 and Phase 8: files (project Files tab, Mo reads every common file type on request), reports from work data (Word/Excel/PDF), lifecycle portfolios and dashboards v2 with role templates, catch-me-up, plain-English filters, smart task creation, close-out | Product owner: AI focus before go-live; dashboards and portfolios were too basic for the onboarding lifecycle (pre-sales → go-live); built in a browser session without a gateway |
 | 2026-09-23 | Backend tests use a real Postgres via `MOMENTUM_TEST_DATABASE_URL` + truncate-per-test, instead of testcontainers + SAVEPOINT | Build environment has no Docker; services commit normally, which keeps tests realistic |
 | 2026-09-23 | Migrations live inside the package (`momentum/migrations`) | Hosts that install the package get migrations too (embedding) |
 | 2026-09-23 | App wiring moved to `momentum/api/` (deps, runtime, system) | Keeps `core` free of outer-layer imports (import-linter) |
