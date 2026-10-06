@@ -443,6 +443,56 @@ def asana_import(
 agents_cli = typer.Typer(no_args_is_help=True, help="Agents: install and inspect (Phase 5)")
 cli.add_typer(agents_cli, name="agents")
 
+snapshots_cli = typer.Typer(help="Project snapshots for trends (Phase 7.5)", no_args_is_help=True)
+cli.add_typer(snapshots_cli, name="snapshots")
+
+
+@snapshots_cli.command("backfill")
+def snapshots_backfill(
+    days: int = typer.Option(180, help="How many past days to reconstruct (1-730)"),
+) -> None:
+    """Reconstruct missing daily snapshots from task dates, project field history and status
+    updates (best effort, marked reconstructed). Existing snapshots are kept."""
+    from momentum.core.db import UnitOfWork, create_engine, create_session_factory
+    from momentum.domain.projects.snapshots import MAX_BACKFILL_DAYS, backfill
+
+    if not 1 <= days <= MAX_BACKFILL_DAYS:
+        raise typer.BadParameter(f"--days must be between 1 and {MAX_BACKFILL_DAYS}")
+    settings = Settings()
+
+    async def _run() -> int:
+        engine = create_engine(settings)
+        uow = UnitOfWork(create_session_factory(engine)())
+        try:
+            async with uow.transaction() as session:
+                return await backfill(session, days)
+        finally:
+            await uow.close()
+            await engine.dispose()
+
+    typer.echo(f"{run_async(_run())} snapshots reconstructed")
+
+
+@snapshots_cli.command("today")
+def snapshots_today() -> None:
+    """Write today's snapshot for every live project now (what the nightly job does)."""
+    from momentum.core.db import UnitOfWork, create_engine, create_session_factory
+    from momentum.domain.projects.snapshots import snapshot_all
+
+    settings = Settings()
+
+    async def _run() -> int:
+        engine = create_engine(settings)
+        uow = UnitOfWork(create_session_factory(engine)())
+        try:
+            async with uow.transaction() as session:
+                return await snapshot_all(session)
+        finally:
+            await uow.close()
+            await engine.dispose()
+
+    typer.echo(f"{run_async(_run())} projects snapshotted")
+
 
 @agents_cli.command("install")
 def agents_install(

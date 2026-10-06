@@ -61,6 +61,9 @@ async def get_workload(
     start: date | None = Query(default=None, description="A day in the first week (default today)"),
     weeks: int = Query(default=6, ge=1, le=service.MAX_WEEKS),
     project_id: uuid.UUID | None = Query(default=None, description="Only this project's work"),
+    portfolio_id: uuid.UUID | None = Query(
+        default=None, description="Only the work of this portfolio's projects (Phase 7.5)"
+    ),
     tasks_for: str = Query(
         default="all",
         pattern=TASKS_FOR,
@@ -69,6 +72,13 @@ async def get_workload(
     ),
 ) -> WorkloadOut:
     async with uow.transaction() as s:
+        project_ids = None
+        if portfolio_id is not None:
+            from momentum.domain.portfolios.rows import visible_member_ids
+            from momentum.domain.portfolios.service import get_portfolio
+
+            portfolio = await get_portfolio(s, ctx, portfolio_id)
+            project_ids = await visible_member_ids(s, ctx, portfolio)
         w = await service.workload(
             s,
             ctx,
@@ -76,6 +86,7 @@ async def get_workload(
             weeks,
             project_id=project_id,
             tasks_for=tasks_for.lower(),
+            project_ids=project_ids,
         )
         return WorkloadOut(
             start=w.start,

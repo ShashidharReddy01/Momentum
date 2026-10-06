@@ -87,7 +87,7 @@ resolve_user(principal):
 | Create/edit agents | ✓ | Personal/project agents (Phase 5 setting) | ✗ |
 | See private projects they aren't a member of | ✗ (admins can see *that it exists* in admin settings, not content) | ✗ | ✗ |
 
-Guests (E7.0, H61; enforced in `domain/access.py`: `_explicit_only`, `visible_people_clause`) reach a project only through explicit project membership, like agents; adding a guest to a team doesn't open the team's projects to them. Workspace-level pages (goals, portfolios, workspace dashboards) stay visible, and every number on them is computed with the guest's own project visibility, so nothing from an unshared project shows. A guest's API tokens are read-only (S5.1.6).
+Guests (E7.0, H61; enforced in `domain/access.py`: `_explicit_only`, `visible_people_clause`) reach a project only through explicit project membership, like agents; adding a guest to a team doesn't open the team's projects to them. Workspace-level pages (goals, workspace dashboards) stay visible, and every number on them is computed with the guest's own project visibility, so nothing from an unshared project shows. **Portfolios (Phase 7.5, S75-05):** a guest sees a portfolio only as one of its members (`portfolio_members`), and then only the rows of projects shared with them (the rest are counted). A guest's API tokens are read-only (S5.1.6).
 
 ## 4a. Team rules (implemented in `momentum/domain/access.py`)
 
@@ -154,3 +154,17 @@ Actions are string constants (`"project.view"`, `"project.edit"`, `"project.mana
 - **Applying and undoing agent changes:** a person applying an agent's proposal acts with their own permissions. An agent's auto-applied action can be undone by the person it was proposed for, not only by an admin (`core.undo(also_by=…)`, used only by `ai.actions.undo_action` for `source="agent"` actions). The undo still goes through services with that person's permissions.
 - **Agent accounts never sign in**: `resolve_user` refuses them whatever the identity provider claims, and dev login refuses them too. Their email is `<key>@agents.momentum.invalid`.
 - Even with permission, AI writes follow the autonomy and risk policy (`ai/ai-architecture.md` §4).
+
+## Portfolios (Phase 7.5, S75-05; spec §5.6)
+
+| Who | See it and its rows (as their own visibility) | Settings, rule, stages, gates, columns, shared views, convert | Members | Personal views |
+|---|---|---|---|---|
+| Owner | yes | yes | yes | yes |
+| Workspace admin | yes | yes | yes | yes |
+| Member with `editor` | yes | yes | no | yes |
+| Member with `viewer`, or any other workspace member | yes | no | no | yes |
+| Guest who is a member | yes (only rows of projects shared with them) | per their role | no | yes |
+| Guest who isn't a member | no (404) | no | no | no |
+
+Moving a project to a stage on the board is a project field change: it needs **project** editor, not portfolio editor. Agents can't be portfolio members. Enforced in `domain/portfolios/service.py` (`role_of`, `require_edit`, `get_portfolio`) and `lifecycle.py`; the matrix is `test_portfolio_permission_matrix`.
+

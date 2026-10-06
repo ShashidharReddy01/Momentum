@@ -118,7 +118,7 @@ Decisions D1–D8 in the spec. Built in a browser session in mock mode; live ver
 - [x] S75-02 File parsing: DocumentModel, parsers, cache, safety (no AI) (2026-10-06; every spec §4.2 format parsed or warned; bombs, encryption, timeout, EXIF, no execution tested; 5,000-row workbook parses in ~1.2 s)
 - [x] S75-03 Mo reads files: tools, table queries, vision, conversation files (J15) (2026-10-06; 8 file tools; vision through look_at with caps; chat file chips and paperclip; 4 eval features, 45 mock cases at 1.0, 21 live-only; J15 green)
 - [x] S75-04 Project fields, template lineage, field history, rules action (2026-10-06; migration 0043 (all lifecycle tables); project fields API, Details card, "Applies to"; rule action `set_project_field` + title/type conditions, gate-aware; Mo tool `set_project_field`; `nl_rule/v6`; 11 backend tests)
-- [ ] S75-05 Portfolio v2 backend: rules, stage, columns, views, gates, snapshots
+- [x] S75-05 Portfolio v2 backend: rules, stage, columns, views, gates, snapshots (2026-10-06; rows with every built-in column in 13 queries (40 projects: ~30 ms); views, members, settings, manual ↔ rule, readiness, stage moves with gate override; snapshots job + backfill CLI; workload by portfolio; portfolio permission matrix)
 - [ ] S75-06 Customer onboarding template, `seed --onboarding`, eval workspace
 - [ ] S75-07 Portfolio v2 web (J16)
 - [ ] S75-08 Dashboards v2: query, widgets, filters, role templates (J17)
@@ -128,7 +128,7 @@ Decisions D1–D8 in the spec. Built in a browser session in mock mode; live ver
 - [ ] S75-12 Smart task creation and project close-out (J19 part 3)
 - [ ] S75-13 Exit (J14 extended, UI audit, live verification list, docs)
 
-**Next up:** S75-05 Portfolio v2 backend: rules, stage, columns, views, gates, snapshots. (Migration 0043 already holds every S75-05 table and column; `domain/portfolios/membership.py` and `gates.py` exist.)
+**Next up:** S75-06 Customer onboarding template, `seed --onboarding`, eval workspace.
 
 **Decisions (Phase 7.5, delegated):** (the build session records its own calls here)
 - D75-1 (S75-00): `momentum.files` may import only `core`; `momentum.reports` may import `core`, `files` and `domain`, never `ai`/`agents`/`integrations`. Enforced by two new import-linter contracts.
@@ -158,6 +158,13 @@ Decisions D1–D8 in the spec. Built in a browser session in mock mode; live ver
 - D75-26 (S75-04): the gate check (`domain/portfolios/gates.py`, `readiness`) is built now because the rule action needs it; S75-05 adds its endpoint and the board's "move anyway". A required milestone is met by a **completed** milestone in the project with that title (case-insensitive); a required file by a current, live file of the project or its tasks whose name matches the glob (case-insensitive).
 - D75-27 (S75-04): `projects.template_id`'s foreign key is `use_alter` (templates.project_id points back at projects), so the metadata's table order has no cycle and export/import fill it in on the second pass.
 - D75-28 (S75-04): a template's project field defaults are applied through `set_project_field_value` as the person creating the project, so the new project's field history starts at its creation; a default whose field was deleted or changed since is skipped.
+- D75-29 (S75-05): rows are `GET /portfolios/{id}/rows` with `view_id`, `filters` (JSON), `group_by` and `sort` (`key:dir,…`); the request's own parameters override the saved view's. Each column family is one SQL query over all rows (13 in total, asserted constant); filters on project fields run in SQL, sorting and grouping in Python on the server after it (a portfolio holds at most a few hundred projects). Empty values sort last in both directions. Grouping by stage lists every stage in lifecycle order, even empty ones.
+- D75-30 (S75-05): `target_date` is the date the project entered its current stage plus that stage's target days when the stage has a target, else the project's due date; `stage_age_days` counts from the stage field's latest history row; `slip_days` = forecast P80 − target. `waiting_on_customer` is null (not 0) when the workspace has no matching "Waiting on"/"Customer" task field, and a portfolio may name another field and choice in its column entry.
+- D75-31 (S75-05): portfolio members are managed by the owner or an admin; `editor` members change settings, the rule, stages, gates, columns and shared views; `viewer` membership matters for guests (who see a portfolio only as members). Agents can't be members. Settings live at `PATCH /portfolios/{id}/settings` (the old `PATCH /portfolios/{id}` still renames and describes).
+- D75-32 (S75-05): a rule portfolio's projects come only from its rule: adding or removing by hand is refused (422 `rule_portfolio`). `include_completed: false` leaves out projects whose status is `complete`. Manual → rule keeps the current projects as the rule's `project_ids`; rule → manual turns what the rule matches now (everyone's, not the editor's view) into the list. Both are one undoable change.
+- D75-33 (S75-05): a board move is `POST /portfolios/{id}/projects/{pid}/stage {to, override}`. It needs project editor (it is a project field change), answers 409 `gate_not_met` with the checklist in the body when the gate isn't met, and with `override: true` records `gate_override: "moved to <stage> without …"` in the activity.
+- D75-34 (S75-05): snapshots have no API yet (S75-08's trend widgets read them through the dashboard query); the CLI also has `momentum snapshots today`. The backfill counts a task as done from its `completed_at` (an earlier completion of a reopened task is lost) and never overwrites a real snapshot.
+- D75-35 (S75-05): the workload grid takes `portfolio_id` (the service takes `project_ids`); scoped to a portfolio, it leaves out the "hidden work" counts, as it does for one project.
 - D75-21 (S75-03): the four file eval features run through the real chat loop with file chips (fixtures live in `mock_responses/chat.yaml`); `momentum evals` and the eval test build `onboarding_v1` beside `launch_v1`.
 
 ### Phase 7: Hardening and Asana-ready

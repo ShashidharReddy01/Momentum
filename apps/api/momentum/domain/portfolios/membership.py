@@ -81,6 +81,8 @@ def rule_clause(rule: dict[str, Any] | None) -> ColumnElement[bool]:
         parts.append(Project.id.in_(explicit))
     if not rule.get("include_archived"):
         parts.append(Project.archived_at.is_(None))
+    if not rule.get("include_completed"):  # a project is complete when its status says so
+        parts.append(or_(Project.status.is_(None), Project.status != "complete"))
     for cond in rule.get("project_field_conditions") or []:
         if isinstance(cond, dict):
             parts.append(condition_clause(cond))

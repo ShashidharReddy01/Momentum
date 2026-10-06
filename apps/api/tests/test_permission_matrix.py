@@ -161,3 +161,63 @@ async def test_project_files_permission_matrix(as_user: Clients) -> None:
         got[kind] = row
     for kind in FILE_EXPECTED:
         assert got[kind] == FILE_EXPECTED[kind], f"{kind}: {got[kind]}"
+
+
+# Phase 7.5 (spec §5.6): portfolio roles. Priya owns the portfolio; mei is an editor member, kim
+# a viewer member, tom a workspace member with no role, admin a workspace admin. sam is a guest
+# and a viewer member; noor a guest with no membership (invisible to them).
+PORTFOLIO_ACTIONS = ["view", "rows", "settings", "shared_view", "personal_view", "members"]
+PORTFOLIO_EXPECTED: dict[str, dict[str, int]] = {
+    #                 view rows settings shared personal members
+    "owner":        dict(zip(PORTFOLIO_ACTIONS, [200, 200, 200, 201, 201, 200], strict=True)),
+    "admin":        dict(zip(PORTFOLIO_ACTIONS, [200, 200, 200, 201, 201, 200], strict=True)),
+    "editor":       dict(zip(PORTFOLIO_ACTIONS, [200, 200, 200, 201, 201, 403], strict=True)),
+    "viewer":       dict(zip(PORTFOLIO_ACTIONS, [200, 200, 403, 403, 201, 403], strict=True)),
+    "member":       dict(zip(PORTFOLIO_ACTIONS, [200, 200, 403, 403, 201, 403], strict=True)),
+    "guest_member": dict(zip(PORTFOLIO_ACTIONS, [200, 200, 403, 403, 201, 403], strict=True)),
+    "guest":        dict(zip(PORTFOLIO_ACTIONS, [404, 404, 404, 404, 404, 404], strict=True)),
+}  # fmt: skip
+PORTFOLIO_WHO = {
+    "owner": "priya",
+    "admin": "admin",
+    "editor": "mei",
+    "viewer": "kim",
+    "member": "tom",
+    "guest_member": "sam",
+    "guest": "noor",
+}
+
+
+async def test_portfolio_permission_matrix(as_user: Clients) -> None:
+    priya, admin = await as_user("priya"), await as_user("admin")
+    users = {
+        u["email"].split("@")[0]: u["id"] for u in (await admin.get(f"{BASE}/users")).json()["data"]
+    }
+    for local in ("sam", "noor"):
+        r = await admin.patch(f"{BASE}/users/{users[local]}", json={"role": "guest"})
+        assert r.status_code == 200, r.text
+    folio = (await priya.post(f"{BASE}/portfolios", json={"name": "Matrix"})).json()["data"]["id"]
+    for local, role in (("mei", "editor"), ("kim", "viewer"), ("sam", "viewer")):
+        r = await priya.put(
+            f"{BASE}/portfolios/{folio}/members/{users[local]}", json={"role": role}
+        )
+        assert r.status_code == 200, r.text
+
+    got: dict[str, dict[str, int]] = {}
+    for kind, local in PORTFOLIO_WHO.items():
+        c = await as_user(local)
+        url = f"{BASE}/portfolios/{folio}"
+        got[kind] = {
+            "view": (await c.get(url)).status_code,
+            "rows": (await c.get(f"{url}/rows")).status_code,
+            "settings": (await c.patch(f"{url}/settings", json={"columns": []})).status_code,
+            "shared_view": (
+                await c.post(f"{url}/views", json={"name": f"S {kind}", "shared": True})
+            ).status_code,
+            "personal_view": (await c.post(f"{url}/views", json={"name": f"P {kind}"})).status_code,
+            "members": (
+                await c.put(f"{url}/members/{users['diego']}", json={"role": "viewer"})
+            ).status_code,
+        }
+    for kind in PORTFOLIO_EXPECTED:
+        assert got[kind] == PORTFOLIO_EXPECTED[kind], f"{kind}: {got[kind]}"

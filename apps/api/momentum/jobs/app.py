@@ -12,6 +12,7 @@ from momentum.jobs import due_approaching as _due_approaching  # noqa: F401 - du
 from momentum.jobs import forecasts as _forecasts  # noqa: F401 - nightly forecasts (S6.5.3)
 from momentum.jobs import recurrence as _recurrence  # noqa: F401 - scheduled recurrence scan
 from momentum.jobs import rules as _rules  # noqa: F401 - registers `run_rules`
+from momentum.jobs import snapshots as _snapshots  # noqa: F401 - nightly snapshots (P7.5)
 from momentum.jobs.tasks import blueprint
 
 # Queue names are prefixed so they never collide with a host app using Procrastinate too.

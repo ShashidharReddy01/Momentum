@@ -49,13 +49,13 @@ from momentum.files.models import FileParse
 async def _portfolio_role(session: AsyncSession, ctx: Ctx, portfolio_id: uuid.UUID) -> str:
     """A portfolio's files (generated reports) are visible to whoever can see the portfolio
     (spec §3.2, §5.6): every member; its editors manage them. Guests see portfolios only through
-    an explicit membership (S75-05), so none here yet."""
+    an explicit membership (S75-05), which ``get_portfolio`` checks."""
     from momentum.domain.portfolios.service import can_edit, get_portfolio
 
     portfolio = await get_portfolio(session, ctx, portfolio_id)
-    if ctx.actor.role == "guest" or ctx.actor.is_agent:
+    if ctx.actor.is_agent:
         raise NotFound("Attachment not found")
-    return "admin" if can_edit(ctx, portfolio) else "viewer"
+    return "admin" if await can_edit(session, ctx, portfolio) else "viewer"
 
 
 @dataclass(frozen=True)

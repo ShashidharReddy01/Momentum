@@ -269,7 +269,9 @@ async def workload(
     project_id: uuid.UUID | None = None,
     today: date | None = None,
     tasks_for: str = "all",
+    project_ids: list[uuid.UUID] | None = None,
 ) -> Workload:
+    """``project_ids`` (Phase 7.5): only these projects (a portfolio's), still as the viewer."""
     if not 1 <= weeks <= MAX_WEEKS:
         raise ValidationFailed(f"Show between 1 and {MAX_WEEKS} weeks", code="invalid_range")
     if project_id is not None:
@@ -300,9 +302,10 @@ async def workload(
     # every open top-level task in a project you can see, due by the window's end: only the
     # columns the grid uses, filtered in SQL (Phase 7 load test: this loaded every open task
     # with its description and dropped most of them in Python)
-    scope = [*_open_top_level(ctx.workspace_id), visible_projects_clause(ctx)]
-    if project_id is not None:
-        scope.append(Project.id == project_id)
+    only = [Project.id == project_id] if project_id is not None else []
+    if project_ids is not None:
+        only.append(Project.id.in_(project_ids))
+    scope = [*_open_top_level(ctx.workspace_id), visible_projects_clause(ctx), *only]
     # Where a task's effort lands (see ``spread_weeks``), in SQL: from its start (its due day when
     # it has no start, today when underway) to its due day (today when overdue).
     begins = case(
@@ -316,7 +319,7 @@ async def workload(
     visible_ids = (
         select(TaskProject.task_id)
         .join(Project, Project.id == TaskProject.project_id)
-        .where(visible_projects_clause(ctx), *([Project.id == project_id] if project_id else []))
+        .where(visible_projects_clause(ctx), *only)
     )
     dated = [*_open_top_level(ctx.workspace_id), Task.id.in_(visible_ids), Task.due_on <= last]
 
@@ -419,7 +422,7 @@ async def workload(
                 )
             )
 
-    if project_id is None:
+    if project_id is None and project_ids is None:
         # open work in projects you can't see: counted per person, never named
         visible = select(TaskProject.task_id).join(Project, Project.id == TaskProject.project_id)
         visible = visible.where(visible_projects_clause(ctx))

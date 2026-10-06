@@ -25,7 +25,8 @@ from momentum.core.ordering import key_between
 from momentum.core.permissions import Action, can
 from momentum.core.undo import UndoConflict, undo_handler, undo_op
 from momentum.domain.access import get_visible_project, visible_projects_clause
-from momentum.domain.portfolios.models import Portfolio, PortfolioItem
+from momentum.domain.portfolios.membership import members_clause
+from momentum.domain.portfolios.models import Portfolio, PortfolioItem, PortfolioMember
 from momentum.domain.portfolios.schemas import PortfolioIn, PortfolioPatchIn
 from momentum.domain.projects.models import Project
 from momentum.domain.status_updates.models import StatusUpdate
@@ -49,19 +50,48 @@ async def get_portfolio(
         raise NotFound("Portfolio not found")
     if p.deleted_at is not None and not include_deleted:
         raise NotFound("Portfolio not found")
+    # Phase 7.5 (spec §5.6, H61): a guest sees a portfolio only as one of its members
+    if _is_guest(ctx) and (
+        ctx.actor.id is None or await session.get(PortfolioMember, (p.id, ctx.actor.id)) is None
+    ):
+        raise NotFound("Portfolio not found")
     return p
 
 
-def can_edit(ctx: Ctx, p: Portfolio) -> bool:
-    return ctx.actor.is_admin or p.owner_id == ctx.actor.id
+async def role_of(session: AsyncSession, ctx: Ctx, p: Portfolio) -> str | None:
+    """Phase 7.5 (spec §5.6): owner, admin, editor or viewer (a member), else None."""
+    if ctx.actor.id is not None and p.owner_id == ctx.actor.id:
+        return "owner"
+    if ctx.actor.is_admin:
+        return "admin"
+    if ctx.actor.id is None:
+        return None
+    member = await session.get(PortfolioMember, (p.id, ctx.actor.id))
+    return member.role if member is not None else None
 
 
-def _require_edit(ctx: Ctx, p: Portfolio) -> None:
-    if not can_edit(ctx, p):
-        raise Forbidden("Only the portfolio's owner or a workspace admin can change it")
+async def can_edit(session: AsyncSession, ctx: Ctx, p: Portfolio) -> bool:
+    return await role_of(session, ctx, p) in ("owner", "admin", "editor")
 
 
-async def _record(
+async def require_edit(session: AsyncSession, ctx: Ctx, p: Portfolio) -> None:
+    if not await can_edit(session, ctx, p):
+        raise Forbidden("Only the portfolio's owner, its editors or an admin can change it")
+
+
+def _require_manual(p: Portfolio) -> None:
+    if p.kind == "rule":
+        raise ValidationFailed(
+            "This portfolio's projects come from its rule: change the rule instead",
+            code="rule_portfolio",
+        )
+
+
+def _is_guest(ctx: Ctx) -> bool:
+    return ctx.actor.role == "guest"
+
+
+async def record(
     session: AsyncSession,
     ctx: Ctx,
     p: Portfolio,
@@ -96,15 +126,16 @@ async def _record(
 
 async def list_portfolios(session: AsyncSession, ctx: Ctx) -> list[tuple[Portfolio, int]]:
     """Every portfolio in the workspace, with how many of its projects the viewer can see."""
-    portfolios = list(
-        (
-            await session.execute(
-                select(Portfolio)
-                .where(Portfolio.workspace_id == ctx.workspace_id, Portfolio.deleted_at.is_(None))
-                .order_by(func.lower(Portfolio.name))
-            )
-        ).scalars()
+    q = select(Portfolio).where(
+        Portfolio.workspace_id == ctx.workspace_id, Portfolio.deleted_at.is_(None)
     )
+    if _is_guest(ctx):
+        q = q.where(
+            Portfolio.id.in_(
+                select(PortfolioMember.portfolio_id).where(PortfolioMember.user_id == ctx.actor.id)
+            )
+        )
+    portfolios = list((await session.execute(q.order_by(func.lower(Portfolio.name)))).scalars())
     counts: dict[uuid.UUID, int] = {
         pid: int(n)
         for pid, n in (
@@ -120,6 +151,15 @@ async def list_portfolios(session: AsyncSession, ctx: Ctx) -> list[tuple[Portfol
             )
         ).all()
     }
+    for p in portfolios:  # Phase 7.5: a rule portfolio's projects are computed, one count each
+        if p.kind == "rule":
+            counts[p.id] = (
+                await session.execute(
+                    select(func.count())
+                    .select_from(Project)
+                    .where(members_clause(p), visible_projects_clause(ctx))
+                )
+            ).scalar_one()
     return [(p, counts.get(p.id, 0)) for p in portfolios]
 
 
@@ -139,7 +179,7 @@ async def create_portfolio(
     )
     session.add(p)
     await session.flush()
-    act = await _record(
+    act = await record(
         session,
         ctx,
         p,
@@ -159,7 +199,7 @@ async def update_portfolio(
     record_undo: bool = True,
 ) -> Mutation[Portfolio]:
     p = await get_portfolio(session, ctx, portfolio_id)
-    _require_edit(ctx, p)
+    await require_edit(session, ctx, p)
     changes: Diff = {}
     for f in patch.model_fields_set & {"name", "description"}:
         new = getattr(patch, f)
@@ -174,7 +214,7 @@ async def update_portfolio(
     if not changes:
         return Mutation(p, version=p.version)
     p.version += 1
-    act = await _record(
+    act = await record(
         session,
         ctx,
         p,
@@ -196,10 +236,10 @@ async def delete_portfolio(
     session: AsyncSession, ctx: Ctx, portfolio_id: uuid.UUID, *, record_undo: bool = True
 ) -> Mutation[Portfolio]:
     p = await get_portfolio(session, ctx, portfolio_id)
-    _require_edit(ctx, p)
+    await require_edit(session, ctx, p)
     p.deleted_at = datetime.now(UTC)
     p.version += 1
-    act = await _record(
+    act = await record(
         session,
         ctx,
         p,
@@ -222,7 +262,8 @@ async def add_project(
     record_undo: bool = True,
 ) -> Mutation[Portfolio]:
     p = await get_portfolio(session, ctx, portfolio_id)
-    _require_edit(ctx, p)
+    await require_edit(session, ctx, p)
+    _require_manual(p)
     project, _ = await get_visible_project(session, ctx, project_id)  # you add what you can see
     if await session.get(PortfolioItem, (p.id, project.id)) is not None:
         raise Conflict("That project is already in this portfolio", code="already_added")
@@ -243,7 +284,7 @@ async def add_project(
     )
     p.version += 1
     await session.flush()
-    act = await _record(
+    act = await record(
         session,
         ctx,
         p,
@@ -265,7 +306,8 @@ async def remove_project(
     record_undo: bool = True,
 ) -> Mutation[Portfolio]:
     p = await get_portfolio(session, ctx, portfolio_id)
-    _require_edit(ctx, p)
+    await require_edit(session, ctx, p)
+    _require_manual(p)
     item = await session.get(PortfolioItem, (p.id, project_id))
     if item is None:
         raise NotFound("That project isn't in this portfolio")
@@ -274,7 +316,7 @@ async def remove_project(
     await session.delete(item)
     p.version += 1
     await session.flush()
-    act = await _record(
+    act = await record(
         session,
         ctx,
         p,
@@ -296,27 +338,18 @@ async def portfolio_rows(
     session: AsyncSession, ctx: Ctx, p: Portfolio
 ) -> tuple[list[tuple[Project, dict[str, Any]]], int]:
     """(visible project rows in portfolio order, how many more the viewer can't see)."""
-    visible = list(
-        (
-            await session.execute(
-                select(Project)
-                .join(PortfolioItem, PortfolioItem.project_id == Project.id)
-                .where(
-                    PortfolioItem.portfolio_id == p.id,
-                    Project.deleted_at.is_(None),
-                    visible_projects_clause(ctx),
-                )
-                .order_by(PortfolioItem.position)
-            )
-        ).scalars()
-    )
-    total_items = (
-        await session.execute(
-            select(func.count())
-            .select_from(PortfolioItem)
-            .join(Project, Project.id == PortfolioItem.project_id)
+    if p.kind == "rule":  # Phase 7.5: computed membership, by name
+        members = select(Project).where(members_clause(p)).order_by(func.lower(Project.name))
+    else:
+        members = (
+            select(Project)
+            .join(PortfolioItem, PortfolioItem.project_id == Project.id)
             .where(PortfolioItem.portfolio_id == p.id, Project.deleted_at.is_(None))
+            .order_by(PortfolioItem.position)
         )
+    visible = list((await session.execute(members.where(visible_projects_clause(ctx)))).scalars())
+    total_items = (
+        await session.execute(select(func.count()).select_from(members.order_by(None).subquery()))
     ).scalar_one()
     ids = [x.id for x in visible]
     today = datetime.now(UTC).date()
@@ -400,7 +433,7 @@ async def post_status(
     session: AsyncSession, ctx: Ctx, portfolio_id: uuid.UUID, data: StatusUpdateIn
 ) -> Mutation[StatusUpdate]:
     p = await get_portfolio(session, ctx, portfolio_id)
-    _require_edit(ctx, p)
+    await require_edit(session, ctx, p)
     update = StatusUpdate(
         workspace_id=ctx.workspace_id,
         entity_type="portfolio",
@@ -418,7 +451,7 @@ async def post_status(
     p.status = data.status
     p.version += 1
     await session.flush()
-    act = await _record(
+    act = await record(
         session,
         ctx,
         p,
@@ -506,12 +539,12 @@ async def _undo_create(session: AsyncSession, ctx: Ctx, args: dict[str, Any]) ->
 @undo_handler("portfolios.restore")
 async def _undo_delete(session: AsyncSession, ctx: Ctx, args: dict[str, Any]) -> None:
     p = await get_portfolio(session, ctx, _pid(args), include_deleted=True)
-    _require_edit(ctx, p)
+    await require_edit(session, ctx, p)
     if p.deleted_at is None:
         raise UndoConflict("The portfolio is not deleted")
     p.deleted_at = None
     p.version += 1
-    await _record(session, ctx, p, "portfolio.restored")
+    await record(session, ctx, p, "portfolio.restored")
 
 
 @undo_handler("portfolios.update")
@@ -552,4 +585,4 @@ async def _undo_status(session: AsyncSession, ctx: Ctx, args: dict[str, Any]) ->
     update.deleted_at = datetime.now(UTC)
     p.status = args.get("previous_status")
     p.version += 1
-    await _record(session, ctx, p, "portfolio.status_withdrawn")
+    await record(session, ctx, p, "portfolio.status_withdrawn")
