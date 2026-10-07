@@ -1,4 +1,5 @@
 import { Download, FileText } from 'lucide-react';
+import { useMutation } from '@tanstack/react-query';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
 import { MoMark } from '@/components/common/MoMark';
@@ -7,7 +8,9 @@ import { Dialog } from '@/components/ui/Dialog';
 import { Icon } from '@/components/ui/Icon';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { Segmented } from '@/components/ui/Tabs';
+import { usePostStatus } from '@/features/status';
 import { useUndoToast } from '@/lib/undo';
+import { useApi } from '@/providers/api';
 import {
   FORMAT_LABELS,
   KINDS,
@@ -56,11 +59,14 @@ export function ReportDialog({
   onOpenChange,
   scope,
   name,
+  initialKind,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   scope: ReportScope;
   name: string;
+  /** S75-12: open on this kind (the close-out report offered on complete / archive) */
+  initialKind?: ReportKind;
 }) {
   return (
     <Dialog
@@ -69,15 +75,26 @@ export function ReportDialog({
       title={`Create a report: ${name}`}
       className="top-[8vh] w-[min(820px,calc(100vw-32px))]"
     >
-      {open ? <ReportBody scope={scope} onDone={() => onOpenChange(false)} /> : null}
+      {open ? (
+        <ReportBody scope={scope} initialKind={initialKind} onDone={() => onOpenChange(false)} />
+      ) : null}
     </Dialog>
   );
 }
 
-function ReportBody({ scope, onDone }: { scope: ReportScope; onDone: () => void }) {
+function ReportBody({
+  scope,
+  initialKind,
+  onDone,
+}: {
+  scope: ReportScope;
+  initialKind?: ReportKind;
+  onDone: () => void;
+}) {
   const kinds = kindsFor(scope);
-  const [kind, setKind] = useState<ReportKind>(kinds[0]!);
-  const [format, setFormat] = useState<ReportFormat>(KINDS[kinds[0]!].formats[0]!);
+  const first = initialKind && kinds.includes(initialKind) ? initialKind : kinds[0]!;
+  const [kind, setKind] = useState<ReportKind>(first);
+  const [format, setFormat] = useState<ReportFormat>(KINDS[first].formats[0]!);
   const [period, setPeriod] = useState('7');
   const [narrative, setNarrative] = useState(true);
   const [run, setRun] = useState<ReportRun | null>(null);
@@ -133,6 +150,7 @@ function ReportBody({ scope, onDone }: { scope: ReportScope; onDone: () => void 
               It’s in the {r.project_id ? 'project’s Files tab' : 'portfolio’s files'}.{' '}
               {canNarrate && narrative ? 'Paragraphs Mo drafted are marked: review them before sending.' : ''}
             </p>
+            {kind === 'closeout' && scope.projectId ? <CloseoutStatus projectId={scope.projectId} /> : null}
             <div className="flex justify-end gap-2">
               <a
                 href={`/api/v1/attachments/${r.attachment_id}/download`}
@@ -309,5 +327,72 @@ function Field({ label, id, children }: { label: string; id: string; children: R
       </label>
       {children}
     </div>
+  );
+}
+
+/** S75-12 (spec §9.4): post the project's final status update from the close-out summary,
+ * previewed first (Mo's paragraphs are cited and marked). */
+function CloseoutStatus({ projectId }: { projectId: string }) {
+  const api = useApi();
+  const undoToast = useUndoToast();
+  const draft = useMutation({
+    mutationFn: async () =>
+      (
+        await api.POST('/api/v1/ai/projects/{project_id}/closeout-status', {
+          params: { path: { project_id: projectId } },
+        })
+      ).data!,
+  });
+  const post = usePostStatus(projectId);
+  const [posted, setPosted] = useState(false);
+  if (posted) return <p className="text-sm text-muted">The close-out status update is posted.</p>;
+  if (!draft.data)
+    return (
+      <div>
+        <Button size="sm" loading={draft.isPending} onClick={() => draft.mutate()}>
+          Post as status update…
+        </Button>
+        {draft.isError ? (
+          <p role="alert" className="mt-1 text-sm text-crit">
+            Couldn’t draft the update.
+          </p>
+        ) : null}
+      </div>
+    );
+  const su = draft.data.status_update;
+  return (
+    <section
+      aria-label="Close-out status update"
+      className="space-y-2 rounded-md border border-hairline p-3 text-sm"
+    >
+      <p className="font-medium">{su.title}</p>
+      <p className={draft.data.ai ? 'whitespace-pre-line text-amber-ink' : 'whitespace-pre-line text-ink-2'}>
+        {su.summary}
+      </p>
+      {(su.sections?.slipped ?? []).length ? (
+        <ul className="list-disc pl-5 text-ink-2">
+          {su.sections!.slipped!.map((i, n) => (
+            <li key={n}>{i.text}</li>
+          ))}
+        </ul>
+      ) : null}
+      <div className="flex justify-end">
+        <Button
+          size="sm"
+          variant="primary"
+          loading={post.isPending}
+          onClick={() =>
+            post.mutate(su, {
+              onSuccess: (res) => {
+                undoToast('Close-out status update posted', res.meta);
+                setPosted(true);
+              },
+            })
+          }
+        >
+          Post status update
+        </Button>
+      </div>
+    </section>
   );
 }

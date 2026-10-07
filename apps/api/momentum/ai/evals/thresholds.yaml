@@ -39,6 +39,9 @@ mock:
   explain_chart: 1.0
   readiness: 1.0
   handoff: 1.0
+  # S75-11 / S75-12
+  catch_up: 1.0
+  closeout: 1.0
 live:
   command: 0.9
   chat: 0.85
@@ -77,3 +80,5 @@ live:
   explain_chart: 0.85
   readiness: 0.85
   handoff: 0.85
+  catch_up: 0.85
+  closeout: 0.85

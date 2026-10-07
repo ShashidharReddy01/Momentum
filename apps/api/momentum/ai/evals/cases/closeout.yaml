@@ -1,0 +1,71 @@
+# Phase 7.5 S75-12 project close-out (spec §9.4): the close-out report's facts as the person and
+# Mo's cited summary (prompt report_narrative/v1, close-out parts) become the final status update
+# draft (status complete), previewed before it's posted. Mo's paragraphs cite the facts; the
+# section items are the facts in words, so every number comes from them.
+feature: closeout
+cases:
+  - id: launch_plan_three_parts
+    mock: true
+    project: "Launch Plan"
+    expect: {paragraphs_min: 3, cites_from_facts: true, status_in: [complete], text_include_any: ["Close-out: Launch Plan"]}
+  - id: launch_plan_numbers_from_facts
+    mock: true
+    project: "Launch Plan"
+    expect: {numbers_from_facts: true}
+  - id: live_customer
+    mock: true
+    customer_in: Live
+    expect: {paragraphs_min: 3, cites_from_facts: true, status_in: [complete]}
+  - id: hypercare_customer
+    mock: true
+    customer_in: Hypercare
+    expect: {paragraphs_min: 1, cites_from_facts: true, numbers_from_facts: true}
+  - id: go_live_customer
+    mock: true
+    customer_in: Go-live
+    expect: {cites_from_facts: true, numbers_from_facts: true}
+  - id: northwind_onboarding
+    mock: true
+    project: "Northwind onboarding"
+    expect: {paragraphs_min: 1, cites_from_facts: true}
+  - id: mobile_app_as_priya
+    mock: true
+    user: priya
+    project: "Mobile App v2"
+    expect: {cites_from_facts: true, status_in: [complete]}
+  - id: consultant_sees_no_private_work
+    mock: true
+    user: mei
+    customer_in: Live
+    expect: {cites_from_facts: true, no_leak: ["Zenith", "Secret Roadmap"]}
+  - id: outsider_refused
+    mock: true
+    user: tom
+    project: "Launch Plan"
+    expect: {error: not_found}
+  - id: private_project_refused
+    mock: true
+    project: "Secret Roadmap"
+    expect: {error: not_found}
+  # --- live-only: judged against the facts
+  - id: live_launch_plan
+    project: "Launch Plan"
+    expect: {cites_from_facts: true, numbers_from_facts: true}
+    judge: {rubric: "What went well, what slipped and why, and lessons each follow from the facts (planned vs actual days, slips, blockers); no blame on people."}
+  - id: live_live_customer
+    customer_in: Live
+    expect: {cites_from_facts: true, numbers_from_facts: true}
+    judge: {rubric: "The time per stage and the milestone slips are stated as the facts give them."}
+  - id: live_short_project
+    user: priya
+    project: "Mobile App v2"
+    expect: {cites_from_facts: true}
+    judge: {rubric: "Thin facts give a short, plain close-out without padding."}
+  - id: live_hypercare
+    customer_in: Hypercare
+    expect: {cites_from_facts: true}
+    judge: {rubric: "Lessons are grounded in the blockers and slips listed, not generic advice."}
+  - id: live_go_live
+    customer_in: Go-live
+    expect: {cites_from_facts: true, numbers_from_facts: true}
+    judge: {rubric: "No numbers or causes beyond the facts."}

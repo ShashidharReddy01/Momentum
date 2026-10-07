@@ -1,3 +1,4 @@
+import { useApi } from '@/providers/api';
 import type { JSONContent } from '@tiptap/react';
 import {
   BellOff,
@@ -48,6 +49,12 @@ import { useMomentumConfig } from '@/lib/config';
 import { formatDay, formatDue } from '@/lib/dates';
 import { applyRealtimeEvent, useChannel } from '@/lib/realtime';
 import { AssigneePicker, assignedMessage } from '../AssigneePicker';
+import {
+  DuplicateWarning,
+  SuggestionStrip,
+  useTaskSuggestions,
+  type TaskSuggestion,
+} from '../TaskSuggestions';
 import { DatePicker } from '../DatePicker';
 import { formatEffort, parseEffort } from '../effort';
 import { useSnoozeNudges, useTaskDetail, useTaskDetailMutations, type TaskDetail } from '../detail';
@@ -445,6 +452,14 @@ function PaneBody({
           </button>
         ) : null}
         <TitleField task={task} canEdit={canEdit} onSave={(title) => m.update.mutate({ patch: { title } })} />
+        {canEdit && task.project && Date.now() - Date.parse(task.created_at) < NEW_TASK_MS ? (
+          <NewTaskSuggestions
+            task={task}
+            onAssign={(id) => m.update.mutate({ patch: { assignee_id: id }, message: 'Assignee set' })}
+            onDue={(day) => m.update.mutate({ patch: { due_on: day }, message: 'Due date set' })}
+            onField={(fieldId, value) => setFieldValue.mutate({ fieldId, value })}
+          />
+        ) : null}
 
         {task.type === 'approval' ? (
           <ApprovalBanner task={task} meId={meId} decide={m.decideApproval} />
@@ -961,5 +976,50 @@ function LikeButton({
       <Icon icon={ThumbsUp} size={15} />
       {likes.length ? <span className="text-xs tabular-nums">{likes.length}</span> : null}
     </button>
+  );
+}
+
+/** S75-12: a task made in the last few minutes shows the suggestions from similar tasks (and a
+ * possible duplicate), each applied with a click. */
+const NEW_TASK_MS = 10 * 60_000;
+
+function NewTaskSuggestions({
+  task,
+  onAssign,
+  onDue,
+  onField,
+}: {
+  task: TaskDetail;
+  onAssign: (userId: string) => void;
+  onDue: (day: string) => void;
+  onField: (fieldId: string, value: unknown) => void;
+}) {
+  const api = useApi();
+  const qc = useQueryClient();
+  const suggestions = useTaskSuggestions(task.project?.id, task.title);
+  const skip: TaskSuggestion['kind'][] = [
+    ...(task.assignee_id ? (['assignee'] as const) : []),
+    ...(task.due_on ? (['due'] as const) : []),
+  ];
+  return (
+    <div className="mt-2 space-y-1.5 px-2">
+      <DuplicateWarning data={suggestions.data} excludeId={task.id} />
+      <SuggestionStrip
+        data={suggestions.data}
+        skip={skip}
+        onApply={(s) => {
+          if (s.kind === 'assignee') onAssign(String(s.value));
+          else if (s.kind === 'due') onDue(String(s.value));
+          else if (s.kind === 'field' && s.field_id) onField(s.field_id, s.value);
+          else if (s.kind === 'tag')
+            void api
+              .POST('/api/v1/tasks/{task_id}/tags', {
+                params: { path: { task_id: task.id } },
+                body: { tag_id: String(s.value) },
+              })
+              .then(() => qc.invalidateQueries({ queryKey: ['tasks', task.id] }));
+        }}
+      />
+    </div>
   );
 }

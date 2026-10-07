@@ -1,3 +1,4 @@
+import { DuplicateWarning, useTaskSuggestions } from './TaskSuggestions';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
 import { CalendarDays, Hourglass, MoreHorizontal, PanelRightOpen, Trash2, UserRound } from 'lucide-react';
 import {
@@ -542,7 +543,10 @@ export function DraftRow({
   onShiftTab,
   placeholder = 'Write a task name',
   initialValue = '',
+  suggestFor,
 }: {
+  /** S75-12: warn about a possible duplicate in this project while typing. */
+  suggestFor?: { projectId: string; sectionId?: string | null };
   onSubmit: (title: string) => void;
   onPasteLines: (lines: string[]) => void;
   onCancel: () => void;
@@ -556,59 +560,69 @@ export function DraftRow({
   const [value, setValue] = useState(initialValue);
   // Tab/Shift+Tab hand the row over to another list: don't treat the blur as "submit".
   const handedOver = useRef(false);
+  const suggestions = useTaskSuggestions(
+    suggestFor?.projectId,
+    suggestFor ? value : '',
+    suggestFor?.sectionId,
+  );
   return (
-    <div
-      role="listitem"
-      aria-label="New task"
-      className="flex h-[var(--row-h)] items-center gap-2.5 border-b border-hair-soft px-2"
-    >
-      <CompleteCheck checked={false} disabled label="New task" onChange={() => {}} />
-      <input
-        aria-label="New task name"
-        placeholder={placeholder}
-        value={value}
-        maxLength={500}
-        // eslint-disable-next-line jsx-a11y/no-autofocus -- the user just asked for a new task row
-        autoFocus
-        onChange={(e) => setValue(e.target.value)}
-        onBlur={() => {
-          if (handedOver.current) return;
-          if (value.trim()) onSubmit(value.trim());
-          onCancel();
-        }}
-        onPaste={(e) => {
-          const lines = e.clipboardData
-            .getData('text')
-            .split(/\r?\n/)
-            .map((l) => l.trim())
-            .filter(Boolean);
-          if (lines.length > 1) {
-            e.preventDefault();
-            onPasteLines(lines);
-          }
-        }}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') {
-            e.preventDefault();
-            const title = value.trim();
-            if (!title) return onCancel();
-            setValue('');
-            onSubmit(title);
-          } else if (e.key === 'Tab' && !e.shiftKey && onTab) {
-            e.preventDefault();
-            handedOver.current = true;
-            onTab(value.trim());
-          } else if (e.key === 'Tab' && e.shiftKey && onShiftTab) {
-            e.preventDefault();
-            handedOver.current = true;
-            onShiftTab(value.trim());
-          } else if (e.key === 'Escape') {
-            e.preventDefault();
+    <div role="listitem" aria-label="New task" className="border-b border-hair-soft">
+      <div className="flex h-[var(--row-h)] items-center gap-2.5 px-2">
+        <CompleteCheck checked={false} disabled label="New task" onChange={() => {}} />
+        <input
+          aria-label="New task name"
+          placeholder={placeholder}
+          value={value}
+          maxLength={500}
+          // eslint-disable-next-line jsx-a11y/no-autofocus -- the user just asked for a new task row
+          autoFocus
+          onChange={(e) => setValue(e.target.value)}
+          onBlur={() => {
+            if (handedOver.current) return;
+            if (value.trim()) onSubmit(value.trim());
             onCancel();
-          }
-        }}
-        className="h-7 min-w-0 flex-1 rounded-sm bg-transparent px-1 text-body outline-none placeholder:text-muted-2"
-      />
+          }}
+          onPaste={(e) => {
+            const lines = e.clipboardData
+              .getData('text')
+              .split(/\r?\n/)
+              .map((l) => l.trim())
+              .filter(Boolean);
+            if (lines.length > 1) {
+              e.preventDefault();
+              onPasteLines(lines);
+            }
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              const title = value.trim();
+              if (!title) return onCancel();
+              setValue('');
+              onSubmit(title);
+            } else if (e.key === 'Tab' && !e.shiftKey && onTab) {
+              e.preventDefault();
+              handedOver.current = true;
+              onTab(value.trim());
+            } else if (e.key === 'Tab' && e.shiftKey && onShiftTab) {
+              e.preventDefault();
+              handedOver.current = true;
+              onShiftTab(value.trim());
+            } else if (e.key === 'Escape') {
+              e.preventDefault();
+              onCancel();
+            }
+          }}
+          className="h-7 min-w-0 flex-1 rounded-sm bg-transparent px-1 text-body outline-none placeholder:text-muted-2"
+        />
+      </div>
+      {suggestFor ? (
+        // keep the name field focused: clicking Open / Not a duplicate mustn't submit the row
+        // eslint-disable-next-line jsx-a11y/no-static-element-interactions
+        <div className="px-2 pb-1.5 empty:hidden" onMouseDown={(e) => e.preventDefault()}>
+          <DuplicateWarning data={suggestions.data} />
+        </div>
+      ) : null}
     </div>
   );
 }

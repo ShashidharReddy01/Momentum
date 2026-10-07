@@ -22,6 +22,7 @@ const now = new Date().toISOString();
 function boot() {
   const previews: Record<string, unknown>[] = [];
   const created: Record<string, unknown>[] = [];
+  const statuses: Record<string, unknown>[] = [];
   server.use(
     ...authHandlers({ loggedIn: true }).handlers,
     ...teamHandlers(),
@@ -49,6 +50,32 @@ function boot() {
         sheets: null,
       });
     }),
+    http.post('*/api/v1/ai/projects/:pid/closeout-status', () =>
+      HttpResponse.json({
+        project_id: 'seed-1',
+        project: 'Website Revamp',
+        ai: true,
+        status_update: {
+          status: 'complete',
+          title: 'Close-out: Website Revamp',
+          summary: 'The launch shipped [T-3]; pricing slipped a week [T-7].',
+          sections: {
+            completed: [],
+            slipped: [{ text: 'Pricing finished 7 days late' }],
+            blockers: [],
+            next: [],
+          },
+          generated_by_ai: true,
+        },
+      }),
+    ),
+    http.post('*/api/v1/projects/:pid/status-updates', async ({ request }) => {
+      statuses.push((await request.json()) as Record<string, unknown>);
+      return HttpResponse.json(
+        { data: { id: 'su-1' }, meta: { activity_id: '01a0ccaf-0000-7000-8000-00000000f002', version: 1 } },
+        { status: 201 },
+      );
+    }),
     http.post('*/api/v1/reports', async ({ request }) => {
       const body = (await request.json()) as { spec: Record<string, unknown> };
       created.push(body.spec);
@@ -72,7 +99,7 @@ function boot() {
   );
   window.history.replaceState(null, '', '/projects/seed-1/list');
   render(<MomentumApp />);
-  return { previews, created, user: userEvent.setup() };
+  return { previews, created, statuses, user: userEvent.setup() };
 }
 
 describe('Create report (Phase 7.5)', () => {
@@ -118,5 +145,22 @@ describe('Create report (Phase 7.5)', () => {
     expect(within(dialog).queryByLabelText('Add Mo’s summary')).toBeNull();
     await waitFor(() => expect(previews.at(-1)).toMatchObject({ kind: 'task_export', format: 'xlsx' }));
     expect(previews.at(-1)).not.toHaveProperty('period');
+  });
+
+  it('close-out: from the menu, then the final status update after a preview (S75-12)', async () => {
+    const { created, statuses, user } = boot();
+    await user.click(await screen.findByRole('button', { name: 'Project actions' }));
+    await user.click(await screen.findByRole('menuitem', { name: /Create close-out report/ }));
+    const dialog = await screen.findByRole('dialog', { name: /Create a report: Website Revamp/ });
+    expect(within(dialog).getByRole('button', { name: /Close-out/ })).toHaveAttribute('aria-pressed', 'true');
+    await user.click(within(dialog).getByRole('button', { name: 'Create report' }));
+    await waitFor(() => expect(created[0]).toMatchObject({ kind: 'closeout' }));
+    await user.click(await within(dialog).findByRole('button', { name: 'Post as status update…' }));
+    const preview = await within(dialog).findByRole('region', { name: 'Close-out status update' });
+    expect(within(preview).getByText(/The launch shipped/)).toHaveClass('text-amber-ink');
+    expect(statuses).toHaveLength(0);
+    await user.click(within(preview).getByRole('button', { name: 'Post status update' }));
+    await waitFor(() => expect(statuses[0]).toMatchObject({ status: 'complete', generated_by_ai: true }));
+    expect(await within(dialog).findByText('The close-out status update is posted.')).toBeInTheDocument();
   });
 });

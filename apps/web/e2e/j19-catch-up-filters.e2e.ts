@@ -89,3 +89,49 @@ test('J19: catch me up after someone else’s changes, then filter the list in p
   await page.getByRole('button', { name: "Clear Mo's filters" }).click();
   await expect(page.getByText('Filtered with Mo')).toBeHidden();
 });
+
+/**
+ * J19 part 3 (Phase 7.5 S75-12): smart task creation. With five similar tasks (all Mei's), quick
+ * add on the project warns about a possible duplicate and suggests Mei, from similar tasks (no
+ * model call); the chip applies only when clicked, and the new task is Mei's.
+ */
+test('J19 part 3: quick add suggests from similar tasks and warns about a duplicate', async ({ page }) => {
+  await login(page);
+  const api = page.request;
+  const teams = (await (await api.get('/api/v1/teams')).json()).data as { id: string; name: string }[];
+  const made = await api.post('/api/v1/projects', {
+    headers: H,
+    data: { team_id: teams.find((t) => t.name === 'Product')!.id, name: 'J19 Smart tasks' },
+  });
+  expect(made.ok()).toBeTruthy();
+  const pid = (await made.json()).data.id as string;
+  const people = (await (await api.get('/api/v1/users?q=mei')).json()).data as {
+    id: string;
+    email: string;
+  }[];
+  const mei = people.find((u) => u.email.startsWith('mei@'))!.id;
+  for (const n of [1, 2, 3, 4, 5])
+    await task(api, pid, `Prepare the launch press kit part ${n}`, { assignee_id: mei });
+
+  await page.goto(`/projects/${pid}/list`);
+  await expect(
+    page.locator('[data-task-id][aria-label="Prepare the launch press kit part 1"]'),
+  ).toBeVisible();
+  await page.locator('body').click({ position: { x: 5, y: 5 } });
+  await page.keyboard.press('q');
+  const dialog = page.getByRole('dialog', { name: 'New task' });
+  await dialog.getByRole('textbox', { name: 'Task name' }).fill('Prepare the launch press kit');
+  await expect(dialog.getByText(/Looks like T-\d+/)).toBeVisible();
+  const strip = dialog.getByRole('group', { name: 'Suggestions' });
+  const chip = strip.getByRole('button', { name: /Mei Chen: 5 of 5 similar tasks were assigned to Mei/ });
+  await expect(chip).toBeVisible();
+  await chip.click();
+  await dialog.getByRole('button', { name: 'Not a duplicate' }).click();
+  await dialog.getByRole('textbox', { name: 'Task name' }).press('Enter');
+  await expect(dialog).toBeHidden();
+  const list = (await (await api.get(`/api/v1/projects/${pid}/tasks`)).json()).data as {
+    title: string;
+    assignee_id: string | null;
+  }[];
+  expect(list.find((t) => t.title === 'Prepare the launch press kit')?.assignee_id).toBe(mei);
+});

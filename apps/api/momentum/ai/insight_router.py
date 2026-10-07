@@ -14,7 +14,15 @@ from fastapi import APIRouter
 from pydantic import BaseModel, ConfigDict, Field
 
 from momentum.ai import catch_up as catch_up_ai
-from momentum.ai import dashboard_draft, explain_chart, handoff, nl_filters, portfolio_brief
+from momentum.ai import closeout as closeout_ai
+from momentum.ai import (
+    dashboard_draft,
+    explain_chart,
+    handoff,
+    nl_filters,
+    portfolio_brief,
+    task_suggestions,
+)
 from momentum.ai import readiness_check as readiness_ai
 from momentum.ai.router import require_llm
 from momentum.api.deps import CtxDep, RuntimeDep, UowDep
@@ -453,4 +461,109 @@ async def ai_catch_up_pending(
         total=facts.total,
         counts=facts.counts,
         show_card=facts.total > catch_up_ai.HOME_CARD_MIN,
+    )
+
+
+# ---------------- smart task creation (S75-12, no model call) ----------------
+
+
+class TaskSuggestionsIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    project_id: uuid.UUID
+    section_id: uuid.UUID | None = None
+    title: str = Field(min_length=1, max_length=500)
+    description: str | None = Field(default=None, max_length=4000)
+
+
+class DuplicateOut(BaseModel):
+    id: uuid.UUID
+    key: str
+    title: str
+    completed: bool
+    assignee: str | None
+    score: float
+
+
+class SuggestionOut(BaseModel):
+    kind: Literal["assignee", "due", "field", "tag"]
+    label: str
+    reason: str
+    value: Any
+    field_id: uuid.UUID | None = None
+    days: int | None = None
+
+
+class TaskSuggestionsOut(BaseModel):
+    enabled: bool = Field(description="False when the setting or the person's preference is off")
+    duplicates: list[DuplicateOut]
+    suggestions: list[SuggestionOut]
+    neighbours: int = Field(description="How many similar tasks the suggestions come from")
+
+
+@router.post(
+    "/task-suggestions",
+    response_model=TaskSuggestionsOut,
+    summary="Possible duplicates and suggested fields for a task being written (no model call)",
+)
+async def ai_task_suggestions(
+    body: TaskSuggestionsIn, ctx: CtxDep, uow: UowDep, rt: RuntimeDep
+) -> TaskSuggestionsOut:
+    async with uow.transaction() as s:
+        out = await task_suggestions.suggest(
+            s, rt.llm, ctx, body.project_id, body.title, section_id=body.section_id
+        )
+    return TaskSuggestionsOut(
+        enabled=out.enabled,
+        duplicates=[
+            DuplicateOut(
+                id=d.id,
+                key=d.key,
+                title=d.title,
+                completed=d.completed,
+                assignee=d.assignee,
+                score=d.score,
+            )
+            for d in out.duplicates
+        ],
+        suggestions=[
+            SuggestionOut(
+                kind=x.kind,
+                label=x.label,
+                reason=x.reason,
+                value=x.value,
+                field_id=x.field_id,
+                days=x.days,
+            )
+            for x in out.suggestions
+        ],
+        neighbours=out.neighbours,
+    )
+
+
+# ---------------- project close-out (S75-12) ----------------
+
+
+class CloseoutStatusOut(BaseModel):
+    project_id: uuid.UUID
+    project: str
+    status_update: StatusUpdateIn = Field(description="The final status update, to preview")
+    ai: bool = Field(description="True when Mo wrote the summary (cited, marked)")
+
+
+@router.post(
+    "/projects/{project_id}/closeout-status",
+    response_model=CloseoutStatusOut,
+    summary="The close-out status update from its facts and Mo's summary (stores nothing)",
+)
+async def ai_closeout_status(
+    project_id: uuid.UUID, ctx: CtxDep, uow: UowDep, rt: RuntimeDep
+) -> CloseoutStatusOut:
+    ctx = ctx.with_(via="ai")
+    async with uow.transaction() as s:
+        d = await closeout_ai.closeout_status(s, rt.llm, ctx, project_id)
+    return CloseoutStatusOut(
+        project_id=d.project_id,
+        project=d.project,
+        status_update=d.status_update,
+        ai=bool(d.paragraphs),
     )

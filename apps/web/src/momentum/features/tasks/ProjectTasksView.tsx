@@ -584,6 +584,7 @@ export function ProjectTasksView({ projectId, canEdit }: { projectId: string; ca
     const draftRow = draftHere ? (
       <DraftRow
         key={`draft-${draftHere.key}`}
+        suggestFor={{ projectId, sectionId: section.id }}
         onSubmit={(title) => {
           const id = m.create({ title, sectionId: section.id, afterId: draftHere.afterId }, (real) => {
             confirmedIds.current.set(id, real);

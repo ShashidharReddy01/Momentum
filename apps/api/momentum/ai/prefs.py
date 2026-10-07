@@ -17,6 +17,8 @@ from momentum.domain.users.models import User
 class AiPrefs(BaseModel):
     model_config = ConfigDict(extra="forbid")
     auto_apply_low_risk: bool = False
+    # Phase 7.5 S75-12: show smart task suggestions while creating a task
+    task_suggestions: bool = True
 
 
 async def get_prefs(session: AsyncSession, ctx: Ctx) -> AiPrefs:

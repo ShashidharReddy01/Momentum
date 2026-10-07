@@ -46,13 +46,29 @@ export function AiSettingsPage() {
             className="mt-0.5"
             checked={prefs?.auto_apply_low_risk ?? false}
             disabled={!prefs || save.isPending}
-            onChange={(e) => save.mutate({ auto_apply_low_risk: e.target.checked })}
+            onChange={(e) => save.mutate({ ...prefs!, auto_apply_low_risk: e.target.checked })}
           />
           <span>
             Apply low-risk changes from Mo without asking
             <span className="block text-muted">
               Small edits you ask for in ⌘K (a due date, an assignee, a completion) go through right away,
               with Undo. Bigger or risky changes always show a preview first.
+            </span>
+          </span>
+        </label>
+        <label className="mt-3 flex items-start gap-2 text-sm">
+          <input
+            type="checkbox"
+            className="mt-0.5"
+            checked={prefs?.task_suggestions ?? true}
+            disabled={!prefs || save.isPending}
+            onChange={(e) => save.mutate({ ...prefs!, task_suggestions: e.target.checked })}
+          />
+          <span>
+            Suggest details while I create a task
+            <span className="block text-muted">
+              Possible duplicates, and an assignee, due date, fields or tags taken from similar tasks, each
+              with its reason. Nothing is set until you click it.
             </span>
           </span>
         </label>

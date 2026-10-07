@@ -797,6 +797,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/ai/projects/{project_id}/closeout-status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** The close-out status update from its facts and Mo's summary (stores nothing) */
+        post: operations["ai_closeout_status_api_v1_ai_projects__project_id__closeout_status_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/ai/projects/{project_id}/handoff": {
         parameters: {
             query?: never;
@@ -876,6 +893,23 @@ export interface paths {
         put?: never;
         /** Summarize a task's comment thread, or my unread inbox (cached by content) */
         post: operations["ai_summarize_api_v1_ai_summarize_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ai/task-suggestions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Possible duplicates and suggested fields for a task being written (no model call) */
+        post: operations["ai_task_suggestions_api_v1_ai_task_suggestions_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4825,6 +4859,11 @@ export interface components {
              * @default false
              */
             auto_apply_low_risk: boolean;
+            /**
+             * Task Suggestions
+             * @default true
+             */
+            task_suggestions: boolean;
         };
         /**
          * ApiTokenCreatedOut
@@ -5407,6 +5446,23 @@ export interface components {
             type: "task" | "project" | "file";
             /** Valid */
             valid: boolean;
+        };
+        /** CloseoutStatusOut */
+        CloseoutStatusOut: {
+            /**
+             * Ai
+             * @description True when Mo wrote the summary (cited, marked)
+             */
+            ai: boolean;
+            /** Project */
+            project: string;
+            /**
+             * Project Id
+             * Format: uuid
+             */
+            project_id: string;
+            /** @description The final status update, to preview */
+            status_update: components["schemas"]["StatusUpdateIn"];
         };
         /** ColumnIn */
         ColumnIn: {
@@ -6044,6 +6100,24 @@ export interface components {
             tasks: string[];
             /** Text */
             text: string;
+        };
+        /** DuplicateOut */
+        DuplicateOut: {
+            /** Assignee */
+            assignee: string | null;
+            /** Completed */
+            completed: boolean;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Key */
+            key: string;
+            /** Score */
+            score: number;
+            /** Title */
+            title: string;
         };
         /**
          * EffectiveAi
@@ -11019,6 +11093,24 @@ export interface components {
             /** Before Id */
             before_id?: string | null;
         };
+        /** SuggestionOut */
+        SuggestionOut: {
+            /** Days */
+            days?: number | null;
+            /** Field Id */
+            field_id?: string | null;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "assignee" | "due" | "field" | "tag";
+            /** Label */
+            label: string;
+            /** Reason */
+            reason: string;
+            /** Value */
+            value: unknown;
+        };
         /** SummarizeIn */
         SummarizeIn: {
             /**
@@ -11558,6 +11650,37 @@ export interface components {
             project_name: string | null;
             /** Title */
             title: string;
+        };
+        /** TaskSuggestionsIn */
+        TaskSuggestionsIn: {
+            /** Description */
+            description?: string | null;
+            /**
+             * Project Id
+             * Format: uuid
+             */
+            project_id: string;
+            /** Section Id */
+            section_id?: string | null;
+            /** Title */
+            title: string;
+        };
+        /** TaskSuggestionsOut */
+        TaskSuggestionsOut: {
+            /** Duplicates */
+            duplicates: components["schemas"]["DuplicateOut"][];
+            /**
+             * Enabled
+             * @description False when the setting or the person's preference is off
+             */
+            enabled: boolean;
+            /**
+             * Neighbours
+             * @description How many similar tasks the suggestions come from
+             */
+            neighbours: number;
+            /** Suggestions */
+            suggestions: components["schemas"]["SuggestionOut"][];
         };
         /**
          * TaskSummaryOut
@@ -14003,6 +14126,37 @@ export interface operations {
             };
         };
     };
+    ai_closeout_status_api_v1_ai_projects__project_id__closeout_status_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CloseoutStatusOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     ai_handoff_api_v1_ai_projects__project_id__handoff_post: {
         parameters: {
             query?: never;
@@ -14159,6 +14313,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SummaryOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ai_task_suggestions_api_v1_ai_task_suggestions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TaskSuggestionsIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskSuggestionsOut"];
                 };
             };
             /** @description Validation Error */

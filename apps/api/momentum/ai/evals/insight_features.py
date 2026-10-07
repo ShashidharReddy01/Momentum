@@ -31,6 +31,7 @@ from momentum.reports.data import today_for
 
 INSIGHT_FEATURES = (
     "catch_up",
+    "closeout",
     "portfolio_brief",
     "nl_filters",
     "dashboard_draft",
@@ -109,6 +110,28 @@ async def run_insight(
             "facts_numbers": sorted(numbers_in(b.facts)),
         }
         _cited(obs.data, [c for i in b.items for c in i.cites], portfolio_brief.citables(b.facts))
+    elif feature == "closeout":
+        from momentum.ai.closeout import closeout_status
+
+        if case.get("customer_in"):
+            pid = await customer_in(session, ctx, p, case["customer_in"])
+        else:
+            pid = world.projects[case["project"]]
+        cd = await closeout_status(session, llm, ctx, pid)
+        su = cd.status_update
+        items = [
+            i.text
+            for key in ("completed", "slipped", "blockers")
+            for i in getattr(su.sections, key)
+        ]
+        obs.text = "\n".join([su.title, su.summary, *items])
+        obs.data = {
+            "paragraphs": len(cd.paragraphs),
+            "status": su.status,
+            "ai": su.generated_by_ai,
+            "facts_numbers": sorted(numbers_in(cd.facts)),
+        }
+        _cited(obs.data, [c for x in cd.paragraphs for c in x.cites], cd.citable)
     elif feature == "catch_up":
         await _catch_up(session, llm, world, case, ctx, obs, p)
     elif feature == "nl_filters":

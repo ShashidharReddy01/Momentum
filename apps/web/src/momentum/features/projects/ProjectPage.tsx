@@ -118,6 +118,17 @@ export function ProjectPage() {
   const [taskTemplatesOpen, setTaskTemplatesOpen] = useState(false);
   const [csvImportOpen, setCsvImportOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
+  // S75-12: the close-out report (menu item, or offered on complete / archive via ?closeout=1)
+  const [reportKind, setReportKind] = useState<'closeout' | undefined>(undefined);
+  const [search, setSearch] = useSearchParams();
+  useEffect(() => {
+    if (search.get('closeout') !== '1') return;
+    setReportKind('closeout');
+    setReportOpen(true);
+    const next = new URLSearchParams(search);
+    next.delete('closeout');
+    setSearch(next, { replace: true });
+  }, [search, setSearch]);
   useCrumbs(project.data ? [project.data.team_name, project.data.name] : null);
   const tabEdges = useScrollEdges();
   useVisitBeacon('project', project.data?.id); // S75-11: when you last looked, for Catch me up
@@ -234,8 +245,21 @@ export function ProjectPage() {
                     ))}
                   </DropdownMenuRadioGroup>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onSelect={() => setReportOpen(true)}>
+                  <DropdownMenuItem
+                    onSelect={() => {
+                      setReportKind(undefined);
+                      setReportOpen(true);
+                    }}
+                  >
                     <Icon icon={FileText} /> Create report…
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onSelect={() => {
+                      setReportKind('closeout');
+                      setReportOpen(true);
+                    }}
+                  >
+                    <Icon icon={FileText} /> Create close-out report…
                   </DropdownMenuItem>
                   <DropdownMenuItem onSelect={() => setRulesOpen(true)}>
                     <Icon icon={Zap} /> Rules
@@ -333,7 +357,13 @@ export function ProjectPage() {
       <FieldsDialog projectId={p.id} canEdit={canEdit} open={fieldsOpen} onOpenChange={setFieldsOpen} />
       {reportOpen ? (
         <Suspense fallback={null}>
-          <ReportDialog open onOpenChange={setReportOpen} scope={{ projectId: p.id }} name={p.name} />
+          <ReportDialog
+            open
+            onOpenChange={setReportOpen}
+            scope={{ projectId: p.id }}
+            name={p.name}
+            initialKind={reportKind}
+          />
         </Suspense>
       ) : null}
       {rulesOpen ? (

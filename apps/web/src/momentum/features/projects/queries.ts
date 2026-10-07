@@ -1,3 +1,4 @@
+import { useOfferCloseout } from '@/lib/closeout';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { components } from '@/lib/api/schema';
 import { toastError } from '@/lib/toast';
@@ -94,6 +95,7 @@ export function useProjectLifecycle(id: string) {
   const api = useApi();
   const invalidate = useInvalidate();
   const undoToast = useUndoToast();
+  const offerCloseout = useOfferCloseout();
   const path = { project_id: id };
   const archive = useMutation({
     mutationFn: async (archived: boolean) =>
@@ -102,6 +104,7 @@ export function useProjectLifecycle(id: string) {
         : (await api.POST('/api/v1/projects/{project_id}/unarchive', { params: { path } })).data!,
     onSuccess: (res, archived) => {
       undoToast(archived ? 'Project archived' : 'Project restored from archive', res.meta);
+      if (archived) offerCloseout(id); // S75-12: offer the close-out report
       void invalidate();
     },
     onError: (e) => toastError(e),

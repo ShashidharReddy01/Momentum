@@ -149,6 +149,10 @@ export function taskHandlers(
     updated_at: new Date().toISOString(),
   });
   return [
+    // S75-12: smart task creation (nothing similar by default)
+    http.post(`*${base}/api/v1/ai/task-suggestions`, () =>
+      HttpResponse.json({ enabled: true, duplicates: [], suggestions: [], neighbours: 0 }),
+    ),
     http.get(`*${base}/api/v1/me/tasks`, ({ request }) => {
       const completed = new URL(request.url).searchParams.get('completed') === 'true';
       const mine = tasks.filter((t) => t.assignee_id === me && !!t.completed_at === completed);

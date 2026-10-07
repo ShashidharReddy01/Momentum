@@ -1,3 +1,9 @@
+import {
+  DuplicateWarning,
+  SuggestionStrip,
+  useTaskSuggestions,
+  type TaskSuggestion,
+} from './TaskSuggestions';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { CalendarDays, Repeat, UserRound, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
@@ -159,6 +165,19 @@ export function QuickAddDialog({
     onError: (e) => toastError(e, "Mo couldn't read that; set the details with the buttons below"),
   });
 
+  // S75-12: suggestions from similar tasks (no model call); tags and fields apply after creating
+  const suggestions = useTaskSuggestions(fields.projectId, fields.title);
+  const [extra, setExtra] = useState<TaskSuggestion[]>([]);
+  const applySuggestion = (s: TaskSuggestion) => {
+    if (s.kind === 'assignee') {
+      setAssignee({ id: String(s.value), name: s.label });
+      setTouched((t) => ({ ...t, assignee: true }));
+    } else if (s.kind === 'due') {
+      setDue({ date: String(s.value), at: null });
+      setTouched((t) => ({ ...t, due: true }));
+    } else setExtra((x) => [...x, s]);
+  };
+
   const create = useMutation({
     mutationFn: async () =>
       (
@@ -183,8 +202,25 @@ export function QuickAddDialog({
           },
         })
       ).data!,
-    onSuccess: (res) => {
+    onSuccess: async (res) => {
       const projectId = fields.projectId!;
+      for (const s of extra) {
+        // best effort: the task exists; a chip that can't apply is simply not set
+        if (s.kind === 'tag')
+          await api
+            .POST('/api/v1/tasks/{task_id}/tags', {
+              params: { path: { task_id: res.data.id } },
+              body: { tag_id: String(s.value) },
+            })
+            .catch(() => undefined);
+        else if (s.kind === 'field' && s.field_id)
+          await api
+            .PUT('/api/v1/tasks/{task_id}/fields/{field_id}', {
+              params: { path: { task_id: res.data.id, field_id: s.field_id } },
+              body: { value: s.value },
+            })
+            .catch(() => undefined);
+      }
       try {
         localStorage.setItem(LAST_PROJECT, projectId);
       } catch {
@@ -238,6 +274,15 @@ export function QuickAddDialog({
               setMo(null); // Mo's reading was of the old text
             }}
             className="h-10 w-full rounded-md border border-hairline bg-surface px-3 text-[15px] outline-none placeholder:text-muted-2 focus:border-focus"
+          />
+          <DuplicateWarning data={suggestions.data} />
+          <SuggestionStrip
+            data={suggestions.data}
+            onApply={applySuggestion}
+            skip={[
+              ...(touched.assignee ? (['assignee'] as const) : []),
+              ...(touched.due ? (['due'] as const) : []),
+            ]}
           />
           <div className="flex flex-wrap items-center gap-2 text-sm">
             <label htmlFor="quick-add-project" className="sr-only">

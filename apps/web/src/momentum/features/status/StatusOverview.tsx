@@ -1,3 +1,4 @@
+import { useOfferCloseout } from '@/lib/closeout';
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { AIBadge, AICallout } from '@/components/common/AI';
 import { MoMark } from '@/components/common/MoMark';
@@ -195,6 +196,7 @@ function StatusEditor({
 }) {
   const post = usePostStatus(projectId);
   const notify = useUndoToast();
+  const offerCloseout = useOfferCloseout();
   const [status, setStatus] = useState<Status>(initial.status);
   const [title, setTitle] = useState(initial.title);
   const [summary, setSummary] = useState(initial.summary ?? '');
@@ -223,6 +225,7 @@ function StatusEditor({
       {
         onSuccess: (r) => {
           notify('Status update posted', r.meta);
+          if (status === 'complete') offerCloseout(projectId); // S75-12
           onDone();
         },
       },

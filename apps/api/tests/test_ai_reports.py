@@ -17,6 +17,7 @@ from momentum.ai.report_narrative import (
 from momentum.core.db import UnitOfWork
 from momentum.domain.attachments.models import Attachment
 from tests.ai_fixtures import REG, World, world
+from tests.helpers import Clients
 
 _ = world
 
@@ -104,3 +105,26 @@ async def test_generate_report_previews_applies_as_the_person_and_undoes(
             s, world.lena, REG, [ProposedCall("generate_report", args)], source="chat"
         )
     assert p3.action is None and p3.failures[0][1].result.error["code"] == "forbidden"  # type: ignore[index]
+
+
+async def test_closeout_status_is_a_preview_until_posted(as_user: Clients) -> None:
+    """S75-12 (spec §9.4): the close-out facts and Mo's cited summary become the final status
+    update draft (complete); nothing is written until it's posted; outsiders get nothing."""
+    ravi = await as_user("ravi")
+    pid = next(
+        p["id"]
+        for p in (await ravi.get("/api/v1/projects")).json()["data"]
+        if p["name"] == "Website Revamp"
+    )
+    before = (await ravi.get(f"/api/v1/projects/{pid}/status-updates")).json()["data"]
+    r = await ravi.post(f"/api/v1/ai/projects/{pid}/closeout-status")
+    assert r.status_code == 200, r.text
+    d = r.json()
+    su = d["status_update"]
+    assert su["status"] == "complete" and su["title"] == "Close-out: Website Revamp"
+    assert d["ai"] is True and su["generated_by_ai"] is True and su["summary"]
+    assert (await ravi.get(f"/api/v1/projects/{pid}/status-updates")).json()["data"] == before
+    posted = await ravi.post(f"/api/v1/projects/{pid}/status-updates", json=su)
+    assert posted.status_code == 201, posted.text
+    tom = await as_user("tom")
+    assert (await tom.post(f"/api/v1/ai/projects/{pid}/closeout-status")).status_code == 404
