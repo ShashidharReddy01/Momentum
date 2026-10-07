@@ -131,6 +131,7 @@ export function ProjectPage() {
   }, [search, setSearch]);
   useCrumbs(project.data ? [project.data.team_name, project.data.name] : null);
   const tabEdges = useScrollEdges();
+  const actionsRef = useRef<HTMLButtonElement>(null); // focus returns here from menu dialogs
   useVisitBeacon('project', project.data?.id); // S75-11: when you last looked, for Catch me up
 
   // On a bare `/projects/:id` (no view segment), redirect once to this user's last view for
@@ -230,7 +231,7 @@ export function ProjectPage() {
             {isAdmin ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <IconButton icon={MoreHorizontal} label="Project actions" />
+                  <IconButton ref={actionsRef} icon={MoreHorizontal} label="Project actions" />
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                   <DropdownMenuLabel>Default view</DropdownMenuLabel>
@@ -363,6 +364,7 @@ export function ProjectPage() {
             scope={{ projectId: p.id }}
             name={p.name}
             initialKind={reportKind}
+            returnFocus={actionsRef}
           />
         </Suspense>
       ) : null}

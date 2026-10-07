@@ -57,6 +57,19 @@ for (const scheme of ['light', 'dark'] as const) {
       ).toBeVisible();
       found.push(...(await serious(page)).map((v) => `Portfolio ${tab}: ${v}`));
     }
+    // S75-13: the portfolio's Dashboard and Reports tabs and Mo's brief (S75-08 to S75-10)
+    for (const tab of ['dashboard', 'reports']) {
+      await page.goto(`/portfolios/${folio}/${tab}`);
+      await expect(
+        page.getByRole('tab', { name: tab[0]!.toUpperCase() + tab.slice(1), selected: true }),
+      ).toBeVisible();
+      found.push(...(await serious(page)).map((v) => `Portfolio ${tab}: ${v}`));
+    }
+    await page.getByRole('button', { name: /Brief me/ }).click();
+    const brief = page.getByRole('dialog', { name: /Brief: Customer onboarding/ });
+    await expect(brief.getByRole('button', { name: 'Done' })).toBeVisible();
+    found.push(...(await serious(page)).map((v) => `Portfolio brief: ${v}`));
+    await brief.getByRole('button', { name: 'Done' }).click();
     // S75-08: a role dashboard (the seed pins Leadership to the admin's Home)
     const pinned = (await (await page.request.get('/api/v1/dashboards/pinned')).json()).data as {
       id: string;
@@ -72,6 +85,24 @@ for (const scheme of ['light', 'dark'] as const) {
       .click();
     await expect(page.getByRole('list', { name: 'Tasks in Review' })).toBeVisible();
     found.push(...(await serious(page)).map((v) => `Project list: ${v}`));
+    // S75-09 / S75-11: the report dialog and Catch me up
+    await page.getByRole('button', { name: 'Project actions' }).click();
+    const reportItem = page.getByRole('menuitem', { name: /^Create report/ });
+    await reportItem.focus();
+    await page.keyboard.press('Enter');
+    const report = page.getByRole('dialog', { name: /Create a report: Website Revamp/ });
+    await expect(
+      report.getByRole('region', { name: 'Report outline' }).getByText(/About \d+ page/),
+    ).toBeVisible();
+    found.push(...(await serious(page)).map((v) => `Report dialog: ${v}`));
+    await report.getByRole('button', { name: 'Cancel' }).click();
+    await expect(report).toBeHidden();
+    await page.getByRole('button', { name: /Catch me up/ }).click();
+    const catchUp = page.getByRole('dialog', { name: 'Catch me up: Website Revamp' });
+    await expect(catchUp.getByRole('button', { name: 'Done' })).toBeVisible();
+    await expect(catchUp.getByText(/changes? by others|Nothing changed since/)).toBeVisible();
+    found.push(...(await serious(page)).map((v) => `Catch me up: ${v}`));
+    await catchUp.getByRole('button', { name: 'Done' }).click();
     const first = page.getByRole('list', { name: 'Tasks in Review' }).locator('[data-task-id]').first();
     const title = (await first.getAttribute('aria-label'))!;
     await row(page, title)
@@ -137,4 +168,30 @@ test('J14: a portfolio board card moves to another stage from the keyboard', asy
   await expect(page.getByRole('menuitem', { name: 'Discovery' })).toBeFocused();
   await page.keyboard.press('Enter');
   await expect(page.getByRole('listitem', { name: /^Discovery:/ }).getByRole('link', { name })).toBeVisible();
+});
+
+test('J14: the report dialog from the keyboard, focus back on the menu button', async ({ page }) => {
+  await login(page);
+  await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Website Revamp' }).click();
+  await expect(page.getByRole('list', { name: 'Tasks in Review' })).toBeVisible();
+  const actions = page.getByRole('button', { name: 'Project actions' });
+  await actions.focus();
+  await page.keyboard.press('Enter');
+  const item = page.getByRole('menuitem', { name: /^Create report/ });
+  await expect(item).toBeVisible();
+  await item.focus();
+  await page.keyboard.press('Enter');
+  const dialog = page.getByRole('dialog', { name: /Create a report: Website Revamp/ });
+  await expect(dialog).toBeVisible();
+  // pick another kind from the keyboard: Tab to it, Enter
+  const customer = dialog.getByRole('button', { name: /Customer update/ });
+  for (let i = 0; i < 6 && !(await customer.evaluate((el) => el === document.activeElement)); i++)
+    await page.keyboard.press('Tab');
+  await expect(customer).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(customer).toHaveAttribute('aria-pressed', 'true');
+  await expect(dialog.getByRole('region', { name: 'Report outline' })).toContainText('progress update');
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
+  await expect(actions).toBeFocused();
 });

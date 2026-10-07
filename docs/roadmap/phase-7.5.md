@@ -362,17 +362,64 @@ Prompts: `portfolio_brief/v1`, `dashboard_draft/v1`, `explain_chart/v1`, `handof
 
 ---
 
+## Phase 7.5 exit (2026-10-07)
+
+| Exit criterion | Result |
+|---|---|
+| Every slice done with its tests; `make check` green | **Met**: S75-00 to S75-13; backend 1004 passed, web 487 passed (97 files); ruff / mypy --strict / import contracts (incl. the `files` and `reports` contracts) / prettier / eslint / tsc clean |
+| e2e: J1–J19 green twice in a row (J15–J19 new) | **Met**: 26/26 twice in a row (6.4 min, 5.0 min) |
+| Mock evals: every new feature at 1.0; live-only cases written | **Met**: `momentum evals` 37 features, every one at 100% (new: file_qa, file_tables, file_vision, file_injection, report_narrative, portfolio_brief, nl_filters, dashboard_draft, explain_chart, readiness, handoff, catch_up, closeout); live-only cases in each new case file, run by the product owner (§ Live verification) |
+| UI audit and keyboard pass: 0 findings, new screens included | **Met**: 320 screens (showcase + onboarding seeds; Files tab, portfolio table / board / timeline / dashboard / reports, role dashboards, report dialog), 0 findings; keyboard pass 0 findings. Found on the way and fixed: H64 (upload 500, S75-01), H65 (report dialog focus) |
+| Performance budgets (spec §5.3, §7.6) met on the seeds | **Met**: portfolio table p95 0.046 s (< 0.3 s); 10-widget dashboard cold p95 0.40 s (< 1.5 s), slowest widget 0.20 s (< 0.4 s); reports 0.09–0.23 s each (S75-13 as built) |
+| Docs per CLAUDE.md §5 | **Met**: data model (0042–0045), events, settings, AI tools and prompts, design system, ADR-0011, INTEGRATION_GUIDE change log |
+| `momentum seed --onboarding` gives the full demo | **Met**: 40 customers, every role dashboard fills every widget with real numbers (`test_dashboards_v2.py`) |
+| Live verification list written | **Met**: § Live verification below |
+
+Not verified here (no gateway): the live-only eval cases, `llm-check` (incl. the new vision row) and the clicks in § Live verification. They are the product owner's, after pulling. Deferred: the Rules and Forms dialogs mount the same lazy way as the report dialog and should get the same focus-return check (handoff).
+
+---
+
 ## Live verification (for the product owner, after pulling)
 
-Fill in at S75-13. At minimum:
-1. `cd apps/api && uv sync && uv run momentum migrate` (0042–0044), then `uv run momentum seed --onboarding`, `uv run momentum snapshots backfill --days 180` and `uv run momentum llm-check` (vision row must pass).
-2. `uv run momentum evals --live --feature file_qa --feature file_tables --feature file_vision --feature file_injection --feature report_narrative --feature catch_up --feature nl_filters --feature dashboard_draft --feature portfolio_brief --feature explain_chart --feature handoff --feature closeout`. Every bucket must meet its live threshold. Fix findings with new prompt versions.
-3. Clicks:
-   - attach your own real files (an .xlsm with macros, a scanned contract, a screenshot, an Outlook .msg) to a task and ask Mo about each;
-   - generate every report kind and open each in Word, Excel and a PDF reader;
-   - sign in as each seed persona (Sofia, Dev, Lena, Ravi, Mei, Sam, Avery) and walk their pinned dashboard;
-   - drag a customer across a gated stage;
-   - ask Mo "brief me on onboarding" and "build me a dashboard for my implementations".
+Everything below was built and tested with mock AI. These steps check it against your real gateway, files and browsers. Tick each line; anything that fails goes back as a finding (a new prompt version for AI wording, a fix otherwise).
+
+**1. Set up (once)**
+- [ ] `git pull`, then `cd apps/api && uv sync` (new dependencies: openpyxl, xlrd, python-pptx, pdfplumber, pypdfium2, Pillow, oletools, extract-msg, striprtf, defusedxml, reportlab).
+- [ ] `uv run momentum migrate` (applies **0042–0045**).
+- [ ] `cd ../web && pnpm install && pnpm build` (or `make build`).
+- [ ] `cd ../api && uv run momentum llm-check`: every alias answers, and the **vision** row passes. If your gateway model can't take images, set `MOMENTUM_LLM_SUPPORTS_VISION=false` and re-run.
+- [ ] On a demo database only: `uv run momentum seed --onboarding` (40 customers, the lifecycle portfolio, the seven role dashboards pinned for each persona), then `uv run momentum snapshots backfill --days 180` (trend widgets).
+
+**2. Live evals** (`EVALS_LIVE=1` against your gateway; report in `reports/evals/`)
+- [ ] `uv run momentum evals --live --feature file_qa --feature file_tables --feature file_vision --feature file_injection --feature report_narrative --feature portfolio_brief --feature nl_filters --feature dashboard_draft --feature explain_chart --feature readiness --feature handoff --feature catch_up --feature closeout`
+- [ ] Every feature meets its live threshold in `momentum/ai/evals/thresholds.yaml` (0.85; file_tables, file_injection 1.0; nl_filters 0.9). Read the judge notes of any failed case before changing a prompt; add a new prompt version (`v2.md`) rather than editing `v1`.
+
+**3. Files and Mo (as Ravi)**
+- [ ] On a task, attach your own real files: an `.xlsm` with macros, a scanned contract PDF, a screenshot, an Outlook `.msg`, a Word document. Ask Mo about each from the task ("what does the macro do?", "total of column D by region", "is the contract signed?", "what does the screenshot say?").
+- [ ] Mo's numbers from a spreadsheet match what Excel shows; macros are described, never run; a password-protected file is reported as such.
+- [ ] A project's **Files** tab lists files across its tasks; upload a new version, then undo.
+
+**4. Reports**
+- [ ] From a customer project's menu, **Create report…**: make each kind (status, customer update, close-out, task export) in each format offered. Open every file in Word, Excel and a PDF reader: the numbers match the project, Mo's paragraphs are marked "AI-drafted, review before sending", and the customer update shows no task tagged `internal`.
+- [ ] From the Customer onboarding portfolio: a portfolio status in Excel and Word, and the Reports tab lists them with Download and Regenerate.
+- [ ] From a role dashboard: **Create report** (PDF).
+
+**5. Portfolios and dashboards (each persona)**
+- [ ] Sign in as each seed persona (Sofia, Dev, Lena, Ravi, Mei, Sam, Avery) and open their pinned dashboard on Home: every widget has real numbers, and clicking a mark opens the tasks or projects behind it.
+- [ ] On the portfolio **Board**, drag a Contracts customer into Implementation: the gate's checklist appears; with "Also let Mo read the files", Mo comments on the signed contract. **Move anyway**, then **Draft handoff to Implementation** and post it.
+- [ ] **Brief me** on the portfolio; "Post as status update…" shows a preview first.
+- [ ] Above the portfolio table, "Implementations going live in November that are at risk" → chips → Apply.
+- [ ] Dashboards → **New with Mo**: "A dashboard for my implementations: go-lives next 90 days, slipping projects, waiting on customer by age, RAID by severity" → preview with numbers → Create.
+- [ ] On any chart, **Explain**.
+
+**6. Catch me up, filters, smart tasks, close-out**
+- [ ] Leave a project; have someone else change a few things; come back and **Catch me up**. Home shows "While you were away" when more than 3 things changed.
+- [ ] On a project list, My Tasks and Search, "Describe what to show…" ("my overdue work tagged Escalated") → chips → Apply → the amber marker → Clear.
+- [ ] Quick add a task whose name resembles existing ones: the duplicate warning and the suggestions (with reasons) appear; nothing applies until you click.
+- [ ] Mark a project's status Complete (or archive it): the toast offers the close-out report; make it, then **Post as status update…**.
+
+**7. Sign-off**
+- [ ] Note any finding in STATUS (Open questions or a hardening register row) and tell the build session; Phase 7.6 starts from STATUS's "Next up".
 
 ## As built
 
@@ -403,6 +450,8 @@ Fill in at S75-13. At minimum:
 **S75-11 as built (2026-10-07).** No migration (`user_visits` came with 0044). **Visits:** `domain/visits/` (`record_visit`, `last_seen`; `PUT /visits`, D75-70). **Catch me up:** `ai/catch_up.py` (since = asked / last visit / 7 days, capped at 30; other people's visible activity grouped and counted, at most 150 events; no model call when nothing changed, D75-71), prompt `catch_up/v1` (alias `fast`), `POST /ai/catch-up`, `GET /ai/catch-up/pending`. **Plain-English filters:** `ai/nl_filters_tasks.py` (list / board / calendar, My Tasks, search; field conditions through the chart's resolution; asked back when unsupported, D75-72), `FieldCondDraft.contains`, prompt `filters/v2`, `POST /ai/filters` takes `project_id`. **Web:** `features/ai/CatchUp.tsx` (`useVisitBeacon` on Home, projects and portfolios; `CatchUpButton` in the project and portfolio headers; `WhileYouWereAway` on Home; the dialog), ⌘K "Catch me up" and "Catch me up on <project>"; `features/ai/AskFilters.tsx` in the list / board / calendar toolbar, My Tasks, Search and (refactored onto it) the portfolio table. **Evals (mock, 1.0):** `catch_up` 12 (nothing changed → no call; own changes aren't news; completed, reassigned, due, mention, new + status, private work never shows, Home, a portfolio stage change, another viewer; invented and uncited lines dropped) + 5 live; `nl_filters` 25 (13 portfolio, 12 task surfaces) + 7 live. **Tests:** `test_ai_catch_up.py` (4: visits debounced and checked; what others changed since my visit with no call when nothing did, my own changes not news, the mention, counts and cited lines with task links, outsiders refused; private work never shows and the window is capped at 30 days, 7 with no visit; the Home card past 3 changes), `test_ai_filters.py` (4: a list draft is the view's preferences (and saves as is), board sort and group, a project view needs its project; unresolvable tags and unsupported words / due asked back with options, a hidden project never named; the search params; relative dates in the viewer's timezone at 23:30 UTC on 31 October); web `catchUp.test.tsx` (2), `askFilters.test.tsx` (2), the portfolio tests on the shared component; **J19** parts 1–2 (Home's "While you were away" after Ana finishes four tasks, the project's Catch me up, then "only my overdue work" → chips → Apply → marker → Clear).
 
 **S75-12 as built (2026-10-07).** No migration. **Smart task creation:** `ai/task_suggestions.py` (no model call; D75-73), `POST /ai/task-suggestions`, `AiPrefs.task_suggestions`; web `features/tasks/TaskSuggestions.tsx` (`useTaskSuggestions`, `DuplicateWarning`, `SuggestionStrip`) in quick add, the add-task row and a new task's pane (D75-74); AI settings toggle. **Close-out:** `ai/closeout.py`, `POST /ai/projects/{id}/closeout-status`; web: the offer toast on archive and on a Complete status update (`lib/closeout.ts`), "Create close-out report…" in the project menu, the report dialog's `initialKind`, "Post as status update…" with the preview (D75-75). Eval `closeout` 10 mock (1.0) + 5 live. **Tests:** `test_task_suggestions.py` (4: every threshold exact on constructed data and one below each; disabled and agent assignees never suggested; duplicates are open tasks of the project, the completed one isn't, a private project's never are, and the title embedding finds a reworded duplicate trigram misses (0.587 < 0.6, cosine 1.0); off by preference, short titles empty), `test_ai_reports.py` (+1: the close-out status draft is complete, cited and marked, nothing written until posted, outsiders 404); web `smartTasks.test.tsx` (quick add: the duplicate, chips applied only when clicked, the tag set after creating), `reports.test.tsx` (+1: close-out from the menu, then the status preview and post); **J19 part 3** (five similar tasks of Mei's → quick add warns about the duplicate and suggests Mei → the new task is Mei's).
+
+**S75-13 as built (2026-10-07).** No migration. **J14** adds the portfolio Dashboard and Reports tabs, the Brief me dialog, the Create report dialog and Catch me up to axe (light and dark), and a keyboard test: the report dialog opened from the project ⋯ menu with the keyboard, filled, cancelled, focus back on the menu button. That test found **H65** (focus fell to the page body because the dialog mounts after the menu closes): `Dialog` takes an optional `returnFocus` ref, used by the report dialog. **`momentum llm-check`** gains a vision row (a red square sent as an image; the mock answers "Red"), so the product owner checks image input on the gateway before the vision evals. **Perf** script `tools/perf/phase75_perf.py` (portfolio rows and reports, in-process, as Ravi, mock AI). **Measured on the 40-customer onboarding seed** (this container, 2026-10-07): portfolio table, every built-in column, 30 requests: p50 0.038 s, **p95 0.046 s** (budget < 0.3 s; 40 projects, and the row count doesn't change the query count, S75-05); grouped by stage p95 0.045 s. **Dashboard** of 10 widgets (`dashboard_perf.py`), cold p50 0.36 s, **p95 0.40 s**, warm p95 0.10 s (budget < 1.5 s); slowest widget p95 0.20 s under 6-way concurrency (budget 0.4 s). **Reports**, request to finished file, 5 each, mock narrative: project status docx 0.12 s median (pdf 0.09 s), customer update docx 0.12 s, close-out docx 0.14 s, portfolio status xlsx 0.11 s, docx 0.23 s. **Docs:** `testing-strategy.md` (J15–J19, J14), `asana-vs-momentum.md` (files, portfolios, dashboards, reports, catch-up rows), `ai-architecture.md` (Phase 7.5 tools and prompts), `INTEGRATION_GUIDE.md` change log, § Live verification, the hardening register (H65), STATUS. **Gate:** see the exit table.
 
 ## The prompt for the build session
 

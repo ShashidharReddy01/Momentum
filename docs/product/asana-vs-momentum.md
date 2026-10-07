@@ -24,7 +24,10 @@
 | AI for planning | Project or template from a brief, conversational intake forms, goal check-in drafts, workload rebalancing, "ask for a chart" | — |
 | Completion forecasts | Likely finish dates with a range (Monte Carlo on your team's throughput), shown on the timeline and overview; 75% backtest accuracy | — |
 | Undo | Undo on every change, including AI changes | Limited |
-| Dashboards | Workspace and project dashboards; click any mark to open its tasks | Project dashboards on Starter |
+| Dashboards | Workspace, project and portfolio dashboards; role templates (sales to leadership), filters for one view, lifecycle funnel, time in stage and aging; click any mark to open its tasks; "New with Mo" from a sentence | Project dashboards on Starter |
+| Lifecycle portfolios | Projects grouped by a rule, a stage board with gates (required fields, milestones, files), project fields, slip and days-in-stage columns, saved views, bulk set | Portfolios on Advanced; no stage gates |
+| Reports | Status, customer update, close-out, portfolio, task export and dashboard reports as Word, Excel, PDF, Markdown or CSV, with Mo's cited summary marked for review | Exports to CSV; no generated documents |
+| Files | Every file in one place with versions; Mo reads Office files, PDFs (also scanned), spreadsheets (queries with exact numbers), emails and images, never running macros | Attachments only; no reading |
 | Approvals, forms, templates, milestones, dependencies, timeline | Included, with dependency-aware rescheduling | Mostly Starter; some limited |
 | Data and cost | Self-hosted in your Azure tenant, no per-seat fee, choice of AI provider (model aliases), export anytime, embeddable in other apps | Per-seat SaaS; data hosted by Asana |
 
@@ -51,9 +54,10 @@ What someone moving off Asana reaches for on their first days, feature by featur
 | Import from Asana | Have | Full, resumable, idempotent (S7.4.2) |
 | My Tasks with sections, Inbox, notifications | Have | |
 | Search with filters | Have | Incl. custom fields; saved searches: partial, see below |
-| Saved searches / reports | Partial | Dashboards with click-through to tasks cover reports (S6.5.1); a saved search list is not built. **Later** (post go-live feedback) |
+| Saved searches / reports | Have, more | Generated reports in five formats (Phase 7.5) and dashboards with click-through; saved portfolio views. A saved task-search list is not built: **Later** (post go-live feedback) |
 | Project overview, brief, status updates | Have | |
-| Portfolios, goals, workload, dashboards | Have | Asana Advanced features |
+| Portfolios, goals, workload, dashboards | Have, more | Asana Advanced features; Phase 7.5 adds lifecycle stages with gates, role dashboards and reports |
+| File versions and file search | Have | Phase 7.5: versions, a Files tab per project, search across files Mo can read |
 | Rules | Have | No monthly cap; plain-English rules |
 | Forms | Have | Public link, conversational intake |
 | Templates (project and task) | Have | |

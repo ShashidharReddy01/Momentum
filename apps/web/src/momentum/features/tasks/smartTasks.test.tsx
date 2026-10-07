@@ -85,7 +85,7 @@ describe('Smart task creation (S75-12)', () => {
     const dialog = await screen.findByRole('dialog', { name: 'New task' });
     await user.type(within(dialog).getByRole('textbox', { name: 'Task name' }), 'Prepare the press kit');
     const warning = await within(dialog).findByText(/Looks like T-123/);
-    expect(warning.closest('[role="status"]')).toHaveTextContent('(open, Mei Tanaka)');
+    expect(warning.closest('[role="status"]')).toHaveTextContent('(open, Mei Chen)');
     expect(within(dialog).getByRole('link', { name: 'Open' })).toHaveAttribute('href', '/task/t-dup');
     expect(asked.at(-1)).toMatchObject({ project_id: 'seed-1', title: 'Prepare the press kit' });
 

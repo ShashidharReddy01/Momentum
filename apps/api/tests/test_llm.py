@@ -718,6 +718,7 @@ async def test_llm_check_passes_in_mock_mode() -> None:
         "embeddings (search_document)",
         "embeddings (search_query)",
         "rerank",
+        "vision (image input)",  # Phase 7.5 (ADR-0011)
     }
     assert all(r.status == "pass" for r in results), render(results, [], header="")
 

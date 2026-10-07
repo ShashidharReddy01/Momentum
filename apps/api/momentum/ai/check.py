@@ -47,6 +47,8 @@ PING = [{"role": "user", "content": "Reply with the single word: pong"}]
 STREAM_PROMPT = [{"role": "user", "content": "Count from one to five in words, one per line."}]
 EMBED_TEXT = "Draft the pricing page copy for the website revamp"
 CATALOG = "tool schemas (catalog)"
+VISION = "vision (image input)"
+VISION_PROMPT = "What colour is this square? Reply with one word."
 RERANK = "rerank"
 RERANK_QUERY = "who is writing the pricing page text"
 RERANK_DOCS = [
@@ -72,6 +74,18 @@ class CheckResult:
 
 class _Fail(Exception):
     pass
+
+
+def _red_square() -> str:
+    """A 32x32 red PNG as a data URL (made here, so llm-check ships no binary)."""
+    import base64
+    import io
+
+    from PIL import Image
+
+    buf = io.BytesIO()
+    Image.new("RGB", (32, 32), (220, 30, 30)).save(buf, format="PNG")
+    return "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
 
 
 def check_ctx(llm: LLM) -> Ctx:
@@ -251,6 +265,31 @@ async def run_llm_check(llm: LLM) -> list[CheckResult]:
 
     results.append(await _timed("pricing", pricing))
 
+    async def vision() -> tuple[Status, str]:
+        """Phase 7.5 (ADR-0011): Mo's look_at sends images; a red square must read as red."""
+        if not llm.settings.llm_supports_vision:
+            return "warn", "off (MOMENTUM_LLM_SUPPORTS_VISION=false): look_at answers not_supported"
+        c = await llm.complete(
+            alias="default",
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": VISION_PROMPT},
+                        {"type": "image_url", "image_url": {"url": _red_square()}},
+                    ],
+                }
+            ],
+            feature=FEATURE,
+            ctx=ctx,
+            max_tokens=10,
+        )
+        if "red" not in c.text.lower():
+            return "warn", f"expected 'red', got {c.text.strip()[:40]!r}"
+        return "pass", f"{c.model}: read the test image"
+
+    results.append(await _timed(VISION, vision))
+
     async def rerank() -> tuple[Status, str]:
         order = await llm.rerank(
             RERANK_QUERY, RERANK_DOCS, top_n=len(RERANK_DOCS), feature=FEATURE, ctx=ctx
@@ -282,6 +321,12 @@ def recommendations(results: list[CheckResult]) -> list[str]:
                 "Streaming tool calls failed but non-streaming tool calls work: set "
                 "MOMENTUM_LLM_SUPPORTS_STREAMING_TOOLS=false (tool steps then run non-streaming)."
             )
+    seen = by_name.get(VISION)
+    if seen and seen.status == "fail" and "SUPPORTS_VISION" not in seen.detail:
+        recs.append(
+            "The model rejected an image: if it can't take image input, set "
+            "MOMENTUM_LLM_SUPPORTS_VISION=false (Mo then says it can't look at pictures)."
+        )
     if any(r.name.startswith("embeddings") and "dimension" in r.detail for r in results):
         recs.append(
             "Embedding dimension mismatch: fix MOMENTUM_LLM_EMBED_MODEL or MOMENTUM_LLM_EMBED_DIM "

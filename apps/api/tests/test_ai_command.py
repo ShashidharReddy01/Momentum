@@ -201,10 +201,17 @@ async def test_command_endpoint_streams_and_prefs(
     r = await ravi.post(f"/api/v1/ai/actions/{action_id}/apply", json={})
     assert r.status_code == 200 and r.json()["outcome"] == "applied"
 
-    assert (await ravi.get("/api/v1/ai/prefs")).json() == {"auto_apply_low_risk": False}
+    # S75-12 added task_suggestions (on by default); a PUT without it keeps the default
+    assert (await ravi.get("/api/v1/ai/prefs")).json() == {
+        "auto_apply_low_risk": False,
+        "task_suggestions": True,
+    }
     r = await ravi.put("/api/v1/ai/prefs", json={"auto_apply_low_risk": True})
     assert r.status_code == 200
-    assert (await ravi.get("/api/v1/ai/prefs")).json() == {"auto_apply_low_risk": True}
+    assert (await ravi.get("/api/v1/ai/prefs")).json() == {
+        "auto_apply_low_risk": True,
+        "task_suggestions": True,
+    }
     assert (await ravi.post("/api/v1/ai/command", json={"text": ""})).status_code == 422
 
 

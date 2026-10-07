@@ -60,7 +60,9 @@ export function ReportDialog({
   scope,
   name,
   initialKind,
+  returnFocus,
 }: {
+  returnFocus?: { current: HTMLElement | null };
   open: boolean;
   onOpenChange: (open: boolean) => void;
   scope: ReportScope;
@@ -73,6 +75,7 @@ export function ReportDialog({
       open={open}
       onOpenChange={onOpenChange}
       title={`Create a report: ${name}`}
+      returnFocus={returnFocus}
       className="top-[8vh] w-[min(820px,calc(100vw-32px))]"
     >
       {open ? (

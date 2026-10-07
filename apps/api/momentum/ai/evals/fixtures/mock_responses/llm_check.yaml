@@ -10,5 +10,7 @@ responses:
         arguments: {task: {key: T-12}, due_on: "2026-10-09"}
   - match: {contains: "count from one to five"}
     text: "(mock) one\ntwo\nthree\nfour\nfive"
+  - match: {contains: "what colour is this square"}
+    text: "(mock) Red"
 default:
   text: "(mock) pong"

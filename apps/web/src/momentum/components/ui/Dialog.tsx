@@ -13,6 +13,9 @@ export interface DialogProps {
   children: ReactNode;
   className?: string;
   hideTitle?: boolean;
+  /** Where focus goes when the dialog closes (a dialog opened from a menu item: the menu's
+   * button, since the item itself is gone). Default: back to what had focus before. */
+  returnFocus?: { current: HTMLElement | null };
 }
 
 export function Dialog({
@@ -23,6 +26,7 @@ export function Dialog({
   children,
   className,
   hideTitle,
+  returnFocus,
 }: DialogProps) {
   const container = usePortalContainer();
   return (
@@ -31,6 +35,11 @@ export function Dialog({
         <D.Overlay className="fixed inset-0 z-40 bg-ink/25 data-[state=open]:animate-[m-fade-in_var(--dur-2)_var(--ease)]" />
         <D.Content
           aria-describedby={description ? undefined : undefined}
+          onCloseAutoFocus={(e) => {
+            if (!returnFocus?.current) return;
+            e.preventDefault();
+            returnFocus.current.focus();
+          }}
           className={cn(
             'fixed left-1/2 top-[14vh] z-50 max-h-[calc(100dvh-16vh)] w-[min(560px,calc(100vw-32px))] -translate-x-1/2 overflow-auto rounded-xl bg-surface shadow-pop data-[state=open]:animate-[m-sheet-in_var(--dur-3)_var(--ease)]',
             className,
