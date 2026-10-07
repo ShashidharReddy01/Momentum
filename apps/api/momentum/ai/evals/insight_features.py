@@ -10,9 +10,10 @@ have cited, the numbers it could use, and whether a model call happened at all.
 from __future__ import annotations
 
 import uuid
+from datetime import timedelta
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from momentum.ai import dashboard_draft, explain_chart, handoff, nl_filters, portfolio_brief
@@ -26,8 +27,10 @@ from momentum.domain.dashboards.models import Dashboard, DashboardWidget
 from momentum.domain.fields.models import FieldDef
 from momentum.domain.portfolios.models import Portfolio
 from momentum.domain.portfolios.rows import ViewSpec, portfolio_rows_v2
+from momentum.reports.data import today_for
 
 INSIGHT_FEATURES = (
+    "catch_up",
     "portfolio_brief",
     "nl_filters",
     "dashboard_draft",
@@ -106,12 +109,25 @@ async def run_insight(
             "facts_numbers": sorted(numbers_in(b.facts)),
         }
         _cited(obs.data, [c for i in b.items for c in i.cites], portfolio_brief.citables(b.facts))
+    elif feature == "catch_up":
+        await _catch_up(session, llm, world, case, ctx, obs, p)
     elif feature == "nl_filters":
-        d = await nl_filters.draft_filters(session, llm, ctx, inp, "portfolio", portfolio_id=p.id)
+        surface = case.get("surface", "portfolio")
+        d = await nl_filters.draft_filters(
+            session,
+            llm,
+            ctx,
+            inp,
+            surface,
+            portfolio_id=p.id if surface == "portfolio" else None,
+            project_id=world.projects[case.get("project", "Launch Plan")]
+            if surface in ("list", "board", "calendar")
+            else None,
+        )
         obs.clarified = d.question is not None
         obs.text = d.question or "\n".join(c.label for c in d.chips)
         obs.data = {"filters": d.named, "question": d.question, "options": d.options}
-        if d.filters and not d.question:  # the filters run: how many projects they keep
+        if d.filters and not d.question and surface == "portfolio":  # how many projects remain
             rows = await portfolio_rows_v2(session, ctx, p, ViewSpec(filters=d.filters))
             obs.data["rows"] = len(rows.rows)
     elif feature == "dashboard_draft":
@@ -184,3 +200,90 @@ async def run_insight(
             "facts_numbers": sorted(numbers_in(h.facts)),
         }
         _cited(obs.data, [c for i in items for c in i.cites], handoff.citables(h.facts))
+
+
+async def _act(
+    session: AsyncSession, world: EvalWorld, ctx: Ctx, action: dict[str, Any], p: Portfolio
+) -> None:
+    """One change by someone else, inside the case (rolled back afterwards)."""
+    from momentum.ai.tools.write_tools import text_doc
+    from momentum.domain.comments.service import create_comment
+    from momentum.domain.fields.project_values import set_project_field_value
+    from momentum.domain.status_updates.schemas import StatusUpdateIn
+    from momentum.domain.status_updates.service import create_status_update
+    from momentum.domain.tasks import service as tasks
+
+    who = world.ctx(action["as"], ctx.settings)
+    kind = action["do"]
+    tid = world.task_ids.get(action.get("task", ""))
+    if kind == "complete":
+        assert tid is not None
+        await tasks.set_completed(session, who, tid, True)
+    elif kind == "create":
+        await tasks.create_task(session, who, world.projects[action["project"]], action["title"])
+    elif kind == "assign":
+        assert tid is not None
+        await tasks.update_task(session, who, tid, {"assignee_id": world.users[action["to"]].id})
+    elif kind == "due":
+        assert tid is not None
+        day = today_for(ctx) + timedelta(days=int(action["days"]))
+        await tasks.update_task(session, who, tid, {"due_on": day})
+    elif kind in ("comment", "mention"):
+        assert tid is not None
+        body: dict[str, Any] = text_doc(action.get("text", "A note on this."))
+        if kind == "mention":
+            target = world.users[action["to"]]
+            body["content"][0]["content"].append(
+                {
+                    "type": "mention",
+                    "attrs": {"kind": "user", "id": str(target.id), "label": target.name},
+                }
+            )
+        await create_comment(session, who, tid, body)
+    elif kind == "status":
+        await create_status_update(
+            session,
+            who,
+            world.projects[action["project"]],
+            StatusUpdateIn(status=action.get("status", "at_risk"), title=action["title"]),
+        )
+    elif kind == "stage":
+        pid = await customer_in(session, who, p, action["customer_in"])
+        assert p.stage_field_id is not None
+        await set_project_field_value(
+            session, who, pid, p.stage_field_id, await _stage_option(session, p, action["to"])
+        )
+
+
+async def _catch_up(
+    session: AsyncSession,
+    llm: LLM,
+    world: EvalWorld,
+    case: dict[str, Any],
+    ctx: Ctx,
+    obs: Any,
+    p: Portfolio,
+) -> None:
+    """S75-11: changes made in the case by others, then the catch-up as the case's person. The
+    window starts at this transaction's own time, so the eval workspace's setup isn't news."""
+    from momentum.ai import catch_up
+
+    since = (await session.execute(select(func.now()))).scalar_one()
+    for action in case.get("actions", []):
+        await _act(session, world, ctx, action, p)
+    scope = case.get("scope", "project")
+    scope_id: uuid.UUID | None = None
+    if scope == "project":
+        scope_id = world.projects[case.get("project", "Launch Plan")]
+    elif scope == "portfolio":
+        scope_id = p.id
+    c = await catch_up.catch_up(session, llm, ctx, scope, scope_id, since=since)
+    obs.text = "\n".join(line.text for line in c.lines)
+    data = c.facts.as_data(ctx)
+    obs.data = {
+        "paragraphs": len(c.lines),
+        "ai": c.ai,
+        "counts": c.facts.counts,
+        "facts_numbers": sorted(numbers_in(data)),
+    }
+    _cited(obs.data, [x for line in c.lines for x in line.cites], catch_up.citables(c.facts))

@@ -30,6 +30,7 @@ import {
   type PortfolioRow,
   type StatusUpdateIn,
 } from './queries';
+import { CatchUpButton, useVisitBeacon } from '@/features/ai';
 import { BriefButton } from './MoPortfolio';
 import { PortfolioBoard } from './PortfolioBoard';
 
@@ -93,6 +94,7 @@ function PortfolioBody({ p }: { p: PortfolioDetail }) {
   const m = usePortfolioMutations(p.id);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
+  useVisitBeacon('portfolio', p.id); // S75-11: when you last looked, for Catch me up
 
   return (
     <div className="mx-auto max-w-7xl space-y-5 px-4 py-6 md:px-8">
@@ -113,6 +115,7 @@ function PortfolioBody({ p }: { p: PortfolioDetail }) {
         {p.can_edit && p.kind === 'manual' ? (
           <AddProject p={p} onAdd={(id) => m.addProject.mutate(id)} />
         ) : null}
+        <CatchUpButton scope="portfolio" scopeId={p.id} name={p.name} />
         <BriefButton portfolioId={p.id} portfolioName={p.name} />
         {p.can_edit ? (
           <Button size="sm" variant="ghost" onClick={() => setReportOpen(true)}>

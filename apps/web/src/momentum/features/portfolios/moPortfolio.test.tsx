@@ -183,7 +183,7 @@ describe('Mo on a portfolio (S75-10)', () => {
     await waitFor(() =>
       expect(rowUrls.some((u) => decodeURIComponent(u).includes('"stage":["s-impl"]'))).toBe(true),
     );
-    await user.click(screen.getByRole('button', { name: 'Clear' }));
+    await user.click(screen.getByRole('button', { name: "Clear Mo's filters" }));
     await waitFor(() => expect(screen.queryByText('Filtered with Mo')).toBeNull());
   });
 

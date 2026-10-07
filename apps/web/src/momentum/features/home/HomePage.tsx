@@ -1,3 +1,4 @@
+import { useVisitBeacon, WhileYouWereAway } from '@/features/ai';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   ArrowRight,
@@ -84,6 +85,8 @@ function HomeBody() {
 }
 
 function HomeContent() {
+  const nav = useTaskNav()!;
+  useVisitBeacon('home'); // S75-11: when you last looked, for "While you were away"
   const me = useMe();
   const home = useHome();
   const [newProject, setNewProject] = useState(false);
@@ -130,6 +133,12 @@ function HomeContent() {
           </>
         ) : null}
       </p>
+
+      {home.data?.has_projects ? (
+        <div className="mt-4">
+          <WhileYouWereAway onOpenTask={(id) => nav.open(id)} />
+        </div>
+      ) : null}
 
       {home.data && (home.data.has_projects || home.data.priorities.length) ? (
         <OnboardingChecklist onNewProject={() => setNewProject(true)} />

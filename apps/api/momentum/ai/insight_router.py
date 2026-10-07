@@ -2,16 +2,18 @@
 the person and stores nothing: posting a brief or a handoff goes through the normal status-update
 endpoints after the preview, and a drafted dashboard through ``POST /dashboards/from-draft``.
 
-S75-11 adds the other plain-English filter surfaces and Catch me up here."""
+S75-11 adds the task surfaces of the plain-English filters and Catch me up."""
 
 from __future__ import annotations
 
 import uuid
+from datetime import UTC, datetime
 from typing import Any, Literal
 
 from fastapi import APIRouter
 from pydantic import BaseModel, ConfigDict, Field
 
+from momentum.ai import catch_up as catch_up_ai
 from momentum.ai import dashboard_draft, explain_chart, handoff, nl_filters, portfolio_brief
 from momentum.ai import readiness_check as readiness_ai
 from momentum.ai.router import require_llm
@@ -81,6 +83,7 @@ class FiltersIn(BaseModel):
     text: str = Field(min_length=1, max_length=nl_filters.MAX_TEXT)
     surface: nl_filters.Surface
     portfolio_id: uuid.UUID | None = None
+    project_id: uuid.UUID | None = Field(default=None, description="list / board / calendar")
 
 
 class ChipOut(BaseModel):
@@ -106,7 +109,13 @@ async def ai_filters(body: FiltersIn, ctx: CtxDep, uow: UowDep, rt: RuntimeDep) 
     ctx = ctx.with_(via="ai")
     async with uow.transaction() as s:
         d = await nl_filters.draft_filters(
-            s, llm, ctx, body.text, body.surface, portfolio_id=body.portfolio_id
+            s,
+            llm,
+            ctx,
+            body.text,
+            body.surface,
+            portfolio_id=body.portfolio_id,
+            project_id=body.project_id,
         )
     return FilterDraftOut(
         surface=d.surface,
@@ -353,4 +362,95 @@ async def ai_handoff(
         },
         files_read=h.files_read,
         status_update=h.status_update(),
+    )
+
+
+# ---------------- catch me up (S75-11) ----------------
+
+
+class CatchUpIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    scope: Literal["home", "project", "portfolio"]
+    scope_id: uuid.UUID | None = None
+    since: datetime | None = Field(
+        default=None, description="Default: your last visit (at most 30 days back; 7 with none)"
+    )
+
+
+class CatchUpLineOut(BaseModel):
+    text: str
+    cites: list[str]
+    task_ids: list[uuid.UUID] = Field(description="The tasks the line cites, to open")
+
+
+class CatchUpOut(BaseModel):
+    scope: str
+    since: datetime
+    total: int = Field(description="Changes by others since then (at most 150 counted)")
+    counts: dict[str, int]
+    nothing_changed: bool
+    lines: list[CatchUpLineOut]
+    ai: bool = Field(description="False when nothing changed (no model call)")
+
+
+class CatchUpPendingOut(BaseModel):
+    since: datetime
+    total: int
+    counts: dict[str, int]
+    show_card: bool = Field(description="Home: more than 3 changes, worth the card")
+
+
+@router.post(
+    "/catch-up",
+    response_model=CatchUpOut,
+    summary="Catch me up on Home, a project or a portfolio since my last visit (stores nothing)",
+)
+async def ai_catch_up(body: CatchUpIn, ctx: CtxDep, uow: UowDep, rt: RuntimeDep) -> CatchUpOut:
+    ctx = ctx.with_(via="ai")
+    async with uow.transaction() as s:
+        now = datetime.now(UTC)
+        since = await catch_up_ai.resolve_since(s, ctx, body.scope, body.scope_id, body.since, now)
+        facts = await catch_up_ai.gather(s, ctx, body.scope, body.scope_id, since, now)
+        if facts.total == 0:  # nothing new: answer without the model (or a gateway)
+            c = catch_up_ai.CatchUp(facts, [], ai=False)
+        else:
+            c = await catch_up_ai.catch_up(
+                s, require_llm(rt), ctx, body.scope, body.scope_id, since=since, now=now
+            )
+    return CatchUpOut(
+        scope=c.facts.scope,
+        since=c.facts.since,
+        total=c.facts.total,
+        counts=c.facts.counts,
+        nothing_changed=c.nothing_changed,
+        lines=[
+            CatchUpLineOut(
+                text=line.text,
+                cites=line.cites,
+                task_ids=[c.facts.task_ids[k] for k in line.cites if k in c.facts.task_ids],
+            )
+            for line in c.lines
+        ],
+        ai=c.ai,
+    )
+
+
+@router.get(
+    "/catch-up/pending",
+    response_model=CatchUpPendingOut,
+    summary="How much changed since my last visit (counts only, no model call)",
+)
+async def ai_catch_up_pending(
+    ctx: CtxDep,
+    uow: UowDep,
+    scope: Literal["home", "project", "portfolio"] = "home",
+    scope_id: uuid.UUID | None = None,
+) -> CatchUpPendingOut:
+    async with uow.transaction() as s:
+        facts = await catch_up_ai.pending(s, ctx, scope, scope_id)
+    return CatchUpPendingOut(
+        since=facts.since,
+        total=facts.total,
+        counts=facts.counts,
+        show_card=facts.total > catch_up_ai.HOME_CARD_MIN,
     )

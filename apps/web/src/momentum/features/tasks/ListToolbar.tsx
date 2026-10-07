@@ -10,6 +10,7 @@ import {
 } from '@/components/ui/DropdownMenu';
 import { Icon } from '@/components/ui/Icon';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/Popover';
+import { AskFilters, type FilterDraft } from '@/features/ai';
 import { FieldFilterChips, FieldFilterSection, type Field } from '@/features/fields';
 import { LIST_GROUPABLE } from '@/features/fields';
 import { usePeople } from '@/features/people';
@@ -36,13 +37,19 @@ export function ListToolbar({
   onChange,
   fields = [],
   filtersOnly = false,
+  ask,
 }: {
   view: ListView;
   onChange: (v: ListView) => void;
   fields?: readonly Field[];
   /** Board and calendar: filters only (sort, group and completed are the list's). */
   filtersOnly?: boolean;
+  /** S75-11: "Describe what to show…" for this project view (Mo drafts, you Apply). */
+  ask?: { surface: 'list' | 'board' | 'calendar'; projectId: string };
 }) {
+  // the view Mo's filters produced: the amber marker stays until the filters are edited
+  const [mo, setMo] = useState<{ draft: FilterDraft; view: ListView; before: ListView } | null>(null);
+  const applied = mo && JSON.stringify(mo.view) === JSON.stringify(view) ? mo.draft : null;
   const n = filterCount(view);
   const sortLabels = {
     ...SORT_LABEL,
@@ -56,6 +63,22 @@ export function ListToolbar({
   } as Record<GroupKey, string>;
   return (
     <>
+      {ask ? (
+        <AskFilters
+          surface={ask.surface}
+          projectId={ask.projectId}
+          applied={applied}
+          onApply={(d) => {
+            const next = { ...view, ...(d.filters as Partial<ListView>) };
+            setMo({ draft: d, view: next, before: view });
+            onChange(next);
+          }}
+          onClear={() => {
+            if (mo) onChange(mo.before);
+            setMo(null);
+          }}
+        />
+      ) : null}
       <div role="toolbar" aria-label="List view options" className="mb-3 flex flex-wrap items-center gap-1">
         <FilterPopover view={view} onChange={onChange} fields={fields}>
           <Button size="sm" variant={n ? 'ghost' : 'text'} className={cn(n > 0 && 'text-ink')}>

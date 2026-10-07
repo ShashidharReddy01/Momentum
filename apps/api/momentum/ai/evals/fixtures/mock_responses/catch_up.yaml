@@ -1,0 +1,12 @@
+# Phase 7.5 S75-11 "Catch me up" (mock). The user message holds what others changed since the last
+# visit as data and a "Citable:" line; {{$cites}} cites its first entries. One line invents a
+# number and one cites nothing: the server must drop both.
+default:
+  tool_calls:
+    - name: submit_result
+      arguments:
+        lines:
+          - {text: "(mock) What needs you: {{$cites}}.", cites: ["{{$cites}}"]}
+          - {text: "(mock) Everything else that changed: {{$cites}}.", cites: ["{{$cites}}"]}
+          - {text: "(mock) 987654 tasks moved while you were away.", cites: ["{{$cites}}"]}
+          - {text: "(mock) This line cites nothing and is dropped.", cites: []}

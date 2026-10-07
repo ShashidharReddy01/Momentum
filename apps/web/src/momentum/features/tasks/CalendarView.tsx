@@ -1,3 +1,4 @@
+import { useMomentumConfig } from '@/lib/config';
 import {
   DndContext,
   PointerSensor,
@@ -94,6 +95,7 @@ export function CalendarView({
   useChannel(`project:${projectId}`, (event) => applyRealtimeEvent(qc, event, { projectId }));
   const open = useProjectTasks(projectId);
   const filter = useTaskFilter(projectId);
+  const { ai_enabled: aiEnabled } = useMomentumConfig();
   const { keep } = filter;
   const sections = useSections(projectId);
   const people = usePeople('', 'all').data;
@@ -205,7 +207,13 @@ export function CalendarView({
     <div ref={containerRef} className="flex h-full min-h-0 gap-4" onKeyDown={onKeyDown}>
       <DndContext sensors={sensors} onDragEnd={onDragEnd}>
         <div className="flex min-w-0 flex-1 flex-col">
-          <ListToolbar view={filter.view} onChange={filter.setView} fields={filter.fields} filtersOnly />
+          <ListToolbar
+            view={filter.view}
+            onChange={filter.setView}
+            fields={filter.fields}
+            filtersOnly
+            ask={aiEnabled ? { surface: 'calendar', projectId } : undefined}
+          />
           <div className="mb-3 flex items-center gap-2">
             <IconButton
               icon={ChevronLeft}

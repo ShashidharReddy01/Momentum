@@ -56,6 +56,11 @@ export function homeHandlers(base = '', initial: Partial<HomeOut> = {}) {
   const completed: string[] = [];
   const handlers = [
     http.get(`*${base}/api/v1/home`, () => HttpResponse.json(state)),
+    // S75-11: "While you were away" (nothing new by default) and the visit beacon
+    http.get(`*${base}/api/v1/ai/catch-up/pending`, () =>
+      HttpResponse.json({ since: new Date().toISOString(), total: 0, counts: {}, show_card: false }),
+    ),
+    http.put(`*${base}/api/v1/visits`, () => HttpResponse.json({ last_seen_at: new Date().toISOString() })),
     http.post(`*${base}/api/v1/tasks/:id/complete`, ({ params }) => {
       const t = state.priorities.find((x) => x.id === params.id);
       if (!t) return undefined; // not a Home task: let other handlers answer

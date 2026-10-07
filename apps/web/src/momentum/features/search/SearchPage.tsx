@@ -1,3 +1,5 @@
+import { AskFilters, type FilterDraft } from '@/features/ai';
+import { useMomentumConfig } from '@/lib/config';
 import {
   Paperclip,
   FolderKanban,
@@ -85,6 +87,31 @@ function SearchPageBody() {
     setParam('type', set.size === TYPES.length || set.size === 0 ? null : [...set].join(','));
   };
 
+  // S75-11: "Describe what to show…": Mo drafts the search params; Apply sets them
+  const { ai_enabled: aiEnabled } = useMomentumConfig();
+  const [mo, setMo] = useState<{ draft: FilterDraft; key: string; before: string } | null>(null);
+  const applied = mo && mo.key === params.toString() ? mo.draft : null;
+  const applyMo = (d: FilterDraft) => {
+    const f = d.filters as {
+      q?: string;
+      type?: string[];
+      project_id?: string;
+      assignee_id?: string;
+      completed?: boolean;
+      field?: string[];
+    };
+    const next = new URLSearchParams();
+    if (f.q) next.set('q', f.q);
+    if (f.type?.length) next.set('type', f.type.join(','));
+    if (f.project_id) next.set('project_id', f.project_id);
+    if (f.assignee_id) next.set('assignee_id', f.assignee_id);
+    if (f.completed !== undefined) next.set('completed', String(f.completed));
+    (f.field ?? []).forEach((x) => next.append('field', x));
+    setMo({ draft: d, key: next.toString(), before: params.toString() });
+    setQ(f.q ?? '');
+    setParams(next, { replace: true });
+  };
+
   const submitQuery = (e: FormEvent) => {
     e.preventDefault();
     setParam('q', q || null);
@@ -106,6 +133,21 @@ function SearchPageBody() {
           <Icon icon={SearchIcon} size={20} /> Search
         </h1>
 
+        {aiEnabled ? (
+          <AskFilters
+            surface="search"
+            applied={applied}
+            onApply={applyMo}
+            onClear={() => {
+              if (mo) {
+                const before = new URLSearchParams(mo.before);
+                setQ(before.get('q') ?? '');
+                setParams(before, { replace: true });
+              }
+              setMo(null);
+            }}
+          />
+        ) : null}
         <form onSubmit={submitQuery} className="mb-3">
           <input
             value={q}

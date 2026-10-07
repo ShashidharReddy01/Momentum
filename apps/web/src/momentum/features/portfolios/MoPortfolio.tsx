@@ -1,14 +1,13 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, Check, X } from 'lucide-react';
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
 import { MoMark } from '@/components/common/MoMark';
 import { Button } from '@/components/ui/Button';
 import { Dialog } from '@/components/ui/Dialog';
 import { Icon } from '@/components/ui/Icon';
-import { Input } from '@/components/ui/Input';
 import { Skeleton } from '@/components/ui/Skeleton';
-import { errorText } from '@/features/ai';
+import { AskFilters, errorText, type FilterDraft } from '@/features/ai';
 import { usePostStatus } from '@/features/status';
 import type { components } from '@/lib/api/schema';
 import { useApi } from '@/providers/api';
@@ -20,7 +19,7 @@ import type { ViewFilters } from './v2queries';
  * only on Apply. Mo's text carries the amber mark. */
 
 export type Brief = components['schemas']['BriefOut'];
-export type FilterDraft = components['schemas']['FilterDraftOut'];
+export type { FilterDraft };
 export type ReadinessCheck = components['schemas']['ReadinessCheckOut'];
 export type Handoff = components['schemas']['HandoffOut'];
 type StatusUpdateIn = components['schemas']['StatusUpdateIn'];
@@ -187,89 +186,15 @@ export function AskPortfolio({
   applied: FilterDraft | null;
   onApply: (d: FilterDraft | null) => void;
 }) {
-  const api = useApi();
-  const [text, setText] = useState('');
-  const ask = useMutation({
-    mutationFn: async (t: string) =>
-      (
-        await api.POST('/api/v1/ai/filters', {
-          body: { text: t, surface: 'portfolio', portfolio_id: portfolioId },
-        })
-      ).data!,
-  });
-  const draft = ask.data && !ask.data.question ? ask.data : null;
-  const submit = (e: FormEvent) => {
-    e.preventDefault();
-    if (text.trim()) ask.mutate(text.trim());
-  };
-  if (applied)
-    return (
-      <div className="flex flex-wrap items-center gap-1.5 text-xs" role="status">
-        <span className="flex items-center gap-1 font-medium text-amber-ink">
-          <MoMark size={12} /> Filtered with Mo
-        </span>
-        {applied.chips.map((c) => (
-          <span key={c.key} className="rounded-full border border-hairline bg-surface-2 px-2 py-0.5">
-            {c.label}
-          </span>
-        ))}
-        <Button size="sm" variant="text" onClick={() => onApply(null)}>
-          Clear
-        </Button>
-      </div>
-    );
   return (
-    <div className="space-y-1.5">
-      <form onSubmit={submit} className="flex items-center gap-2">
-        <MoMark size={13} />
-        <Input
-          aria-label="Ask the portfolio"
-          placeholder="Describe what to show…"
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          className="h-8 max-w-md"
-          maxLength={300}
-        />
-        <Button size="sm" variant="ai" type="submit" loading={ask.isPending} disabled={!text.trim()}>
-          Ask
-        </Button>
-      </form>
-      {ask.isError ? <AiError error={ask.error} /> : null}
-      {ask.data?.question ? (
-        <p className="text-sm text-amber-ink" role="status">
-          {ask.data.question}
-          {ask.data.options?.length ? (
-            <span className="block text-xs text-muted">Options: {ask.data.options.join(', ')}</span>
-          ) : null}
-        </p>
-      ) : null}
-      {draft ? (
-        <div className="flex flex-wrap items-center gap-1.5 text-xs" aria-label="Mo's filters">
-          {draft.chips.map((c) => (
-            <span
-              key={c.key}
-              className="rounded-full border border-amber bg-amber-2 px-2 py-0.5 text-amber-ink"
-            >
-              {c.label}
-            </span>
-          ))}
-          <Button
-            size="sm"
-            variant="primary"
-            onClick={() => {
-              onApply(draft);
-              ask.reset();
-              setText('');
-            }}
-          >
-            Apply
-          </Button>
-          <Button size="sm" variant="text" onClick={() => ask.reset()}>
-            Cancel
-          </Button>
-        </div>
-      ) : null}
-    </div>
+    <AskFilters
+      surface="portfolio"
+      portfolioId={portfolioId}
+      applied={applied}
+      onApply={onApply}
+      onClear={() => onApply(null)}
+      label="Ask the portfolio"
+    />
   );
 }
 

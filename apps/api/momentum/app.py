@@ -75,6 +75,7 @@ def _api_router(settings: Settings) -> APIRouter:
     from momentum.domain.templates.router import router as templates_router
     from momentum.domain.users.router import dev_router
     from momentum.domain.users.router import router as users_router
+    from momentum.domain.visits.router import router as visits_router
     from momentum.domain.workload.router import router as workload_router
     from momentum.domain.workspace.router import router as workspace_router
     from momentum.integrations.asana_import.router import router as asana_router
@@ -116,6 +117,7 @@ def _api_router(settings: Settings) -> APIRouter:
     api.include_router(undo_router)
     api.include_router(ai_router)
     api.include_router(ai_insight_router)
+    api.include_router(visits_router)
     api.include_router(ai_templates_router)
     api.include_router(agents_install_router)
     api.include_router(agents_router)

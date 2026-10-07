@@ -27,5 +27,30 @@ responses:
     tool_calls: [{name: submit_result, arguments: {name_contains: Harbor}}]
   - match: {contains: "by vendor tier"}
     tool_calls: [{name: submit_result, arguments: {fields: [{field: "Vendor tier", is_any: [Gold]}]}}]
+  # S75-11: the task surfaces
+  - match: {contains: "only my overdue work"}
+    tool_calls: [{name: submit_result, arguments: {people: [me], due: overdue}}]
+  - match: {contains: "my overdue tasks tagged escalated"}
+    tool_calls: [{name: submit_result, arguments: {people: [me], due: overdue, tags: [Escalated]}}]
+  - match: {contains: "unassigned work with high risk"}
+    tool_calls: [{name: submit_result, arguments: {people: [unassigned], fields: [{field: Risk, is_any: [High]}]}}]
+  - match: {contains: "what ana has due this week"}
+    tool_calls: [{name: submit_result, arguments: {people: [Ana], due: this_week}}]
+  - match: {contains: "everything including done, sorted by due date"}
+    tool_calls: [{name: submit_result, arguments: {show_completed: true, sort: due, group: assignee}}]
+  - match: {contains: "tasks tagged urgent-ish"}
+    tool_calls: [{name: submit_result, arguments: {tags: [urgent-ish]}}]
+  - match: {contains: "anything that mentions dataco"}
+    tool_calls: [{name: submit_result, arguments: {words: DataCo}}]
+  - match: {contains: "where the vendor is dataco"}
+    tool_calls: [{name: submit_result, arguments: {show_completed: true, fields: [{field: Vendor, contains: DataCo}]}}]
+  - match: {contains: "only my overdue ones"}
+    tool_calls: [{name: submit_result, arguments: {due: overdue}}]
+  - match: {contains: "search contract in launch plan assigned to ana"}
+    tool_calls: [{name: submit_result, arguments: {words: contract, project: "Launch Plan", people: [Ana]}}]
+  - match: {contains: "finished tasks and comments about pricing"}
+    tool_calls: [{name: submit_result, arguments: {words: pricing, completed: completed, types: [task, comment]}}]
+  - match: {contains: "search ideas in secret roadmap"}
+    tool_calls: [{name: submit_result, arguments: {words: ideas, project: "Secret Roadmap"}}]
 default:
   tool_calls: [{name: submit_result, arguments: {question: "(mock) What should the view show?"}}]

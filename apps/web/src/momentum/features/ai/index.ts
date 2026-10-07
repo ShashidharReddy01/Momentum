@@ -31,3 +31,5 @@ export {
 } from './useMoRuns';
 export { contextScreen, suggestionsFor } from './suggestions';
 export { looksLikeInstruction } from './intent';
+export { AskFilters, type FilterDraft, type FilterSurface } from './AskFilters';
+export { CatchUpButton, CatchUpDialog, useVisitBeacon, WhileYouWereAway } from './CatchUp';

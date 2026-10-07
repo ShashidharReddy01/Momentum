@@ -399,6 +399,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/ai/catch-up": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Catch me up on Home, a project or a portfolio since my last visit (stores nothing) */
+        post: operations["ai_catch_up_api_v1_ai_catch_up_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ai/catch-up/pending": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** How much changed since my last visit (counts only, no model call) */
+        get: operations["ai_catch_up_pending_api_v1_ai_catch_up_pending_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/ai/chat": {
         parameters: {
             query?: never;
@@ -4007,6 +4041,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/visits": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** I looked at Home, a project or a portfolio (at most one write per 5 minutes) */
+        put: operations["put_visit_api_v1_visits_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/workload": {
         parameters: {
             query?: never;
@@ -5173,6 +5224,80 @@ export interface components {
             /** Updated */
             updated: number;
         };
+        /** CatchUpIn */
+        CatchUpIn: {
+            /**
+             * Scope
+             * @enum {string}
+             */
+            scope: "home" | "project" | "portfolio";
+            /** Scope Id */
+            scope_id?: string | null;
+            /**
+             * Since
+             * @description Default: your last visit (at most 30 days back; 7 with none)
+             */
+            since?: string | null;
+        };
+        /** CatchUpLineOut */
+        CatchUpLineOut: {
+            /** Cites */
+            cites: string[];
+            /**
+             * Task Ids
+             * @description The tasks the line cites, to open
+             */
+            task_ids: string[];
+            /** Text */
+            text: string;
+        };
+        /** CatchUpOut */
+        CatchUpOut: {
+            /**
+             * Ai
+             * @description False when nothing changed (no model call)
+             */
+            ai: boolean;
+            /** Counts */
+            counts: {
+                [key: string]: number;
+            };
+            /** Lines */
+            lines: components["schemas"]["CatchUpLineOut"][];
+            /** Nothing Changed */
+            nothing_changed: boolean;
+            /** Scope */
+            scope: string;
+            /**
+             * Since
+             * Format: date-time
+             */
+            since: string;
+            /**
+             * Total
+             * @description Changes by others since then (at most 150 counted)
+             */
+            total: number;
+        };
+        /** CatchUpPendingOut */
+        CatchUpPendingOut: {
+            /** Counts */
+            counts: {
+                [key: string]: number;
+            };
+            /**
+             * Show Card
+             * @description Home: more than 3 changes, worth the card
+             */
+            show_card: boolean;
+            /**
+             * Since
+             * Format: date-time
+             */
+            since: string;
+            /** Total */
+            total: number;
+        };
         /** ChartAskIn */
         ChartAskIn: {
             /**
@@ -6298,10 +6423,15 @@ export interface components {
             /** Portfolio Id */
             portfolio_id?: string | null;
             /**
-             * Surface
-             * @constant
+             * Project Id
+             * @description list / board / calendar
              */
-            surface: "portfolio";
+            project_id?: string | null;
+            /**
+             * Surface
+             * @enum {string}
+             */
+            surface: "portfolio" | "list" | "board" | "calendar" | "my_tasks" | "search";
             /** Text */
             text: string;
         };
@@ -11965,6 +12095,24 @@ export interface components {
             /** Status */
             status?: string[];
         };
+        /** VisitIn */
+        VisitIn: {
+            /**
+             * Scope
+             * @enum {string}
+             */
+            scope: "home" | "project" | "portfolio";
+            /** Scope Id */
+            scope_id?: string | null;
+        };
+        /** VisitOut */
+        VisitOut: {
+            /**
+             * Last Seen At
+             * Format: date-time
+             */
+            last_seen_at: string;
+        };
         /** VizIn */
         VizIn: {
             /**
@@ -13036,6 +13184,71 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UsageReport"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ai_catch_up_api_v1_ai_catch_up_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CatchUpIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatchUpOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ai_catch_up_pending_api_v1_ai_catch_up_pending_get: {
+        parameters: {
+            query?: {
+                scope?: "home" | "project" | "portfolio";
+                scope_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatchUpPendingOut"];
                 };
             };
             /** @description Validation Error */
@@ -21674,6 +21887,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TransferOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_visit_api_v1_visits_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VisitIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VisitOut"];
                 };
             };
             /** @description Validation Error */

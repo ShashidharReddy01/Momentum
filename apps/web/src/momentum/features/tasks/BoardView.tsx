@@ -1,3 +1,4 @@
+import { useMomentumConfig } from '@/lib/config';
 import {
   closestCenter,
   DndContext,
@@ -77,6 +78,7 @@ export function BoardView({
   const sections = useSections(projectId);
   const open = useProjectTasks(projectId);
   const filter = useTaskFilter(projectId);
+  const { ai_enabled: aiEnabled } = useMomentumConfig();
   const { keep } = filter;
   const people = usePeople('', 'all').data;
   const {
@@ -224,7 +226,13 @@ export function BoardView({
     // Keyboard handling delegated from focusable cards.
     // eslint-disable-next-line jsx-a11y/no-static-element-interactions
     <div ref={containerRef} className="flex h-full min-h-0 flex-col" onKeyDown={onKeyDown}>
-      <ListToolbar view={filter.view} onChange={filter.setView} fields={filter.fields} filtersOnly />
+      <ListToolbar
+        view={filter.view}
+        onChange={filter.setView}
+        fields={filter.fields}
+        filtersOnly
+        ask={aiEnabled ? { surface: 'board', projectId } : undefined}
+      />
       <DndContext
         sensors={sensors}
         collisionDetection={collisions}

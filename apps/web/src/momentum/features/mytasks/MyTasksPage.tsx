@@ -1,3 +1,5 @@
+import { AskFilters, type FilterDraft } from '@/features/ai';
+import { useMomentumConfig } from '@/lib/config';
 import {
   closestCenter,
   DndContext,
@@ -133,6 +135,10 @@ function MyTasksList() {
     setParams(p, { replace: true });
   };
   const library = useFieldLibrary().data;
+  // S75-11: "Describe what to show…": Mo's draft applies only on Apply; the marker stays until edited
+  const { ai_enabled: aiEnabled } = useMomentumConfig();
+  const [mo, setMo] = useState<{ draft: FilterDraft; key: string; before: [boolean, string[]] } | null>(null);
+  const applied = mo && mo.key === JSON.stringify([showCompleted, fieldTexts]) ? mo.draft : null;
   const libraryById = useMemo(() => new Map((library ?? []).map((f) => [f.id, f])), [library]);
   const openIds = useMemo(() => (open.data ?? []).map((t) => t.id), [open.data]);
   const values = useFieldValuesLookup(openIds, fieldFilters.length > 0).data;
@@ -301,6 +307,31 @@ function MyTasksList() {
     // Keyboard handling is delegated from the rows (each row is focusable).
     // eslint-disable-next-line jsx-a11y/no-static-element-interactions
     <div ref={container} className="@container" onKeyDown={onKeyDown}>
+      {aiEnabled ? (
+        <AskFilters
+          surface="my_tasks"
+          applied={applied}
+          onApply={(d) => {
+            const f = d.filters as { show_completed?: boolean; fields?: string[] };
+            const nextShow = f.show_completed ?? showCompleted;
+            const nextFields = f.fields ?? fieldTexts;
+            setMo({
+              draft: d,
+              key: JSON.stringify([nextShow, nextFields]),
+              before: [showCompleted, fieldTexts],
+            });
+            setShowCompleted(nextShow);
+            setFieldTexts(nextFields);
+          }}
+          onClear={() => {
+            if (mo) {
+              setShowCompleted(mo.before[0]);
+              setFieldTexts(mo.before[1]);
+            }
+            setMo(null);
+          }}
+        />
+      ) : null}
       <div className="mb-3 flex items-center justify-between gap-2">
         <p className="min-w-0 flex-1 text-sm text-muted">
           {total ? `${total} open task${total === 1 ? '' : 's'} assigned to you` : null}

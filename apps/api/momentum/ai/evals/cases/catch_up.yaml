@@ -1,0 +1,87 @@
+# Phase 7.5 S75-11 "Catch me up" (spec §9.1): what other people changed since the last visit, as
+# the person (visible work only), grouped and counted in code; Mo words it, citing tasks and
+# projects from the facts. Nothing new means no model call. Each case makes its own changes; the
+# window starts at the case's own transaction, so the workspace's setup isn't news.
+feature: catch_up
+cases:
+  - id: nothing_changed_no_call
+    mock: true
+    expect: {no_model_call: true, paragraphs_min: 0}
+  - id: own_changes_are_not_news
+    mock: true
+    actions: [{as: ravi, do: complete, task: "Finalize pricing tiers"}]
+    expect: {no_model_call: true}
+  - id: completed_by_someone_else
+    mock: true
+    actions: [{as: ana, do: complete, task: "Sign vendor contract"}]
+    expect: {model_called: true, counts_include: {completed: 1}, cites_from_facts: true, paragraphs_min: 2}
+  - id: reassigned_to_me_first
+    mock: true
+    actions: [{as: ana, do: assign, task: "Prepare press kit", to: ravi}]
+    expect: {counts_include: {reassigned_to_me: 1}, cites_from_facts: true}
+  - id: due_date_moved
+    mock: true
+    actions: [{as: ana, do: due, task: "Book launch webinar", days: 9}]
+    expect: {counts_include: {due_changes: 1}, cites_from_facts: true, numbers_from_facts: true}
+  - id: mention_needs_me
+    mock: true
+    actions: [{as: ana, do: mention, task: "QA the checkout flow", to: ravi, text: "Can you check the coupon case"}]
+    expect: {counts_include: {mentions: 1, comments: 0}, cites_from_facts: true}
+  - id: new_task_and_status
+    mock: true
+    actions:
+      - {as: ana, do: create, project: "Launch Plan", title: "Translate the launch page"}
+      - {as: ana, do: status, project: "Launch Plan", title: "Launch slips a week", status: at_risk}
+    expect: {counts_include: {new: 1, status_updates: 1}, cites_from_facts: true}
+  - id: drops_invented_and_uncited_lines
+    mock: true
+    actions: [{as: ana, do: comment, task: "Draft customer email", text: "First draft is in the doc."}]
+    expect: {text_exclude: ["987654", "cites nothing"], numbers_from_facts: true}
+  - id: private_work_never_shows
+    mock: true
+    scope: home
+    actions: [{as: priya, do: complete, task: "Secret launch partner: Zenith Corp"}]
+    expect: {no_model_call: true, no_leak: ["Zenith", "Secret Roadmap"]}
+  - id: home_gathers_everything
+    mock: true
+    scope: home
+    actions:
+      - {as: ana, do: complete, task: "Sign vendor contract"}
+      - {as: mei, do: assign, task: "Choose analytics tool", to: ravi}
+      - {as: ana, do: mention, task: "Update pricing page copy", to: ravi}
+    expect: {model_called: true, counts_include: {completed: 1, reassigned_to_me: 1, mentions: 1}, cites_from_facts: true}
+  - id: portfolio_stage_change
+    mock: true
+    scope: portfolio
+    actions: [{as: sofia, do: stage, customer_in: Discovery, to: Contracts}]
+    expect: {model_called: true, counts_include: {stage_changes: 1}, cites_from_facts: true}
+  - id: someone_else_on_the_project
+    mock: true
+    user: mei
+    actions: [{as: ana, do: complete, task: "Sign vendor contract"}]
+    expect: {counts_include: {completed: 1}, cites_from_facts: true}
+  # --- live-only: judged against the facts
+  - id: live_needs_you_first
+    actions:
+      - {as: ana, do: complete, task: "Sign vendor contract"}
+      - {as: mei, do: assign, task: "Choose analytics tool", to: ravi}
+    expect: {cites_from_facts: true, numbers_from_facts: true}
+    judge: {rubric: "The first line is about the task reassigned to the person; then what Ana finished. Short, plain, cited."}
+  - id: live_due_change
+    actions: [{as: ana, do: due, task: "Book launch webinar", days: 9}]
+    expect: {cites_from_facts: true, numbers_from_facts: true}
+    judge: {rubric: "Says the webinar's due date moved, with the dates as given."}
+  - id: live_mention
+    actions: [{as: ana, do: mention, task: "QA the checkout flow", to: ravi, text: "Can you check the coupon case"}]
+    expect: {cites_from_facts: true}
+    judge: {rubric: "Says Ana mentioned them on the checkout QA task and what she asked, from the facts."}
+  - id: live_home_mix
+    scope: home
+    actions:
+      - {as: ana, do: complete, task: "Sign vendor contract"}
+      - {as: ana, do: create, project: "Launch Plan", title: "Translate the launch page"}
+      - {as: ana, do: status, project: "Launch Plan", title: "Launch slips a week", status: at_risk}
+    expect: {cites_from_facts: true}
+    judge: {rubric: "5 to 8 lines at most, no padding; each line says one change and cites it."}
+  - id: live_nothing
+    expect: {no_model_call: true}

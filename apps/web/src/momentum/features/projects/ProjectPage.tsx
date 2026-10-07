@@ -17,6 +17,7 @@ import {
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { AskMoButton } from '@/components/common/AI';
+import { CatchUpButton, useVisitBeacon } from '@/features/ai';
 import { MoMark } from '@/components/common/MoMark';
 import { InlineText } from '@/components/common/InlineText';
 import { ErrorState } from '@/components/common/States';
@@ -119,6 +120,7 @@ export function ProjectPage() {
   const [reportOpen, setReportOpen] = useState(false);
   useCrumbs(project.data ? [project.data.team_name, project.data.name] : null);
   const tabEdges = useScrollEdges();
+  useVisitBeacon('project', project.data?.id); // S75-11: when you last looked, for Catch me up
 
   // On a bare `/projects/:id` (no view segment), redirect once to this user's last view for
   // this project, or the project's admin-set `default_view` for a project they've never opened.
@@ -199,6 +201,7 @@ export function ProjectPage() {
               ))}
             </div>
             <AskMoButton about={{ kind: 'project', projectId: p.id, label: p.name }} />
+            {aiEnabled ? <CatchUpButton scope="project" scopeId={p.id} name={p.name} /> : null}
             {canEdit && aiEnabled ? (
               <Button
                 size="sm"

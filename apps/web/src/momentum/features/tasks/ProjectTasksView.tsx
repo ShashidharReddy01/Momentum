@@ -1,3 +1,4 @@
+import { useMomentumConfig } from '@/lib/config';
 import {
   DragOverlay,
   useDndContext,
@@ -72,6 +73,7 @@ export function ProjectTasksView({ projectId, canEdit }: { projectId: string; ca
   const qc = useQueryClient();
   useChannel(`project:${projectId}`, (event) => applyRealtimeEvent(qc, event, { projectId }));
   const { view, setView: applyView, ready: viewReady } = useListView(projectId);
+  const { ai_enabled: aiEnabled } = useMomentumConfig();
   const showCompleted = view.show_completed;
   const manual = isManualOrder(view);
   const open = useProjectTasks(projectId);
@@ -665,7 +667,12 @@ export function ProjectTasksView({ projectId, canEdit }: { projectId: string; ca
     // Keyboard handling is delegated from the rows (each row is focusable).
     // eslint-disable-next-line jsx-a11y/no-static-element-interactions
     <div ref={container} className="@container" onKeyDownCapture={onKeyDownCapture} onKeyDown={onKeyDown}>
-      <ListToolbar view={view} onChange={setView} fields={fieldList} />
+      <ListToolbar
+        view={view}
+        onChange={setView}
+        fields={fieldList}
+        ask={aiEnabled ? { surface: 'list', projectId } : undefined}
+      />
       {!manual && canEdit ? (
         <p className="mb-2 text-xs text-muted">
           Drag to reorder is off while the list is sorted or grouped.{' '}

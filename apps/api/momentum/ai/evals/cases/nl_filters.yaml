@@ -58,6 +58,67 @@ cases:
     mock: true
     input: "Customers by vendor tier gold"
     expect: {asks: true, options_include: [Region, "Target go-live"]}
+  # --- S75-11: the task surfaces (list / board / calendar of Launch Plan, My Tasks, search)
+  - id: list_only_my_overdue_work
+    mock: true
+    surface: list
+    input: "Only my overdue work"
+    expect: {filters_exact: {people: [me], due: overdue}}
+  - id: list_my_overdue_escalated
+    mock: true
+    surface: list
+    input: "My overdue tasks tagged escalated"
+    expect: {filters_exact: {people: [me], due: overdue, tags: [Escalated]}}
+  - id: board_high_risk_unassigned
+    mock: true
+    surface: board
+    input: "Unassigned work with high risk"
+    expect: {filters_exact: {people: [Unassigned], fields: [{field: Risk, is_any: [High]}]}}
+  - id: calendar_ana_this_week
+    mock: true
+    surface: calendar
+    input: "What Ana has due this week"
+    expect: {filters_exact: {people: ["Ana Souza"], due: this_week}}
+  - id: list_including_done_sorted
+    mock: true
+    surface: list
+    input: "Everything including done, sorted by due date, grouped by person"
+    expect: {filters_exact: {show_completed: true, sort: due, group: assignee}}
+  - id: list_unknown_tag_asked
+    mock: true
+    surface: list
+    input: "Tasks tagged urgent-ish"
+    expect: {asks: true, options_include: [Escalated, "Needs review"]}
+  - id: list_words_asked_back
+    mock: true
+    surface: list
+    input: "Anything that mentions DataCo"
+    expect: {asks: true, text_include_any: ["Search"]}
+  - id: my_tasks_vendor_field
+    mock: true
+    surface: my_tasks
+    input: "My tasks where the vendor is DataCo, including finished ones"
+    expect: {filters_exact: {show_completed: true, fields: [{field: Vendor, contains: DataCo}]}}
+  - id: my_tasks_due_asked_back
+    mock: true
+    surface: my_tasks
+    input: "Only my overdue ones"
+    expect: {asks: true}
+  - id: search_words_project_person
+    mock: true
+    surface: search
+    input: "Search contract in Launch Plan assigned to Ana"
+    expect: {filters_exact: {words: contract, project: "Launch Plan", people: ["Ana Souza"]}}
+  - id: search_completed_comments
+    mock: true
+    surface: search
+    input: "Finished tasks and comments about pricing"
+    expect: {filters_exact: {words: pricing, completed: completed, types: [comment, task]}}
+  - id: search_private_project_asked
+    mock: true
+    surface: search
+    input: "Search ideas in Secret Roadmap"
+    expect: {asks: true, no_leak: ["Zenith"]}
   # --- live-only
   - id: live_november_at_risk
     input: "Implementations going live in November that are at risk"
@@ -71,6 +132,14 @@ cases:
   - id: live_big_deals_in_contracts
     input: "Contracts stage deals worth more than 250k"
     expect: {filters_exact: {stages: [Contracts], fields: [{field: "Contract value", on_or_after: "250000"}]}}
+  - id: live_list_mine_overdue
+    surface: list
+    input: "Show me my late stuff"
+    expect: {filters_exact: {people: [me], due: overdue}}
+  - id: live_search
+    surface: search
+    input: "comments about the checkout"
+    expect: {filters_exact: {words: checkout, types: [comment]}}
   - id: live_unknown_asks
     input: "Projects in the Pilot stage"
     expect: {asks: true}

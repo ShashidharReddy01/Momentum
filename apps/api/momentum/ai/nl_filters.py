@@ -6,8 +6,8 @@ works in names (people, stages, fields, options, health) and the server resolves
 the viewer can see; anything it can't resolve is asked back with the real options. Relative dates
 ("in November", "next 30 days") are resolved here, in the viewer's timezone, never by the model.
 
-S75-10 builds the engine for the portfolio surface; S75-11 adds the list, board, calendar,
-My Tasks and search surfaces on the same engine.
+S75-10 built the engine for the portfolio surface; S75-11 adds the list, board, calendar,
+My Tasks and search surfaces (``nl_filters_tasks``) on the same engine.
 """
 
 from __future__ import annotations
@@ -39,7 +39,7 @@ from momentum.domain.users.service import list_users
 from momentum.reports.data import today_for
 
 MAX_TEXT = 300
-Surface = Literal["portfolio"]
+Surface = Literal["portfolio", "list", "board", "calendar", "my_tasks", "search"]
 Health = Literal["on_track", "at_risk", "off_track", "on_hold", "complete", "none"]
 MONTHS = {m.lower(): i for i, m in enumerate(calendar.month_name) if m}
 MONTHS |= {m.lower(): i for i, m in enumerate(calendar.month_abbr) if m}
@@ -63,6 +63,7 @@ class FieldCondDraft(BaseModel):
     on_or_before: str | None = Field(
         default=None, max_length=20, description='YYYY-MM-DD, "today", "today+30" or a number'
     )
+    contains: str | None = Field(default=None, max_length=100, description="Text fields")
     has_value: bool | None = None
 
 
@@ -242,6 +243,8 @@ async def resolve_portfolio_draft(
             raise Ask(f'There\'s no project field "{c.field.strip()}". Which did you mean?', listed)
         nf: dict[str, Any] = {"field": target.name}
         labels: list[str] = []
+        if c.contains:
+            raise Ask(f'Portfolio views can\'t search inside "{target.name}" yet.')
         if c.is_any:
             values: list[str] = []
             opts = {lb.lower(): oid for lb, oid in _labels(target)}
@@ -324,13 +327,16 @@ async def draft_filters(
     surface: Surface,
     *,
     portfolio_id: uuid.UUID | None = None,
+    project_id: uuid.UUID | None = None,
 ) -> FilterDraft:
     text = text.strip()
     if not text:
         raise ValidationFailed("Describe what to show first")
     if len(text) > MAX_TEXT:
         raise ValidationFailed(f"That's too long (at most {MAX_TEXT} characters)")
-    if surface != "portfolio" or portfolio_id is None:
+    if surface != "portfolio":
+        return await _draft_tasks(session, llm, ctx, text, surface, project_id)
+    if portfolio_id is None:
         raise ValidationFailed("Say which portfolio to filter")
     p = await get_portfolio(session, ctx, portfolio_id)
     reference, defs = await _reference(session, ctx, p)
@@ -349,5 +355,36 @@ async def draft_filters(
         return FilterDraft(surface=surface, question=d.question.strip())
     try:
         return await resolve_portfolio_draft(session, ctx, p, d, defs)
+    except Ask as ask:
+        return FilterDraft(surface=surface, question=ask.question, options=ask.options[:20])
+
+
+async def _draft_tasks(
+    session: AsyncSession,
+    llm: LLM,
+    ctx: Ctx,
+    text: str,
+    surface: str,
+    project_id: uuid.UUID | None,
+) -> FilterDraft:
+    from momentum.ai import nl_filters_tasks as tasks
+
+    if surface in tasks.PROJECT_SURFACES and project_id is None:
+        raise ValidationFailed("Say which project's view to filter")
+    reference, defs = await tasks.reference(session, ctx, surface, project_id)
+    prompt = prompts.load("filters")
+    d = await extract(
+        llm,
+        ctx,
+        prompt=prompt,
+        system=prompt.body,
+        user=f'{reference}\n<data source="request" surface="{surface}">{safe(text)}</data>',
+        schema=tasks.TaskFilterDraft,
+        description="Submit the filters, or a question to ask back.",
+    )
+    if d.question and d.empty():
+        return FilterDraft(surface=surface, question=d.question.strip())
+    try:
+        return await tasks.resolve_task_draft(session, ctx, surface, d, defs, project_id)
     except Ask as ask:
         return FilterDraft(surface=surface, question=ask.question, options=ask.options[:20])
