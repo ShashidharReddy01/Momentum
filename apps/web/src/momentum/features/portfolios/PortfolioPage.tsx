@@ -30,6 +30,7 @@ import {
   type PortfolioRow,
   type StatusUpdateIn,
 } from './queries';
+import { BriefButton } from './MoPortfolio';
 import { PortfolioBoard } from './PortfolioBoard';
 
 // Phase 7.5: the Dashboard tab lives in the dashboards chunk
@@ -112,6 +113,7 @@ function PortfolioBody({ p }: { p: PortfolioDetail }) {
         {p.can_edit && p.kind === 'manual' ? (
           <AddProject p={p} onAdd={(id) => m.addProject.mutate(id)} />
         ) : null}
+        <BriefButton portfolioId={p.id} portfolioName={p.name} />
         {p.can_edit ? (
           <Button size="sm" variant="ghost" onClick={() => setReportOpen(true)}>
             <Icon icon={FileText} size={14} /> Create report

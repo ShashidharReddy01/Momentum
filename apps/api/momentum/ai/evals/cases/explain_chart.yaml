@@ -1,0 +1,95 @@
+# Phase 7.5 S75-10 "Explain this chart" (spec §8): the widget's own numbers as the person, the
+# previous period where it has one and a drill sample; every kept paragraph cites a label, stage,
+# project or task from them and states only their numbers; the sample becomes "Open the tasks".
+feature: explain_chart
+cases:
+  - id: bar_waiting_on_customer
+    mock: true
+    dashboard: "Implementation lead"
+    widget: "Waiting on customer, open tasks by customer"
+    expect: {paragraphs_min: 2, cites_from_facts: true, numbers_from_facts: true, links_min: 1}
+  - id: stacked_raid
+    mock: true
+    dashboard: "Implementation lead"
+    widget: "Open RAID by customer, split by Severity"
+    expect: {paragraphs_min: 1, cites_from_facts: true, numbers_from_facts: true}
+  - id: table_control_tower
+    mock: true
+    dashboard: "Implementation lead"
+    widget: "Control tower"
+    expect: {paragraphs_min: 2, cites_from_facts: true, links_min: 1}
+  - id: line_overdue_per_week
+    mock: true
+    dashboard: "Implementation lead"
+    widget: "Overdue tasks per week across my implementations"
+    expect: {cites_from_facts: true, numbers_from_facts: true, text_exclude: ["987654"]}
+  - id: funnel
+    mock: true
+    user: admin
+    dashboard: "Leadership"
+    widget: "Lifecycle funnel (180 days)"
+    expect: {paragraphs_min: 2, cites_from_facts: true, numbers_from_facts: true}
+  - id: time_in_stage
+    mock: true
+    user: admin
+    dashboard: "Leadership"
+    widget: "Time in stage vs target"
+    expect: {paragraphs_min: 2, cites_from_facts: true, numbers_from_facts: true}
+  - id: aging_all_stages
+    mock: true
+    user: admin
+    dashboard: "Leadership"
+    widget: "All stages"
+    expect: {cites_from_facts: true, links_min: 1}
+  - id: region_bar
+    mock: true
+    user: admin
+    dashboard: "Leadership"
+    widget: "Customers by region"
+    expect: {paragraphs_min: 2, cites_from_facts: true, text_exclude: ["cites nothing"]}
+  - id: consultant_by_customer
+    mock: true
+    user: mei
+    dashboard: "Implementation consultant"
+    widget: "My open tasks by customer"
+    expect: {cites_from_facts: true, numbers_from_facts: true, no_leak: ["Zenith"]}
+  - id: discovery_aging
+    mock: true
+    user: dev
+    dashboard: "Discovery"
+    widget: "Discovery aging vs 21 days"
+    expect: {cites_from_facts: true, numbers_from_facts: true}
+  - id: nothing_visible_no_call
+    mock: true
+    user: priya
+    dashboard: "Implementation lead"
+    widget: "Control tower"
+    expect: {no_model_call: true, text_include_any: ["nothing to explain"]}
+  # --- live-only
+  - id: live_bar_outlier
+    dashboard: "Implementation lead"
+    widget: "Waiting on customer, open tasks by customer"
+    expect: {cites_from_facts: true, numbers_from_facts: true}
+    judge: {rubric: "Names the customer with the most tasks waiting and its count exactly as in the facts; no invented causes."}
+  - id: live_funnel_conversion
+    user: admin
+    dashboard: "Leadership"
+    widget: "Lifecycle funnel (180 days)"
+    expect: {cites_from_facts: true, numbers_from_facts: true}
+    judge: {rubric: "Points at the stage where the funnel narrows most, with the conversion percentage as given."}
+  - id: live_time_vs_target
+    user: admin
+    dashboard: "Leadership"
+    widget: "Time in stage vs target"
+    expect: {cites_from_facts: true, numbers_from_facts: true}
+    judge: {rubric: "Names stages whose median is over target with both numbers as given; doesn't compute new figures."}
+  - id: live_line_change
+    dashboard: "Implementation lead"
+    widget: "Overdue tasks per week across my implementations"
+    expect: {cites_from_facts: true, numbers_from_facts: true}
+    judge: {rubric: "Compares the last week with the week before using the facts' numbers."}
+  - id: live_table
+    dashboard: "Implementation lead"
+    widget: "Control tower"
+    expect: {cites_from_facts: true}
+    judge: {rubric: "Picks out the most slipped projects from the rows; plain and short."}

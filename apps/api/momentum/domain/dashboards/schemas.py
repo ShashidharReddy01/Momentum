@@ -392,6 +392,18 @@ class TemplatePreviewOut(BaseModel):
     notes: list[str]
 
 
+class FromDraftIn(BaseModel):
+    """S75-10: create the dashboard Mo drafted from a sentence (after its preview), in one step.
+    The widgets are checked again like any hand-built ones."""
+
+    model_config = ConfigDict(extra="forbid")
+    name: str = Field(min_length=1, max_length=200)
+    description: str | None = Field(default=None, max_length=500)
+    filters: DashboardFilters = Field(default_factory=DashboardFilters)
+    widgets: list[WidgetIn] = Field(min_length=1, max_length=12)
+    prompt: str = Field(min_length=1, max_length=300, description="The sentence Mo drafted it from")
+
+
 class FromTemplateOut(BaseModel):
     dashboard: DashboardDetailOut
     notes: list[str]

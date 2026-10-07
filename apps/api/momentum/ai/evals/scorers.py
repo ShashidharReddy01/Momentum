@@ -106,6 +106,22 @@ KNOWN = frozenset(
         "no_leak",
         "paragraphs_min",
         "cites_from_facts",
+        # Phase 7.5 S75-10 (Mo on portfolios and dashboards)
+        "numbers_from_facts",
+        "no_model_call",
+        "model_called",
+        "filters_exact",
+        "draft_exact",
+        "asks",
+        "options_include",
+        "widgets_with_numbers",
+        "links_min",
+        "hidden_min",
+        "kinds_include",
+        "sections_include",
+        "checklist",
+        "files_read",
+        "rows_max",
     }
 )
 
@@ -602,6 +618,54 @@ def score(obs: Observation, expect: dict[str, Any], *, today: date, asked: str =
         cites = [str(c) for c in obs.data.get("cites", [])]
         bad = [c for c in cites if c.lower() not in allowed]
         add(Check("cites_from_facts", bool(cites) and not bad, f"bad: {bad}"))
+    # Phase 7.5 S75-10: Mo on portfolios and dashboards
+    if expect.get("numbers_from_facts"):
+        fact_nums = {str(n) for n in obs.data.get("facts_numbers", [])}
+        said_nums: list[str] = re.findall(r"\d+(?:\.\d+)?", text)
+        unknown = [n for n in said_nums if n not in fact_nums]
+        add(Check("numbers_from_facts", not unknown, f"not in facts: {unknown[:8]}"))
+    if expect.get("no_model_call"):
+        add(Check("no_model_call", obs.data.get("ai") is False, f"ai: {obs.data.get('ai')}"))
+    if expect.get("model_called"):
+        add(Check("model_called", obs.data.get("ai") is True, f"ai: {obs.data.get('ai')}"))
+    if "filters_exact" in expect:
+        got_f = obs.data.get("filters")
+        add(Check("filters_exact", got_f == expect["filters_exact"], json.dumps(got_f)[:300]))
+    if "draft_exact" in expect:
+        got_d = obs.data.get("draft")
+        add(Check("draft_exact", got_d == expect["draft_exact"], json.dumps(got_d)[:300]))
+    if "asks" in expect:
+        asked_back = bool(obs.data.get("question"))
+        add(
+            Check(
+                "asks", asked_back == bool(expect["asks"]), f"question: {obs.data.get('question')}"
+            )
+        )
+    for opt in expect.get("options_include", []):
+        add(Check(f"options_include:{opt}", opt in obs.data.get("options", []), "options"))
+    if "widgets_with_numbers" in expect:
+        n_w = int(obs.data.get("widgets_with_numbers", 0))
+        add(Check("widgets_with_numbers", n_w >= int(expect["widgets_with_numbers"]), f"{n_w}"))
+    if "links_min" in expect:
+        n_l = int(obs.data.get("links", 0))
+        add(Check("links_min", n_l >= int(expect["links_min"]), f"links: {n_l}"))
+    if "hidden_min" in expect:
+        n_h = int(obs.data.get("hidden", 0))
+        add(Check("hidden_min", n_h >= int(expect["hidden_min"]), f"hidden: {n_h}"))
+    for k in expect.get("kinds_include", []):
+        add(Check(f"kinds_include:{k}", k in obs.data.get("kinds", []), f"{obs.data.get('kinds')}"))
+    for k in expect.get("sections_include", []):
+        got_s = obs.data.get("sections", [])
+        add(Check(f"sections_include:{k}", k in got_s, f"sections: {got_s}"))
+    if "checklist" in expect:
+        got_c = obs.data.get("checklist")
+        add(Check("checklist", got_c == expect["checklist"], f"checklist: {got_c}"))
+    if "files_read" in expect:
+        n_f = int(obs.data.get("files_read", 0))
+        add(Check("files_read", n_f == int(expect["files_read"]), f"files read: {n_f}"))
+    if "rows_max" in expect:
+        n_r = obs.data.get("rows")
+        add(Check("rows_max", n_r is not None and n_r <= int(expect["rows_max"]), f"rows: {n_r}"))
     for secret in expect.get("no_leak", []):
         in_text = _low(secret) in lt and _low(secret) not in _low(asked)
         in_tools = _low(secret) in json.dumps(outputs, ensure_ascii=False).lower()

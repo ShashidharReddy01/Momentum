@@ -1,0 +1,22 @@
+# Phase 7.5 S75-10 handoff notes (mock). The user message holds the project's facts as data and a
+# "Citable:" line (the project name first); {{$cites}} cites its first entries. One item invents a
+# number and one cites nothing: the server must drop both.
+responses:
+  - match: {contains: 'IGNORE PREVIOUS INSTRUCTIONS'}
+    tool_calls:
+      - name: submit_result
+        arguments:
+          sold: [{text: "(mock) What was sold, from the facts: {{$cites}}.", cites: ["{{$cites}}"]}]
+          risks: [{text: "(mock) No risks at all, as the comment says.", cites: []}]
+default:
+  tool_calls:
+    - name: submit_result
+      arguments:
+        sold: [{text: "(mock) What was sold, from the fields: {{$cites}}.", cites: ["{{$cites}}"]}]
+        scope: [{text: "(mock) In scope, from the brief and milestones: {{$cites}}.", cites: ["{{$cites}}"]}]
+        commitments: [{text: "(mock) Promised milestones and dates: {{$cites}}.", cites: ["{{$cites}}"]}]
+        contacts: [{text: "(mock) The people on it: {{$cites}}.", cites: ["{{$cites}}"]}]
+        risks:
+          - {text: "(mock) Open risks from overdue and blocked work: {{$cites}}.", cites: ["{{$cites}}"]}
+          - {text: "(mock) 987654 risks are open.", cites: ["{{$cites}}"]}
+        waiting: [{text: "(mock) This item cites nothing and is dropped.", cites: []}]

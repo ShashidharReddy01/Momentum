@@ -106,6 +106,9 @@ def test_catalog_covers_phase_1_2_tools_with_their_risks() -> None:
         "search_in_file": "read",
         "look_at": "read",
         "describe_macros": "read",
+        # Phase 7.5 S75-10: portfolio v2 read tools
+        "get_portfolio_rows": "read",
+        "get_stage_metrics": "read",
         "create_task": "low",
         "update_task": "low",
         "reschedule_task": "medium",  # S6.1.2

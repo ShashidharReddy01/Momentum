@@ -1,0 +1,58 @@
+# Phase 7.5 S75-10 dashboards from a sentence (mock). The model picks widgets by recipe key (the
+# role templates' widgets) and names a portfolio; the server binds and counts as the person.
+responses:
+  - match: {contains: "for my implementations: go-lives"}
+    tool_calls:
+      - name: submit_result
+        arguments:
+          name: "My implementations"
+          portfolio: "Customer onboarding"
+          mine: true
+          widgets:
+            - {recipe: go_lives_next_90_days}
+            - {recipe: slipping, title: "Slipping projects"}
+            - {recipe: waiting_on_customer_open_tasks_by_customer}
+            - {recipe: open_raid_by_customer_split_by_severity}
+  - match: {contains: "leadership view: funnel"}
+    tool_calls:
+      - name: submit_result
+        arguments:
+          name: "Leadership"
+          portfolio: "Customer onboarding"
+          widgets: [{recipe: lifecycle_funnel_180_days}, {recipe: time_in_stage_vs_target}, {recipe: revenue_in_flight}, {recipe: customers_at_risk}]
+  - match: {contains: "sales dashboard: my pipeline"}
+    tool_calls:
+      - name: submit_result
+        arguments: {name: "My pipeline", portfolio: "Customer onboarding", mine: true, widgets: [{recipe: my_pipeline_value}, {recipe: deal_aging}, {recipe: value_by_stage}]}
+  - match: {contains: "hypercare at a glance"}
+    tool_calls:
+      - name: submit_result
+        arguments: {name: "Hypercare", widgets: [{recipe: hypercare_aging_vs_30_days}, {recipe: hypercare_issues_by_customer}]}
+  - match: {contains: "with a burndown"}
+    tool_calls:
+      - name: submit_result
+        arguments: {name: "Delivery", portfolio: "Customer onboarding", widgets: [{recipe: burndown_chart}, {recipe: control_tower}]}
+  - match: {contains: "only a burndown"}
+    tool_calls:
+      - name: submit_result
+        arguments: {name: "Burndown", portfolio: "Customer onboarding", widgets: [{recipe: burndown_chart}]}
+  - match: {contains: "for partner rollouts"}
+    tool_calls:
+      - name: submit_result
+        arguments: {name: "Partners", portfolio: "Partner rollouts", widgets: [{recipe: control_tower}]}
+  - match: {contains: "write me a poem"}
+    tool_calls: [{name: submit_result, arguments: {question: "I can build a dashboard from the portfolio's widgets: go-lives, slipping projects, stage times and more. What should it show?"}}]
+  - match: {contains: "go-lives next 30 days and nps"}
+    tool_calls:
+      - name: submit_result
+        arguments: {name: "Go-lives", portfolio: "Customer onboarding", widgets: [{recipe: go_lives_next_30_days}], left_out: ["NPS by customer"]}
+  - match: {contains: "slipping twice"}
+    tool_calls:
+      - name: submit_result
+        arguments: {name: "Slipping", portfolio: "Customer onboarding", widgets: [{recipe: slipping}, {recipe: slipping}, {recipe: control_tower}]}
+  - match: {contains: "consultant load and my blocked"}
+    tool_calls:
+      - name: submit_result
+        arguments: {name: "My work", portfolio: "Customer onboarding", mine: true, widgets: [{recipe: consultant_load_open_tasks_by_assignee}, {recipe: my_blocked_tasks}, {recipe: my_tasks_due_this_week_across_customers}]}
+default:
+  tool_calls: [{name: submit_result, arguments: {question: "(mock) What should the dashboard show?"}}]

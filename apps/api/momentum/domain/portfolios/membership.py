@@ -13,7 +13,19 @@ import json
 import uuid
 from typing import Any
 
-from sqlalchemy import ColumnElement, and_, cast, false, literal, or_, select
+from sqlalchemy import (
+    ColumnElement,
+    Numeric,
+    and_,
+    case,
+    cast,
+    false,
+    func,
+    literal,
+    literal_column,
+    or_,
+    select,
+)
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -33,7 +45,9 @@ def _uuids(values: Any) -> list[uuid.UUID]:
 
 
 def condition_clause(cond: dict[str, Any]) -> ColumnElement[bool]:
-    """One project-field condition: ``{field_id, op: is|is_not|any|empty|set, value}``."""
+    """One project-field condition: ``{field_id, op: is|is_not|any|empty|set|gte|lte, value}``.
+    ``gte`` / ``lte`` (S75-10, "going live in November") compare a date field's ISO day or a
+    number field's value, inclusive."""
     fid = _uuids([cond.get("field_id")])
     if not fid:
         return false()
@@ -57,6 +71,19 @@ def condition_clause(cond: dict[str, Any]) -> ColumnElement[bool]:
                 )
             )
         )
+    if op in ("gte", "lte"):
+        if isinstance(value, bool) or not isinstance(value, str | int | float):
+            return false()
+        raw = ProjectFieldValue.value
+        as_text = raw.op("#>>")(literal_column("'{}'"))  # a JSON scalar as text
+        right: Any
+        if isinstance(value, str):  # an ISO date: same-length strings compare in date order
+            left: Any = case((func.jsonb_typeof(raw) == "string", as_text), else_=None)
+            right = value[:10]
+        else:  # the cast only runs on numbers (CASE keeps Postgres from casting text)
+            left = case((func.jsonb_typeof(raw) == "number", cast(as_text, Numeric)), else_=None)
+            right = value
+        return Project.id.in_(has.where(left >= right if op == "gte" else left <= right))
     return false()
 
 

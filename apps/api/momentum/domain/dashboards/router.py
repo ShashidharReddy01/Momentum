@@ -20,6 +20,7 @@ from momentum.domain.dashboards.schemas import (
     DashboardTemplateOut,
     DrillAnyIn,
     DrillOut,
+    FromDraftIn,
     FromTemplateIn,
     FromTemplateOut,
     MemberIn,
@@ -170,6 +171,22 @@ async def from_template(
         return MutationOut(
             data=FromTemplateOut(dashboard=await _detail(s, m.entity, True), notes=notes),
             meta=_meta(m.activity_id, m.version),
+        )
+
+
+@router.post(
+    "/from-draft",
+    response_model=MutationOut[DashboardDetailOut],
+    status_code=status.HTTP_201_CREATED,
+    summary="Create the dashboard Mo drafted from a sentence, after its preview (undoable)",
+)
+async def from_draft(
+    body: FromDraftIn, ctx: CtxDep, uow: UowDep
+) -> MutationOut[DashboardDetailOut]:
+    async with uow.transaction() as s:
+        m = await service.create_from_draft(s, ctx, body)
+        return MutationOut(
+            data=await _detail(s, m.entity, True), meta=_meta(m.activity_id, m.version)
         )
 
 

@@ -49,6 +49,7 @@ from momentum.domain.dashboards.schemas import (
     DashboardPatchIn,
     DrillAnyIn,
     DrillOut,
+    FromDraftIn,
     QueryFilters,
     QueryResultOut,
     QuerySpec,
@@ -993,3 +994,48 @@ async def create_from_template(
         undo_op("dashboards.delete", dashboard_id=d.id),
     )
     return Mutation(d, act, version=d.version), bound.notes
+
+
+# ---------- dashboard from a sentence (Phase 7.5 S75-10, spec §8) ----------
+
+
+async def create_from_draft(
+    session: AsyncSession, ctx: Ctx, data: FromDraftIn
+) -> Mutation[Dashboard]:
+    """The dashboard Mo drafted, created as the person after they saw its preview: every
+    widget's spec is validated and checked again (it comes back from the client), in one
+    undoable step. Each widget keeps the sentence in ``created_from_prompt``."""
+    if ctx.actor.id is None or not can(ctx, Action.PROJECT_CREATE):
+        raise Forbidden("You can't create dashboards")
+    if data.filters.portfolio_id is not None:
+        from momentum.domain.portfolios.service import get_portfolio
+
+        await get_portfolio(session, ctx, data.filters.portfolio_id)
+    for w in data.widgets:
+        check_any(w.kind, w.query_spec)
+        await query_v2.check_any(session, ctx, w.query_spec)
+    prompt = data.prompt.strip()
+    d = Dashboard(
+        workspace_id=ctx.workspace_id,
+        owner_id=ctx.actor.id,
+        name=data.name.strip(),
+        description=(data.description or "").strip() or None,
+        scope="workspace",
+        filters=data.filters.model_dump(mode="json", exclude_defaults=True),
+    )
+    session.add(d)
+    await session.flush()
+    for w, pos in zip(data.widgets, _keys(None, len(data.widgets)), strict=True):
+        row = _widget_row(ctx, d, w.kind, w.title, w.query_spec, w.viz, pos)
+        row.created_from_prompt = prompt
+        session.add(row)
+    await session.flush()
+    act = await _record(
+        session,
+        ctx,
+        d,
+        "dashboard.created",
+        {"name": (None, d.name), "created_from_prompt": (None, prompt)},
+        undo_op("dashboards.delete", dashboard_id=d.id),
+    )
+    return Mutation(d, act, version=d.version)

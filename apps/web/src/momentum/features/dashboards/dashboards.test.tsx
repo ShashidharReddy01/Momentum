@@ -206,7 +206,10 @@ describe('Dashboards (S6.5.1)', () => {
     boot({ ...DETAIL, can_edit: false });
     await screen.findByRole('region', { name: 'Overdue' });
     expect(screen.queryByRole('button', { name: 'Add chart' })).toBeNull();
-    expect(screen.queryByRole('button', { name: /options$/ })).toBeNull();
+    // S75-10: a viewer's widget menu only offers Mo's "Explain"
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Overdue: options' }));
+    expect(await screen.findByRole('menuitem', { name: /Explain/ })).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: /Edit chart|Remove|Move/ })).toBeNull();
   });
 });
 

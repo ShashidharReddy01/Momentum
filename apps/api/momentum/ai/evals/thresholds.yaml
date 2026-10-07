@@ -32,6 +32,13 @@ mock:
   file_tables: 1.0
   file_vision: 1.0
   file_injection: 1.0
+  # Phase 7.5 S75-10: Mo on portfolios and dashboards
+  portfolio_brief: 1.0
+  nl_filters: 1.0
+  dashboard_draft: 1.0
+  explain_chart: 1.0
+  readiness: 1.0
+  handoff: 1.0
 live:
   command: 0.9
   chat: 0.85
@@ -63,3 +70,10 @@ live:
   file_tables: 1.0
   file_vision: 0.85
   file_injection: 1.0
+  # Phase 7.5 S75-10: numbers and filters exact-ish, wording judged
+  portfolio_brief: 0.85
+  nl_filters: 0.9
+  dashboard_draft: 0.85
+  explain_chart: 0.85
+  readiness: 0.85
+  handoff: 0.85

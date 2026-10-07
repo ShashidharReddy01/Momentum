@@ -41,7 +41,7 @@ WidgetKindV2 = Literal[
     "timeline",
     "note",
 ]
-ConditionOp = Literal["is", "is_not", "any", "empty", "set"]
+ConditionOp = Literal["is", "is_not", "any", "empty", "set", "gte", "lte"]
 Period = Literal["this_week", "this_month", "last_30_days", "this_quarter", "custom"]
 SpecPeriod = Literal["this_week", "this_month", "last_30_days", "this_quarter"]
 ProjectGroupBy = Literal["project_field", "owner", "status", "team", "stage"]

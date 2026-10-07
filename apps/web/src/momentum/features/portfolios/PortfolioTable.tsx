@@ -11,6 +11,7 @@ import { FieldValueEditor, useProjectFieldDefs, type Field } from '@/features/fi
 import { cn } from '@/lib/cn';
 import { useMomentumConfig } from '@/lib/config';
 import { Cell, NUMERIC_KEYS, fieldOf, money } from './cells';
+import { AskPortfolio, draftFilters, type FilterDraft } from './MoPortfolio';
 import type { PortfolioDetail } from './queries';
 import {
   rowsQuery,
@@ -48,7 +49,9 @@ export function PortfolioTable({ p }: { p: PortfolioDetail }) {
   // ad hoc choices on top of the saved view (undefined = the view's own)
   const [groupBy, setGroupBy] = useState<string | null | undefined>(undefined);
   const [sort, setSort] = useState<SortSpec[] | undefined>(undefined);
-  const params: RowsParams = { viewId, groupBy, sort };
+  // S75-10: "Ask the portfolio" filters, applied only on Apply (amber until cleared)
+  const [moFilters, setMoFilters] = useState<FilterDraft | null>(null);
+  const params: RowsParams = { viewId, groupBy, sort, filters: draftFilters(moFilters) };
   const q = usePortfolioRows(p.id, params);
   const defs = useProjectFieldDefs();
   const fields = useMemo(() => new Map((defs.data ?? []).map((f) => [f.id, f])), [defs.data]);
@@ -76,6 +79,7 @@ export function PortfolioTable({ p }: { p: PortfolioDetail }) {
 
   return (
     <div className="space-y-3">
+      <AskPortfolio portfolioId={p.id} applied={moFilters} onApply={setMoFilters} />
       <Toolbar
         p={p}
         views={views.data ?? []}

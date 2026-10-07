@@ -1,0 +1,11 @@
+# Phase 7.5 S75-10 readiness notes (mock), only when "also read files" is ticked and a gate file
+# is there. The Citable line starts with the files read; {{$cites}} cites its first entries. One
+# note invents a number and one cites nothing: the server must drop both.
+default:
+  tool_calls:
+    - name: submit_result
+      arguments:
+        notes:
+          - {item: "*signed*", text: "(mock) {{$cites}}: the passages read as a signed agreement.", concern: false, cites: ["{{$cites}}"]}
+          - {item: "*signed*", text: "(mock) Signed on page 987654.", concern: false, cites: ["{{$cites}}"]}
+          - {item: "*signed*", text: "(mock) A note about no file at all.", concern: true, cites: []}

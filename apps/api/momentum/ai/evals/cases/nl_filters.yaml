@@ -1,0 +1,76 @@
+# Phase 7.5 plain-English filters (spec §9.2; S75-10 builds the engine on the portfolio surface,
+# S75-11 adds the list, board, calendar, My Tasks and search surfaces and grows this to 20+). The
+# filters are compared exactly, as names (relative dates stay as said: the server resolves them in
+# the person's timezone); unresolvable names are asked back with the real options.
+feature: nl_filters
+cases:
+  - id: november_at_risk_implementations
+    mock: true
+    input: "Implementations going live in November that are at risk"
+    expect:
+      filters_exact: {stages: [Implementation], health: [at_risk], fields: [{field: "Target go-live", in_month: November}]}
+      rows_max: 12
+  - id: region_option
+    mock: true
+    input: "Customers in EMEA"
+    expect: {filters_exact: {fields: [{field: Region, is_any: [EMEA]}]}}
+  - id: owner_me
+    mock: true
+    input: "Projects I own"
+    expect: {filters_exact: {owners: [me]}}
+  - id: health_and_stages
+    mock: true
+    input: "Off track or at risk in Go-live or Hypercare"
+    expect: {filters_exact: {health: [at_risk, off_track], stages: [Go-live, Hypercare]}}
+  - id: currency_bound
+    mock: true
+    input: "Deals over 200k"
+    expect: {filters_exact: {fields: [{field: "Contract value", on_or_after: "200000"}]}}
+  - id: overdue_only
+    mock: true
+    input: "Customers with overdue work"
+    expect: {filters_exact: {overdue_only: true}}
+  - id: unknown_stage_asked_with_options
+    mock: true
+    input: "Anything in the Pilot stage"
+    expect: {asks: true, options_include: [Discovery, Implementation]}
+  - id: unknown_person_asked
+    mock: true
+    input: "Projects owned by Zed"
+    expect: {asks: true, text_include_any: ["Zed"]}
+  - id: off_topic_asked
+    mock: true
+    input: "What's the weather like?"
+    expect: {asks: true}
+  - id: relative_dates_and_multi_select
+    mock: true
+    input: "Analytics customers going live in the next 60 days"
+    expect: {filters_exact: {fields: [{field: Products, is_any: [Analytics]}, {field: "Target go-live", on_or_after: today, on_or_before: "today+60"}]}}
+  - id: empty_field
+    mock: true
+    input: "Customers with no target go-live yet"
+    expect: {filters_exact: {fields: [{field: "Target go-live", has_value: false}]}}
+  - id: name_contains
+    mock: true
+    input: "Projects named Harbor"
+    expect: {filters_exact: {name_contains: Harbor}}
+  - id: unknown_field_asked_with_options
+    mock: true
+    input: "Customers by vendor tier gold"
+    expect: {asks: true, options_include: [Region, "Target go-live"]}
+  # --- live-only
+  - id: live_november_at_risk
+    input: "Implementations going live in November that are at risk"
+    expect: {filters_exact: {stages: [Implementation], health: [at_risk], fields: [{field: "Target go-live", in_month: November}]}}
+  - id: live_red_customers
+    input: "Which customers are in trouble?"
+    expect: {filters_exact: {health: [off_track]}}
+  - id: live_my_emea
+    input: "My EMEA customers"
+    expect: {filters_exact: {owners: [me], fields: [{field: Region, is_any: [EMEA]}]}}
+  - id: live_big_deals_in_contracts
+    input: "Contracts stage deals worth more than 250k"
+    expect: {filters_exact: {stages: [Contracts], fields: [{field: "Contract value", on_or_after: "250000"}]}}
+  - id: live_unknown_asks
+    input: "Projects in the Pilot stage"
+    expect: {asks: true}

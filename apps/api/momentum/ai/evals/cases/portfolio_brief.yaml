@@ -1,0 +1,57 @@
+# Phase 7.5 S75-10 portfolio brief (spec §8): facts computed as the person (the portfolio table and
+# its stage metrics), worded by Mo; every kept item cites a project or stage from the facts and
+# states only numbers from them; projects the person can't see are counted, never named.
+feature: portfolio_brief
+cases:
+  - id: brief_ravi_items
+    mock: true
+    expect: {paragraphs_min: 4, cites_from_facts: true, model_called: true}
+  - id: brief_numbers_only_from_facts
+    mock: true
+    expect: {numbers_from_facts: true, text_exclude: ["987654"]}
+  - id: brief_drops_uncited
+    mock: true
+    expect: {text_exclude: ["this item is dropped"], cites_from_facts: true}
+  - id: brief_kinds
+    mock: true
+    expect: {kinds_include: [slipping, sla, bottleneck, waiting_customer, decision]}
+  - id: brief_sofia
+    mock: true
+    user: sofia
+    expect: {paragraphs_min: 1, cites_from_facts: true, numbers_from_facts: true}
+  - id: brief_mei
+    mock: true
+    user: mei
+    expect: {paragraphs_min: 1, cites_from_facts: true}
+  - id: brief_no_private_projects
+    mock: true
+    expect: {no_leak: ["Zenith onboarding", "Secret Roadmap"]}
+  - id: brief_outsider_sees_nothing_no_call
+    mock: true
+    user: priya
+    expect: {no_model_call: true, hidden_min: 1, text_include_any: ["No projects here"]}
+  - id: brief_dev
+    mock: true
+    user: dev
+    expect: {cites_from_facts: true, numbers_from_facts: true}
+  - id: brief_admin
+    mock: true
+    user: admin
+    expect: {paragraphs_min: 4, cites_from_facts: true}
+  # --- live-only: judged against the facts
+  - id: live_brief_slipping_first
+    expect: {paragraphs_min: 2, cites_from_facts: true, numbers_from_facts: true}
+    judge: {rubric: "The headline names the most important problem from the facts; slipping customers come with their slip in days as given; nothing is invented."}
+  - id: live_brief_bottleneck
+    expect: {cites_from_facts: true, numbers_from_facts: true}
+    judge: {rubric: "Names the bottleneck stage with its median and target days exactly as the facts give them, if the facts have one; otherwise does not invent one."}
+  - id: live_brief_waiting_split
+    expect: {cites_from_facts: true}
+    judge: {rubric: "Separates customers waiting on the customer from work waiting on us (overdue or blocked), as the facts sort them."}
+  - id: live_brief_decisions
+    expect: {cites_from_facts: true}
+    judge: {rubric: "Decisions needed are only projects the facts list as off track, at risk or without a recent update, with the reason given there."}
+  - id: live_brief_no_padding
+    user: mei
+    expect: {cites_from_facts: true, numbers_from_facts: true}
+    judge: {rubric: "Short and plain; no praise, judgments or advice the facts don't support."}

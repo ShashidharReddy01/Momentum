@@ -42,6 +42,7 @@ def _api_router(settings: Settings) -> APIRouter:
     from momentum.agents.router import router as agents_install_router
     from momentum.ai.forms_intake_router import public_router as forms_intake_public_router
     from momentum.ai.forms_intake_router import router as forms_intake_router
+    from momentum.ai.insight_router import router as ai_insight_router
     from momentum.ai.router import router as ai_router
     from momentum.ai.templates_router import router as ai_templates_router
     from momentum.api.admin import router as admin_router
@@ -114,6 +115,7 @@ def _api_router(settings: Settings) -> APIRouter:
     api.include_router(asana_router)
     api.include_router(undo_router)
     api.include_router(ai_router)
+    api.include_router(ai_insight_router)
     api.include_router(ai_templates_router)
     api.include_router(agents_install_router)
     api.include_router(agents_router)

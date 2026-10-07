@@ -8,6 +8,8 @@ import { Input } from '@/components/ui/Input';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { formatRelative } from '@/lib/dates';
 import { useCreateDashboard, useDashboards } from './queries';
+import { MoMark } from '@/components/common/MoMark';
+import { NewWithMoDialog } from './MoDashboards';
 import { TemplateGallery } from './TemplateGallery';
 
 /** S6.5.1: the workspace's dashboards. Every member sees them; numbers inside are theirs. */
@@ -18,6 +20,7 @@ export function DashboardsPage() {
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState('');
   const [gallery, setGallery] = useState(false);
+  const [withMo, setWithMo] = useState(false);
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
@@ -30,6 +33,9 @@ export function DashboardsPage() {
     <div className="mx-auto max-w-5xl px-4 py-6 md:px-8">
       <header className="mb-6 flex items-center gap-3">
         <h1 className="flex-1 page-title">Dashboards</h1>
+        <Button variant="ai" onClick={() => setWithMo(true)}>
+          <MoMark size={13} /> New with Mo
+        </Button>
         <Button onClick={() => setGallery(true)}>
           <Icon icon={LayoutTemplate} size={15} /> From a template
         </Button>
@@ -37,6 +43,7 @@ export function DashboardsPage() {
           <Icon icon={Plus} size={15} /> New dashboard
         </Button>
       </header>
+      <NewWithMoDialog open={withMo} onOpenChange={setWithMo} />
       <TemplateGallery
         open={gallery}
         onOpenChange={setGallery}

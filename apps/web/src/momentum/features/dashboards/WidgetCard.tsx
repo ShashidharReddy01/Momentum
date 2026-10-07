@@ -37,6 +37,7 @@ import {
   type TaskRow,
   type WidgetKind,
 } from './queries';
+const ExplainDialog = lazy(() => import('./MoDashboards').then((m) => ({ default: m.ExplainDialog })));
 import { Aging, Funnel, Kpi, Note, ProjectTable, StackedBars, StageTime, Timeline } from './widgets2';
 
 // Recharts lives in its own chunk, fetched the first time a chart widget renders.
@@ -101,19 +102,27 @@ export function WidgetCard({
   const [asTable, setAsTable] = useState(false);
   const canTable = item.kind === 'bar' || item.kind === 'donut' || item.kind === 'line';
 
+  // S75-10: anyone viewing a saved chart can ask Mo to explain it
+  const canExplain = item.id !== null && item.kind !== 'note';
+  const [explaining, setExplaining] = useState(false);
   const menu =
-    editable && (onEdit || onRemove || onMove) ? (
+    (editable && (onEdit || onRemove || onMove)) || canExplain ? (
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <IconButton icon={MoreHorizontal} label={`${item.title}: options`} size="icon-sm" />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          {onEdit ? (
+          {canExplain ? (
+            <DropdownMenuItem onSelect={() => setExplaining(true)}>
+              <MoMark size={14} /> Explain
+            </DropdownMenuItem>
+          ) : null}
+          {editable && onEdit ? (
             <DropdownMenuItem onSelect={onEdit}>
               <Icon icon={Pencil} size={14} /> Edit chart
             </DropdownMenuItem>
           ) : null}
-          {onMove ? (
+          {editable && onMove ? (
             <>
               <DropdownMenuItem onSelect={() => onMove(-1)}>
                 <Icon icon={ArrowLeft} size={14} /> Move earlier
@@ -123,7 +132,7 @@ export function WidgetCard({
               </DropdownMenuItem>
             </>
           ) : null}
-          {onRemove ? (
+          {editable && onRemove ? (
             <>
               <DropdownMenuSeparator />
               <DropdownMenuItem onSelect={onRemove} className="text-crit">
@@ -157,6 +166,19 @@ export function WidgetCard({
     </div>
   ) : null;
 
+  const explainDialog =
+    explaining && item.id ? (
+      <Suspense fallback={null}>
+        <ExplainDialog
+          widgetId={item.id}
+          title={item.title}
+          filters={filters}
+          onOpenTask={onOpenTask}
+          onClose={() => setExplaining(false)}
+        />
+      </Suspense>
+    ) : null;
+
   if (TILE_KINDS.includes(item.kind)) {
     return (
       <section
@@ -173,6 +195,7 @@ export function WidgetCard({
           </div>
         </div>
         <div className="mt-1">{body}</div>
+        {explainDialog}
       </section>
     );
   }
@@ -208,6 +231,7 @@ export function WidgetCard({
         {menu}
       </header>
       <div className="min-h-0 flex-1">{body}</div>
+      {explainDialog}
     </section>
   );
 }

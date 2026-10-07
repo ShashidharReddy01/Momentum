@@ -1,0 +1,86 @@
+# Phase 7.5 S75-10 handoff note (spec §8): offered after a stage change; the facts are read as the
+# person (brief, project fields, milestones, open work, comments, people, files when ticked); every
+# kept item cites something from them and states only their numbers.
+feature: handoff
+cases:
+  - id: contracts_to_implementation
+    mock: true
+    customer_in: Contracts
+    to: Implementation
+    expect: {paragraphs_min: 5, cites_from_facts: true, numbers_from_facts: true, sections_include: [sold, scope, commitments, contacts, risks]}
+  - id: drops_invented_and_uncited
+    mock: true
+    customer_in: Contracts
+    to: Implementation
+    expect: {text_exclude: ["987654", "cites nothing"]}
+  - id: discovery_to_contracts
+    mock: true
+    customer_in: Discovery
+    to: Contracts
+    expect: {paragraphs_min: 3, cites_from_facts: true}
+  - id: implementation_to_go_live
+    mock: true
+    customer_in: Implementation
+    to: Go-live
+    expect: {paragraphs_min: 3, cites_from_facts: true, numbers_from_facts: true}
+  - id: hypercare_to_live
+    mock: true
+    customer_in: Hypercare
+    to: Live
+    expect: {paragraphs_min: 3, cites_from_facts: true}
+  - id: with_files_hostile_text_is_data
+    mock: true
+    customer_in: Go-live
+    to: Hypercare
+    read_files: true  # a sample file carries an injection line: its uncited claim is dropped
+    expect: {paragraphs_min: 1, cites_from_facts: true, numbers_from_facts: true, text_exclude: ["No risks at all"]}
+  - id: no_stage_named
+    mock: true
+    customer_in: Implementation
+    expect: {paragraphs_min: 3, cites_from_facts: true}
+  - id: consultant_drafts
+    mock: true
+    user: mei
+    customer_in: Implementation
+    to: Go-live
+    expect: {cites_from_facts: true, no_leak: ["Zenith"]}
+  - id: sales_drafts
+    mock: true
+    user: sofia
+    customer_in: Contracts
+    to: Implementation
+    expect: {cites_from_facts: true, numbers_from_facts: true}
+  - id: outsider_refused
+    mock: true
+    user: priya
+    pick_as: ravi
+    customer_in: Contracts
+    to: Implementation
+    expect: {error: not_found}
+  # --- live-only: judged against the facts
+  - id: live_contracts_to_implementation
+    customer_in: Contracts
+    to: Implementation
+    expect: {cites_from_facts: true, numbers_from_facts: true}
+    judge: {rubric: "What was sold (products, value) matches the fields; commitments carry the milestones' dates as given; contacts name the people on the project with their roles."}
+  - id: live_waiting
+    customer_in: Implementation
+    to: Go-live
+    expect: {cites_from_facts: true}
+    judge: {rubric: "Separates what's waiting on the customer from what's waiting on us, as the facts show; no invented items."}
+  - id: live_files
+    customer_in: Go-live
+    to: Hypercare
+    read_files: true
+    expect: {cites_from_facts: true, numbers_from_facts: true}
+    judge: {rubric: "Uses the file digests only for scope and commitments they actually state."}
+  - id: live_short
+    customer_in: Discovery
+    to: Contracts
+    expect: {cites_from_facts: true}
+    judge: {rubric: "One sentence per item; empty sections stay empty rather than padded."}
+  - id: live_no_invention
+    customer_in: Hypercare
+    to: Live
+    expect: {cites_from_facts: true, numbers_from_facts: true}
+    judge: {rubric: "No products, dates, people or promises the facts don't give."}

@@ -938,6 +938,110 @@
   },
   {
     "function": {
+      "description": "A portfolio's projects as its table shows them: stage, days in stage vs target, health, progress, open/overdue/blocked tasks, waiting on customer, target vs forecast date, slip days, next milestone and latest update. Filter by health, stage names, owner, overdue, slipping or waiting on the customer.",
+      "name": "get_portfolio_rows",
+      "parameters": {
+        "additionalProperties": false,
+        "properties": {
+          "health": {
+            "items": {
+              "enum": [
+                "on_track",
+                "at_risk",
+                "off_track",
+                "on_hold",
+                "complete",
+                "none"
+              ],
+              "type": "string"
+            },
+            "maxItems": 6,
+            "type": "array"
+          },
+          "limit": {
+            "default": 40,
+            "maximum": 60,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "overdue_only": {
+            "default": false,
+            "type": "boolean"
+          },
+          "owner": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "\"me\" or a name"
+          },
+          "portfolio": {
+            "description": "Portfolio name or id",
+            "maxLength": 200,
+            "type": "string"
+          },
+          "slipping_only": {
+            "default": false,
+            "description": "Forecast later than target",
+            "type": "boolean"
+          },
+          "stages": {
+            "description": "Stage names (the portfolio's stages)",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 12,
+            "type": "array"
+          },
+          "waiting_on_customer_only": {
+            "default": false,
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "portfolio"
+        ],
+        "type": "object"
+      }
+    },
+    "type": "function"
+  },
+  {
+    "function": {
+      "description": "Lifecycle numbers of a portfolio with stages: the funnel (projects reaching each stage, conversion), time in stage (median and 90th percentile days vs the target), aging (how long projects have been in their stage now, how many are past target) and the bottleneck stage.",
+      "name": "get_stage_metrics",
+      "parameters": {
+        "additionalProperties": false,
+        "properties": {
+          "portfolio": {
+            "description": "Portfolio name or id",
+            "maxLength": 200,
+            "type": "string"
+          },
+          "window_days": {
+            "default": 90,
+            "description": "Look back this many days",
+            "maximum": 730,
+            "minimum": 7,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "portfolio"
+        ],
+        "type": "object"
+      }
+    },
+    "type": "function"
+  },
+  {
+    "function": {
       "description": "Files the user can see, with where each lives: the files in this conversation, on a task, in a project, or matching a name. Use it to find 'the contract' or 'the attached workbook' before reading.",
       "name": "list_files",
       "parameters": {

@@ -75,7 +75,7 @@ class PortfolioStatusDraftOut(BaseModel):
 
 # ---------------- Phase 7.5: portfolio v2 (spec §5.2-§5.6) ----------------
 
-ConditionOp = Literal["is", "is_not", "any", "empty", "set"]
+ConditionOp = Literal["is", "is_not", "any", "empty", "set", "gte", "lte"]
 SortDir = Literal["asc", "desc"]
 
 

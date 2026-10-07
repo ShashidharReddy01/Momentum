@@ -28,6 +28,7 @@ import { useProjectFieldDefs, type Field } from '@/features/fields';
 import { cn } from '@/lib/cn';
 import { day, money } from './cells';
 import type { PortfolioDetail } from './queries';
+import { HandoffOffer, ReadinessDialog, ReadWithMo } from './MoPortfolio';
 import { gateChecklist, useMoveStage, usePortfolioRows, type Readiness, type RowV2 } from './v2queries';
 
 const HEALTH_DOT: Record<string, string> = {
@@ -53,6 +54,9 @@ export function PortfolioBoard({ p }: { p: PortfolioDetail }) {
   const defs = useProjectFieldDefs();
   const move = useMoveStage(p.id);
   const [pending, setPending] = useState<Pending | null>(null);
+  // S75-10: "Check readiness for…" from a card, and the handoff offered after a move
+  const [checking, setChecking] = useState<{ row: RowV2; to: Option } | null>(null);
+  const [moved, setMoved] = useState<{ id: string; name: string; stage: string } | null>(null);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
   const fields = useMemo(() => new Map((defs.data ?? []).map((f) => [f.id, f])), [defs.data]);
   const stage = p.stage_field_id ? fields.get(p.stage_field_id) : undefined;
@@ -82,12 +86,17 @@ export function PortfolioBoard({ p }: { p: PortfolioDetail }) {
 
   const byId = new Map(rows.data.rows.map((r) => [r.id, r]));
   const targets = (p.stage_targets ?? {}) as Record<string, number>;
+  const gates = (p.stage_gates ?? {}) as Record<string, unknown>;
+  const gated = options.filter((o) => gates[o.id]);
   const tryMove = (row: RowV2, to: Option, override = false) => {
     if (row.stage?.option_id === to.id) return;
     move.mutate(
       { projectId: row.id, to: to.id, override, label: to.label },
       {
-        onSuccess: () => setPending(null),
+        onSuccess: () => {
+          setPending(null);
+          setMoved({ id: row.id, name: row.name, stage: to.label });
+        },
         onError: (e) => {
           const r = gateChecklist(e);
           if (r) setPending({ row, to, readiness: r });
@@ -103,6 +112,16 @@ export function PortfolioBoard({ p }: { p: PortfolioDetail }) {
 
   return (
     <>
+      {moved ? (
+        <div className="mb-3">
+          <HandoffOffer
+            key={`${moved.id}:${moved.stage}`}
+            project={moved}
+            stage={moved.stage}
+            onDismiss={() => setMoved(null)}
+          />
+        </div>
+      ) : null}
       <DndContext sensors={sensors} onDragEnd={onDragEnd}>
         <div className="flex gap-3 overflow-x-auto pb-2" role="list" aria-label={`Stages of ${p.name}`}>
           {(rows.data.groups ?? []).map((g) => {
@@ -128,6 +147,8 @@ export function PortfolioBoard({ p }: { p: PortfolioDetail }) {
                     valueField={valueField}
                     target={targets[option.id] ?? null}
                     onMove={(to) => tryMove(row, to)}
+                    gated={gated}
+                    onCheck={(to) => setChecking({ row, to })}
                   />
                 ))}
               </Column>
@@ -135,7 +156,16 @@ export function PortfolioBoard({ p }: { p: PortfolioDetail }) {
           })}
         </div>
       </DndContext>
+      {checking ? (
+        <ReadinessDialog
+          portfolioId={p.id}
+          project={checking.row}
+          stage={checking.to}
+          onClose={() => setChecking(null)}
+        />
+      ) : null}
       <GateDialog
+        portfolioId={p.id}
         pending={pending}
         busy={move.isPending}
         onCancel={() => setPending(null)}
@@ -193,12 +223,16 @@ function Card({
   valueField,
   target,
   onMove,
+  gated,
+  onCheck,
 }: {
   row: RowV2;
   options: Option[];
   valueField: Field | undefined;
   target: number | null;
   onMove: (to: Option) => void;
+  gated: Option[];
+  onCheck: (to: Option) => void;
 }) {
   const drag = useDraggable({ id: row.id, disabled: !row.can_edit });
   const value = valueField ? row.fields[valueField.id] : undefined;
@@ -253,6 +287,12 @@ function Card({
                   {o.label}
                 </DropdownMenuItem>
               ))}
+              {gated.length ? <DropdownMenuLabel>Check readiness for…</DropdownMenuLabel> : null}
+              {gated.map((o) => (
+                <DropdownMenuItem key={`check:${o.id}`} onSelect={() => onCheck(o)}>
+                  {o.label} readiness
+                </DropdownMenuItem>
+              ))}
             </DropdownMenuContent>
           </DropdownMenu>
         ) : null}
@@ -284,11 +324,13 @@ function Card({
 
 /** The gate's checklist: met and missing, each with a link to what to open. */
 function GateDialog({
+  portfolioId,
   pending,
   busy,
   onCancel,
   onOverride,
 }: {
+  portfolioId: string;
   pending: Pending | null;
   busy: boolean;
   onCancel: () => void;
@@ -318,6 +360,9 @@ function GateDialog({
               </li>
             ))}
           </ul>
+          {r.items.some((i) => i.kind === 'file' && i.met) ? (
+            <ReadWithMo portfolioId={portfolioId} projectId={pending!.row.id} to={r.stage} />
+          ) : null}
           <div className="flex justify-end gap-2">
             <Button variant="ghost" size="sm" onClick={onCancel}>
               Cancel

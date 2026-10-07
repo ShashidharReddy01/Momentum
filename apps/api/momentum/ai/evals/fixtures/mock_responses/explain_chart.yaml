@@ -1,0 +1,12 @@
+# Phase 7.5 S75-10 "Explain this chart" (mock). The user message holds the widget's numbers as
+# data and a "Citable:" line; {{$cites}} cites its first entries. Each answer also carries one
+# paragraph with an invented number and one citing nothing: the server must drop both.
+default:
+  tool_calls:
+    - name: submit_result
+      arguments:
+        paragraphs:
+          - {text: "(mock) What this chart shows, from its own numbers: {{$cites}}.", cites: ["{{$cites}}"]}
+          - {text: "(mock) The biggest mark, and what's behind it: {{$cites}}.", cites: ["{{$cites}}"]}
+          - {text: "(mock) It grew by 987654 since last week.", cites: ["{{$cites}}"]}
+          - {text: "(mock) This paragraph cites nothing and is dropped.", cites: []}

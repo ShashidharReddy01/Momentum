@@ -505,6 +505,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/ai/dashboards/draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Draft a dashboard from a sentence, with real numbers (saves nothing) */
+        post: operations["ai_dashboard_draft_api_v1_ai_dashboards_draft_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/ai/dashboards/query": {
         parameters: {
             query?: never;
@@ -522,6 +539,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/ai/dashboards/widgets/{widget_id}/explain": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Explain a chart: changes and outliers, from its own numbers (stores nothing) */
+        post: operations["ai_explain_chart_api_v1_ai_dashboards_widgets__widget_id__explain_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/ai/feedback": {
         parameters: {
             query?: never;
@@ -533,6 +567,23 @@ export interface paths {
         /** Rate an answer or action 👍/👎 */
         put: operations["put_ai_feedback_api_v1_ai_feedback_put"];
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ai/filters": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Turn a sentence into the view's filters (nothing applies until Apply) */
+        post: operations["ai_filters_api_v1_ai_filters_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -626,6 +677,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/ai/portfolios/{portfolio_id}/brief": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Brief me on a portfolio: slipping, bottleneck, waiting, decisions (stores nothing) */
+        post: operations["ai_portfolio_brief_api_v1_ai_portfolios__portfolio_id__brief_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/ai/portfolios/{portfolio_id}/lines": {
         parameters: {
             query?: never;
@@ -637,6 +705,23 @@ export interface paths {
         put?: never;
         /** One line per visible project in a portfolio, from its numbers (stores nothing) */
         post: operations["ai_portfolio_lines_api_v1_ai_portfolios__portfolio_id__lines_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ai/portfolios/{portfolio_id}/projects/{project_id}/readiness": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Check readiness for a stage: the gate's checklist, plus Mo's notes on its files when asked (stores nothing) */
+        post: operations["ai_readiness_api_v1_ai_portfolios__portfolio_id__projects__project_id__readiness_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -672,6 +757,23 @@ export interface paths {
         put?: never;
         /** Plan a project from a brief (a previewed AI action; creates nothing) */
         post: operations["ai_project_from_brief_api_v1_ai_projects_from_brief_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ai/projects/{project_id}/handoff": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Draft a handoff note for the next stage (stores nothing) */
+        post: operations["ai_handoff_api_v1_ai_projects__project_id__handoff_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1015,6 +1117,23 @@ export interface paths {
         put?: never;
         /** The tasks (or projects) behind one bar, slice, point, stage or tile, as the viewer sees them */
         post: operations["drill_api_v1_dashboards_drill_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/dashboards/from-draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create the dashboard Mo drafted from a sentence, after its preview (undoable) */
+        post: operations["from_draft_api_v1_dashboards_from_draft_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4995,6 +5114,43 @@ export interface components {
             /** Brief */
             brief: string;
         };
+        /** BriefItemOut */
+        BriefItemOut: {
+            /** Cites */
+            cites: string[];
+            /** Kind */
+            kind: string;
+            /** Project Ids */
+            project_ids: string[];
+            /** Text */
+            text: string;
+        };
+        /** BriefOut */
+        BriefOut: {
+            /**
+             * Ai
+             * @description False when nothing needed Mo (no model call)
+             */
+            ai: boolean;
+            /** Headline */
+            headline: string;
+            /**
+             * Hidden
+             * @description Projects in the portfolio the viewer can't see (not named)
+             */
+            hidden: number;
+            /** Items */
+            items: components["schemas"]["BriefItemOut"][];
+            /** Portfolio */
+            portfolio: string;
+            /**
+             * Portfolio Id
+             * Format: uuid
+             */
+            portfolio_id: string;
+            /** @description The brief as a portfolio status update, for the preview to confirm */
+            status_update: components["schemas"]["StatusUpdateIn"];
+        };
         /**
          * BulkSetFieldIn
          * @description Phase 7.5 (spec §5.4): "Set field…" on the selected rows, one undo for all of them.
@@ -5101,6 +5257,13 @@ export interface components {
             preview?: boolean | null;
             /** Summary */
             summary?: string | null;
+        };
+        /** ChipOut */
+        ChipOut: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
         };
         /** CitationOut */
         CitationOut: {
@@ -5403,6 +5566,47 @@ export interface components {
             /** Widgets */
             widgets: components["schemas"]["WidgetOut"][];
         };
+        /** DashboardDraftIn */
+        DashboardDraftIn: {
+            /**
+             * Portfolio Id
+             * @description The portfolio the person is on, if any
+             */
+            portfolio_id?: string | null;
+            /** Text */
+            text: string;
+        };
+        /** DashboardDraftOut */
+        DashboardDraftOut: {
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+            filters?: components["schemas"]["DashboardFilters"] | null;
+            /**
+             * Left Out
+             * @description Parts of the sentence no widget can show
+             */
+            left_out?: string[];
+            /**
+             * Name
+             * @default
+             */
+            name: string;
+            /** Notes */
+            notes?: string[];
+            /** Options */
+            options?: string[];
+            /** Portfolio */
+            portfolio?: string | null;
+            /** Portfolio Id */
+            portfolio_id?: string | null;
+            /** Question */
+            question?: string | null;
+            /** Widgets */
+            widgets?: components["schemas"]["DraftWidgetOut"][];
+        };
         /**
          * DashboardFilters
          * @description Saved on a dashboard (editors) or passed for one view (anyone): applied to every widget
@@ -5628,6 +5832,20 @@ export interface components {
             /** Title */
             title: string;
         };
+        /** DraftWidgetOut */
+        DraftWidgetOut: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "count" | "bar" | "line" | "donut" | "list" | "kpi" | "stacked_bar" | "table" | "funnel" | "stage_time" | "aging" | "timeline" | "note";
+            /** Query Spec */
+            query_spec: components["schemas"]["QuerySpec"] | (components["schemas"]["TasksSpec"] | components["schemas"]["ProjectsSpec"] | components["schemas"]["StageSpec"] | components["schemas"]["SnapshotSpec"] | components["schemas"]["NoteSpec"]);
+            result: components["schemas"]["QueryResultOut"] | null;
+            /** Title */
+            title: string;
+            viz: components["schemas"]["VizIn"];
+        };
         /**
          * DrillAnyIn
          * @description Phase 7.5: the drill for any spec. A v1 spec (no filters) drills exactly as ``DrillIn``;
@@ -5748,6 +5966,39 @@ export interface components {
              */
             type: "event";
         };
+        /** ExplainIn */
+        ExplainIn: {
+            /** @description The viewer's filters for this view (the saved ones if absent) */
+            filters?: components["schemas"]["DashboardFilters"] | null;
+        };
+        /** ExplainOut */
+        ExplainOut: {
+            /** Ai */
+            ai: boolean;
+            /**
+             * Links
+             * @description What's behind the biggest mark (Open the tasks)
+             */
+            links: components["schemas"]["LinkOut"][];
+            /** Paragraphs */
+            paragraphs: components["schemas"]["ExplainParagraphOut"][];
+            /** Sample Label */
+            sample_label?: string | null;
+            /** Title */
+            title: string;
+            /**
+             * Widget Id
+             * Format: uuid
+             */
+            widget_id: string;
+        };
+        /** ExplainParagraphOut */
+        ExplainParagraphOut: {
+            /** Cites */
+            cites: string[];
+            /** Text */
+            text: string;
+        };
         /** FavoriteIn */
         FavoriteIn: {
             /** After Id */
@@ -5851,7 +6102,7 @@ export interface components {
              * @default is
              * @enum {string}
              */
-            op: "is" | "is_not" | "any" | "empty" | "set";
+            op: "is" | "is_not" | "any" | "empty" | "set" | "gte" | "lte";
             /** Value */
             value?: unknown;
         };
@@ -6004,6 +6255,27 @@ export interface components {
              */
             type: "project" | "task" | "comment" | "portfolio";
         };
+        /** FilterDraftOut */
+        FilterDraftOut: {
+            /** Chips */
+            chips: components["schemas"]["ChipOut"][];
+            /**
+             * Filters
+             * @description In the surface's own filter schema
+             */
+            filters: {
+                [key: string]: unknown;
+            };
+            /**
+             * Options
+             * @description Real options to pick from
+             */
+            options?: string[];
+            /** Question */
+            question?: string | null;
+            /** Surface */
+            surface: string;
+        };
         /**
          * FilterNameOut
          * @description A readable name for one value of a list filter (a project, section, person, tag or
@@ -6020,6 +6292,18 @@ export interface components {
             key: string;
             /** Label */
             label: string;
+        };
+        /** FiltersIn */
+        FiltersIn: {
+            /** Portfolio Id */
+            portfolio_id?: string | null;
+            /**
+             * Surface
+             * @constant
+             */
+            surface: "portfolio";
+            /** Text */
+            text: string;
         };
         /** FollowerIn */
         FollowerIn: {
@@ -6225,6 +6509,25 @@ export interface components {
             tasks: number;
             /** Team */
             team: string;
+        };
+        /**
+         * FromDraftIn
+         * @description S75-10: create the dashboard Mo drafted from a sentence (after its preview), in one step.
+         *     The widgets are checked again like any hand-built ones.
+         */
+        FromDraftIn: {
+            /** Description */
+            description?: string | null;
+            filters?: components["schemas"]["DashboardFilters"];
+            /** Name */
+            name: string;
+            /**
+             * Prompt
+             * @description The sentence Mo drafted it from
+             */
+            prompt: string;
+            /** Widgets */
+            widgets: components["schemas"]["WidgetIn"][];
         };
         /** FromTemplateIn */
         FromTemplateIn: {
@@ -6570,6 +6873,46 @@ export interface components {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
         };
+        /** HandoffIn */
+        HandoffIn: {
+            /**
+             * Read Files
+             * @default false
+             */
+            read_files: boolean;
+            /**
+             * To Stage
+             * @description The stage's name
+             */
+            to_stage?: string | null;
+        };
+        /** HandoffItemOut */
+        HandoffItemOut: {
+            /** Cites */
+            cites: string[];
+            /** Text */
+            text: string;
+        };
+        /** HandoffOut */
+        HandoffOut: {
+            /** Files Read */
+            files_read: string[];
+            /** Project */
+            project: string;
+            /**
+             * Project Id
+             * Format: uuid
+             */
+            project_id: string;
+            /** Sections */
+            sections: {
+                [key: string]: components["schemas"]["HandoffItemOut"][];
+            };
+            /** @description The note as a project status update, for the preview to confirm */
+            status_update: components["schemas"]["StatusUpdateIn"];
+            /** To Stage */
+            to_stage: string | null;
+        };
         /** HomeCounts */
         HomeCounts: {
             /** Due Today */
@@ -6744,6 +7087,21 @@ export interface components {
             status: string;
             /** Title */
             title: string;
+        };
+        /** LinkOut */
+        LinkOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "task" | "project";
+            /** Label */
+            label: string;
         };
         /** ListMeta */
         ListMeta: {
@@ -8377,7 +8735,7 @@ export interface components {
              * @default is
              * @enum {string}
              */
-            op: "is" | "is_not" | "any" | "empty" | "set";
+            op: "is" | "is_not" | "any" | "empty" | "set" | "gte" | "lte";
             /** Value */
             value?: unknown;
         };
@@ -9167,6 +9525,45 @@ export interface components {
             emoji: string;
             /** User Ids */
             user_ids: string[];
+        };
+        /** ReadinessCheckIn */
+        ReadinessCheckIn: {
+            /**
+             * Read Files
+             * @description Also let Mo read the gate's files
+             * @default false
+             */
+            read_files: boolean;
+            /**
+             * To
+             * @description The stage option id
+             */
+            to: string;
+        };
+        /** ReadinessCheckOut */
+        ReadinessCheckOut: {
+            /** Ai */
+            ai: boolean;
+            /** Files Read */
+            files_read: string[];
+            /** Notes */
+            notes: components["schemas"]["ReadinessNoteOut"][];
+            /** Project */
+            project: string;
+            readiness: components["schemas"]["ReadinessOut"];
+            /** Unreadable */
+            unreadable: string[];
+        };
+        /** ReadinessNoteOut */
+        ReadinessNoteOut: {
+            /** Cites */
+            cites: string[];
+            /** Concern */
+            concern: boolean;
+            /** Item */
+            item: string;
+            /** Text */
+            text: string;
         };
         /** ReadinessOut */
         ReadinessOut: {
@@ -12829,6 +13226,39 @@ export interface operations {
             };
         };
     };
+    ai_dashboard_draft_api_v1_ai_dashboards_draft_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DashboardDraftIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DashboardDraftOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     ai_ask_chart_api_v1_ai_dashboards_query_post: {
         parameters: {
             query?: never;
@@ -12862,6 +13292,41 @@ export interface operations {
             };
         };
     };
+    ai_explain_chart_api_v1_ai_dashboards_widgets__widget_id__explain_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                widget_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExplainIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExplainOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     put_ai_feedback_api_v1_ai_feedback_put: {
         parameters: {
             query?: never;
@@ -12882,6 +13347,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["FeedbackOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ai_filters_api_v1_ai_filters_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FiltersIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FilterDraftOut"];
                 };
             };
             /** @description Validation Error */
@@ -13108,6 +13606,37 @@ export interface operations {
             };
         };
     };
+    ai_portfolio_brief_api_v1_ai_portfolios__portfolio_id__brief_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                portfolio_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BriefOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     ai_portfolio_lines_api_v1_ai_portfolios__portfolio_id__lines_post: {
         parameters: {
             query?: never;
@@ -13126,6 +13655,42 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PortfolioLinesOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ai_readiness_api_v1_ai_portfolios__portfolio_id__projects__project_id__readiness_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                portfolio_id: string;
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReadinessCheckIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReadinessCheckOut"];
                 };
             };
             /** @description Validation Error */
@@ -13212,6 +13777,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["FromBriefOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ai_handoff_api_v1_ai_projects__project_id__handoff_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HandoffIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HandoffOut"];
                 };
             };
             /** @description Validation Error */
@@ -13932,6 +14532,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DrillOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    from_draft_api_v1_dashboards_from_draft_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FromDraftIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationOut_DashboardDetailOut_"];
                 };
             };
             /** @description Validation Error */

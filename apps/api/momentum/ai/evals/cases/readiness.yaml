@@ -1,0 +1,85 @@
+# Phase 7.5 S75-10 readiness check (spec §8): the gate's checklist is computed in code; Mo reads the
+# gate's files only when "also read files" is ticked and a file is there (otherwise no model
+# call); every kept note cites a file it read and states only numbers from the facts.
+feature: readiness
+cases:
+  - id: checklist_only_no_call
+    mock: true
+    customer_in: Hypercare
+    expect: {no_model_call: true, checklist: [[field, true], [milestone, true], [file, true]]}
+  - id: reads_the_signed_contract
+    mock: true
+    customer_in: Hypercare
+    read_files: true
+    expect: {model_called: true, paragraphs_min: 1, cites_from_facts: true, files_read: 1}
+  - id: notes_drop_invented_numbers
+    mock: true
+    customer_in: Live
+    read_files: true
+    expect: {paragraphs_min: 1, cites_from_facts: true, text_exclude: ["987654", "no file at all"]}
+  - id: go_live_customer_reads
+    mock: true
+    customer_in: Go-live
+    read_files: true
+    expect: {model_called: true, files_read: 1, cites_from_facts: true}
+  - id: presales_nothing_to_read_no_call
+    mock: true
+    customer_in: Pre-sales
+    read_files: true
+    expect: {no_model_call: true, files_read: 0}
+  - id: contracts_unsigned_no_call
+    mock: true
+    customer_in: Contracts
+    read_files: true
+    expect: {no_model_call: true, files_read: 0}
+  - id: gate_without_files_no_call
+    mock: true
+    customer_in: Go-live
+    to: Live
+    read_files: true
+    expect: {no_model_call: true, checklist: [[milestone, false]]}
+  - id: stage_without_gate_is_empty
+    mock: true
+    customer_in: Discovery
+    to: Contracts
+    read_files: true
+    expect: {no_model_call: true, checklist: []}
+  - id: consultant_reads
+    mock: true
+    user: mei
+    customer_in: Hypercare
+    read_files: true
+    expect: {model_called: true, cites_from_facts: true}
+  - id: outsider_refused
+    mock: true
+    user: priya
+    pick_as: ravi
+    customer_in: Hypercare
+    read_files: true
+    expect: {error: not_found}
+  # --- live-only: judged against the file digests
+  - id: live_signed_contract
+    customer_in: Hypercare
+    read_files: true
+    expect: {cites_from_facts: true}
+    judge: {rubric: "Says whether the contract file reads as signed, from its passages; flags a concern only if the digest shows one."}
+  - id: live_no_invention
+    customer_in: Live
+    read_files: true
+    expect: {cites_from_facts: true}
+    judge: {rubric: "Doesn't claim signatures, dates or parties the digest doesn't show."}
+  - id: live_go_live
+    customer_in: Go-live
+    read_files: true
+    expect: {cites_from_facts: true}
+    judge: {rubric: "One short note per file, about whether it meets its checklist item."}
+  - id: live_consultant
+    user: mei
+    customer_in: Hypercare
+    read_files: true
+    expect: {cites_from_facts: true}
+    judge: {rubric: "Plain words, no restating of the checklist."}
+  - id: live_no_call
+    customer_in: Pre-sales
+    read_files: true
+    expect: {no_model_call: true}

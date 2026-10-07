@@ -1,0 +1,80 @@
+# Phase 7.5 S75-10 dashboard from a sentence (spec §8): Mo picks widgets from the recipes (the role
+# templates' widgets), the server binds them to the portfolio by name and counts every widget as
+# the person; anything it can't map or resolve is asked back or listed as left out.
+feature: dashboard_draft
+cases:
+  - id: implementations_example
+    mock: true
+    input: "A dashboard for my implementations: go-lives next 90 days, slipping projects, waiting on customer by age, RAID by severity"
+    expect:
+      draft_exact: {portfolio: "Customer onboarding", mine: true, widgets: [go_lives_next_90_days, open_raid_by_customer_split_by_severity, slipping, waiting_on_customer_open_tasks_by_customer]}
+      widgets_with_numbers: 4
+  - id: leadership
+    mock: true
+    input: "A leadership view: funnel, time in stage, revenue in flight and customers at risk"
+    expect:
+      draft_exact: {portfolio: "Customer onboarding", mine: false, widgets: [customers_at_risk, lifecycle_funnel_180_days, revenue_in_flight, time_in_stage_vs_target]}
+      widgets_with_numbers: 4
+  - id: sales_mine
+    mock: true
+    user: sofia
+    input: "A sales dashboard: my pipeline value, deal aging, value by stage"
+    expect: {draft_exact: {portfolio: "Customer onboarding", mine: true, widgets: [deal_aging, my_pipeline_value, value_by_stage]}}
+  - id: portfolio_inferred_when_only_one_has_stages
+    mock: true
+    input: "Hypercare at a glance"
+    expect: {draft_exact: {portfolio: "Customer onboarding", mine: false, widgets: [hypercare_aging_vs_30_days, hypercare_issues_by_customer]}}
+  - id: portfolio_from_the_page
+    mock: true
+    on_portfolio: true
+    input: "Hypercare at a glance, please"
+    expect: {draft_exact: {portfolio: "Customer onboarding", mine: false, widgets: [hypercare_aging_vs_30_days, hypercare_issues_by_customer]}}
+  - id: unknown_widget_noted
+    mock: true
+    input: "Delivery with a burndown and the control tower"
+    expect: {draft_exact: {portfolio: "Customer onboarding", mine: false, widgets: [control_tower]}, text_include_any: ["no widget called"]}
+  - id: only_unknown_asks_with_options
+    mock: true
+    input: "Give me only a burndown"
+    expect: {asks: true}
+  - id: unknown_portfolio_asks_with_options
+    mock: true
+    input: "A control tower for Partner rollouts"
+    expect: {asks: true, options_include: ["Customer onboarding"]}
+  - id: off_topic_asks
+    mock: true
+    input: "Write me a poem"
+    expect: {asks: true}
+  - id: left_out_listed
+    mock: true
+    input: "Go-lives next 30 days and NPS by customer"
+    expect: {draft_exact: {portfolio: "Customer onboarding", mine: false, widgets: [go_lives_next_30_days]}, text_include_any: ["NPS"]}
+  - id: duplicates_once
+    mock: true
+    input: "Slipping twice and the control tower"
+    expect: {draft_exact: {portfolio: "Customer onboarding", mine: false, widgets: [control_tower, slipping]}}
+  - id: consultant_tasks
+    mock: true
+    user: mei
+    input: "Consultant load and my blocked tasks and what's due this week"
+    expect: {draft_exact: {portfolio: "Customer onboarding", mine: true, widgets: [consultant_load_open_tasks_by_assignee, my_blocked_tasks, my_tasks_due_this_week_across_customers]}, widgets_with_numbers: 3}
+  # --- live-only
+  - id: live_implementations_example
+    input: "A dashboard for my implementations: go-lives next 90 days, slipping projects, waiting on customer by age, RAID by severity"
+    expect: {widgets_with_numbers: 3}
+    judge: {rubric: "The widgets cover go-lives in the next 90 days, slipping projects, waiting on the customer and RAID by severity; mine is set; nothing unrelated added."}
+  - id: live_leadership
+    input: "What would a VP of customer success want to see each Monday?"
+    expect: {widgets_with_numbers: 3}
+    judge: {rubric: "Picks portfolio-level widgets (funnel, time in stage, revenue or customers at risk), not personal task lists."}
+  - id: live_left_out
+    input: "Go-lives next 30 days and NPS by customer"
+    expect: {text_include_any: ["NPS"]}
+  - id: live_off_topic
+    input: "Book me a flight to Lisbon"
+    expect: {asks: true}
+  - id: live_consultant
+    user: mei
+    input: "My week as a consultant across customers"
+    expect: {widgets_with_numbers: 2}
+    judge: {rubric: "Picks the person's own task widgets (due this week, blocked, by customer) and sets mine."}

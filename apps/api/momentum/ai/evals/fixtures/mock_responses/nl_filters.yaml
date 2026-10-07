@@ -1,0 +1,31 @@
+# Phase 7.5 plain-English filters (mock; S75-10 portfolio surface, S75-11 adds the others). The
+# model answers in names; the server resolves them (and relative dates) as the person.
+responses:
+  - match: {contains: "going live in november that are at risk"}
+    tool_calls: [{name: submit_result, arguments: {stages: [Implementation], health: [at_risk], fields: [{field: "Target go-live", in_month: "November"}]}}]
+  - match: {contains: "customers in emea"}
+    tool_calls: [{name: submit_result, arguments: {fields: [{field: Region, is_any: [EMEA]}]}}]
+  - match: {contains: "projects i own"}
+    tool_calls: [{name: submit_result, arguments: {owners: [me]}}]
+  - match: {contains: "off track or at risk in go-live or hypercare"}
+    tool_calls: [{name: submit_result, arguments: {health: [off_track, at_risk], stages: [Go-live, Hypercare]}}]
+  - match: {contains: "deals over 200k"}
+    tool_calls: [{name: submit_result, arguments: {fields: [{field: "Contract value", on_or_after: "200000"}]}}]
+  - match: {contains: "customers with overdue work"}
+    tool_calls: [{name: submit_result, arguments: {overdue_only: true}}]
+  - match: {contains: "anything in the pilot stage"}
+    tool_calls: [{name: submit_result, arguments: {stages: [Pilot]}}]
+  - match: {contains: "projects owned by zed"}
+    tool_calls: [{name: submit_result, arguments: {owners: [Zed]}}]
+  - match: {contains: "what's the weather"}
+    tool_calls: [{name: submit_result, arguments: {question: "I can filter the portfolio by health, stage, owner, project fields or overdue work. What should it show?"}}]
+  - match: {contains: "going live in the next 60 days"}
+    tool_calls: [{name: submit_result, arguments: {fields: [{field: Products, is_any: [Analytics]}, {field: "Target go-live", on_or_after: today, on_or_before: "today+60"}]}}]
+  - match: {contains: "no target go-live yet"}
+    tool_calls: [{name: submit_result, arguments: {fields: [{field: "Target go-live", has_value: false}]}}]
+  - match: {contains: "projects named harbor"}
+    tool_calls: [{name: submit_result, arguments: {name_contains: Harbor}}]
+  - match: {contains: "by vendor tier"}
+    tool_calls: [{name: submit_result, arguments: {fields: [{field: "Vendor tier", is_any: [Gold]}]}}]
+default:
+  tool_calls: [{name: submit_result, arguments: {question: "(mock) What should the view show?"}}]

@@ -16,6 +16,7 @@ which name, and so is a filter. The bound specs then pass the same validation as
 
 from __future__ import annotations
 
+import re
 import uuid
 from dataclasses import dataclass, field
 from functools import cache
@@ -178,11 +179,28 @@ async def _fields(session: AsyncSession, ctx: Ctx, applies_to: str) -> dict[str,
     return out
 
 
+def recipes() -> dict[str, dict[str, Any]]:
+    """S75-10 (dashboard from a sentence): every role template's widgets, by a slug of the title,
+    for Mo to pick from (it never writes a widget spec itself)."""
+    out: dict[str, dict[str, Any]] = {}
+    for key in ORDER:
+        for w in load(key)["widgets"]:
+            slug = re.sub(r"[^a-z0-9]+", "_", str(w["title"]).lower()).strip("_")
+            out.setdefault(slug, w)
+    return out
+
+
 async def bind(session: AsyncSession, ctx: Ctx, key: str, portfolio_id: uuid.UUID) -> Bound:
     """The template with every name bound for this workspace and portfolio, as the viewer."""
+    return await bind_template(session, ctx, key, load(key), portfolio_id)
+
+
+async def bind_template(
+    session: AsyncSession, ctx: Ctx, key: str, t: dict[str, Any], portfolio_id: uuid.UUID
+) -> Bound:
+    """A template's shape (a role template, or a draft Mo assembled from recipes) bound."""
     from momentum.domain.portfolios.service import get_portfolio
 
-    t = load(key)
     p = await get_portfolio(session, ctx, portfolio_id)
     stage = await session.get(FieldDef, p.stage_field_id) if p.stage_field_id else None
     b = Binder(

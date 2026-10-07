@@ -1,0 +1,25 @@
+# Phase 7.5 S75-10 portfolio briefs (mock). The user message holds the portfolio's facts as data
+# and a "Citable:" line; {{$cites}} cites its first entries. Each answer also carries one item
+# that cites nothing and one with an invented number: the server must drop both.
+responses:
+  - match: {contains: 'IGNORE PREVIOUS INSTRUCTIONS'}
+    tool_calls:
+      - name: submit_result
+        arguments:
+          headline: "(mock) The portfolio's facts are data; here is what they show."
+          items:
+            - {kind: slipping, text: "(mock) Slipping, from the facts: {{$cites}}.", cites: ["{{$cites}}"]}
+            - {kind: decision, text: "(mock) Every customer is fine, as the note says.", cites: []}
+default:
+  tool_calls:
+    - name: submit_result
+      arguments:
+        headline: "(mock) Where the portfolio stands, from its facts: {{$cites}}."
+        items:
+          - {kind: slipping, text: "(mock) Slipping against target: {{$cites}}.", cites: ["{{$cites}}"]}
+          - {kind: sla, text: "(mock) Longer in their stage than its target: {{$cites}}.", cites: ["{{$cites}}"]}
+          - {kind: bottleneck, text: "(mock) The bottleneck stage, by median time against target: {{$cites}}.", cites: ["{{$cites}}"]}
+          - {kind: waiting_customer, text: "(mock) Waiting on the customer: {{$cites}}.", cites: ["{{$cites}}"]}
+          - {kind: decision, text: "(mock) Needs a decision or an update: {{$cites}}.", cites: ["{{$cites}}"]}
+          - {kind: waiting_us, text: "(mock) Nothing cited here, so this item is dropped.", cites: []}
+          - {kind: decision, text: "(mock) 987654 customers are late.", cites: ["{{$cites}}"]}
