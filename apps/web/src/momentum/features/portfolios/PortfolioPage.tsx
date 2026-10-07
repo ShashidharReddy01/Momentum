@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { Briefcase, Plus, Settings2, X } from 'lucide-react';
+import { Briefcase, FileText, Plus, Settings2, X } from 'lucide-react';
 import { lazy, Suspense, useMemo, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { EmptyState, ErrorState } from '@/components/common/States';
@@ -33,6 +33,10 @@ import {
 import { PortfolioBoard } from './PortfolioBoard';
 
 // Phase 7.5: the Dashboard tab lives in the dashboards chunk
+const PortfolioReports = lazy(() =>
+  import('@/features/reports').then((m) => ({ default: m.PortfolioReports })),
+);
+const ReportDialog = lazy(() => import('@/features/reports').then((m) => ({ default: m.ReportDialog })));
 const PortfolioDashboard = lazy(() =>
   import('@/features/dashboards').then((m) => ({ default: m.PortfolioDashboard })),
 );
@@ -78,6 +82,7 @@ const TABS = [
   { value: 'workload', label: 'Workload' },
   { value: 'overview', label: 'Overview' },
   { value: 'dashboard', label: 'Dashboard' },
+  { value: 'reports', label: 'Reports' },
 ] as const;
 
 function PortfolioBody({ p }: { p: PortfolioDetail }) {
@@ -86,6 +91,7 @@ function PortfolioBody({ p }: { p: PortfolioDetail }) {
   const current = TABS.some((t) => t.value === tab) ? tab! : 'table';
   const m = usePortfolioMutations(p.id);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
 
   return (
     <div className="mx-auto max-w-7xl space-y-5 px-4 py-6 md:px-8">
@@ -105,6 +111,11 @@ function PortfolioBody({ p }: { p: PortfolioDetail }) {
         </div>
         {p.can_edit && p.kind === 'manual' ? (
           <AddProject p={p} onAdd={(id) => m.addProject.mutate(id)} />
+        ) : null}
+        {p.can_edit ? (
+          <Button size="sm" variant="ghost" onClick={() => setReportOpen(true)}>
+            <Icon icon={FileText} size={14} /> Create report
+          </Button>
         ) : null}
         {p.can_edit ? (
           <Button size="sm" variant="ghost" onClick={() => setSettingsOpen(true)}>
@@ -135,6 +146,13 @@ function PortfolioBody({ p }: { p: PortfolioDetail }) {
         <TabsContent value="overview" className="pt-4">
           <PortfolioOverview p={p} />
         </TabsContent>
+        <TabsContent value="reports" className="pt-4">
+          {current === 'reports' ? (
+            <Suspense fallback={<Skeleton className="h-40" />}>
+              <PortfolioReports portfolioId={p.id} portfolioName={p.name} canEdit={!!p.can_edit} />
+            </Suspense>
+          ) : null}
+        </TabsContent>
         <TabsContent value="dashboard" className="pt-4">
           {current === 'dashboard' ? (
             <Suspense fallback={<Skeleton className="h-64" />}>
@@ -144,6 +162,11 @@ function PortfolioBody({ p }: { p: PortfolioDetail }) {
         </TabsContent>
       </Tabs>
       {settingsOpen ? <PortfolioSettingsDialog p={p} open onOpenChange={setSettingsOpen} /> : null}
+      {reportOpen ? (
+        <Suspense fallback={null}>
+          <ReportDialog open onOpenChange={setReportOpen} scope={{ portfolioId: p.id }} name={p.name} />
+        </Suspense>
+      ) : null}
     </div>
   );
 }

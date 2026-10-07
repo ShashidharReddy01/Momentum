@@ -28,6 +28,7 @@ mock:
   workload_rebalance: 1.0
   chart: 1.0
   file_qa: 1.0
+  report_narrative: 1.0
   file_tables: 1.0
   file_vision: 1.0
   file_injection: 1.0
@@ -58,6 +59,7 @@ live:
   chart: 0.9
   # Phase 7.5 (spec §11.3): 0.85, except numbers (always exact)
   file_qa: 0.85
+  report_narrative: 0.85
   file_tables: 1.0
   file_vision: 0.85
   file_injection: 1.0

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict
 
@@ -27,3 +27,5 @@ class AttachmentOut(BaseModel):
     version_group: uuid.UUID | None = None
     version: int = 1
     is_current: bool = True
+    # Phase 7.5: a generated report's spec (kind, scope, format, ai_drafted); null for uploads
+    generated_spec: dict[str, Any] | None = None

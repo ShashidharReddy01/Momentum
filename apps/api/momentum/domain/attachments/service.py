@@ -173,6 +173,8 @@ async def create_attachment(
     replace_id: uuid.UUID | None = None,
     source: str | None = None,
     generated_spec: dict[str, Any] | None = None,
+    verb: str | None = None,
+    batch_id: uuid.UUID | None = None,
 ) -> Mutation[Attachment]:
     """Attach a file to exactly one owner, or (``replace_id``) add the next version of an
     existing file in the same place: the new one becomes current, the old one stays
@@ -242,13 +244,14 @@ async def create_attachment(
     await session.flush()
     if previous is not None:
         await _recompute_current(session, att.version_group)
-    verb = "attachment.version_added" if previous else "attachment.created"
+    event = "attachment.version_added" if previous else "attachment.created"
     act = await record_activity(
         session,
         ctx,
         entity_type="attachment",
         entity_id=att.id,
-        verb=verb,
+        verb=verb or event,  # Phase 7.5: "report.generated" for a generated report
+        batch_id=batch_id,
         changes={
             next(iter(owner.data)): (None, next(iter(owner.data.values()))),
             **({"version": (previous.version, att.version)} if previous else {}),
@@ -258,7 +261,7 @@ async def create_attachment(
     await emit(
         session,
         ctx,
-        type=verb,
+        type=event,
         entity_type="attachment",
         entity_id=att.id,
         data={**owner.data, "version_group": str(att.version_group), "version": att.version},
@@ -311,6 +314,20 @@ async def list_for_task(session: AsyncSession, ctx: Ctx, task_id: uuid.UUID) -> 
         select(Attachment)
         .where(Attachment.task_id == task_id, *_live_current())
         .order_by(Attachment.created_at)
+    )
+    return list(rows.scalars())
+
+
+async def list_for_portfolio(
+    session: AsyncSession, ctx: Ctx, portfolio_id: uuid.UUID
+) -> list[Attachment]:
+    """Phase 7.5: a portfolio's own files (its generated reports), newest first, for whoever can
+    see the portfolio."""
+    await _portfolio_role(session, ctx, portfolio_id)
+    rows = await session.execute(
+        select(Attachment)
+        .where(Attachment.portfolio_id == portfolio_id, *_live_current())
+        .order_by(Attachment.created_at.desc())
     )
     return list(rows.scalars())
 

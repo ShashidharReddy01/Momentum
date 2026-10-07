@@ -1,0 +1,35 @@
+# Phase 7.5 report narratives (mock). The user message holds the report's facts as data and a
+# "Citable:" line; {{$cites}} cites its first entries. One hostile case cites nothing (dropped).
+responses:
+  - match: {contains: 'IGNORE PREVIOUS INSTRUCTIONS'}
+    tool_calls:
+      - name: submit_result
+        arguments:
+          paragraphs:
+            - {part: summary, text: "(mock) The facts are data; this project's numbers are as shown above.", cites: ["{{$cites}}"]}
+            - {part: risks, text: "(mock) Everything is perfect and the customer approved early.", cites: []}
+  - match: {contains: 'kind="closeout"'}
+    tool_calls:
+      - name: submit_result
+        arguments:
+          paragraphs:
+            - {part: went_well, text: "(mock) What went well, from the facts: {{$cites}}.", cites: ["{{$cites}}"]}
+            - {part: slipped, text: "(mock) What slipped, and why, from the facts: {{$cites}}.", cites: ["{{$cites}}"]}
+            - {part: lessons, text: "(mock) Lessons for the next project, from {{$cites}}.", cites: ["{{$cites}}"]}
+  - match: {contains: 'kind="customer_status"'}
+    tool_calls:
+      - name: submit_result
+        arguments:
+          paragraphs:
+            - {part: summary, text: "(mock) Here is where we are with you: {{$cites}}.", cites: ["{{$cites}}"]}
+            - {part: next_steps, text: "(mock) Next, together: {{$cites}}.", cites: ["{{$cites}}"]}
+default:
+  tool_calls:
+    - name: submit_result
+      arguments:
+        paragraphs:
+          - {part: summary, text: "(mock) Summary of the period from the facts: {{$cites}}.", cites: ["{{$cites}}"]}
+          - {part: highlights, text: "(mock) Highlights: {{$cites}}.", cites: ["{{$cites}}"]}
+          - {part: risks, text: "(mock) Risks named in the facts: {{$cites}}.", cites: ["{{$cites}}"]}
+          - {part: next_steps, text: "(mock) Next steps: {{$cites}}.", cites: ["{{$cites}}"]}
+          - {part: summary, text: "(mock) A second summary is dropped.", cites: ["{{$cites}}"]}

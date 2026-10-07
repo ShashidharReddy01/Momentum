@@ -47,3 +47,6 @@ class MomentumRuntime:
     extras: dict[str, Any] = field(default_factory=dict)
     # Phase 7.5 (spec §7.6): dashboard widget results, 60 s, keyed by the newest outbox id
     dashboard_cache: ResultCache = field(default_factory=ResultCache)
+    # Phase 7.5 (spec §6.1): the report narrative, built from ``llm`` in the lifespan (reports
+    # never import ai; the narrator is handed in)
+    report_narrator: Any = None

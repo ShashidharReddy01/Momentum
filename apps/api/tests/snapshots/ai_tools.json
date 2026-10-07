@@ -3763,5 +3763,131 @@
       }
     },
     "type": "function"
+  },
+  {
+    "function": {
+      "description": "Make a report file from Momentum's data (status of a project or portfolio, a customer update, a close-out, a task export, or a dashboard) as docx, pdf, xlsx, md or csv. The preview shows the outline; applying makes the file in the project's or portfolio's files.",
+      "name": "generate_report",
+      "parameters": {
+        "additionalProperties": false,
+        "properties": {
+          "audience": {
+            "anyOf": [
+              {
+                "enum": [
+                  "internal",
+                  "customer"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "dashboard": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Dashboard name"
+          },
+          "format": {
+            "anyOf": [
+              {
+                "enum": [
+                  "docx",
+                  "xlsx",
+                  "pdf",
+                  "md",
+                  "csv"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Default: the kind's first format"
+          },
+          "kind": {
+            "enum": [
+              "project_status",
+              "portfolio_status",
+              "task_export",
+              "customer_status",
+              "closeout",
+              "dashboard"
+            ],
+            "type": "string"
+          },
+          "narrative": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Add Mo's marked summary"
+          },
+          "period_days": {
+            "anyOf": [
+              {
+                "maximum": 366,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The last N days (status reports; default 7)"
+          },
+          "portfolio": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Portfolio name"
+          },
+          "project": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Project name or id"
+          }
+        },
+        "required": [
+          "kind"
+        ],
+        "type": "object"
+      }
+    },
+    "type": "function"
   }
 ]

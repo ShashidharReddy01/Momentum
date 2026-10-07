@@ -865,6 +865,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/attachments/{attachment_id}/regenerate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Run a generated report's spec again, as a new version of the file */
+        post: operations["regenerate_api_v1_attachments__attachment_id__regenerate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/attachments/{attachment_id}/versions": {
         parameters: {
             query?: never;
@@ -2014,6 +2031,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/portfolios/{portfolio_id}/files": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A portfolio's own files (its generated reports), newest first */
+        get: operations["list_portfolio_files_api_v1_portfolios__portfolio_id__files_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/portfolios/{portfolio_id}/members": {
         parameters: {
             query?: never;
@@ -2874,6 +2908,57 @@ export interface paths {
         put?: never;
         /** Submit a public form (no login; rate limited) */
         post: operations["submit_public_form_api_v1_public_forms__token__submit_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Make a report (a job; poll GET /reports/jobs/{id}) */
+        post: operations["create_report_api_v1_reports_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/jobs/{run_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A report job */
+        get: operations["get_job_api_v1_reports_jobs__run_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** What a report would hold (an outline and its length), as you; no file */
+        post: operations["preview_api_v1_reports_preview_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4749,6 +4834,10 @@ export interface components {
             extract_status: "pending" | "done" | "skipped" | "failed";
             /** Filename */
             filename: string;
+            /** Generated Spec */
+            generated_spec?: {
+                [key: string]: unknown;
+            } | null;
             /**
              * Id
              * Format: uuid
@@ -7726,6 +7815,31 @@ export interface components {
              */
             task_id: string;
         };
+        /** OutlineItemOut */
+        OutlineItemOut: {
+            /** Rows */
+            rows?: number | null;
+            /** Title */
+            title: string;
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "heading" | "kpis" | "table" | "tasks" | "chart" | "narrative";
+        };
+        /** Period */
+        Period: {
+            /**
+             * From
+             * Format: date
+             */
+            from: string;
+            /**
+             * To
+             * Format: date
+             */
+            to: string;
+        };
         /** PersonHit */
         PersonHit: {
             /** Avatar Url */
@@ -9321,6 +9435,93 @@ export interface components {
              */
             workdays_only: boolean;
         };
+        /** ReportIn */
+        ReportIn: {
+            spec: components["schemas"]["ReportSpec"];
+        };
+        /** ReportPreviewOut */
+        ReportPreviewOut: {
+            /** Items */
+            items: components["schemas"]["OutlineItemOut"][];
+            /** Pages */
+            pages?: number | null;
+            /** Scope Note */
+            scope_note: string;
+            /** Sheets */
+            sheets?: number | null;
+            /** Subtitle */
+            subtitle: string;
+            /** Title */
+            title: string;
+        };
+        /** ReportRunOut */
+        ReportRunOut: {
+            /** Activity Id */
+            activity_id?: string | null;
+            /** Attachment Id */
+            attachment_id: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Error */
+            error?: string | null;
+            /** Filename */
+            filename?: string | null;
+            /** Finished At */
+            finished_at: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Kind */
+            kind: string;
+            /** Portfolio Id */
+            portfolio_id?: string | null;
+            /** Project Id */
+            project_id?: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "queued" | "running" | "done" | "failed";
+        };
+        /** ReportSpec */
+        ReportSpec: {
+            /**
+             * Audience
+             * @default internal
+             * @enum {string}
+             */
+            audience: "internal" | "customer";
+            /** @description Task exports only */
+            filters?: components["schemas"]["QueryFilters"] | null;
+            /**
+             * Format
+             * @enum {string}
+             */
+            format: "docx" | "xlsx" | "pdf" | "md" | "csv";
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "project_status" | "portfolio_status" | "task_export" | "customer_status" | "closeout" | "dashboard";
+            /**
+             * Narrative
+             * @description Default: on for status, customer and close-out reports
+             */
+            narrative?: boolean | null;
+            /** @description Default: the last 7 days (status), the whole life (close-out) */
+            period?: components["schemas"]["Period"] | null;
+            scope?: components["schemas"]["Scope"];
+            /**
+             * Sections
+             * @description Default: every section the kind has
+             */
+            sections?: string[];
+        };
         /**
          * RescheduleIn
          * @description New dates for a task (omit a field to keep it; null clears it), and whether the work that
@@ -9774,6 +9975,15 @@ export interface components {
             type: "schedule";
         } & {
             [key: string]: unknown;
+        };
+        /** Scope */
+        Scope: {
+            /** Dashboard Id */
+            dashboard_id?: string | null;
+            /** Portfolio Id */
+            portfolio_id?: string | null;
+            /** Project Id */
+            project_id?: string | null;
         };
         /** ScreenIn */
         ScreenIn: {
@@ -13378,6 +13588,37 @@ export interface operations {
             };
         };
     };
+    regenerate_api_v1_attachments__attachment_id__regenerate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                attachment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportRunOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_versions_api_v1_attachments__attachment_id__versions_get: {
         parameters: {
             query?: never;
@@ -16131,6 +16372,37 @@ export interface operations {
             };
         };
     };
+    list_portfolio_files_api_v1_portfolios__portfolio_id__files_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                portfolio_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListOut_AttachmentOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_members_api_v1_portfolios__portfolio_id__members_get: {
         parameters: {
             query?: never;
@@ -18318,6 +18590,103 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OkOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_report_api_v1_reports_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReportIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportRunOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_job_api_v1_reports_jobs__run_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportRunOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_api_v1_reports_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReportIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportPreviewOut"];
                 };
             };
             /** @description Validation Error */

@@ -1,0 +1,85 @@
+# Phase 7.5 report narratives (spec §6.1): built from a report's facts as the person; every kept
+# paragraph cites a task key or a name from the facts (the server drops the rest), customer
+# reports name no one on the team and no internal work, and private work never shows.
+feature: report_narrative
+cases:
+  - id: project_status_launch_plan
+    mock: true
+    kind: project_status
+    project: "Launch Plan"
+    expect: {paragraphs_min: 3, cites_from_facts: true}
+  - id: project_status_one_per_part
+    mock: true
+    kind: project_status
+    project: "Launch Plan"
+    expect: {paragraphs_min: 4, cites_from_facts: true, text_exclude: ["A second summary is dropped"]}
+  - id: project_status_mobile
+    mock: true
+    kind: project_status
+    project: "Mobile App v2"
+    user: priya
+    expect: {paragraphs_min: 1, cites_from_facts: true}
+  - id: customer_status_two_parts
+    mock: true
+    kind: customer_status
+    project: "Launch Plan"
+    expect: {paragraphs_min: 2, cites_from_facts: true, text_exclude: ["Zenith"]}
+  - id: customer_status_onboarding
+    mock: true
+    kind: customer_status
+    project: "Northwind onboarding"
+    expect: {paragraphs_min: 2, cites_from_facts: true}
+  - id: closeout_parts
+    mock: true
+    kind: closeout
+    project: "Launch Plan"
+    expect: {paragraphs_min: 3, cites_from_facts: true}
+  - id: portfolio_status_onboarding
+    mock: true
+    kind: portfolio_status
+    portfolio: "Customer onboarding"
+    expect: {paragraphs_min: 3, cites_from_facts: true, text_exclude: ["Zenith onboarding"]}
+  - id: no_private_project_in_portfolio
+    mock: true
+    kind: portfolio_status
+    portfolio: "Customer onboarding"
+    user: mei
+    expect: {cites_from_facts: true, no_leak: ["Secret Roadmap", "Zenith Corp"]}
+  - id: outsider_refused
+    mock: true
+    user: tom
+    kind: project_status
+    project: "Launch Plan"
+    expect: {error: not_found}
+  - id: private_project_refused
+    mock: true
+    kind: project_status
+    project: "Secret Roadmap"
+    expect: {error: not_found}
+  # --- live-only: judged against the facts
+  - id: live_status_true_to_facts
+    kind: project_status
+    project: "Launch Plan"
+    expect: {paragraphs_min: 3, cites_from_facts: true}
+    judge: {rubric: "Every sentence is supported by the facts (overdue vendor contract and pricing tiers, blocked work, what's due next). No invented progress, numbers or causes."}
+  - id: live_customer_voice
+    kind: customer_status
+    project: "Launch Plan"
+    expect: {paragraphs_min: 2, cites_from_facts: true, text_exclude: ["Ana", "Priya", "Ravi"]}
+    judge: {rubric: "Written to the customer (we / you), names no one on the team, says plainly what is waiting on them and what comes next."}
+  - id: live_closeout_lessons
+    kind: closeout
+    project: "Launch Plan"
+    expect: {paragraphs_min: 3, cites_from_facts: true}
+    judge: {rubric: "Went well / slipped and why / lessons each follow from the facts (planned vs actual, slips, blockers); no blame on people, no invented causes."}
+  - id: live_portfolio_bottleneck
+    kind: portfolio_status
+    portfolio: "Customer onboarding"
+    expect: {paragraphs_min: 3, cites_from_facts: true}
+    judge: {rubric: "Names the at-risk and slipping customers and the stages over target from the facts; no numbers the facts don't give."}
+  - id: live_quiet_project
+    kind: project_status
+    project: "Mobile App v2"
+    user: priya
+    expect: {cites_from_facts: true}
+    judge: {rubric: "If the facts are thin, it says so briefly instead of padding."}

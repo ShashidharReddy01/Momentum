@@ -16,6 +16,7 @@ import { TaskNavProvider, TaskPane, useTaskNav } from '@/features/tasks';
 import { useCrumbs } from '@/lib/crumbs';
 import { Board } from './Board';
 import { FilterBar, useViewFilters } from './FilterBar';
+import { ReportButton } from './ReportButton';
 import { activeFilters, useDashboard, useDashboardMutations, usePin, type DashboardDetail } from './queries';
 
 /** S6.5.1: one workspace dashboard, with the task pane for whatever a chart opens. */
@@ -88,6 +89,7 @@ function DashboardBody() {
             }
             actions={
               <>
+                <ReportButton dashboardId={d.id} name={d.name} />
                 <PinButton pinned={!!d.pinned} onToggle={() => pin.mutate(!d.pinned)} />
                 {d.can_edit ? (
                   <DropdownMenu>

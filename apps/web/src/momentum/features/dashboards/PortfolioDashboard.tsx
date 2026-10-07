@@ -8,6 +8,7 @@ import { TaskNavProvider, TaskPane, useTaskNav } from '@/features/tasks';
 import { Board } from './Board';
 import { PinButton } from './DashboardPage';
 import { FilterBar, useViewFilters } from './FilterBar';
+import { ReportButton } from './ReportButton';
 import {
   activeFilters,
   useCreateDashboard,
@@ -120,7 +121,12 @@ function PortfolioDashboardBody({
             />
           }
           title={<h2 className="text-base font-semibold">{dashboard.name}</h2>}
-          actions={<PinButton pinned={!!dashboard.pinned} onToggle={() => pin.mutate(!dashboard.pinned)} />}
+          actions={
+            <>
+              {tab.data.can_edit ? <ReportButton dashboardId={dashboard.id} name={dashboard.name} /> : null}
+              <PinButton pinned={!!dashboard.pinned} onToggle={() => pin.mutate(!dashboard.pinned)} />
+            </>
+          }
         />
       </div>
       {nav.openId ? (

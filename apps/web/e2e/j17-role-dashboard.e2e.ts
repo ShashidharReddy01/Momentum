@@ -5,7 +5,8 @@ import { login } from './helpers';
  * J17 (Phase 7.5, spec §11.4): a role dashboard. On the seeded lifecycle portfolio's Dashboard tab,
  * create "Implementation lead" from its template, check the filter bar's "owner = me" (saved by the
  * template) and change it for this view only, add a lifecycle funnel, and drill a stage into the
- * projects behind it. (The PDF export step joins in S75-09.)
+ * projects behind it, then export the dashboard as a PDF: the job completes and the file appears
+ * in the portfolio's Reports.
  */
 test('J17: role dashboard from a template, filters and a stage drill', async ({ page }) => {
   await login(page);
@@ -61,4 +62,24 @@ test('J17: role dashboard from a template, filters and a stage drill', async ({ 
   const panel = page.getByRole('complementary', { name: 'Projects behind this number' });
   await expect(panel.getByRole('heading', { name: /Pre-sales/ })).toBeVisible();
   await expect(panel.getByRole('link').first()).toBeVisible();
+  await panel.getByRole('button', { name: 'Close' }).click();
+
+  // export the dashboard as a PDF (S75-09): it lands in the portfolio's Reports
+  await page
+    .getByRole('tabpanel', { name: 'Dashboard' })
+    .getByRole('button', { name: 'Create report' })
+    .click();
+  const dialog = page.getByRole('dialog', { name: /Create a report/ });
+  await expect(dialog.getByRole('radio', { name: 'PDF' })).toHaveAttribute('aria-checked', 'true');
+  await expect(
+    dialog.getByRole('region', { name: 'Report outline' }).getByText('Lifecycle funnel').first(),
+  ).toBeVisible();
+  await dialog.getByRole('button', { name: 'Create report' }).click();
+  const ready = dialog.getByRole('status');
+  await expect(ready).toContainText('Report ready', { timeout: 30_000 });
+  const filename = (await ready.locator('span.font-medium').textContent())!.trim();
+  expect(filename).toMatch(/\.pdf$/);
+  await dialog.getByRole('button', { name: 'Done' }).click();
+  await page.getByRole('tab', { name: 'Reports' }).click();
+  await expect(page.getByRole('list', { name: 'Reports' }).getByText(filename)).toBeVisible();
 });

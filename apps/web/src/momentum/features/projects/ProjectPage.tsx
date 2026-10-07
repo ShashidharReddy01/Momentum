@@ -5,6 +5,7 @@ import {
   ClipboardList,
   Download,
   FileSpreadsheet,
+  FileText,
   Lock,
   MoreHorizontal,
   SlidersHorizontal,
@@ -72,6 +73,7 @@ const ProjectOverview = lazy(async () => ({ default: (await import('./ProjectOve
 // opened from the project menu: loaded on first open, not with every project
 const RulesDialog = lazy(async () => ({ default: (await import('@/features/rules')).RulesDialog }));
 const FormsDialog = lazy(async () => ({ default: (await import('@/features/forms')).FormsDialog }));
+const ReportDialog = lazy(() => import('@/features/reports').then((m) => ({ default: m.ReportDialog })));
 const TimelineView = lazy(() => import('@/features/timeline').then((m) => ({ default: m.TimelineView })));
 // Lazy too: dashboards and their charts (Recharts) load only when the tab opens.
 const FilesView = lazy(() => import('@/features/files').then((m) => ({ default: m.FilesView })));
@@ -114,6 +116,7 @@ export function ProjectPage() {
   const [saveTemplateOpen, setSaveTemplateOpen] = useState(false);
   const [taskTemplatesOpen, setTaskTemplatesOpen] = useState(false);
   const [csvImportOpen, setCsvImportOpen] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
   useCrumbs(project.data ? [project.data.team_name, project.data.name] : null);
   const tabEdges = useScrollEdges();
 
@@ -228,6 +231,9 @@ export function ProjectPage() {
                     ))}
                   </DropdownMenuRadioGroup>
                   <DropdownMenuSeparator />
+                  <DropdownMenuItem onSelect={() => setReportOpen(true)}>
+                    <Icon icon={FileText} /> Create report…
+                  </DropdownMenuItem>
                   <DropdownMenuItem onSelect={() => setRulesOpen(true)}>
                     <Icon icon={Zap} /> Rules
                   </DropdownMenuItem>
@@ -322,6 +328,11 @@ export function ProjectPage() {
 
       <ShareDialog project={p} open={share} onOpenChange={setShare} />
       <FieldsDialog projectId={p.id} canEdit={canEdit} open={fieldsOpen} onOpenChange={setFieldsOpen} />
+      {reportOpen ? (
+        <Suspense fallback={null}>
+          <ReportDialog open onOpenChange={setReportOpen} scope={{ projectId: p.id }} name={p.name} />
+        </Suspense>
+      ) : null}
       {rulesOpen ? (
         <Suspense fallback={null}>
           <RulesDialog projectId={p.id} canEdit={isAdmin} open onOpenChange={setRulesOpen} />

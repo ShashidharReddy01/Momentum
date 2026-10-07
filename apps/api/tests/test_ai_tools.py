@@ -111,6 +111,7 @@ def test_catalog_covers_phase_1_2_tools_with_their_risks() -> None:
         "reschedule_task": "medium",  # S6.1.2
         "set_field_value": "low",  # S5.3.2 (Sorter)
         "set_project_field": "low",  # Phase 7.5 S75-04 (project fields)
+        "generate_report": "low",  # Phase 7.5 S75-09 (reports)
         "complete_task": "low",
         "move_task": "low",
         "add_comment": "low",

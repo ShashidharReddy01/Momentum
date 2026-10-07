@@ -81,7 +81,7 @@ if (atlas) {
 const folios = await page.evaluate(async () => (await (await fetch('/api/v1/portfolios')).json()).data);
 const onboarding = folios.find((f) => f.name === 'Customer onboarding')?.id;
 if (onboarding)
-  for (const v of ['table', 'board', 'timeline', 'dashboard'])
+  for (const v of ['table', 'board', 'timeline', 'dashboard', 'reports'])
     screens.push([`onboarding-${v}`, `/portfolios/${onboarding}/${v}`]);
 // S75-08: a role dashboard (filter bar, KPI tiles, stage charts)
 const pinned = await page.evaluate(async () => (await (await fetch('/api/v1/dashboards/pinned')).json()).data);

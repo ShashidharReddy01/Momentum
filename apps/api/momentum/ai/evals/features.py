@@ -88,6 +88,7 @@ FEATURES = (
     "workload_rebalance",
     "chart",
     *("file_qa", "file_tables", "file_vision", "file_injection"),
+    "report_narrative",
 )
 # Phase 7.5 (spec §11.3): Ask Mo about files, on the onboarding_v1 eval workspace
 FILE_FEATURES = ("file_qa", "file_tables", "file_vision", "file_injection")
@@ -322,6 +323,35 @@ async def _run(
         obs.text = "\n".join([body.title, body.summary, *items])
         obs.data = {"status": body.status, "items": items, "facts": d.facts}
         obs.citations = [c.to_json() for c in await citations.resolve(session, ctx, obs.text)]
+    elif feature == "report_narrative":
+        # Phase 7.5 (spec §6.1): the builder's facts as the person, then the narrative
+        from momentum.ai.report_narrative import citables, narrate
+        from momentum.domain.portfolios.models import Portfolio
+        from momentum.reports.generate import build
+        from momentum.reports.spec import FORMATS, ReportSpec
+
+        rscope: dict[str, Any] = {}
+        if case.get("project"):
+            rscope["project_id"] = str(world.projects[case["project"]])
+        else:
+            pid = (
+                await session.execute(
+                    select(Portfolio.id).where(Portfolio.name == case["portfolio"])
+                )
+            ).scalar_one()
+            rscope["portfolio_id"] = str(pid)
+        kind = case["kind"]
+        rspec = ReportSpec.model_validate(
+            {"kind": kind, "scope": rscope, "format": FORMATS[kind][0]}
+        )
+        doc = await build(session, ctx, rspec)
+        paragraphs = await narrate(llm, ctx, kind, doc.facts)
+        obs.text = "\n".join(p.text for p in paragraphs)
+        obs.data = {
+            "paragraphs": len(paragraphs),
+            "cites": [c for p in paragraphs for c in p.cites],
+            "citables": citables(doc.facts),
+        }
     elif feature == "goal_check_in":
         # S6.3.2: a goal made for the case (half its period gone), linked to eval projects
         today = now.date()

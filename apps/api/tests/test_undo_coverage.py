@@ -538,6 +538,7 @@ def test_every_mutation_records_activity() -> None:
         "domain/forecasts/service.py:store",  # computed data (realtime catalog: no activity)
         "domain/forms/service.py:submit_form",  # create_task records the task's activity
         "domain/notifications/service.py:_create_or_coalesce",  # a notification is the record
+        "domain/reports/service.py:execute",  # create_attachment records report.generated (undo)
         "domain/rules/due_scan.py:scan_due_approaching",  # a system trigger, not a change
         "domain/rules/engine.py:_fire",  # rule_runs is the record; actions go through services
         "domain/tasks/service.py:_hand_off",  # task.unblocked: a trigger, nothing changed

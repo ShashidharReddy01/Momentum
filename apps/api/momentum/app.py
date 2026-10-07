@@ -62,6 +62,7 @@ def _api_router(settings: Settings) -> APIRouter:
     from momentum.domain.portfolios.router import router as portfolios_router
     from momentum.domain.projects.router import favorites_router
     from momentum.domain.projects.router import router as projects_router
+    from momentum.domain.reports.router import router as reports_router
     from momentum.domain.rules.router import router as rules_router
     from momentum.domain.search.router import router as search_router
     from momentum.domain.sections.router import router as sections_router
@@ -98,6 +99,7 @@ def _api_router(settings: Settings) -> APIRouter:
     api.include_router(goals_router)
     api.include_router(workload_router)
     api.include_router(dashboards_router)
+    api.include_router(reports_router)
     api.include_router(forecasts_router)
     api.include_router(rules_router)
     api.include_router(forms_router)
@@ -198,6 +200,9 @@ def create_app(
             ),
         )
         runtime.llm = llm
+        from momentum.ai.report_narrative import make_narrator
+
+        runtime.report_narrator = make_narrator(llm, settings)
         if settings.db_auto_migrate:
             from momentum.migrations_runner import upgrade_head
 

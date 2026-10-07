@@ -282,6 +282,19 @@ async def list_task_attachments(
 
 
 @router.get(
+    "/portfolios/{portfolio_id}/files",
+    response_model=ListOut[AttachmentOut],
+    summary="A portfolio's own files (its generated reports), newest first",
+)
+async def list_portfolio_files(
+    portfolio_id: uuid.UUID, ctx: CtxDep, uow: UowDep
+) -> ListOut[AttachmentOut]:
+    async with uow.transaction() as s:
+        rows = await service.list_for_portfolio(s, ctx, portfolio_id)
+        return ListOut(data=[AttachmentOut.model_validate(r) for r in rows])
+
+
+@router.get(
     "/comments/{comment_id}/attachments",
     response_model=ListOut[AttachmentOut],
     summary="A comment's files",

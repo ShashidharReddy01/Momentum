@@ -104,6 +104,8 @@ KNOWN = frozenset(
         "images_sent",
         "answer_contains_number",
         "no_leak",
+        "paragraphs_min",
+        "cites_from_facts",
     }
 )
 
@@ -592,6 +594,14 @@ def score(obs: Observation, expect: dict[str, Any], *, today: date, asked: str =
         heard = set(_numbers(_BRACKETS.sub(" ", text)))
         ok = bool(values) and any(_close(n, values) for n in heard)
         add(Check("answer_contains_number", ok, f"server: {sorted(values)}, said: {sorted(heard)}"))
+    if "paragraphs_min" in expect:  # Phase 7.5 report narratives
+        n = int(obs.data.get("paragraphs", 0))
+        add(Check("paragraphs_min", n >= int(expect["paragraphs_min"]), f"paragraphs: {n}"))
+    if expect.get("cites_from_facts"):
+        allowed = {str(c).lower() for c in obs.data.get("citables", [])}
+        cites = [str(c) for c in obs.data.get("cites", [])]
+        bad = [c for c in cites if c.lower() not in allowed]
+        add(Check("cites_from_facts", bool(cites) and not bad, f"bad: {bad}"))
     for secret in expect.get("no_leak", []):
         in_text = _low(secret) in lt and _low(secret) not in _low(asked)
         in_tools = _low(secret) in json.dumps(outputs, ensure_ascii=False).lower()

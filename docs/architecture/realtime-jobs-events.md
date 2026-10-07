@@ -76,6 +76,7 @@ Event payloads share an envelope:
 | `task.tagged` / `task.untagged` | 2 | `tag_id`; the task's channels (S2.3.3) |
 | `tag.created` / `tag.updated` / `tag.deleted` / `tag.restored` | 2 | none; channel `workspace:<id>` (S2.3.3; `restored` is an undone delete, E7.0 H53) |
 | `attachment.created` / `attachment.deleted` / `attachment.restored` | 2 | `task_id` for task and comment files, `project_id` for project files (Phase 7.5), `portfolio_id` for portfolio reports; `version_group`, `version` (Phase 7.5). Channel `task:<id>`, `project:<id>` or `portfolio:<id>` (the catalog called it `attachment.added` until Phase 7.5; the code has always emitted `attachment.created`) |
+| `report.generated` | 7.5 | S75-09: `attachment_id`, `kind`, and `project_id` or `portfolio_id`; channel `user:<requester>` (the progress toast). The file itself also emits `attachment.created` / `attachment.version_added`; the activity verb of a generated file is `report.generated` (undo deletes it). Job `generate_report` (queue `momentum_default`, capped by `MOMENTUM_REPORT_TIMEOUT_S`); with no worker (`worker_mode=off`) the request runs it right after recording it |
 | `attachment.version_added` | 7.5 | Same data as `attachment.created`, for a new version of an existing file (S75-01) |
 | `status_update.created` | 3 | `project_id`, `status`, `version` (S3.4.3; channel `project:<id>`) |
 | `status_update.withdrawn` | 3 | `project_id`, `status` (the restored one), `version`: an undone update (S3.4.3) |
