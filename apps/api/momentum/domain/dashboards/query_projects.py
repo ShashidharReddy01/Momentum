@@ -34,6 +34,7 @@ from momentum.domain.portfolios.rows import (
     compute_rows,
     sort_value,
 )
+from momentum.domain.tasks.service import today_for
 from momentum.domain.teams.models import Team
 from momentum.domain.users.models import User
 
@@ -77,7 +78,7 @@ async def project_rows(
         stage_field=scope.stage_field,
         stage_targets=(scope.portfolio.stage_targets if scope.portfolio else None) or {},
         columns=(scope.portfolio.columns if scope.portfolio else None) or [],
-        today=datetime.now(UTC).date(),
+        today=today_for(ctx),  # the viewer's day, as task widgets (H66)
         live_fields=set(defs),
     )
     team_of = {p.id: p.team_id for p in scope.projects}

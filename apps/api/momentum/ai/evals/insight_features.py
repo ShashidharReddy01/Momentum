@@ -108,6 +108,7 @@ async def run_insight(
             "hidden": b.hidden,
             "kinds": sorted({i.kind for i in b.items}),
             "facts_numbers": sorted(numbers_in(b.facts)),
+            "source": b.facts,
         }
         _cited(obs.data, [c for i in b.items for c in i.cites], portfolio_brief.citables(b.facts))
     elif feature == "closeout":
@@ -130,6 +131,7 @@ async def run_insight(
             "status": su.status,
             "ai": su.generated_by_ai,
             "facts_numbers": sorted(numbers_in(cd.facts)),
+            "source": cd.facts,
         }
         _cited(obs.data, [c for x in cd.paragraphs for c in x.cites], cd.citable)
     elif feature == "catch_up":
@@ -178,6 +180,7 @@ async def run_insight(
             "ai": e.ai,
             "links": len(e.links),
             "facts_numbers": sorted(numbers_in(e.facts)),
+            "source": e.facts,
         }
         _cited(
             obs.data, [c for x in e.paragraphs for c in x.cites], explain_chart.citables(e.facts)
@@ -197,6 +200,7 @@ async def run_insight(
             "checklist": [[i.kind, i.met] for i in r.readiness.items],
             "files_read": len(r.files_read),
             "concerns": sum(1 for n in r.notes if n.concern),
+            "source": r.facts,
         }
         _cited(
             obs.data,
@@ -221,6 +225,7 @@ async def run_insight(
             "sections": sorted(h.sections),
             "files_read": len(h.files_read),
             "facts_numbers": sorted(numbers_in(h.facts)),
+            "source": h.facts,
         }
         _cited(obs.data, [c for i in items for c in i.cites], handoff.citables(h.facts))
 
@@ -308,5 +313,6 @@ async def _catch_up(
         "ai": c.ai,
         "counts": c.facts.counts,
         "facts_numbers": sorted(numbers_in(data)),
+        "source": data,
     }
     _cited(obs.data, [x for line in c.lines for x in line.cites], catch_up.citables(c.facts))

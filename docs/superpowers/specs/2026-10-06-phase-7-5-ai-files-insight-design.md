@@ -281,7 +281,7 @@ Asana puts custom fields on projects through portfolios; Momentum makes them fir
 - **blocked:** open tasks with an open blocker.
 - **waiting_on_customer:** open tasks whose project-template task field "Waiting on" = Customer, matched by field name "Waiting on" and option "Customer". Configurable in `portfolios.columns` meta.
 - **next_milestone:** the earliest open milestone with its due date.
-- **target_date:** the stage field target or `projects.due_on`.
+- **target_date:** the go-live target: the "Target go-live" project date field, else `projects.due_on` (changed 2026-10-08, H69: it was the end of the current stage, which made projects on plan look months late; a stage's lateness is `stage_age_days` vs `stage_target_days`).
 - **forecast_date:** the forecast `p80`.
 - **slip_days:** forecast − target.
 - **stage_age_days:** days since the last `project_field_events` for the stage field.

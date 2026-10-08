@@ -297,16 +297,18 @@ async def drill_any(
             label="Projects", tasks=[], total=len(rows), entity="projects", projects=projects
         )
     if isinstance(s, StageSpec):
-        if body.key is None:
+        # a KPI tile drills with no key: a one-stage KPI ("went live this quarter") means its stage
+        key = body.key if body.key is not None else (s.stages[0] if len(s.stages) == 1 else None)
+        if key is None:
             raise ValidationFailed("Pick a stage to drill into")
         if a.window is not None:
             s = s.model_copy(update={"window_days": a.window})
-        ids = await drill_stage(session, ctx, s, body.key)
+        ids = await drill_stage(session, ctx, s, key, period=a.period)
         label = next(
             (
                 str(o.get("label"))
                 for o in (await _stage_options(session, ctx, s))
-                if str(o.get("id")) == body.key
+                if str(o.get("id")) == key
             ),
             "Stage",
         )

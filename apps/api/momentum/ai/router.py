@@ -50,6 +50,7 @@ from momentum.domain.dashboards.schemas import QueryResultOut, QuerySpec, Widget
 from momentum.domain.portfolios import service as portfolios
 from momentum.domain.status_updates.schemas import StatusUpdateIn
 from momentum.domain.status_updates.service import body_text as status_body_text
+from momentum.domain.tasks.service import today_for
 from momentum.domain.workload import rebalance
 from momentum.domain.workspace.service import (
     AiConfig,
@@ -975,7 +976,7 @@ async def ai_portfolio_lines(
             )
             for x, f in rows
         ]
-        out = await portfolio_lines.lines_for(llm, ctx, facts, datetime.now(UTC).date())
+        out = await portfolio_lines.lines_for(llm, ctx, facts, today_for(ctx))
         return PortfolioLinesOut(
             lines=[PortfolioLineOut(project_id=x.project_id, text=x.text, ai=x.ai) for x in out]
         )

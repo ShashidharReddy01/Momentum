@@ -437,7 +437,10 @@ async def build_closeout(bc: BuildContext) -> ReportDocument:
         "planned_finish": planned_end.isoformat() if planned_end else None,
         "actual_finish": actual_end.isoformat() if actual_end else None,
         "planned_days": planned_days,
-        "actual_days": actual_days,
+        # a running project has no actual duration yet: days so far, never "took N days" (live)
+        "finished": actual_end is not None,
+        "actual_days": actual_days if actual_end else None,
+        "days_so_far": None if actual_end else actual_days,
         "scope": {"planned": planned, "added": added, "total": len(tasks)},
         "milestone_slips": [{"name": s[0], "days_late": s[3]} for s in slips if s[3]],
         "stages": [{"stage": s[0], "days": s[3]} for s in stays],

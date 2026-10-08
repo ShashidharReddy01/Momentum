@@ -195,3 +195,38 @@ test('J14: the report dialog from the keyboard, focus back on the menu button', 
   await expect(dialog).toBeHidden();
   await expect(actions).toBeFocused();
 });
+
+// H67: every dialog on the project ⋯ menu closes with one Escape (the Close button's tooltip must
+// not open by itself and take the first Escape) and gives focus back to the menu button
+for (const [item, title] of [
+  [/^Create report/, /Create a report: Website Revamp/],
+  [/^Rules/, 'Rules'],
+  [/^Forms/, 'Forms'],
+  [/^Save as template/, 'Save as template'],
+  [/^Task templates/, 'Task templates'],
+  [/^Import from CSV/, 'Import from CSV'],
+] as const) {
+  test(`J14: ${String(item).slice(2, -1)} from the keyboard, one Escape, focus back on the menu button`, async ({
+    page,
+  }) => {
+    await login(page);
+    await page
+      .getByRole('navigation', { name: 'Main' })
+      .getByRole('link', { name: 'Website Revamp' })
+      .click();
+    await expect(page.getByRole('list', { name: 'Tasks in Review' })).toBeVisible();
+    const actions = page.getByRole('button', { name: 'Project actions' });
+    await actions.focus();
+    await page.keyboard.press('Enter');
+    const entry = page.getByRole('menuitem', { name: item });
+    await expect(entry).toBeVisible();
+    await entry.focus();
+    await page.keyboard.press('Enter');
+    const dialog = page.getByRole('dialog', { name: title });
+    await expect(dialog).toBeVisible();
+    await expect(page.getByRole('tooltip')).toHaveCount(0);
+    await page.keyboard.press('Escape');
+    await expect(dialog).toBeHidden();
+    await expect(actions).toBeFocused();
+  });
+}

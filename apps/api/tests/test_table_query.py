@@ -187,3 +187,17 @@ def test_caps_mark_truncation() -> None:
     assert sheet.truncated and r.model.file.truncated
     res = run_query(sheet, r.rows[sheet.data_ref], q(aggregates=[{"fn": "count"}]))
     assert res.truncated and res.note and "cut" in res.note
+
+
+def test_a_sum_leaves_out_the_sheets_own_total_row() -> None:
+    """Live check 2026-10-08: "the total of the quote's line items" came back 102,000, twice the
+    51,000, because the sheet's own Total row was summed with the items. Aggregates leave out
+    rows labelled Total / Subtotal / Grand total and say so; listing rows still shows them."""
+    r = parse_bytes(build.xlsx_quote(), "quote.xlsx", "x")
+    sheet = r.model.sheets[0]
+    rows = r.rows[sheet.data_ref]
+    res = run_query(sheet, rows, q(aggregates=[{"fn": "sum", "column": "Line total"}]))
+    assert res.rows[0][0] == pytest.approx(51000)
+    assert res.note and "Total" in res.note
+    listed = run_query(sheet, rows, q())
+    assert any(row[0] == "Total" for row in listed.rows)

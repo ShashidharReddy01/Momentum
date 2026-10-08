@@ -1,6 +1,6 @@
 import * as D from '@radix-ui/react-dialog';
 import { X } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { useRef, type ReactNode } from 'react';
 import { cn } from '@/lib/cn';
 import { usePortalContainer } from '@/providers/portal';
 import { IconButton } from './IconButton';
@@ -29,19 +29,33 @@ export function Dialog({
   returnFocus,
 }: DialogProps) {
   const container = usePortalContainer();
+  const contentRef = useRef<HTMLDivElement>(null);
+  const closeRef = useRef<HTMLButtonElement>(null);
   return (
     <D.Root open={open} onOpenChange={onOpenChange}>
       <D.Portal container={container}>
         <D.Overlay className="fixed inset-0 z-40 bg-ink/25 data-[state=open]:animate-[m-fade-in_var(--dur-2)_var(--ease)]" />
         <D.Content
+          ref={contentRef}
           aria-describedby={description ? undefined : undefined}
+          onOpenAutoFocus={(e) => {
+            // Radix focuses the first tabbable, usually the header's Close button, whose tooltip
+            // then opens and takes the first Escape (H67). Focus the dialog itself instead; Tab
+            // still reaches Close first. A field with autoFocus already has focus and stays.
+            const first = contentRef.current?.querySelector<HTMLElement>(
+              'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+            );
+            if (first !== closeRef.current) return;
+            e.preventDefault();
+            contentRef.current?.focus();
+          }}
           onCloseAutoFocus={(e) => {
             if (!returnFocus?.current) return;
             e.preventDefault();
             returnFocus.current.focus();
           }}
           className={cn(
-            'fixed left-1/2 top-[14vh] z-50 max-h-[calc(100dvh-16vh)] w-[min(560px,calc(100vw-32px))] -translate-x-1/2 overflow-auto rounded-xl bg-surface shadow-pop data-[state=open]:animate-[m-sheet-in_var(--dur-3)_var(--ease)]',
+            'fixed left-1/2 top-[14vh] z-50 focus:outline-none max-h-[calc(100dvh-16vh)] w-[min(560px,calc(100vw-32px))] -translate-x-1/2 overflow-auto rounded-xl bg-surface shadow-pop data-[state=open]:animate-[m-sheet-in_var(--dur-3)_var(--ease)]',
             className,
           )}
         >
@@ -56,7 +70,7 @@ export function Dialog({
                 ) : null}
               </div>
               <D.Close asChild>
-                <IconButton icon={X} label="Close" size="icon-sm" />
+                <IconButton ref={closeRef} icon={X} label="Close" size="icon-sm" />
               </D.Close>
             </div>
           )}

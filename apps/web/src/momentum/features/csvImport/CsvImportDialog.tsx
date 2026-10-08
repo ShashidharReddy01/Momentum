@@ -24,10 +24,13 @@ export function CsvImportDialog({
   projectId,
   open,
   onOpenChange,
+  returnFocus,
 }: {
   projectId: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Where focus goes on close (opened from a menu: the menu's button, H66). */
+  returnFocus?: { current: HTMLElement | null };
 }) {
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<CsvPreview | null>(null);
@@ -78,6 +81,7 @@ export function CsvImportDialog({
         if (!v) reset();
       }}
       title="Import from CSV"
+      returnFocus={returnFocus}
       className="w-[min(560px,calc(100vw-32px))]"
     >
       <div className="flex flex-col gap-4 p-4">

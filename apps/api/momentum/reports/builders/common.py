@@ -8,6 +8,7 @@ from datetime import date, datetime, timedelta
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from momentum.core.context import Ctx
+from momentum.reports.data import local_time
 from momentum.reports.document import ReportDocument
 from momentum.reports.spec import ReportSpec
 
@@ -38,7 +39,7 @@ class BuildContext:
         return ReportDocument(
             title=title,
             subtitle=subtitle,
-            generated_at=self.now,
+            generated_at=local_time(self.now, self.ctx),  # file name and footer: reader's day
             generated_by=who,
             scope_note=f"Includes what {who} could see on {self.today:%d %b %Y}.",
         )

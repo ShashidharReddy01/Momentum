@@ -191,11 +191,14 @@ export function TaskTemplatesDialog({
   canEdit,
   open,
   onOpenChange,
+  returnFocus,
 }: {
   projectId: string;
   canEdit: boolean;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Where focus goes on close (opened from a menu: the menu's button, H66). */
+  returnFocus?: { current: HTMLElement | null };
 }) {
   const templates = useTaskTemplates(projectId, open);
   const [creating, setCreating] = useState(false);
@@ -205,6 +208,7 @@ export function TaskTemplatesDialog({
       open={open}
       onOpenChange={onOpenChange}
       title="Task templates"
+      returnFocus={returnFocus}
       className="w-[min(520px,calc(100vw-32px))]"
     >
       <div className="flex max-h-[70vh] flex-col gap-3 overflow-y-auto p-5">

@@ -370,22 +370,45 @@ export function ProjectPage() {
       ) : null}
       {rulesOpen ? (
         <Suspense fallback={null}>
-          <RulesDialog projectId={p.id} canEdit={isAdmin} open onOpenChange={setRulesOpen} />
+          <RulesDialog
+            projectId={p.id}
+            canEdit={isAdmin}
+            open
+            onOpenChange={setRulesOpen}
+            returnFocus={actionsRef}
+          />
         </Suspense>
       ) : null}
       {formsOpen ? (
         <Suspense fallback={null}>
-          <FormsDialog projectId={p.id} canEdit={isAdmin} open onOpenChange={setFormsOpen} />
+          <FormsDialog
+            projectId={p.id}
+            canEdit={isAdmin}
+            open
+            onOpenChange={setFormsOpen}
+            returnFocus={actionsRef}
+          />
         </Suspense>
       ) : null}
-      <SaveAsTemplateDialog projectId={p.id} open={saveTemplateOpen} onOpenChange={setSaveTemplateOpen} />
+      <SaveAsTemplateDialog
+        projectId={p.id}
+        open={saveTemplateOpen}
+        onOpenChange={setSaveTemplateOpen}
+        returnFocus={actionsRef}
+      />
       <TaskTemplatesDialog
         projectId={p.id}
         canEdit={canEdit}
         open={taskTemplatesOpen}
         onOpenChange={setTaskTemplatesOpen}
+        returnFocus={actionsRef}
       />
-      <CsvImportDialog projectId={p.id} open={csvImportOpen} onOpenChange={setCsvImportOpen} />
+      <CsvImportDialog
+        projectId={p.id}
+        open={csvImportOpen}
+        onOpenChange={setCsvImportOpen}
+        returnFocus={actionsRef}
+      />
       {p.my_role === 'viewer' || p.my_role === 'commenter' ? (
         <div role="status" className="bg-info-tint px-4 md:px-8 py-1.5 text-xs text-ink-2">
           You have {p.my_role} access to this project.

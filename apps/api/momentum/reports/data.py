@@ -64,6 +64,15 @@ def today_for(ctx: Ctx) -> date:
     return datetime.now(tz).date()
 
 
+def local_time(value: datetime, ctx: Ctx) -> datetime:
+    """A stored (UTC) moment on the reader's clock, for what a report prints (H66)."""
+    try:
+        tz = ZoneInfo(ctx.actor.timezone)
+    except (KeyError, ValueError):
+        tz = ZoneInfo("UTC")
+    return value.astimezone(tz)
+
+
 def local_date(value: datetime | None, ctx: Ctx) -> date | None:
     if value is None:
         return None

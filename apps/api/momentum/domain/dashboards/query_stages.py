@@ -260,9 +260,10 @@ def _describe(spec: StageSpec, window: int, scope: Scope, period: str | None = N
 
 
 async def drill_stage(
-    session: AsyncSession, ctx: Ctx, spec: StageSpec, option_id: str
+    session: AsyncSession, ctx: Ctx, spec: StageSpec, option_id: str, period: str | None = None
 ) -> list[uuid.UUID]:
-    """The projects behind one stage of a stage analysis (for the drill)."""
+    """The projects behind one stage of a stage analysis (for the drill), over the same window
+    or calendar period as ``run_stages`` counted."""
     scope = await scope_projects(
         session,
         ctx,
@@ -272,7 +273,11 @@ async def drill_stage(
     )
     if scope.stage_field is None:
         return []
-    start = now_utc() - timedelta(days=spec.window_days)
+    now = now_utc()
+    start = now - timedelta(days=spec.window_days)
+    bounds = period_bounds(period, now.date())
+    if bounds is not None:
+        start = day_start(bounds[0])
     all_stays = await stays(session, scope)
     if spec.analysis == "aging":
         return sorted({s.project_id for s in all_stays if s.end is None and s.option == option_id})

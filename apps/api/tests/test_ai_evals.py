@@ -15,7 +15,7 @@ from momentum.ai.evals import runner
 from momentum.ai.evals.features import Observation
 from momentum.ai.evals.main import evals_url, reset_database
 from momentum.ai.evals.runner import fill, latest, load_cases, render, run_evals, save
-from momentum.ai.evals.scorers import score
+from momentum.ai.evals.scorers import _close, _query_matches, score
 from momentum.ai.evals.workspace import build_workspace
 from momentum.ai.llm import build_llm
 from momentum.ai.tools.catalog import build_registry
@@ -347,3 +347,26 @@ def test_agent_tools_any_accepts_either_tool() -> None:
         ]
         is False
     )
+
+
+def test_numbers_round_half_up_and_yes_no_match_booleans() -> None:
+    """Live run 2026-10-08: 765.625 written as 765.63 (the way people round) is the tool's number,
+    and a filter on paid = false is the same query as paid = "no"."""
+    assert _close(765.63, {765.625})
+    assert _close(2.6, {2.45}) is False
+    assert _close(57.7, {0.577})
+    want = {"filters": [{"column": "paid", "op": "eq", "value": "no"}]}
+    assert _query_matches(want, {"filters": [{"column": "Paid", "op": "eq", "value": False}]})
+    assert not _query_matches(want, {"filters": [{"column": "Paid", "op": "eq", "value": True}]})
+
+
+def test_numbers_from_tools_allows_row_counts_and_asides_in_brackets() -> None:
+    """Live run 2026-10-08: "these 5 customers" (five rows came back) and "Total (12,735.43)"
+    are numbers the tool gave; 999 is not."""
+    out = {"data": {"rows": [["a", 1], ["b", 2], ["c", 3], ["d", 4], ["e", 12735.43]]}}
+    calls = [{"name": "query_table", "ok": True, "args": {}, "output": out}]
+    for text, ok in (("These 5 customers; Total (12,735.43)", True), ("About 999 rows", False)):
+        obs = Observation(text=text, data={"tool_calls": calls})
+        checks = score(obs, {"numbers_from_tools": True}, today=date(2026, 10, 8))
+        (check,) = [c for c in checks if c.name == "numbers_from_tools"]
+        assert check.passed is ok, (text, check.detail)

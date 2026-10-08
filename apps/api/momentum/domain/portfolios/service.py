@@ -33,6 +33,7 @@ from momentum.domain.status_updates.models import StatusUpdate
 from momentum.domain.status_updates.schemas import StatusItem, StatusSections, StatusUpdateIn
 from momentum.domain.status_updates.service import STATUS_LABELS, body_text
 from momentum.domain.tasks.models import Task, TaskProject
+from momentum.domain.tasks.service import today_for
 
 # worst first: a portfolio is as healthy as its least healthy project
 SEVERITY = ("off_track", "at_risk", "on_hold", "on_track", "complete")
@@ -352,7 +353,7 @@ async def portfolio_rows(
         await session.execute(select(func.count()).select_from(members.order_by(None).subquery()))
     ).scalar_one()
     ids = [x.id for x in visible]
-    today = datetime.now(UTC).date()
+    today = today_for(ctx)
     counts: dict[uuid.UUID, tuple[int, int, int]] = {}
     latest: dict[uuid.UUID, tuple[str, datetime]] = {}
     if ids:
@@ -488,7 +489,7 @@ async def draft_status(session: AsyncSession, ctx: Ctx, portfolio_id: uuid.UUID)
     if statuses.count(None):
         tally.append(f"{statuses.count(None)} with no status yet")
     title = ", ".join(tally) if tally else "No projects yet"
-    today = datetime.now(UTC).date()
+    today = today_for(ctx)
     slipped, blockers, completed, nxt = [], [], [], []
     for x, facts in rows:
         latest = facts["latest_update_title"]

@@ -315,6 +315,14 @@ def today_for(ctx: Ctx) -> date:
         return datetime.now(UTC).date()
 
 
+def local_date_for(ctx: Ctx, value: datetime) -> date:
+    """The viewer's calendar day for a stored (UTC) timestamp, to compare with ``today_for``."""
+    try:
+        return value.astimezone(ZoneInfo(ctx.actor.timezone)).date()
+    except (KeyError, ValueError):
+        return value.astimezone(UTC).date()
+
+
 def due_clause(due: DueFilter, today: date) -> ColumnElement[bool] | None:
     """SQL condition for a due bucket (weeks start on Monday, in the actor's timezone)."""
     week_end = today + timedelta(days=6 - today.weekday())

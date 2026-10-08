@@ -61,6 +61,7 @@ class ReadinessCheck:
     files_read: list[str] = field(default_factory=list)
     unreadable: list[str] = field(default_factory=list)
     ai: bool = False
+    facts: dict[str, Any] = field(default_factory=dict)  # what the model was shown (evals' judge)
 
 
 def keep(out: ReadinessNotes, facts: dict[str, Any]) -> list[ReadinessNote]:
@@ -137,5 +138,6 @@ async def check(
         description="Submit the notes on the gate's files.",
     )
     out.notes = keep(notes, facts)
+    out.facts = facts
     out.ai = True
     return out

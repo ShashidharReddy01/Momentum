@@ -12,10 +12,13 @@ export function SaveAsTemplateDialog({
   projectId,
   open,
   onOpenChange,
+  returnFocus,
 }: {
   projectId: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Where focus goes on close (opened from a menu: the menu's button, H66). */
+  returnFocus?: { current: HTMLElement | null };
 }) {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -38,7 +41,7 @@ export function SaveAsTemplateDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange} title="Save as template">
+    <Dialog open={open} onOpenChange={onOpenChange} title="Save as template" returnFocus={returnFocus}>
       <form onSubmit={submit} className="flex flex-col gap-3 p-5">
         <p className="text-sm text-muted">
           Sections, tasks, subtasks, fields and rules are captured; dates become relative to the project's

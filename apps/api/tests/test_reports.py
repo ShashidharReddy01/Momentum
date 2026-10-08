@@ -15,8 +15,14 @@ import pdfplumber
 from docx import Document
 from openpyxl import load_workbook
 
+from momentum.core.context import Actor, Ctx
+from momentum.core.db import UnitOfWork
+from momentum.core.settings import Settings
+from momentum.reports.builders.common import BuildContext
 from momentum.reports.document import AI_LABEL
-from tests.helpers import Clients
+from momentum.reports.generate import build, filename_for
+from momentum.reports.spec import ReportSpec
+from tests.helpers import Clients, ctx_for
 
 B = "/api/v1"
 
@@ -265,3 +271,37 @@ async def test_preview_undo_regenerate_and_permissions(as_user: Clients) -> None
     # someone else's job is not found
     assert (await tom.get(f"{B}/reports/jobs/{run['id']}")).status_code == 404
     assert (await ravi.get(f"{B}/reports/jobs/{uuid.uuid4()}")).status_code == 404
+
+
+def test_report_date_is_the_readers_day(settings: Settings) -> None:
+    """H66: 23:30 UTC on 31 October is already 1 November in Kolkata: the file name and the
+    PDF footer carry the reader's day, like the report's own period and scope note."""
+    actor = Actor(
+        id=uuid.uuid4(),
+        workspace_id=uuid.uuid4(),
+        role="member",
+        email="r@x.test",
+        name="R",
+        timezone="Asia/Kolkata",
+    )
+    spec = ReportSpec(kind="project_status", scope={"project_id": uuid.uuid4()}, format="pdf")
+    now = datetime(2026, 10, 31, 23, 30, tzinfo=UTC)
+    bc = BuildContext(None, Ctx(actor=actor, settings=settings), spec, now.date(), now)  # type: ignore[arg-type]
+    doc = bc.doc("Acme: status", "")
+    assert f"{doc.generated_at:%Y-%m-%d}" == "2026-11-01"
+    assert filename_for(doc, spec) == "Acme - Status 2026-11-01.pdf"
+
+
+async def test_closeout_facts_never_call_a_running_project_finished(
+    as_user: Clients, uow: UnitOfWork, settings: Settings
+) -> None:
+    """Live evals 2026-10-08: on a project still running, the facts said actual_days (days so
+    far) beside planned_days, and Mo wrote "completed in 146 days, 30 days early"."""
+    ravi = await as_user("ravi")
+    pid = await _pid(ravi)
+    ctx = await ctx_for(uow, settings, "ravi")
+    spec = ReportSpec(kind="closeout", scope={"project_id": pid}, format="docx")
+    async with uow.transaction() as s:
+        facts = (await build(s, ctx, spec)).facts
+    assert facts["finished"] is False and facts["actual_finish"] is None
+    assert facts["actual_days"] is None and isinstance(facts["days_so_far"], int)

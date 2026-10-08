@@ -10,6 +10,7 @@ import json
 import re
 from dataclasses import dataclass
 from datetime import date, timedelta
+from decimal import ROUND_HALF_UP, Decimal
 from typing import Any
 
 from momentum.ai.evals.features import Observation
@@ -146,6 +147,12 @@ def _numbers(text: str) -> list[float]:
     return out
 
 
+def _rows_of(output: Any) -> list[Any] | None:
+    data = output.get("data") if isinstance(output, dict) else None
+    rows = data.get("rows") if isinstance(data, dict) else None
+    return rows if isinstance(rows, list) else None
+
+
 def _flat_numbers(value: Any) -> set[float]:
     found: set[float] = set()
     if isinstance(value, bool):
@@ -163,13 +170,18 @@ def _flat_numbers(value: Any) -> set[float]:
     return found
 
 
+def _half_up(k: float, places: int) -> float:
+    """Rounded the way people write it (765.625 → 765.63); ``round`` gives 765.62."""
+    return float(Decimal(repr(k)).quantize(Decimal(1).scaleb(-places), rounding=ROUND_HALF_UP))
+
+
 def _close(n: float, known: set[float]) -> bool:
     """Equal, or the same value rounded the way a person writes it (0-2 decimals, or x100 for
     a share shown as a percentage)."""
     for k in known:
-        if abs(n - k) < 1e-6 or any(abs(n - round(k, d)) < 1e-6 for d in (0, 1, 2)):
+        if abs(n - k) < 1e-6 or any(abs(n - _half_up(k, d)) < 1e-6 for d in (0, 1, 2)):
             return True
-        if abs(n - round(k * 100, 1)) < 1e-6 or abs(n - round(k * 100)) < 1e-6:
+        if any(abs(n - _half_up(k * 100, d)) < 1e-6 for d in (0, 1)):
             return True
     return False
 
@@ -178,6 +190,8 @@ def _query_matches(want: dict[str, Any], got: dict[str, Any]) -> bool:
     """Every key the case names must match (names case-insensitive); others are free."""
 
     def norm(v: Any) -> Any:
+        if isinstance(v, bool):  # a yes/no column: the tool treats "no" and false alike
+            return "yes" if v else "no"
         if isinstance(v, str):
             return v.strip().lower()
         if isinstance(v, list):
@@ -578,8 +592,11 @@ def score(obs: Observation, expect: dict[str, Any], *, today: date, asked: str =
         add(Check("cites_locator", ok, f"file citations: {got}"))
     if expect.get("numbers_from_tools"):
         known = _flat_numbers(outputs) | set(_numbers(asked))
+        # "these 5 customers": how many rows a tool returned is a number it gave
+        known |= {float(len(o["data"]["rows"])) for o in outputs if _rows_of(o) is not None}
         said = _numbers(_BRACKETS.sub(" ", text))
-        stray = [n for n in said if not _close(n, known)]
+        # "(12,735,966.43)" in prose is an aside, not an accounting negative
+        stray = [n for n in said if not _close(n, known) and not _close(abs(n), known)]
         add(Check("numbers_from_tools", not stray, f"numbers not in any tool output: {stray}"))
     if "query_exact" in expect:
         want = expect["query_exact"]

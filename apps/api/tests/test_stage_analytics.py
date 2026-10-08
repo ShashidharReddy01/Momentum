@@ -198,6 +198,30 @@ async def test_throughput_known_answer(as_user: Clients, session_factory: Sessio
     assert sum(p["value"] for p in line["series"]) == 3
 
 
+async def test_throughput_kpi_drills_into_its_own_stage_and_period(
+    as_user: Clients, session_factory: SessionFactory
+) -> None:
+    """A KPI tile drills with no key (live check, "Went live this quarter"): a one-stage
+    throughput KPI drills into that stage, over the same window or calendar period it counts."""
+    ravi = await as_user("ravi")
+    folio, opt, _p = await _world(ravi, session_factory)
+    for extra in ({"window_days": 180}, {"period": "this_quarter"}, {"period": "this_month"}):
+        spec = {
+            "version": 2,
+            "entity": "stage_events",
+            "portfolio_id": folio,
+            "analysis": "throughput",
+            "stages": [opt["Contracts"]],
+            **extra,
+        }
+        args = {k: v for k, v in spec.items() if k not in ("version", "entity")}
+        kpi = await _q(ravi, "kpi", **args)
+        r = await ravi.post(f"{B}/dashboards/drill", json={"query_spec": spec})
+        assert r.status_code == 200, (extra, r.text)
+        assert r.json()["total"] == kpi["value"], extra
+        assert r.json()["label"] == "Contracts"
+
+
 async def test_aging_known_answer(as_user: Clients, session_factory: SessionFactory) -> None:
     ravi = await as_user("ravi")
     folio, _opt, _p = await _world(ravi, session_factory)

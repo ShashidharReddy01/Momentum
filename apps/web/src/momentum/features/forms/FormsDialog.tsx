@@ -120,11 +120,14 @@ export function FormsDialog({
   canEdit,
   open,
   onOpenChange,
+  returnFocus,
 }: {
   projectId: string;
   canEdit: boolean;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Where focus goes on close (opened from a menu: the menu's button, H66). */
+  returnFocus?: { current: HTMLElement | null };
 }) {
   const forms = useForms(projectId, open);
   const m = useFormMutations(projectId);
@@ -134,7 +137,13 @@ export function FormsDialog({
   const create = (spec: FormSpec) => m.create.mutate(spec, { onSuccess: () => setCreating(false) });
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange} title="Forms" className="w-[min(640px,calc(100vw-32px))]">
+    <Dialog
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Forms"
+      returnFocus={returnFocus}
+      className="w-[min(640px,calc(100vw-32px))]"
+    >
       <div className="flex max-h-[70vh] flex-col gap-3 overflow-y-auto p-5">
         {forms.isPending ? (
           <p className="text-sm text-muted">Loading…</p>

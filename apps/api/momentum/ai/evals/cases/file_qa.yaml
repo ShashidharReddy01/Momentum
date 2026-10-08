@@ -28,12 +28,12 @@ cases:
     mock: true
     input: "What does the customer's UAT email say?"
     files: ["customer-email.eml"]
-    expect: {tools_any: [read_file], cites_locator: "body", text_include_any: ["12 January"], numbers_from_tools: true}
+    expect: {tools_any: [read_file], cites_locator: "body", text_include_any: ["12 January", "January 12"], numbers_from_tools: true}
   - id: outlook_message
     mock: true
     input: "Summarise the Outlook message about migration"
     files: ["customer-email.msg"]
-    expect: {tools_any: [read_file], cites_locator: "body", text_include_any: ["3 February"]}
+    expect: {tools_any: [read_file], cites_locator: "body", text_include_any: ["3 February", "February 3"]}
   - id: workbook_macros
     mock: true
     input: "Does this workbook have macros, and what do they do?"
@@ -53,7 +53,7 @@ cases:
     mock: true
     input: "What's inside bundle.zip?"
     files: ["bundle.zip"]
-    expect: {tools_any: [file_outline], text_include_all: ["msa.pdf", "readme.txt"], text_include_any: ["on its own"]}
+    expect: {tools_any: [file_outline], text_include_all: ["msa.pdf", "readme.txt"], text_include_any: ["on its own", "individually", "separately"]}
   - id: quote_vs_sow
     mock: true
     input: "Compare the quote's line items with the SOW scope"

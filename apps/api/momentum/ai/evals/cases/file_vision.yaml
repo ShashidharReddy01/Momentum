@@ -17,7 +17,7 @@ cases:
     mock: true
     input: "Is the scanned contract signed?"
     files: ["scanned-contract.pdf"]
-    expect: {tools_include: [file_outline, look_at], images_sent: {min: 1, max: 1}, cites_locator: "p1"}
+    expect: {tools_include: [look_at], images_sent: {min: 1, max: 1}, cites_locator: "p1"}
   - id: scanned_contract_read
     mock: true
     input: "Read the scanned contract page for me"

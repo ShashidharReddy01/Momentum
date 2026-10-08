@@ -182,11 +182,14 @@ export function RulesDialog({
   canEdit,
   open,
   onOpenChange,
+  returnFocus,
 }: {
   projectId: string;
   canEdit: boolean;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Where focus goes on close (opened from a menu: the menu's button, H66). */
+  returnFocus?: { current: HTMLElement | null };
 }) {
   const rules = useRules(projectId, open);
   const m = useRuleMutations(projectId);
@@ -203,7 +206,13 @@ export function RulesDialog({
   const create = (spec: RuleSpec) => m.create.mutate(spec, { onSuccess: closeBuilder });
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange} title="Rules" className="w-[min(640px,calc(100vw-32px))]">
+    <Dialog
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Rules"
+      returnFocus={returnFocus}
+      className="w-[min(640px,calc(100vw-32px))]"
+    >
       <div className="flex max-h-[70vh] flex-col gap-3 overflow-y-auto p-5">
         {rules.isPending ? (
           <p className="text-sm text-muted">Loading…</p>

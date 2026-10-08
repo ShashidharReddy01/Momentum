@@ -1002,6 +1002,27 @@ async def _persona_touches(w: _Seeder, pfields: dict[str, FieldDef], made: list[
             .values(due_on=w.today + timedelta(days=6))
         )
     mei = w.users[w.person("mei")].id
+    # Mei's "due this week" widget is never empty, whatever the weekday (late in the week the
+    # plan's dates can all fall past Sunday)
+    week_end = w.today + timedelta(days=6 - w.today.weekday())
+    open_mei = list(
+        (
+            await w.s.execute(
+                select(Task)
+                .join(TaskProject, TaskProject.task_id == Task.id)
+                .where(
+                    TaskProject.project_id.in_(ids),
+                    Task.assignee_id == mei,
+                    Task.completed_at.is_(None),
+                    Task.deleted_at.is_(None),
+                    Task.parent_id.is_(None),
+                )
+                .order_by(Task.title, Task.id)
+            )
+        ).scalars()
+    )
+    if open_mei and not any(t.due_on and w.today <= t.due_on <= week_end for t in open_mei):
+        await w.s.execute(update(Task).where(Task.id == open_mei[0].id).values(due_on=w.today))
     rows = (
         await w.s.execute(
             select(Task, TaskProject.project_id)

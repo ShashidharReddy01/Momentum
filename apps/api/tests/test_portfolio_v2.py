@@ -7,17 +7,22 @@ from __future__ import annotations
 
 import time
 import uuid
+from dataclasses import replace
 from datetime import UTC, date, datetime, timedelta
 from typing import Any
+from zoneinfo import ZoneInfo
 
 import httpx
+import time_machine
 from sqlalchemy import event
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 from momentum.core.activity import Activity
+from momentum.core.context import Ctx
 from momentum.core.db import UnitOfWork
 from momentum.core.settings import Settings
 from momentum.domain.forecasts.models import Forecast
+from momentum.domain.portfolios import service
 from momentum.domain.portfolios.models import Portfolio
 from momentum.domain.portfolios.rows import ViewSpec, portfolio_rows_v2
 from tests.helpers import Clients, ctx_for
@@ -77,6 +82,38 @@ async def _task(c: httpx.AsyncClient, pid: str, title: str, **body: Any) -> str:
     return str(r.json()["data"]["id"])
 
 
+# ---------------- "today" is the viewer's day (H66) ----------------
+
+
+async def test_overdue_uses_the_viewers_day_like_reports(
+    as_user: Clients, uow: UnitOfWork, settings: Settings
+) -> None:
+    """23:30 UTC on 31 October is already 1 November in Kolkata: a task due 31 October is overdue
+    for a Kolkata viewer in the rows, the portfolio page and the status draft, as in reports."""
+    ravi = await as_user("ravi")
+    pid = (await _ids(ravi))["Website Revamp"]
+    folio = uuid.UUID(await _portfolio(ravi, "Onboarding", pid))
+    await _task(ravi, pid, "Due on the UTC day", due_on="2026-10-31")
+    base = await ctx_for(uow, settings, "ravi")
+    ctx = Ctx(actor=replace(base.actor, timezone="Asia/Kolkata"), settings=settings)
+
+    async def counts() -> tuple[int, int, str]:
+        async with uow.transaction() as s:
+            p = await service.get_portfolio(s, ctx, folio)
+            (row,) = (await portfolio_rows_v2(s, ctx, p)).rows
+            ((_project, facts),), _hidden = await service.portfolio_rows(s, ctx, p)
+            draft = await service.draft_status(s, ctx, folio)
+        return int(row["overdue"]), int(facts["overdue_tasks"]), draft.model_dump_json()
+
+    with time_machine.travel(datetime(2026, 10, 31, 12, 0, tzinfo=UTC), tick=False):
+        before, _, _ = await counts()
+    with time_machine.travel(datetime(2026, 10, 31, 23, 30, tzinfo=UTC), tick=False):
+        rows_overdue, page_overdue, draft = await counts()
+    assert rows_overdue == before + 1
+    assert page_overdue == rows_overdue
+    assert f"{rows_overdue} overdue" in draft
+
+
 # ---------------- rows: every built-in column ----------------
 
 
@@ -95,7 +132,10 @@ async def test_rows_compute_every_builtin_column(
     )
     assert r.status_code == 200, r.text
 
-    today = datetime.now(UTC).date()
+    today = datetime.now(ZoneInfo("Asia/Kolkata")).date()  # Ravi's day: rows use the viewer's day
+    r = await ravi.post(f"{B}/project-fields", json={"name": "Target go-live", "type": "date"})
+    assert r.status_code == 201, r.text
+    await _set(ravi, pid, r.json()["data"]["id"], (today + timedelta(days=50)).isoformat())
     late = await _task(ravi, pid, "Late thing", due_on=(today - timedelta(days=2)).isoformat())
     blocker = await _task(ravi, pid, "Blocker")
     waits = await _task(ravi, pid, "Waits on blocker")
@@ -144,9 +184,12 @@ async def test_rows_compute_every_builtin_column(
     assert row["next_milestone"]["title"] == "Contract signed"
     assert row["stage"] == {"option_id": stages["Implementation"], "label": "Implementation"}
     assert row["stage_age_days"] == 0 and row["stage_target_days"] == 30
-    assert row["target_date"] == (today + timedelta(days=30)).isoformat()
+    # H69: the slip is the go-live forecast against the go-live target ("Target go-live"), not
+    # against the end of the current stage (entered today + 30 days): forecast 40 days out,
+    # go-live target 50 days out, so 10 days early, not 10 days late
+    assert row["target_date"] == (today + timedelta(days=50)).isoformat()
     assert row["forecast_date"] == (today + timedelta(days=40)).isoformat()
-    assert row["slip_days"] == 10
+    assert row["slip_days"] == -10
     assert row["fields"][value_id] == 120000
     assert 0 <= row["progress"] <= 1
     keys = [c["key"] for c in out["columns"]]

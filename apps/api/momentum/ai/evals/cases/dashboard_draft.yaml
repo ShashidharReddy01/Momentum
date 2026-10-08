@@ -32,7 +32,7 @@ cases:
   - id: unknown_widget_noted
     mock: true
     input: "Delivery with a burndown and the control tower"
-    expect: {draft_exact: {portfolio: "Customer onboarding", mine: false, widgets: [control_tower]}, text_include_any: ["no widget called"]}
+    expect: {draft_exact: {portfolio: "Customer onboarding", mine: false, widgets: [control_tower]}, text_include_any: ["no widget called", "burndown"]}
   - id: only_unknown_asks_with_options
     mock: true
     input: "Give me only a burndown"

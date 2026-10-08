@@ -8,10 +8,11 @@ projects (in the portfolio, not visible to the viewer) are only counted, never n
 
 from __future__ import annotations
 
+import contextlib
 import uuid
 from collections import defaultdict
 from dataclasses import dataclass, field
-from datetime import UTC, date, datetime, timedelta
+from datetime import date, datetime
 from typing import Any
 
 from sqlalchemy import Select, and_, cast, func, literal, or_, select
@@ -28,6 +29,7 @@ from momentum.domain.portfolios.models import Portfolio, PortfolioItem
 from momentum.domain.projects.models import Project
 from momentum.domain.status_updates.models import StatusUpdate
 from momentum.domain.tasks.models import Task, TaskDependency, TaskProject
+from momentum.domain.tasks.service import local_date_for, today_for
 from momentum.domain.users.models import User
 
 # spec §5.2: the built-in column keys, in their default order
@@ -197,7 +199,7 @@ async def portfolio_rows_v2(
     today: date | None = None,
 ) -> Rows:
     spec = spec or ViewSpec()
-    today = today or datetime.now(UTC).date()
+    today = today or today_for(ctx)  # the viewer's day, as reports and dashboards (H66)
     projects = list((await session.execute(_member_query(ctx, p, spec))).scalars())
     hidden = await _hidden(session, ctx, p)
     defs = list(
@@ -486,6 +488,19 @@ async def compute_rows(
     ).all():
         milestones[pid] = {"id": tid, "title": title, "due_on": due}
 
+    # the go-live target a slip is measured against (H69): the "Target go-live" date field
+    golive = (
+        await session.execute(
+            select(FieldDef.id).where(
+                FieldDef.workspace_id == ctx.workspace_id,
+                FieldDef.applies_to == "project",
+                FieldDef.type == "date",
+                FieldDef.deleted_at.is_(None),
+                func.lower(FieldDef.name) == "target go-live",
+            )
+        )
+    ).scalar()
+    golive_on: dict[uuid.UUID, date] = {}
     values: dict[uuid.UUID, dict[str, Any]] = defaultdict(dict)
     for pid, fid, value in (
         await session.execute(
@@ -496,6 +511,9 @@ async def compute_rows(
     ).all():
         if fid in by_id:
             values[pid][str(fid)] = value
+        if fid == golive and isinstance(value, str):
+            with contextlib.suppress(ValueError):
+                golive_on[pid] = date.fromisoformat(value[:10])
 
     entered: dict[uuid.UUID, datetime] = {}
     if stage_field is not None:
@@ -560,14 +578,13 @@ async def compute_rows(
         total, done, overdue = counts.get(x.id, (0, 0, 0))
         fields = values.get(x.id, {})
         stage_value = fields.get(str(stage_field.id)) if stage_field else None
-        since = entered.get(x.id)
-        stage_age = (today - since.date()).days if since and stage_value else None
+        entered_at = entered.get(x.id)
+        since = local_date_for(ctx, entered_at) if entered_at else None
+        stage_age = (today - since).days if since and stage_value else None
         target_days = targets.get(str(stage_value)) if stage_value is not None else None
-        target: date | None
-        if isinstance(target_days, int | float) and since is not None:
-            target = since.date() + timedelta(days=int(target_days))
-        else:
-            target = x.due_on
+        # the project's go-live target, never the end of its current stage (H69): a stage's
+        # lateness is stage age vs stage target; the slip compares the go-live forecast with this
+        target: date | None = golive_on.get(x.id) or x.due_on
         forecast = forecasts.get(x.id)
         rows.append(
             {

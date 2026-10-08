@@ -2,6 +2,13 @@
 
 > Moved out of `STATUS.md` (2026-09-27) to keep it small: every AI session reads STATUS in full. Newest first. Nothing here is current instruction; the code and the docs are.
 
+## Handoff notes (2026-10-07, Phase 7.5 build session, cloud, mock AI; exit)
+- **Where it stands:** Phase 7.5 is complete (S75-00 to S75-13, exit table in `phase-7.5.md`). **Next: Phase 7.6 (`phase-7.6.md`)**, from S76-00; read its build prompt at the end of that file.
+- **For the product owner after pulling:** `uv run momentum migrate` (0042–0045), `uv run momentum llm-check` (the new "vision (image input)" row must pass before the file_vision live cases mean anything), `EVALS_LIVE=1 make evals` for the live-only cases, then the clicks in § Live verification. Nothing here was run against a real gateway.
+- **Known follow-ups (not blocking):** the Rules and Forms dialogs mount lazily from the project ⋯ menu like the report dialog did before H65; check that focus returns to the menu button and pass `returnFocus` if not. Report and portfolio timings were measured in this container (in-process, one worker); re-measure on the Azure size in Phase 8.
+- **Fresh container recipe (this session):** `apt-get install -y postgresql-16-pgvector`; `initdb -D /home/user/.pgdata -U postgres` as `postgres`; start with `su postgres -c "/usr/lib/postgresql/16/bin/pg_ctl -D /home/user/.pgdata -o '-p 5432 -k /tmp' -l /tmp/pg.log start"`; role `momentum`/`momentum` (createdb), databases `momentum` + `momentum_test`; `vector`, `pg_trgm`, `citext` in `template1` and both databases; `uv sync` in `apps/api`, `pnpm install` in `apps/web`. `make check` takes ~25 minutes; run it in the background and never run pytest beside it (they share `momentum_test`).
+- **Branches:** each green slice is pushed to the session branch and to `main` (product owner's working rule: one branch, `main`; fetch before starting and before every push).
+
 ## Handoff notes (2026-10-01, S6.5.1–S6.5.3 and the Phase 6 exit)
 - **Phase 6 exit (2026-10-01):** all criteria met (details in `phase-6.md` "Phase 6 exit"); full e2e **13/13 on two consecutive runs**. Found at exit and fixed: a real rapid-entry bug (typing tasks fast lost one on screen: a refetch from our own realtime echo replaced the list without the still-saving task) and three journey-hygiene issues. **Your one live check:** `momentum evals --live --feature chart`.
 - **Shipped:** S6.5.1 Dashboards (project **Dashboard** tab with a live starter layout, workspace **Dashboards**, every mark opens its tasks) and S6.5.2 **✦ Ask for a chart** (a question → Mo picks the chart and filters → live preview → add; the numbers are always counted by the server as you; Mo's `query_metrics` tool counts the same way). Details: `phase-6.md` "As built" for both.

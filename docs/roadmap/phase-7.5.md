@@ -384,14 +384,14 @@ Not verified here (no gateway): the live-only eval cases, `llm-check` (incl. the
 Everything below was built and tested with mock AI. These steps check it against your real gateway, files and browsers. Tick each line; anything that fails goes back as a finding (a new prompt version for AI wording, a fix otherwise).
 
 **1. Set up (once)**
-- [ ] `git pull`, then `cd apps/api && uv sync` (new dependencies: openpyxl, xlrd, python-pptx, pdfplumber, pypdfium2, Pillow, oletools, extract-msg, striprtf, defusedxml, reportlab).
-- [ ] `uv run momentum migrate` (applies **0042–0045**).
-- [ ] `cd ../web && pnpm install && pnpm build` (or `make build`).
-- [ ] `cd ../api && uv run momentum llm-check`: every alias answers, and the **vision** row passes. If your gateway model can't take images, set `MOMENTUM_LLM_SUPPORTS_VISION=false` and re-run.
-- [ ] On a demo database only: `uv run momentum seed --onboarding` (40 customers, the lifecycle portfolio, the seven role dashboards pinned for each persona), then `uv run momentum snapshots backfill --days 180` (trend widgets).
+- [x] `git pull`, then `cd apps/api && uv sync` (new dependencies: openpyxl, xlrd, python-pptx, pdfplumber, pypdfium2, Pillow, oletools, extract-msg, striprtf, defusedxml, reportlab).
+- [x] `uv run momentum migrate` (applies **0042–0045**).
+- [x] `cd ../web && pnpm install && pnpm build` (or `make build`).
+- [x] `cd ../api && uv run momentum llm-check`: every alias answers, and the **vision** row passes. If your gateway model can't take images, set `MOMENTUM_LLM_SUPPORTS_VISION=false` and re-run.
+- [x] On a demo database only: `uv run momentum seed --onboarding` (40 customers, the lifecycle portfolio, the seven role dashboards pinned for each persona), then `uv run momentum snapshots backfill --days 180` (trend widgets).
 
 **2. Live evals** (`EVALS_LIVE=1` against your gateway; report in `reports/evals/`)
-- [ ] `uv run momentum evals --live --feature file_qa --feature file_tables --feature file_vision --feature file_injection --feature report_narrative --feature portfolio_brief --feature nl_filters --feature dashboard_draft --feature explain_chart --feature readiness --feature handoff --feature catch_up --feature closeout`
+- [x] `uv run momentum evals --live --feature file_qa --feature file_tables --feature file_vision --feature file_injection --feature report_narrative --feature portfolio_brief --feature nl_filters --feature dashboard_draft --feature explain_chart --feature readiness --feature handoff --feature catch_up --feature closeout`
 - [ ] Every feature meets its live threshold in `momentum/ai/evals/thresholds.yaml` (0.85; file_tables, file_injection 1.0; nl_filters 0.9). Read the judge notes of any failed case before changing a prompt; add a new prompt version (`v2.md`) rather than editing `v1`.
 
 **3. Files and Mo (as Ravi)**
@@ -405,7 +405,7 @@ Everything below was built and tested with mock AI. These steps check it against
 - [ ] From a role dashboard: **Create report** (PDF).
 
 **5. Portfolios and dashboards (each persona)**
-- [ ] Sign in as each seed persona (Sofia, Dev, Lena, Ravi, Mei, Sam, Avery) and open their pinned dashboard on Home: every widget has real numbers, and clicking a mark opens the tasks or projects behind it.
+- [x] Sign in as each seed persona (Sofia, Dev, Lena, Ravi, Mei, Sam, Avery) and open their pinned dashboard on Home: every widget has real numbers, and clicking a mark opens the tasks or projects behind it.
 - [ ] On the portfolio **Board**, drag a Contracts customer into Implementation: the gate's checklist appears; with "Also let Mo read the files", Mo comments on the signed contract. **Move anyway**, then **Draft handoff to Implementation** and post it.
 - [ ] **Brief me** on the portfolio; "Post as status update…" shows a preview first.
 - [ ] Above the portfolio table, "Implementations going live in November that are at risk" → chips → Apply.
@@ -417,6 +417,16 @@ Everything below was built and tested with mock AI. These steps check it against
 - [ ] On a project list, My Tasks and Search, "Describe what to show…" ("my overdue work tagged Escalated") → chips → Apply → the amber marker → Clear.
 - [ ] Quick add a task whose name resembles existing ones: the duplicate warning and the suggestions (with reasons) appear; nothing applies until you click.
 - [ ] Mark a project's status Complete (or archive it): the toast offers the close-out report; make it, then **Post as status update…**.
+
+**Results (product owner's machine, 2026-10-08, real Portkey gateway, AI-run by Claude Code)**
+- Setup green after one fix: `make check` failed on `test_reports` at 01:44 IST, a real time-zone bug (**H66**, fixed). `llm-check` 11/11 incl. vision (1.7 s); rerank WARN (off). Seed on the synthetic "Acme Demo" database; the backfill added nothing (the seed already writes 180 days).
+- **Live evals:** first run 2/13 features at threshold. Triage: a grader that never showed the judge its source material and three more grader bugs (**H70**), prompt problems (new versions `chat/v3`, `filters/v3`, `dashboard_draft/v2`; v1/v2 unchanged), a table bug that summed the sheet's own Total row (fixed in `files/tables.py`), and the slip definition (**H69**, fixed) behind most portfolio_brief failures. Latest runs: see STATUS.
+- **Dashboards (§5, first item):** all seven personas' pinned dashboards, 44/44 widgets with numbers; every KPI and bar drill returns exactly the counted projects or tasks (checked through the API the UI calls, as the persona). Lifecycle KPIs failed to drill (**H68**, fixed). "Slipping 29 of 40" was H69 (fixed: the slip now uses the go-live target); the demo forecasts are H79.
+- **Reports (§4):** every kind in every format generated and parsed back; numbers match the project's row; the customer update leaves out the `internal` task. File name and PDF footer were in UTC (H66, fixed). Mo's narrative, the portfolio Reports tab and the clicks in Word/Excel are left to the product owner.
+- **Stage gate (§5):** a Contracts customer → Implementation shows the three-item checklist and is refused with `gate_not_met` without override.
+- **Files and Mo (§3):** macros described, never run; a password-protected file reported as such; throttled answers (**H75**) re-run after the gateway calmed down.
+- **Keyboard (H65 follow-up):** every ⋯-menu dialog needed two Escapes and five lost focus (**H67**, fixed; J14).
+- Not done here: the clicks in a real browser (the Chrome extension wasn't connected), catch-up after someone else's changes, quick-add suggestions and close-out from the toast.
 
 **7. Sign-off**
 - [ ] Note any finding in STATUS (Open questions or a hardening register row) and tell the build session; Phase 7.6 starts from STATUS's "Next up".

@@ -356,6 +356,7 @@ async def _run(
             "paragraphs": len(paragraphs),
             "cites": [c for p in paragraphs for c in p.cites],
             "citables": citables(doc.facts),
+            "source": doc.facts,  # the judge checks the paragraphs against these
         }
     elif feature == "goal_check_in":
         # S6.3.2: a goal made for the case (half its period gone), linked to eval projects

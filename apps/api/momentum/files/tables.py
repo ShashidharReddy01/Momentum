@@ -8,6 +8,7 @@ numbers, common date forms, booleans). Columns are named by header text or by le
 
 from __future__ import annotations
 
+import re
 import statistics
 from datetime import date
 from typing import Any, Literal
@@ -209,6 +210,15 @@ def _aggregate(fn: Fn, col: _Col | None, rows: list[list[Any]]) -> Any:
         raise QueryError(f"{col.name} mixes kinds of values") from e
 
 
+_TOTAL_LABEL = re.compile(r"^(grand\s+|sub-?\s*)?totals?\s*:?$", re.IGNORECASE)
+
+
+def _is_total_row(r: list[Any]) -> bool:
+    """The sheet's own total line: its first text cell is exactly Total / Subtotal / Grand total."""
+    first = next((v for v in r if isinstance(v, str) and v.strip()), None)
+    return first is not None and bool(_TOTAL_LABEL.match(first.strip()))
+
+
 def run_query(info: SheetInfo, rows: list[list[Cell]], q: TableQuery) -> TableResult:
     header = info.header_row_guess
     body = [r for r in (rows[header:] if header else rows) if any(not is_empty(c) for c in r)]
@@ -224,6 +234,13 @@ def run_query(info: SheetInfo, rows: list[list[Cell]], q: TableQuery) -> TableRe
         else None
     )
     if q.group_by or q.aggregates:
+        # a sum over the items must not count the sheet's own Total line again
+        totals = [r for r in typed if _is_total_row(r)]
+        if totals:
+            typed = [r for r in typed if not _is_total_row(r)]
+            matched = len(typed)
+            left = f"Left out the sheet's own Total row(s) ({len(totals)}): not counted twice"
+            note = f"{note}. {left}" if note else left
         groups = [_find(cols, g) for g in q.group_by]
         aggs = q.aggregates or [Aggregate(fn="count")]
         agg_cols = [(_find(cols, a.column) if a.column else None) for a in aggs]
