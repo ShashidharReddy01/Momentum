@@ -1,0 +1,28 @@
+# Test-only pack (never shipped): a job that fails, crashes or succeeds on command, for the
+# replay, retry-from-the-failed-step and undo-everything tests (S76-02).
+key: failer
+name: Failer
+title: Test pack
+avatar: teammate
+version: 1.0.0
+sdk: ">=1.0,<2"
+kind: script
+description: Fails, crashes or succeeds when told to. Used only by Momentum's own platform tests.
+capabilities:
+  - key: work
+    title: Do three steps
+    description: Comments, renames the task and makes a subtask, then a step that may fail.
+triggers:
+  - { type: assigned }
+  - { type: manual }
+effects:
+  - comments.create
+  - tasks.rename
+  - tasks.create_subtask
+  - tasks.complete_own
+data:
+  classification: internal
+limits: { max_steps: 20, step_timeout_s: 30, max_active_s: 120, max_job_usd: 0.10, max_job_tokens: 10000, concurrency: 2, max_children: 5 }
+model_alias: fast
+budget_monthly_usd: 1
+budget_monthly_tokens: 100000

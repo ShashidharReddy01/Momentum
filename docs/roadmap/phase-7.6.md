@@ -162,6 +162,7 @@ Sizes: S ≈ half a day, M ≈ 1 day, L ≈ 2 days. **e2e** marks slices that en
   - every Phase 5 agent test still passes.
 
 ### S76-03 Asks and conversation (L)
+- `job.propose(tool, args)` (spec §8.1, moved here from S76-02): anything beyond the declared effects goes through preview → confirm → apply → undo to the run's person.
 - **Next migration** (jobs group, part 3): `asks` and the notification kinds `agent_ask`, `agent_ask_reminder`, `skill_proposed`.
 - `domain/asks/` (service, router):
   - create through the SDK only;
@@ -453,6 +454,49 @@ S76-00's contracts); registry definitions; install → unchanged → updated (1.
 edit → forced (1.2.0); no hand-made pack agents and no test run; setup preview → apply → re-apply
 (no change) → one undo; library-field attach and `unless` skip, with undo keeping the other
 project's field; setup is pack-only and apply needs a project admin.
+
+**S76-02 as built (2026-10-08, local session, mock AI only, $0 gateway spend).** **Migration
+0047:** the `agent_runs` job columns (spec §4.1; `request_id` filled by `gen_random_uuid()` for
+older rows, every older run `mode='oneshot'`), statuses `waiting`/`paused`/`expired`, table
+`agent_run_steps` (kinds as the spec plus `event`: a wait met by an outbox event). **Engine**
+(`momentum/agents/jobs/`): `job.py` (the `Job` and its state: `run_step` = look up → run once in
+its own transaction with a timeout → store the output, typed by the function's return annotation,
+large ones gzipped to storage; `Suspend`; `Interrupted` when a person cancelled or paused the job
+mid-pass; the job's own budget over the run tree; transient retries 2/8/30 s; `JobLLM`
+complete/json/vision with the injection-hygiene system rule; `JobPrompts` reading the pack's own
+`prompts/`); `effects.py` (comments.create, tasks.create_subtask/rename/set_fields/move_to_review/
+complete_own, attachments.create: only inside a step, only when declared); `engine.py`
+(`execute_job` = one pass, `_finish` with the race-safe "already met?" check under the parent row
+lock, `create_child` / `child_results` / `wake_parent`, `tick_jobs` (due timers recorded as their
+step, maximum age → `expired` + the person told, a dead pass requeued, failed after 3),
+`wake_on_events` (outbox cursor `agent_jobs`)); `control.py` (retry from the failed step, cancel
+with children, pause/resume, undo everything). **Claiming:** children of one parent at most
+`limits.concurrency` at a time, no per-task slot for a child, one-shot staleness rule unchanged
+and limited to one-shot runs, jobs held while `MOMENTUM_PACKS_ENABLED=false`. **Triggers:** a pack
+agent's triggers come from its manifest (`triggers_of`), for events, assignments, mentions and
+"run now" (whose text becomes `input.text`). **Agent off/on** pauses and resumes its jobs
+(`runs.pause_jobs_of` / `resume_jobs_of`; a timer or event wait is restored as it was). **API:**
+`POST /agents/runs/{id}/retry|cancel|pause|resume|undo`; the run detail gains the job fields,
+`job_steps` and `children`; realtime channel kind `run:<id>`. **SDK:** `Job`, `step`, `ChildRef`,
+`ChildResult`, `document_block`. **Test packs:** `failer` (fails, crashes or succeeds on command),
+`spawner` (fan-out and gather, a model-calling capability); `echo` now runs a real job. **Plan
+deviations:** the spec's `llm_json.py` doesn't exist in this codebase; the JSON helper asks for a
+forced `answer` tool call (how every structured feature here works) and falls back to tolerant
+text parsing. `job.propose(...)` (spec §8.1) moves to S76-03 with the other person-facing flows;
+the `tasks.request_approval` effect to S76-10 (Bernie's deciding), records/entities/skills effects
+to S76-04/05. A `spawn` that makes a subtask needs `tasks.create_subtask` declared (every write is
+a declared effect). Pausing a *running* job is allowed: it stops at its next step. **Tests:**
+`test_jobs_replay.py` (a killed job resumes without re-running finished steps or duplicating their
+effects; retry from the failed step; typed outputs replay; unique keys, effects only inside steps
+and only declared, no nesting; legacy runs stay one-shot; manifest triggers; run-now text),
+`test_jobs_waiting.py` (20 children 4 at a time; a failing child fails only itself; timers; events;
+cancel; pause/resume; agent off/on; expiry; run-channel events and authorization),
+`test_jobs_budget.py` (llm steps billed with GenAI attributes; the job cap shared with children;
+gateway retries; the JSON helper's four shapes; vision gated), `test_jobs_undo_all.py` (undo
+everything, permissions, edited-since rows listed, the controls over the API),
+`test_pack_determinism.py` (the lint over every pack, and the lint's own cases). Every Phase 5
+agent test file passes unchanged (126). `test_every_mutation_records_activity` allow-lists the job
+lifecycle events (the run and step rows are the record).
 
 ## The prompt for the build session
 

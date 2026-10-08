@@ -302,9 +302,15 @@ async def _recipient(
 
 
 async def consume_events(
-    session: AsyncSession, settings: Settings, *, batch: int = 200, max_batches: int = 20
+    session: AsyncSession,
+    settings: Settings,
+    *,
+    batch: int = 200,
+    max_batches: int = 20,
+    packs: object = None,
 ) -> TriggerStats:
-    """Queue agent runs for new outbox events. The caller commits."""
+    """Queue agent runs for new outbox events. The caller commits. ``packs`` (the app's
+    ``PackRegistry``) supplies a pack agent's triggers, which live in its code, not its row."""
     stats = TriggerStats()
     cursor = await _cursor(session)
     if not settings.agents_enabled:  # a kill switch drops what happened meanwhile, never replays it
@@ -329,13 +335,30 @@ async def consume_events(
             cursor.last_event_id = ev.id
             stats.events += 1
             if agents:
-                stats.queued += await _handle(session, settings, agents, ev)
+                stats.queued += await _handle(session, settings, agents, ev, packs)
     await session.flush()
     return stats
 
 
+def triggers_of(agent: Agent, packs: object = None) -> list[dict[str, Any]]:
+    """An agent's triggers: its row's, or for a pack agent its manifest's (Phase 7.6: read from
+    code, so an edit to the row can't widen when the agent runs). A pack agent whose pack isn't
+    loaded has none."""
+    if agent.kind != "pack":
+        return list(agent.triggers or [])
+    loaded = getattr(packs, "packs", None) or {}
+    pack = loaded.get(agent.pack_key)
+    if pack is None:
+        return []
+    return [t.model_dump(exclude_none=True) for t in pack.manifest.triggers]
+
+
 async def _handle(
-    session: AsyncSession, settings: Settings, agents: list[tuple[Agent, User]], ev: OutboxEvent
+    session: AsyncSession,
+    settings: Settings,
+    agents: list[tuple[Agent, User]],
+    ev: OutboxEvent,
+    packs: object = None,
 ) -> int:
     actor_id, actor_kind = _actor(ev)
     if actor_kind == "agent":
@@ -351,7 +374,7 @@ async def _handle(
     # a task assigned to an agent
     if ev.type == "task.assigned" and str(data.get("assignee_id")) in by_user:
         agent, _user = by_user[str(data["assignee_id"])]
-        if any(t.get("type") == "assigned" for t in agent.triggers or []):
+        if any(t.get("type") == "assigned" for t in triggers_of(agent, packs)):
             trigger = {
                 "type": "assigned",
                 "event_id": ev.id,
@@ -369,7 +392,7 @@ async def _handle(
             if str(uid) not in by_user:
                 continue
             agent, _user = by_user[str(uid)]
-            if not any(t.get("type") == "mentioned" for t in agent.triggers or []):
+            if not any(t.get("type") == "mentioned" for t in triggers_of(agent, packs)):
                 continue
             trigger = {
                 "type": "mentioned",
@@ -387,7 +410,7 @@ async def _handle(
     for agent, user in agents:
         matching = [
             t
-            for t in agent.triggers or []
+            for t in triggers_of(agent, packs)
             if t.get("type") == "event" and t.get("event") == ev.type
         ]
         if not matching:
@@ -435,6 +458,7 @@ async def request_run(
     task_id: uuid.UUID | None = None,
     project_id: uuid.UUID | None = None,
     text: str | None = None,
+    packs: object = None,
 ) -> uuid.UUID:
     """ "Run now" by a person: on a task or project they can see (or on nothing), optionally with
     text to work from (notes, a brief). The result and any proposals are for them."""
@@ -444,7 +468,7 @@ async def request_run(
         raise Forbidden("Guests can't run agents")
     if not agent.enabled:
         raise ValidationFailed(f"{agent.name} is turned off")
-    if not any(t.get("type") == "manual" for t in agent.triggers or []):
+    if not any(t.get("type") == "manual" for t in triggers_of(agent, packs)):
         raise ValidationFailed(f"{agent.name} can't be run by hand")
     trigger: dict[str, Any] = {"type": "manual", "requested_by": str(ctx.actor.id)}
     if task_id is not None:

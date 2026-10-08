@@ -13,6 +13,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from momentum.agents import radar, runs_view
+from momentum.agents.jobs import control
 from momentum.agents.loader import DefinitionError, all_definitions
 from momentum.agents.packs import setup as pack_setup
 from momentum.agents.packs.registry import packs_of
@@ -85,12 +86,20 @@ class RunQueuedOut(BaseModel):
     status_code=status.HTTP_202_ACCEPTED,
     summary="Run an agent now, on a task or project you can see; it starts within a minute",
 )
-async def run_agent(agent_id: uuid.UUID, body: RunIn, ctx: CtxDep, uow: UowDep) -> RunQueuedOut:
+async def run_agent(
+    agent_id: uuid.UUID, body: RunIn, ctx: CtxDep, uow: UowDep, runtime: RuntimeDep
+) -> RunQueuedOut:
     async with uow.transaction() as s:
         agent = await service.get_agent(s, ctx, agent_id)
         task_id = body.task_id or (await _task_id(s, ctx, body.task) if body.task else None)
         run_id = await request_run(
-            s, ctx, agent, task_id=task_id, project_id=body.project_id, text=body.text
+            s,
+            ctx,
+            agent,
+            task_id=task_id,
+            project_id=body.project_id,
+            text=body.text,
+            packs=packs_of(runtime),
         )
         run = await s.get(AgentRun, run_id)
         return RunQueuedOut(run_id=run_id, status=run.status if run else "queued")
@@ -119,9 +128,91 @@ async def list_agent_runs(
     response_model=runs_view.AgentRunDetailOut,
     summary="One run: its steps, proposals, answer, cost and errors",
 )
-async def get_agent_run(run_id: uuid.UUID, ctx: CtxDep, uow: UowDep) -> runs_view.AgentRunDetailOut:
+async def get_agent_run(
+    run_id: uuid.UUID, ctx: CtxDep, uow: UowDep, runtime: RuntimeDep
+) -> runs_view.AgentRunDetailOut:
     async with uow.transaction() as s:
-        return await runs_view.get_run(s, ctx, run_id)
+        return await runs_view.get_run(s, ctx, run_id, packs=packs_of(runtime))
+
+
+# ---------- Phase 7.6 S76-02 (spec §4.3, §4.7): controlling a durable job ----------
+
+
+class RunStateOut(BaseModel):
+    run_id: uuid.UUID
+    status: str
+
+
+@router.post(
+    "/agents/runs/{run_id}/retry",
+    response_model=RunStateOut,
+    summary="Retry a failed job from the step that failed (the person who asked, or an admin)",
+)
+async def retry_job(run_id: uuid.UUID, ctx: CtxDep, uow: UowDep) -> RunStateOut:
+    async with uow.transaction() as s:
+        run = await control.retry(s, ctx, run_id)
+        return RunStateOut(run_id=run.id, status=run.status)
+
+
+@router.post(
+    "/agents/runs/{run_id}/cancel",
+    response_model=RunStateOut,
+    summary="Cancel a job and its open children (the person who asked, a project or workspace"
+    " admin); what it wrote stays",
+)
+async def cancel_job(run_id: uuid.UUID, ctx: CtxDep, uow: UowDep) -> RunStateOut:
+    async with uow.transaction() as s:
+        run = await control.cancel(s, ctx, run_id)
+        return RunStateOut(run_id=run.id, status=run.status)
+
+
+@router.post(
+    "/agents/runs/{run_id}/pause",
+    response_model=RunStateOut,
+    summary="Pause a job (workspace admins); a running pass stops at its next step",
+)
+async def pause_job(run_id: uuid.UUID, ctx: CtxDep, uow: UowDep) -> RunStateOut:
+    async with uow.transaction() as s:
+        run = await control.pause(s, ctx, run_id)
+        return RunStateOut(run_id=run.id, status=run.status)
+
+
+@router.post(
+    "/agents/runs/{run_id}/resume",
+    response_model=RunStateOut,
+    summary="Resume a paused job (workspace admins)",
+)
+async def resume_job(run_id: uuid.UUID, ctx: CtxDep, uow: UowDep) -> RunStateOut:
+    async with uow.transaction() as s:
+        run = await control.resume(s, ctx, run_id)
+        return RunStateOut(run_id=run.id, status=run.status)
+
+
+class UndoSkippedOut(BaseModel):
+    entity_type: str
+    entity_id: uuid.UUID
+    verb: str
+    reason: str
+
+
+class UndoAllOut(BaseModel):
+    undone: int
+    skipped: list[UndoSkippedOut]
+
+
+@router.post(
+    "/agents/runs/{run_id}/undo",
+    response_model=UndoAllOut,
+    summary="Undo everything a job and its children did, newest first, with your permissions;"
+    " changes that can't be undone are listed",
+)
+async def undo_job(run_id: uuid.UUID, ctx: CtxDep, uow: UowDep) -> UndoAllOut:
+    async with uow.transaction() as s:
+        result = await control.undo_all(s, ctx, run_id)
+        return UndoAllOut(
+            undone=result.undone,
+            skipped=[UndoSkippedOut.model_validate(x) for x in result.skipped],
+        )
 
 
 class DraftIn(BaseModel):

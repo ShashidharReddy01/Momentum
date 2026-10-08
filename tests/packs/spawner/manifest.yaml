@@ -1,0 +1,30 @@
+# Test-only pack (never shipped): a parent that fans out to child jobs and gathers them (S76-02).
+key: spawner
+name: Spawner
+title: Test pack
+avatar: teammate
+version: 1.0.0
+sdk: ">=1.0,<2"
+kind: pipeline
+description: Starts one child job per item and adds up their results. Used only by platform tests.
+capabilities:
+  - key: batch
+    title: Square and sum
+    description: Squares each number in a child job and adds them up.
+  - key: square
+    title: Square one number
+    description: Squares one number.
+  - key: ask_model
+    title: Ask the model
+    description: Asks the model one question.
+triggers:
+  - { type: manual }
+effects:
+  - comments.create
+  - tasks.create_subtask
+data:
+  classification: internal
+limits: { max_steps: 100, step_timeout_s: 30, max_active_s: 300, max_job_usd: 1.0, max_job_tokens: 100000, concurrency: 4, max_children: 25 }
+model_alias: fast
+budget_monthly_usd: 1
+budget_monthly_tokens: 1000000

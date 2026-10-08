@@ -528,6 +528,14 @@ def test_every_mutation_records_activity() -> None:
     streaming). Found field detach / reorder / show-hide and reactions without any (H55, H57)."""
     allowed = {
         "agents/runtime.py:execute_run",  # agent_run.finished: the run row is the record
+        # Phase 7.6 S76-02: a durable job's lifecycle events (step, waiting, resumed, progress,
+        # finished); the run and its step rows are the record, the agent's changes go through
+        # services (with activity, under the job's request_id for undo everything)
+        "agents/jobs/engine.py:_after_terminal",
+        "agents/jobs/engine.py:_emit_resumed",
+        "agents/jobs/engine.py:_finish",
+        "agents/jobs/job.py:emit_step",
+        "agents/jobs/job.py:progress",
         "ai/chat.py:run_chat",  # SSE stream events, not the outbox
         "ai/chat.py:tracked",
         "ai/command.py:run_command",

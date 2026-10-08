@@ -27,7 +27,7 @@ from momentum.core.context import Ctx
 from momentum.core.errors import Forbidden, NotFound
 from momentum.core.ids import task_key
 from momentum.domain.access import get_visible_project, get_visible_task
-from momentum.domain.agents.models import RUN_STATUSES, Agent, AgentRun
+from momentum.domain.agents.models import RUN_STATUSES, Agent, AgentRun, AgentRunStep
 from momentum.domain.users.models import User
 
 Detail = Literal["full", "summary"]
@@ -75,10 +75,24 @@ class RunStepOut(BaseModel):
     ok: bool | None = None
 
 
+class RunProgressOut(BaseModel):
+    done: int
+    total: int
+    label: str | None = None
+
+
 class AgentRunOut(BaseModel):
     id: uuid.UUID
     agent: RunAgentOut
     status: str
+    # Phase 7.6 S76-02: durable jobs (mode "job"); one-shot runs leave these empty
+    mode: str = "oneshot"
+    capability: str | None = None
+    parent_run_id: uuid.UUID | None = None
+    waiting_on: str | None = None  # what a waiting job waits for: ask · children · timer · event
+    progress: RunProgressOut | None = None
+    attempt: int = 0
+    active_seconds: int = 0
     trigger: str
     task: RunTaskOut | None
     project: RunProjectOut | None
@@ -95,12 +109,29 @@ class AgentRunOut(BaseModel):
     applied: int
 
 
+class JobStepOut(BaseModel):
+    seq: int
+    key: str
+    kind: str
+    status: str
+    started_at: datetime | None
+    finished_at: datetime | None
+    duration_ms: int | None
+    tokens_in: int
+    tokens_out: int
+    cost_usd: Decimal
+    error: str | None
+    output: Any = None  # full viewers only; a classified pack's only to those who see the task
+
+
 class AgentRunDetailOut(AgentRunOut):
     detail: Detail
     trace: list[RunStepOut]
     answer: str | None
     comment_id: uuid.UUID | None
     actions: list[RunActionOut]
+    job_steps: list[JobStepOut] = []
+    children: list[AgentRunOut] = []
 
 
 @dataclass
@@ -176,6 +207,15 @@ async def _summary(
         "error": run.error,
         "proposals": sum(1 for a in actions if a.decided_by != agent.user_id),
         "applied": sum(1 for a in actions if a.state in ("applied", "undone")),
+        "mode": run.mode,
+        "capability": run.capability,
+        "parent_run_id": run.parent_run_id,
+        "waiting_on": (run.waiting_on or {}).get("type")
+        if run.status in ("waiting", "paused")
+        else None,
+        "progress": RunProgressOut.model_validate(run.progress) if run.progress else None,
+        "attempt": run.attempt,
+        "active_seconds": run.active_seconds,
     }
 
 
@@ -223,7 +263,46 @@ async def list_runs(
     return out
 
 
-async def get_run(session: AsyncSession, ctx: Ctx, run_id: uuid.UUID) -> AgentRunDetailOut:
+async def _job_steps(session: AsyncSession, run: AgentRun, show_output: bool) -> list[JobStepOut]:
+    rows = (
+        await session.execute(
+            select(AgentRunStep).where(AgentRunStep.run_id == run.id).order_by(AgentRunStep.seq)
+        )
+    ).scalars()
+    out = []
+    for r in rows:
+        duration = (
+            int((r.finished_at - r.started_at).total_seconds() * 1000)
+            if r.started_at and r.finished_at
+            else None
+        )
+        out.append(
+            JobStepOut(
+                seq=r.seq,
+                key=r.key,
+                kind=r.kind,
+                status=r.status,
+                started_at=r.started_at,
+                finished_at=r.finished_at,
+                duration_ms=duration,
+                tokens_in=r.tokens_in,
+                tokens_out=r.tokens_out,
+                cost_usd=r.cost_usd,
+                error=r.error if show_output or r.status == "failed" else None,
+                output=r.output if show_output and r.output_ref is None else None,
+            )
+        )
+    return out
+
+
+def _classification(agent: Agent, packs: object) -> str:
+    pack = (getattr(packs, "packs", None) or {}).get(agent.pack_key) if agent.pack_key else None
+    return str(pack.manifest.data.classification) if pack is not None else "internal"
+
+
+async def get_run(
+    session: AsyncSession, ctx: Ctx, run_id: uuid.UUID, *, packs: object = None
+) -> AgentRunDetailOut:
     _require_member(ctx)
     run = await session.get(AgentRun, run_id)
     if run is None or run.workspace_id != ctx.workspace_id:
@@ -248,6 +327,24 @@ async def get_run(session: AsyncSession, ctx: Ctx, run_id: uuid.UUID) -> AgentRu
     ]
     output = run.output or {}
     comment = output.get("comment_id")
+    job_steps: list[JobStepOut] = []
+    children: list[AgentRunOut] = []
+    if run.mode == "job":
+        # spec §4.6/§8.5: outputs for full viewers; a financial or personal pack's only for
+        # people who can see the job's task
+        classified = _classification(agent, packs) in ("financial", "personal")
+        show = full and (not classified or seen.task is not None)
+        job_steps = await _job_steps(session, run, show)
+        kids = (
+            await session.execute(
+                select(AgentRun)
+                .where(AgentRun.parent_run_id == run.id)
+                .order_by(AgentRun.created_at, AgentRun.id)
+            )
+        ).scalars()
+        for kid in kids:
+            kid_seen = await _seen(session, ctx, kid) or seen
+            children.append(AgentRunOut(**await _summary(session, kid, agent, kid_seen, [])))
     return AgentRunDetailOut(
         **await _summary(session, run, agent, seen, actions),
         detail=seen.detail,
@@ -265,4 +362,6 @@ async def get_run(session: AsyncSession, ctx: Ctx, run_id: uuid.UUID) -> AgentRu
             )
             for a in actions
         ],
+        job_steps=job_steps,
+        children=children,
     )

@@ -50,6 +50,11 @@ def _parse(path: Path) -> Prompt:
     )
 
 
+def parse_prompt(path: Path) -> Prompt:
+    """One prompt file, for prompts kept outside this package (a pack's own ``prompts/``)."""
+    return _parse(path)
+
+
 @functools.cache
 def load(feature: str, version: int | None = None) -> Prompt:
     folder = ROOT / feature

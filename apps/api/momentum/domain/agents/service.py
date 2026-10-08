@@ -39,6 +39,7 @@ from momentum.core.mutation import Mutation
 from momentum.core.permissions import Action, can
 from momentum.domain.access import visible_projects_clause
 from momentum.domain.agents.models import Agent
+from momentum.domain.agents.runs import pause_jobs_of, resume_jobs_of
 from momentum.domain.agents.schemas import (
     AgentConfig,
     AgentDefinition,
@@ -358,6 +359,9 @@ async def update_agent(
         agent.enabled = data.enabled
         if data.enabled:
             agent.enabled_at = datetime.now(UTC)
+            await resume_jobs_of(session, agent.id)  # Phase 7.6: its paused jobs carry on
+        else:
+            await pause_jobs_of(session, agent.id)  # Phase 7.6: jobs pause, never fail
     activity_id = await _updated(session, ctx, agent, changes)
     return Mutation(agent, activity_id, version=agent.version)
 

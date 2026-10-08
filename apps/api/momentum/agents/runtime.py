@@ -389,8 +389,9 @@ async def execute_run(
         if agent.kind == "handler" and handler is None:
             raise _Failed(f"No handler is registered for {agent.handler}")
         if agent.kind == "pack":
-            # Phase 7.6: packs run as durable jobs (S76-02), never through the one-shot loop
-            raise _Failed(f"{agent.name} runs as a durable job, which isn't available yet")
+            # Phase 7.6: a pack's runs are durable jobs (mode='job', agents/jobs/engine.py);
+            # a one-shot run of a pack agent can only be a leftover from before S76-02
+            raise _Failed(f"{agent.name} runs as a durable job, not as a one-shot run")
         requester = await _person(session, trigger.get("requested_by"))
         for_user = await _person(session, trigger.get("for_user_id"))
         if trigger.get("for_user_id") and for_user is None:

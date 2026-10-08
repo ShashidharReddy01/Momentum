@@ -6,11 +6,14 @@ to change; only this module is a promise.
 
 Each pack declares `sdk: ">=1.0,<2"` in its manifest; the loader refuses a pack whose declared
 range this version doesn't satisfy. The surface grows slice by slice (design spec §11.2):
-S76-01 adds `Pack`, `Capability`, `PackSettings` and the setup items (`TaskField`, `Section`).
+S76-01 adds `Pack`, `Capability`, `PackSettings` and the setup items (`TaskField`, `Section`);
+S76-02 adds the durable `Job` (steps, `job.llm`, `job.effects`, children, waiting, progress), the
+`@step` marker for step bodies, `ChildRef` / `ChildResult` and `document_block`.
 """
 
 from __future__ import annotations
 
+from momentum.agents.jobs.job import ChildRef, ChildResult, Job, document_block, step
 from momentum.agents.packs.loader import SDK_VERSION
 from momentum.agents.packs.manifest import Capability, PackManifest
 from momentum.agents.packs.pack import Pack, PackError, PackSettings
@@ -19,10 +22,15 @@ from momentum.agents.packs.setup import Section, TaskField
 __all__ = [
     "SDK_VERSION",
     "Capability",
+    "ChildRef",
+    "ChildResult",
+    "Job",
     "Pack",
     "PackError",
     "PackManifest",
     "PackSettings",
     "Section",
     "TaskField",
+    "document_block",
+    "step",
 ]

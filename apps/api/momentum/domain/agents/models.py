@@ -20,6 +20,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     func,
+    text,
 )
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.orm import Mapped, mapped_column
@@ -32,7 +33,32 @@ AGENT_MODEL_ALIASES = ("fast", "default", "smart")
 # starter = packaged with Momentum, host = a definition directory the host app passed in,
 # custom = created in the UI/API, pack = installed from a pack's manifest (Phase 7.6)
 AGENT_SOURCES = ("starter", "host", "custom", "pack")
-RUN_STATUSES = ("queued", "running", "succeeded", "failed", "cancelled", "budget_exceeded")
+RUN_STATUSES = (
+    "queued",
+    "running",
+    "waiting",  # Phase 7.6: a job parked until an answer, its children, a time or an event
+    "paused",  # Phase 7.6: a job a person paused (or whose agent was turned off)
+    "succeeded",
+    "failed",
+    "cancelled",
+    "budget_exceeded",
+    "expired",  # Phase 7.6: a job open longer than MOMENTUM_AGENT_JOB_MAX_AGE_DAYS
+)
+RUN_MODES = ("oneshot", "job")  # job: a pack's durable job (Phase 7.6 S76-02)
+STEP_KINDS = (
+    "step",
+    "llm",
+    "tool",
+    "ask",
+    "spawn",
+    "gather",
+    "consult",
+    "effect",
+    "now",
+    "sleep",
+    "event",
+)
+STEP_STATUSES = ("running", "done", "failed")
 
 
 class Agent(IdMixin, TimestampMixin, Base):
@@ -113,10 +139,66 @@ class AgentRun(IdMixin, Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Phase 7.6 S76-02 (spec §4.1): durable jobs. Legacy runs keep mode='oneshot'.
+    mode: Mapped[str] = mapped_column(String(8), default="oneshot", server_default="oneshot")
+    parent_run_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("agent_runs.id"))
+    plan_id: Mapped[uuid.UUID | None]  # FK added with the plans table (S76-12)
+    plan_step_key: Mapped[str | None] = mapped_column(String(60))
+    capability: Mapped[str | None] = mapped_column(String(60))
+    waiting_on: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    resume_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    progress: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    pack_version: Mapped[str | None] = mapped_column(String(20))
+    active_seconds: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    attempt: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    request_id: Mapped[uuid.UUID] = mapped_column(
+        default=uuid.uuid4, server_default=text("gen_random_uuid()")
+    )
 
     __table_args__ = (
         UniqueConstraint("agent_id", "dedupe_key"),
         CheckConstraint(f"status in {RUN_STATUSES}", name="status"),
+        CheckConstraint(f"mode in {RUN_MODES}", name="mode"),
+        Index("ix_agent_runs_parent", "parent_run_id"),
+        Index(
+            "ix_agent_runs_jobs_due",
+            "status",
+            "resume_at",
+            postgresql_where=text("mode = 'job'"),
+        ),
         Index("ix_agent_runs_agent_created", "agent_id", "created_at"),
         Index("ix_agent_runs_workspace_created", "workspace_id", "created_at"),
+    )
+
+
+class AgentRunStep(IdMixin, Base):
+    """Phase 7.6 S76-02 (spec §4.1-4.2): one recorded step of a durable job. A finished step's
+    output is what a replay returns instead of running it again; outputs above
+    ``MOMENTUM_AGENT_STEP_OUTPUT_MAX_KB`` live in storage (``output_ref``, gzipped JSON).
+    ``attrs`` uses OpenTelemetry GenAI attribute names (spec §8.8). Written by the job engine
+    only; a log, like the run itself."""
+
+    __tablename__ = "agent_run_steps"
+
+    workspace_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("workspaces.id"))
+    run_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("agent_runs.id", ondelete="CASCADE"))
+    seq: Mapped[int] = mapped_column(Integer)
+    key: Mapped[str] = mapped_column(String(120))
+    kind: Mapped[str] = mapped_column(String(16))
+    status: Mapped[str] = mapped_column(String(12))
+    output: Mapped[Any | None] = mapped_column(JSONB)
+    output_ref: Mapped[str | None] = mapped_column(String(200))
+    error: Mapped[str | None] = mapped_column(Text)
+    attrs: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
+    tokens_in: Mapped[int] = mapped_column(Integer, default=0)
+    tokens_out: Mapped[int] = mapped_column(Integer, default=0)
+    cost_usd: Mapped[Decimal] = mapped_column(Numeric(12, 6), default=Decimal(0))
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    __table_args__ = (
+        UniqueConstraint("run_id", "key"),
+        CheckConstraint(f"kind in {STEP_KINDS}", name="kind"),
+        CheckConstraint(f"status in {STEP_STATUSES}", name="status"),
+        Index("ix_agent_run_steps_run_seq", "run_id", "seq"),
     )

@@ -141,6 +141,91 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/agents/runs/{run_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cancel a job and its open children (the person who asked, a project or workspace admin); what it wrote stays */
+        post: operations["cancel_job_api_v1_agents_runs__run_id__cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/agents/runs/{run_id}/pause": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Pause a job (workspace admins); a running pass stops at its next step */
+        post: operations["pause_job_api_v1_agents_runs__run_id__pause_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/agents/runs/{run_id}/resume": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Resume a paused job (workspace admins) */
+        post: operations["resume_job_api_v1_agents_runs__run_id__resume_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/agents/runs/{run_id}/retry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Retry a failed job from the step that failed (the person who asked, or an admin) */
+        post: operations["retry_job_api_v1_agents_runs__run_id__retry_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/agents/runs/{run_id}/undo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Undo everything a job and its children did, newest first, with your permissions; changes that can't be undone are listed */
+        post: operations["undo_job_api_v1_agents_runs__run_id__undo_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/agents/tools": {
         parameters: {
             query?: never;
@@ -4668,11 +4753,28 @@ export interface components {
         AgentRunDetailOut: {
             /** Actions */
             actions: components["schemas"]["RunActionOut"][];
+            /**
+             * Active Seconds
+             * @default 0
+             */
+            active_seconds: number;
             agent: components["schemas"]["RunAgentOut"];
             /** Answer */
             answer: string | null;
             /** Applied */
             applied: number;
+            /**
+             * Attempt
+             * @default 0
+             */
+            attempt: number;
+            /** Capability */
+            capability?: string | null;
+            /**
+             * Children
+             * @default []
+             */
+            children: components["schemas"]["AgentRunOut"][];
             /** Comment Id */
             comment_id: string | null;
             /** Cost Usd */
@@ -4696,6 +4798,19 @@ export interface components {
              * Format: uuid
              */
             id: string;
+            /**
+             * Job Steps
+             * @default []
+             */
+            job_steps: components["schemas"]["JobStepOut"][];
+            /**
+             * Mode
+             * @default oneshot
+             */
+            mode: string;
+            /** Parent Run Id */
+            parent_run_id?: string | null;
+            progress?: components["schemas"]["RunProgressOut"] | null;
             project: components["schemas"]["RunProjectOut"] | null;
             /** Proposals */
             proposals: number;
@@ -4715,12 +4830,26 @@ export interface components {
             trace: components["schemas"]["RunStepOut"][];
             /** Trigger */
             trigger: string;
+            /** Waiting On */
+            waiting_on?: string | null;
         };
         /** AgentRunOut */
         AgentRunOut: {
+            /**
+             * Active Seconds
+             * @default 0
+             */
+            active_seconds: number;
             agent: components["schemas"]["RunAgentOut"];
             /** Applied */
             applied: number;
+            /**
+             * Attempt
+             * @default 0
+             */
+            attempt: number;
+            /** Capability */
+            capability?: string | null;
             /** Cost Usd */
             cost_usd: string;
             /**
@@ -4737,6 +4866,14 @@ export interface components {
              * Format: uuid
              */
             id: string;
+            /**
+             * Mode
+             * @default oneshot
+             */
+            mode: string;
+            /** Parent Run Id */
+            parent_run_id?: string | null;
+            progress?: components["schemas"]["RunProgressOut"] | null;
             project: components["schemas"]["RunProjectOut"] | null;
             /** Proposals */
             proposals: number;
@@ -4754,6 +4891,8 @@ export interface components {
             tokens_out: number;
             /** Trigger */
             trigger: string;
+            /** Waiting On */
+            waiting_on?: string | null;
         };
         /**
          * AgentScope
@@ -7301,6 +7440,33 @@ export interface components {
             status: string;
             /** Task Name */
             task_name: string;
+        };
+        /** JobStepOut */
+        JobStepOut: {
+            /** Cost Usd */
+            cost_usd: string;
+            /** Duration Ms */
+            duration_ms: number | null;
+            /** Error */
+            error: string | null;
+            /** Finished At */
+            finished_at: string | null;
+            /** Key */
+            key: string;
+            /** Kind */
+            kind: string;
+            /** Output */
+            output?: unknown;
+            /** Seq */
+            seq: number;
+            /** Started At */
+            started_at: string | null;
+            /** Status */
+            status: string;
+            /** Tokens In */
+            tokens_in: number;
+            /** Tokens Out */
+            tokens_out: number;
         };
         /** JobsOut */
         JobsOut: {
@@ -10494,6 +10660,15 @@ export interface components {
             /** Name */
             name: string;
         };
+        /** RunProgressOut */
+        RunProgressOut: {
+            /** Done */
+            done: number;
+            /** Label */
+            label?: string | null;
+            /** Total */
+            total: number;
+        };
         /** RunProjectOut */
         RunProjectOut: {
             /**
@@ -10506,6 +10681,16 @@ export interface components {
         };
         /** RunQueuedOut */
         RunQueuedOut: {
+            /**
+             * Run Id
+             * Format: uuid
+             */
+            run_id: string;
+            /** Status */
+            status: string;
+        };
+        /** RunStateOut */
+        RunStateOut: {
             /**
              * Run Id
              * Format: uuid
@@ -12156,6 +12341,13 @@ export interface components {
             /** User Id */
             user_id?: string | null;
         };
+        /** UndoAllOut */
+        UndoAllOut: {
+            /** Skipped */
+            skipped: components["schemas"]["UndoSkippedOut"][];
+            /** Undone */
+            undone: number;
+        };
         /** UndoIn */
         UndoIn: {
             /** Activity Id */
@@ -12167,6 +12359,20 @@ export interface components {
         UndoOut: {
             /** Undone */
             undone: string[];
+        };
+        /** UndoSkippedOut */
+        UndoSkippedOut: {
+            /**
+             * Entity Id
+             * Format: uuid
+             */
+            entity_id: string;
+            /** Entity Type */
+            entity_type: string;
+            /** Reason */
+            reason: string;
+            /** Verb */
+            verb: string;
         };
         /** UnreadCountOut */
         UnreadCountOut: {
@@ -12832,6 +13038,161 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AgentRunDetailOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancel_job_api_v1_agents_runs__run_id__cancel_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunStateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    pause_job_api_v1_agents_runs__run_id__pause_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunStateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    resume_job_api_v1_agents_runs__run_id__resume_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunStateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    retry_job_api_v1_agents_runs__run_id__retry_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunStateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    undo_job_api_v1_agents_runs__run_id__undo_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UndoAllOut"];
                 };
             };
             /** @description Validation Error */

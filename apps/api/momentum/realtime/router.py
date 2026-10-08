@@ -90,6 +90,11 @@ async def authorize_channel(session: AsyncSession, ctx: Ctx, channel: str) -> No
         from momentum.domain.goals.service import get_goal
 
         await get_goal(session, ctx, entity_id)
+    elif kind == "run":
+        # Phase 7.6 S76-02: a job's live timeline; subscribable by whoever may see the run
+        from momentum.agents.runs_view import get_run
+
+        await get_run(session, ctx, entity_id)
     else:
         raise DomainError("Unknown channel", code="invalid_channel")
 
