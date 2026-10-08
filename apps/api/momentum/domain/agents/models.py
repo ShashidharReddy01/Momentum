@@ -26,12 +26,12 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from momentum.core.db import Base, IdMixin, TimestampMixin
 
-AGENT_KINDS = ("llm", "handler")
+AGENT_KINDS = ("llm", "handler", "pack")  # pack: Phase 7.6 (ADR-0012)
 AUTONOMY_LEVELS = ("suggest", "confirm", "auto")
 AGENT_MODEL_ALIASES = ("fast", "default", "smart")
 # starter = packaged with Momentum, host = a definition directory the host app passed in,
-# custom = created in the UI/API
-AGENT_SOURCES = ("starter", "host", "custom")
+# custom = created in the UI/API, pack = installed from a pack's manifest (Phase 7.6)
+AGENT_SOURCES = ("starter", "host", "custom", "pack")
 RUN_STATUSES = ("queued", "running", "succeeded", "failed", "cancelled", "budget_exceeded")
 
 
@@ -55,6 +55,10 @@ class Agent(IdMixin, TimestampMixin, Base):
     instructions: Mapped[str] = mapped_column(Text, default="")
     kind: Mapped[str] = mapped_column(String(16), default="llm")
     handler: Mapped[str | None] = mapped_column(String(120))
+    # Phase 7.6 (migration 0046): the pack an agent was installed from, and the version installed.
+    # Capabilities, effects and data are always read from the pack's code, never from this row.
+    pack_key: Mapped[str | None] = mapped_column(String(60))
+    pack_version: Mapped[str | None] = mapped_column(String(20))
     tools: Mapped[list[str]] = mapped_column(ARRAY(Text), default=list)
     scope: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
     autonomy: Mapped[str] = mapped_column(String(16), default="confirm")
@@ -75,6 +79,9 @@ class Agent(IdMixin, TimestampMixin, Base):
         UniqueConstraint("workspace_id", "key"),
         CheckConstraint(f"kind in {AGENT_KINDS}", name="kind"),
         CheckConstraint("(kind = 'handler') = (handler is not null)", name="handler"),
+        CheckConstraint(
+            "(kind = 'pack') = (pack_key is not null and pack_version is not null)", name="pack"
+        ),
         CheckConstraint(f"autonomy in {AUTONOMY_LEVELS}", name="autonomy"),
         CheckConstraint(f"model_alias in {AGENT_MODEL_ALIASES}", name="model_alias"),
         CheckConstraint(f"source in {AGENT_SOURCES}", name="source"),

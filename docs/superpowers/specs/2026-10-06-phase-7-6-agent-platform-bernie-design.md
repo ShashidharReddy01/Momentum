@@ -1282,6 +1282,8 @@ All new UI follows the design system: amber for AI, a purple MOCK marker in mock
 
 ### 13.1 Migrations
 
+> **As built (2026-10-08):** these three numbers are logical groups. 0045 was already taken by Phase 7.5 (`report_runs`), and each slice ships its own migration file, so the files are numbered in order from 0046 (S76-01: 0046 = the `agents` pack columns). See `docs/roadmap/phase-7.6.md` working rule 7.
+
 | Migration | Tables / columns |
 |---|---|
 | **0045** | `agent_runs` (§4.1 columns, status values); `agent_run_steps`; `asks`; `agent_pack_settings`; `agents.pack_key`, `agents.pack_version`, `agents.kind` gains `pack`; `activity.request_id` index if missing; notification kinds `agent_ask`, `agent_ask_reminder`, `skill_proposed` |

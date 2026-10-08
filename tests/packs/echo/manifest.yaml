@@ -1,0 +1,31 @@
+# Test-only pack (never shipped): exercises install, upgrade rules and project setup (S76-01);
+# steps, progress and records join in S76-02 and S76-04.
+key: echo
+name: Echo
+title: Test pack
+avatar: teammate
+version: 1.0.0
+sdk: ">=1.0,<2"
+kind: script
+description: Echoes its input back. Used only by Momentum's own platform tests.
+charter: |
+  I repeat what I'm given. I exist so the agent platform can be tested without a real agent.
+capabilities:
+  - key: echo
+    title: Echo the input
+    description: Returns the input text unchanged.
+    input: { text: required }
+    output: { text: true }
+    examples: ["Echo hello"]
+    typical_duration_s: 1
+triggers:
+  - { type: assigned }
+  - { type: manual }
+effects:
+  - comments.create
+data:
+  classification: internal
+limits: { max_steps: 10, step_timeout_s: 30, max_active_s: 120, max_job_usd: 0.10, max_job_tokens: 10000, concurrency: 2, max_children: 5 }
+model_alias: fast
+budget_monthly_usd: 1
+budget_monthly_tokens: 100000

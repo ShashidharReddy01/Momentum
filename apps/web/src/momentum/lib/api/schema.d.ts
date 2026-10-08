@@ -244,6 +244,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/agents/{agent_id}/setup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Preview a pack agent's project setup (fields and sections it needs); changes nothing */
+        get: operations["preview_setup_api_v1_agents__agent_id__setup_get"];
+        put?: never;
+        /** Apply a pack agent's project setup as one undoable batch (project admins) */
+        post: operations["apply_setup_api_v1_agents__agent_id__setup_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/agents/{agent_id}/stats": {
         parameters: {
             query?: never;
@@ -4306,7 +4324,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "llm" | "handler";
+            kind: "llm" | "handler" | "pack";
             /** Limits */
             limits: {
                 [key: string]: unknown;
@@ -4318,6 +4336,10 @@ export interface components {
             model_alias: "fast" | "default" | "smart";
             /** Name */
             name: string;
+            /** Pack Key */
+            pack_key?: string | null;
+            /** Pack Version */
+            pack_version?: string | null;
             /** Projects */
             projects?: components["schemas"]["AgentProjectOut"][];
             /** Scope */
@@ -4328,7 +4350,7 @@ export interface components {
              * Source
              * @enum {string}
              */
-            source: "starter" | "host" | "custom";
+            source: "starter" | "host" | "custom" | "pack";
             /** Tools */
             tools: string[];
             /** Triggers */
@@ -4399,7 +4421,7 @@ export interface components {
              * @default llm
              * @enum {string}
              */
-            kind: "llm" | "handler";
+            kind: "llm" | "handler" | "pack";
             limits?: components["schemas"]["AgentLimits"];
             /**
              * Model Alias
@@ -4409,6 +4431,10 @@ export interface components {
             model_alias: "fast" | "default" | "smart";
             /** Name */
             name: string;
+            /** Pack Key */
+            pack_key?: string | null;
+            /** Pack Version */
+            pack_version?: string | null;
             scope?: components["schemas"]["AgentScope"];
             /** Tools */
             tools?: string[];
@@ -4460,7 +4486,7 @@ export interface components {
              * @default llm
              * @enum {string}
              */
-            kind: "llm" | "handler";
+            kind: "llm" | "handler" | "pack";
             limits?: components["schemas"]["AgentLimits"];
             /**
              * Model Alias
@@ -4470,6 +4496,10 @@ export interface components {
             model_alias: "fast" | "default" | "smart";
             /** Name */
             name: string;
+            /** Pack Key */
+            pack_key?: string | null;
+            /** Pack Version */
+            pack_version?: string | null;
             scope?: components["schemas"]["AgentScope"];
             /** Tools */
             tools?: string[];
@@ -4529,7 +4559,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "llm" | "handler";
+            kind: "llm" | "handler" | "pack";
             /** Limits */
             limits: {
                 [key: string]: unknown;
@@ -4541,6 +4571,10 @@ export interface components {
             model_alias: "fast" | "default" | "smart";
             /** Name */
             name: string;
+            /** Pack Key */
+            pack_key?: string | null;
+            /** Pack Version */
+            pack_version?: string | null;
             /** Scope */
             scope: {
                 [key: string]: unknown;
@@ -4549,7 +4583,7 @@ export interface components {
              * Source
              * @enum {string}
              */
-            source: "starter" | "host" | "custom";
+            source: "starter" | "host" | "custom" | "pack";
             /** Tools */
             tools: string[];
             /** Triggers */
@@ -10712,6 +10746,63 @@ export interface components {
             /** Label */
             label: string;
         };
+        /** SetupAppliedOut */
+        SetupAppliedOut: {
+            /**
+             * Agent Id
+             * Format: uuid
+             */
+            agent_id: string;
+            /**
+             * Batch Id
+             * @description Undo the whole setup with POST /undo {batch_id}; null = no change
+             */
+            batch_id?: string | null;
+            /** Changes */
+            changes: components["schemas"]["SetupChangeOut"][];
+            /**
+             * Project Id
+             * Format: uuid
+             */
+            project_id: string;
+        };
+        /** SetupApplyIn */
+        SetupApplyIn: {
+            /**
+             * Project Id
+             * Format: uuid
+             */
+            project_id: string;
+        };
+        /** SetupChangeOut */
+        SetupChangeOut: {
+            /**
+             * Action
+             * @description create · attach · exists · skip
+             */
+            action: string;
+            /** Detail */
+            detail: string;
+            /** Kind */
+            kind: string;
+            /** Name */
+            name: string;
+        };
+        /** SetupPreviewOut */
+        SetupPreviewOut: {
+            /**
+             * Agent Id
+             * Format: uuid
+             */
+            agent_id: string;
+            /** Changes */
+            changes: components["schemas"]["SetupChangeOut"][];
+            /**
+             * Project Id
+             * Format: uuid
+             */
+            project_id: string;
+        };
         /**
          * ShowIf
          * @description Branching v1: show this question only if an earlier one's answer equals a value.
@@ -12963,6 +13054,74 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ListOut_AgentRunOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_setup_api_v1_agents__agent_id__setup_get: {
+        parameters: {
+            query: {
+                project_id: string;
+            };
+            header?: never;
+            path: {
+                agent_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SetupPreviewOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    apply_setup_api_v1_agents__agent_id__setup_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                agent_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetupApplyIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SetupAppliedOut"];
                 };
             };
             /** @description Validation Error */

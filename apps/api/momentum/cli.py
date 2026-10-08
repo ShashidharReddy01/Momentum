@@ -462,6 +462,9 @@ cli.add_typer(agents_cli, name="agents")
 snapshots_cli = typer.Typer(help="Project snapshots for trends (Phase 7.5)", no_args_is_help=True)
 cli.add_typer(snapshots_cli, name="snapshots")
 
+packs_cli = typer.Typer(no_args_is_help=True, help="Agent packs: list and check (Phase 7.6)")
+cli.add_typer(packs_cli, name="packs")
+
 
 @snapshots_cli.command("backfill")
 def snapshots_backfill(
@@ -524,7 +527,8 @@ def agents_install(
     enables each one. Safe to re-run: unchanged agents are left alone, edited ones are reported
     as drifted and kept (unless --force)."""
     from momentum.agents.extensions import load_extensions
-    from momentum.agents.loader import DefinitionError, load_definitions
+    from momentum.agents.loader import DefinitionError, all_definitions
+    from momentum.agents.packs.registry import PackRegistry
     from momentum.ai.tools.catalog import build_registry
     from momentum.core.context import Actor, Ctx
     from momentum.core.db import UnitOfWork, create_engine, create_session_factory
@@ -534,7 +538,9 @@ def agents_install(
     settings = Settings()
     ext = load_extensions(settings)  # MOMENTUM_AGENT_EXTENSIONS (S5.1.5)
     try:
-        definitions = load_definitions([*definitions_dir, *ext.definition_dirs])
+        definitions = all_definitions(
+            [*definitions_dir, *ext.definition_dirs], PackRegistry.load(settings)
+        )
     except DefinitionError as e:
         raise typer.BadParameter(str(e)) from e
 
@@ -565,6 +571,39 @@ def agents_install(
 
     for line in run_async(_run()):
         typer.echo(line)
+
+
+@packs_cli.command("list")
+def packs_list() -> None:
+    """Loaded packs (version, kind, SDK range, capabilities), then any that were refused and why."""
+    from momentum.agents.packs.registry import PackRegistry
+
+    registry = PackRegistry.load(Settings())
+    for key, pack in sorted(registry.packs.items()):
+        m = pack.manifest
+        caps = ", ".join(c.key for c in m.capabilities)
+        typer.echo(f"{key:<16} {m.version:<8} {m.kind:<9} sdk {m.sdk:<10} {caps}")
+    for err in registry.errors:
+        typer.echo(f"refused          {err.source}: {err.reason}")
+    if not registry.packs and not registry.errors:
+        typer.echo("No packs installed")
+
+
+@packs_cli.command("check")
+def packs_check(
+    key: str | None = typer.Argument(None, help="Only this pack"),
+) -> None:
+    """Check packs against the platform's rules: the manifest, the SDK range, limits within this
+    deployment's ceilings, handlers only for declared capabilities, and (for installed packs) an
+    import-linter contract keeping the pack to momentum.sdk. More checks join as features land."""
+    from momentum.agents.packs.check import check_packs
+
+    problems = check_packs(Settings(), only=key)
+    for line in problems:
+        typer.echo(line)
+    if problems:
+        raise typer.Exit(code=1)
+    typer.echo("All packs pass")
 
 
 @agents_cli.command("list")

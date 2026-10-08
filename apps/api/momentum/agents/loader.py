@@ -11,11 +11,15 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import yaml
 from pydantic import ValidationError
 
 from momentum.domain.agents.schemas import AgentDefinition
+
+if TYPE_CHECKING:
+    from momentum.agents.packs.registry import PackRegistry
 
 PACKAGED_DIR = Path(__file__).parent / "definitions"
 
@@ -49,4 +53,20 @@ def load_definitions(extra_dirs: Sequence[Path | str] = ()) -> list[tuple[AgentD
                 )
             seen[definition.key] = path
             found.append((definition, source))
+    return found
+
+
+def all_definitions(
+    extra_dirs: Sequence[Path | str], packs: PackRegistry
+) -> list[tuple[AgentDefinition, str]]:
+    """YAML definitions plus one per loaded pack (Phase 7.6; source ``pack``). A pack can't take a
+    key a definition file already uses."""
+    found = load_definitions(extra_dirs)
+    taken = {d.key for d, _ in found}
+    for definition, source in packs.definitions():
+        if definition.key in taken:
+            raise DefinitionError(
+                f"pack {definition.key!r}: an agent definition file already uses that key"
+            )
+        found.append((definition, source))
     return found

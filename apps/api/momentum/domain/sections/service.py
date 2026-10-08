@@ -110,6 +110,8 @@ async def create_section(
     name: str,
     after_id: uuid.UUID | None = None,
     before_id: uuid.UUID | None = None,
+    *,
+    batch_id: uuid.UUID | None = None,
 ) -> Mutation[Section]:
     _, role = await get_visible_project(session, ctx, project_id)
     require_project_role(role, "editor", "add sections")
@@ -132,6 +134,7 @@ async def create_section(
         verb="section.created",
         changes={"name": (None, section.name)},
         undo=undo_op("sections.delete", section_id=section.id),
+        batch_id=batch_id,
     )
     await emit(
         session,

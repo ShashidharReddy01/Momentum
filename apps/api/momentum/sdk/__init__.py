@@ -4,15 +4,25 @@ import only `momentum.sdk`, its own package and allowed third-party libraries �
 (import-linter enforces this per pack). With 50-100+ packs, Momentum's internals must stay free
 to change; only this module is a promise.
 
-**Empty facade (S76-00).** `Pack`, `Job`, `step`, `ask`, records, entities, skills, settings,
-policy, effects and the testing helpers are built incrementally from S76-01 onward (see
-docs/roadmap/phase-7.6.md and the design spec's §11.2 SDK reference table). Each pack declares
-`sdk: ">=1.0,<2"` in its manifest; the loader (S76-01) refuses a pack whose declared range this
-version doesn't satisfy.
+Each pack declares `sdk: ">=1.0,<2"` in its manifest; the loader refuses a pack whose declared
+range this version doesn't satisfy. The surface grows slice by slice (design spec §11.2):
+S76-01 adds `Pack`, `Capability`, `PackSettings` and the setup items (`TaskField`, `Section`).
 """
 
 from __future__ import annotations
 
-SDK_VERSION = "1.0"
+from momentum.agents.packs.loader import SDK_VERSION
+from momentum.agents.packs.manifest import Capability, PackManifest
+from momentum.agents.packs.pack import Pack, PackError, PackSettings
+from momentum.agents.packs.setup import Section, TaskField
 
-__all__ = ["SDK_VERSION"]
+__all__ = [
+    "SDK_VERSION",
+    "Capability",
+    "Pack",
+    "PackError",
+    "PackManifest",
+    "PackSettings",
+    "Section",
+    "TaskField",
+]

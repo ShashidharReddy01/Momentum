@@ -129,6 +129,18 @@ Design work is judgment-heavy (visual systems, layout under tight sizes, interac
 | S7.5.3 Accessibility | S | S7.5.4 Admin completeness | S |
 | S7.5.5 Backup/restore rehearsal | S | | |
 
+### Phase 7.6: Agent platform and Bernie (tagged 2026-10-08; whole phase run on Opus by product owner decision, like Phase 5)
+| Slice | Model | Slice | Model |
+|---|---|---|---|
+| S76-00 Kickoff and foundations | **O** | S76-01 Packs | **O** |
+| S76-02 Durable jobs | **O** (replay, effects, undo-all) | S76-03 Asks and conversation | **O** |
+| S76-04 Records | **O** (financial data, guests) | S76-05 Entities, skills, settings | **O** |
+| S76-06 Governance and health | S | S76-07 Web: directory, agent page | S |
+| S76-08 Web: review kit, records | S | S76-09 Bernie 1: ingest and reading | **O** |
+| S76-10 Bernie 2: checking, deciding | **O** | S76-11 Bernie 3: learning, Mo | **O** |
+| S76-12 Coordination, plans, consult | **O** (loop protection) | S76-13 Builder kit and docs | S |
+| S76-14 Exit | **O** | | |
+
 ### Phase 8: Azure and go-live (was Phase 9)
 | Slice | Model | Slice | Model |
 |---|---|---|---|

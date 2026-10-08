@@ -154,7 +154,13 @@ async def _get_attached(
 
 
 async def create_field(
-    session: AsyncSession, ctx: Ctx, project_id: uuid.UUID, data: FieldCreateIn
+    session: AsyncSession,
+    ctx: Ctx,
+    project_id: uuid.UUID,
+    data: FieldCreateIn,
+    *,
+    batch_id: uuid.UUID | None = None,
+    undoable: bool = False,
 ) -> Mutation[FieldDef]:
     """Create a field def and attach it to ``project_id`` in one step (the usual "+ Add field"
     flow: most fields start life on one project, `is_library` just controls whether other
@@ -186,6 +192,12 @@ async def create_field(
         entity_id=field.id,
         verb="field.created",
         changes={"name": (None, field.name)},
+        # Creating a field isn't undoable on its own (configuration, like rules); a pack's
+        # project setup (Phase 7.6, spec §3.4) asks for it so the whole setup undoes as one.
+        undo=undo_op("fields.setup_remove", project_id=project_id, field_id=field.id, created=True)
+        if undoable
+        else None,
+        batch_id=batch_id,
     )
     await emit(
         session,
@@ -207,6 +219,9 @@ async def attach_field(
     field_id: uuid.UUID,
     after_id: uuid.UUID | None,
     before_id: uuid.UUID | None,
+    *,
+    batch_id: uuid.UUID | None = None,
+    undoable: bool = False,
 ) -> Mutation[FieldDef]:
     """Attach an existing library field (from another project) to ``project_id``."""
     _, role = await get_visible_project(session, ctx, project_id)
@@ -229,6 +244,10 @@ async def attach_field(
         entity_id=field.id,
         verb="field.attached",
         changes={"name": (None, field.name)},
+        undo=undo_op("fields.setup_remove", project_id=project_id, field_id=field.id, created=False)
+        if undoable
+        else None,
+        batch_id=batch_id,
     )
     await emit(
         session,
@@ -624,6 +643,55 @@ async def _undo_set_value(session: AsyncSession, ctx: Ctx, args: dict[str, Any])
 
 def _ids(args: dict[str, Any]) -> tuple[uuid.UUID, uuid.UUID]:
     return uuid.UUID(str(args["project_id"])), uuid.UUID(str(args["field_id"]))
+
+
+@undo_handler("fields.setup_remove")
+async def _undo_setup_field(session: AsyncSession, ctx: Ctx, args: dict[str, Any]) -> None:
+    """Undo a pack setup's field (Phase 7.6): take it off the project, and archive it when the
+    setup created it and no other project uses it. Refused once tasks hold values for it."""
+    project_id, field_id = _ids(args)
+    _, role = await get_visible_project(session, ctx, project_id)
+    require_project_role(role, "editor", "manage fields")
+    field = await session.get(FieldDef, field_id)
+    pf = await session.get(ProjectField, (project_id, field_id))
+    if field is None or pf is None:
+        return
+    in_use = (
+        await session.execute(
+            select(FieldValue.task_id)
+            .join(TaskProject, TaskProject.task_id == FieldValue.task_id)
+            .where(
+                FieldValue.field_id == field_id,
+                TaskProject.project_id == project_id,
+                FieldValue.value.is_not(None),
+            )
+            .limit(1)
+        )
+    ).first()
+    if in_use is not None:
+        raise UndoConflict(f"Tasks have values in {field.name} now; remove the field by hand")
+    await session.delete(pf)
+    await session.flush()
+    if args.get("created") and not await _project_ids_using(session, field_id):
+        field.deleted_at = datetime.now(UTC)
+    act = await record_activity(
+        session,
+        ctx,
+        entity_type="field",
+        entity_id=field_id,
+        verb="field.detached",
+        changes={"project_id": (str(project_id), None)},
+    )
+    await emit(
+        session,
+        ctx,
+        type="field.detached",
+        entity_type="field",
+        entity_id=field_id,
+        data={"project_id": str(project_id)},
+        channels=_channels(project_id),
+        activity_id=act.id,
+    )
 
 
 @undo_handler("fields.unarchive")

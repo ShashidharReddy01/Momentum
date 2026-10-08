@@ -13,7 +13,9 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from momentum.agents import radar, runs_view
-from momentum.agents.loader import DefinitionError, load_definitions
+from momentum.agents.loader import DefinitionError, all_definitions
+from momentum.agents.packs import setup as pack_setup
+from momentum.agents.packs.registry import packs_of
 from momentum.agents.runtime import dry_run
 from momentum.agents.triggers import request_run
 from momentum.ai.agent_draft import MAX_DESCRIPTION, AgentDraftOut, draft_agent
@@ -47,7 +49,7 @@ async def install_agents(
     body: InstallIn, ctx: CtxDep, uow: UowDep, runtime: RuntimeDep
 ) -> InstallOut:
     try:
-        definitions = load_definitions(runtime.agent_definition_dirs)
+        definitions = all_definitions(runtime.agent_definition_dirs, packs_of(runtime))
     except DefinitionError as e:
         raise ValidationFailed(str(e)) from e
     async with uow.transaction() as s:
@@ -290,3 +292,73 @@ async def latest_risk(
         agent_id=agent.id,
         agent_name=agent.name,
     )
+
+
+# ---------- Phase 7.6 (spec §3.4): a pack's project setup ----------
+
+
+class SetupChangeOut(BaseModel):
+    kind: str
+    name: str
+    action: str = Field(description="create · attach · exists · skip")
+    detail: str
+
+
+class SetupPreviewOut(BaseModel):
+    agent_id: uuid.UUID
+    project_id: uuid.UUID
+    changes: list[SetupChangeOut]
+
+
+class SetupApplyIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    project_id: uuid.UUID
+
+
+class SetupAppliedOut(SetupPreviewOut):
+    batch_id: uuid.UUID | None = Field(
+        default=None,
+        description="Undo the whole setup with POST /undo {batch_id}; null = no change",
+    )
+
+
+def _changes(changes: list[pack_setup.SetupChange]) -> list[SetupChangeOut]:
+    return [
+        SetupChangeOut(kind=c.kind, name=c.name, action=c.action, detail=c.detail) for c in changes
+    ]
+
+
+@router.get(
+    "/agents/{agent_id}/setup",
+    response_model=SetupPreviewOut,
+    summary="Preview a pack agent's project setup (fields and sections it needs); changes nothing",
+)
+async def preview_setup(
+    agent_id: uuid.UUID, project_id: uuid.UUID, ctx: CtxDep, uow: UowDep, runtime: RuntimeDep
+) -> SetupPreviewOut:
+    async with uow.transaction() as s:
+        agent = await service.get_agent(s, ctx, agent_id)
+        items = await pack_setup.items_for(s, agent, project_id, packs_of(runtime))
+        changes = await pack_setup.preview(s, ctx, project_id, items)
+        return SetupPreviewOut(agent_id=agent.id, project_id=project_id, changes=_changes(changes))
+
+
+@router.post(
+    "/agents/{agent_id}/setup",
+    response_model=SetupAppliedOut,
+    summary="Apply a pack agent's project setup as one undoable batch (project admins)",
+)
+async def apply_setup(
+    agent_id: uuid.UUID, body: SetupApplyIn, ctx: CtxDep, uow: UowDep, runtime: RuntimeDep
+) -> SetupAppliedOut:
+    async with uow.transaction() as s:
+        agent = await service.get_agent(s, ctx, agent_id)
+        items = await pack_setup.items_for(s, agent, body.project_id, packs_of(runtime))
+        result = await pack_setup.apply(s, ctx, body.project_id, items)
+        return SetupAppliedOut(
+            agent_id=agent.id,
+            project_id=body.project_id,
+            changes=_changes(result.changes),
+            batch_id=result.batch_id,
+        )

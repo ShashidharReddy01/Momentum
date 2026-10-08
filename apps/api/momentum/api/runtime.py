@@ -50,3 +50,7 @@ class MomentumRuntime:
     # Phase 7.5 (spec §6.1): the report narrative, built from ``llm`` in the lifespan (reports
     # never import ai; the narrator is handed in)
     report_narrator: Any = None
+    # Phase 7.6 (ADR-0012): the packs loaded for this app (a PackRegistry; entry points and the
+    # MOMENTUM_PACKS filter). Untyped here so the domain layer, which imports this module, never
+    # depends on the agents package; ``momentum.agents.packs.registry.packs_of`` reads it.
+    packs: Any = None

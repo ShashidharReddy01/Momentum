@@ -85,6 +85,11 @@ def canonical(cfg: AgentConfig) -> dict[str, Any]:
     a row (so hashes compare)."""
     data = cfg.model_dump(mode="json", include=set(CONFIG_FIELDS))
     data["budget_monthly_usd"] = f"{Decimal(cfg.budget_monthly_usd):.2f}"
+    # Phase 7.6: left out when unset, so agents installed before packs existed hash as before
+    # (no starter agent turns "drifted" on upgrade)
+    for key in ("pack_key", "pack_version"):
+        if data.get(key) is None:
+            data.pop(key, None)
     return data
 
 
@@ -301,6 +306,8 @@ async def create_agent(
         raise ValidationFailed(
             "Code-backed agents come from the host application's agent definitions"
         )
+    if data.kind == "pack":
+        raise ValidationFailed("Pack agents are installed from their pack, not created by hand")
     if data.autonomy == "auto":
         # S5.1.4 (agents.md §5): acting alone is earned with a track record, never a default
         raise ValidationFailed(

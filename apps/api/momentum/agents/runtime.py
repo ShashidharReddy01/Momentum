@@ -388,6 +388,9 @@ async def execute_run(
         handler = available.get(agent.handler or "") if agent.kind == "handler" else None
         if agent.kind == "handler" and handler is None:
             raise _Failed(f"No handler is registered for {agent.handler}")
+        if agent.kind == "pack":
+            # Phase 7.6: packs run as durable jobs (S76-02), never through the one-shot loop
+            raise _Failed(f"{agent.name} runs as a durable job, which isn't available yet")
         requester = await _person(session, trigger.get("requested_by"))
         for_user = await _person(session, trigger.get("for_user_id"))
         if trigger.get("for_user_id") and for_user is None:
@@ -799,7 +802,7 @@ async def dry_run(
     and everything is rolled back. The agent may be switched off (that's what testing is for);
     the deployment's agent switch and the AI switches still apply. Model calls count toward the
     workspace's AI usage, not the agent's run history (there is no run)."""
-    if agent.kind == "handler":
+    if agent.kind in ("handler", "pack"):
         raise ValidationFailed(
             "Test runs are for model-driven agents; a code-backed agent is the host's own code"
         )

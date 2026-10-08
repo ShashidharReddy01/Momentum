@@ -22,12 +22,13 @@ from pydantic import (
 )
 
 Autonomy = Literal["suggest", "confirm", "auto"]
-AgentKind = Literal["llm", "handler"]
+AgentKind = Literal["llm", "handler", "pack"]  # pack: Phase 7.6 (ADR-0012)
 AgentAlias = Literal["fast", "default", "smart"]
 
 KEY_PATTERN = r"^[a-z][a-z0-9_]{1,59}$"
 AVATAR_PATTERN = r"^[a-z0-9][a-z0-9_-]{0,39}$"
 HANDLER_PATTERN = r"^[A-Za-z_][A-Za-z0-9_.:-]{0,119}$"
+PACK_VERSION_PATTERN = r"^\d+\.\d+\.\d+$"  # semver major.minor.patch
 EVENT_PATTERN = r"^[a-z_]+(\.[a-z_]+)+$"
 
 # agents.md §3: agents never delete and never decide approvals. Refused on every agent, whatever
@@ -156,6 +157,9 @@ class AgentConfig(_Strict):
     instructions: str = Field(default="", max_length=20_000)
     kind: AgentKind = "llm"
     handler: str | None = Field(default=None, pattern=HANDLER_PATTERN)
+    # Phase 7.6: set only for kind ``pack`` (installed from a pack's manifest, never typed in)
+    pack_key: str | None = Field(default=None, pattern=KEY_PATTERN)
+    pack_version: str | None = Field(default=None, pattern=PACK_VERSION_PATTERN)
     triggers: list[Trigger] = Field(default_factory=list, max_length=10)
     tools: list[str] = Field(default_factory=list, max_length=40)
     scope: AgentScope = Field(default_factory=AgentScope)
@@ -181,8 +185,12 @@ class AgentConfig(_Strict):
     def _kind(self) -> AgentConfig:
         if self.kind == "handler" and not self.handler:
             raise ValueError("A handler agent needs `handler` (the registered function's name)")
-        if self.kind == "llm" and self.handler is not None:
+        if self.kind != "handler" and self.handler is not None:
             raise ValueError("Only handler agents have a `handler`")
+        if self.kind == "pack" and not (self.pack_key and self.pack_version):
+            raise ValueError("A pack agent needs `pack_key` and `pack_version`")
+        if self.kind != "pack" and (self.pack_key is not None or self.pack_version is not None):
+            raise ValueError("Only pack agents have a `pack_key` / `pack_version`")
         return self
 
 
@@ -252,6 +260,8 @@ class AgentOut(BaseModel):
     instructions: str
     kind: AgentKind
     handler: str | None
+    pack_key: str | None = None
+    pack_version: str | None = None
     triggers: list[dict[str, Any]]
     tools: list[str]
     scope: dict[str, Any]
@@ -261,7 +271,7 @@ class AgentOut(BaseModel):
     budget_monthly_tokens: int
     limits: dict[str, Any]
     enabled: bool
-    source: Literal["starter", "host", "custom"]
+    source: Literal["starter", "host", "custom", "pack"]
     # an installed agent an admin has edited since (a re-install won't overwrite it)
     drifted: bool = False
     version: int

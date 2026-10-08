@@ -74,7 +74,7 @@
    - AI output amber-marked with `created_via` / `actor_kind`;
    - mock output visibly marked (purple MOCK);
    - document and user content is data, never instructions.
-7. **Migrations:** **0045** (jobs, steps, asks, pack settings, agents pack columns, notification kinds), **0046** (record types, records, versions, entities, skills), **0047** (plans).
+7. **Migrations:** one migration file per slice that needs one, numbered in order from **0046** (0045 is Phase 7.5's `report_runs`). The slices below say which logical group each belongs to (the spec's §13.1 "0045 / 0046 / 0047" are those groups, not file numbers): **jobs group** (agents pack columns, jobs, steps, asks, pack settings, notification kinds), **records group** (record types, records, versions, entities, skills), **plans group**. A committed migration is never edited; the next slice adds the next number. *(Plan change 2026-10-08, see STATUS.)*
    - Review the autogenerate output.
    - No data is dropped; legacy runs default to `mode='oneshot'`.
    - Downgrades work.
@@ -128,7 +128,7 @@ Sizes: S ≈ half a day, M ≈ 1 day, L ≈ 2 days. **e2e** marks slices that en
   - `loader.py` (entry points `momentum.packs`, `MOMENTUM_PACKS` filter, SDK range check, `MOMENTUM_TEST_PACKS` loading `tests/packs/`);
   - `registry.py` (packs by key, capabilities by key).
 - `momentum.sdk`: `Pack`, `Capability`, `PackSettings` base.
-- **Migration 0045, part 1:** `agents.pack_key`, `agents.pack_version`, `kind` value `pack`.
+- **Migration 0046** (jobs group, part 1): `agents.pack_key`, `agents.pack_version`, `kind` value `pack`.
 - **Install / upgrade / drift** extended to packs (spec §3.3); the display fields come from the manifest; effects, capabilities and data are always read from code.
 - **Setup checklist** infra (spec §3.4): the pack's `setup` returns a preview of declared changes; confirmed by the admin when adding the agent to a project; applied as one undoable batch.
 - `momentum packs list`, `momentum packs check` (manifest validation, contract present; more checks added as features land).
@@ -137,7 +137,7 @@ Sizes: S ≈ half a day, M ≈ 1 day, L ≈ 2 days. **e2e** marks slices that en
 - **AC:** an echo pack installs disabled, appears in `GET /agents`, survives upgrade rules, and its setup preview applies and undoes.
 
 ### S76-02 Durable jobs (L)
-- **Migration 0045, part 2:** the `agent_runs` columns (spec §4.1) and `agent_run_steps`.
+- **Migration 0047** (jobs group, part 2): the `agent_runs` columns (spec §4.1) and `agent_run_steps`.
 - `momentum/agents/jobs/`:
   - the engine (claim → run → `Suspend` → waiting → resume);
   - replay (`job.step`, `job.now`, `job.uuid`; output (de)serialisation by return annotation; large outputs to storage);
@@ -162,7 +162,7 @@ Sizes: S ≈ half a day, M ≈ 1 day, L ≈ 2 days. **e2e** marks slices that en
   - every Phase 5 agent test still passes.
 
 ### S76-03 Asks and conversation (L)
-- **Migration 0045, part 3:** `asks` and the notification kinds `agent_ask`, `agent_ask_reminder`, `skill_proposed`.
+- **Next migration** (jobs group, part 3): `asks` and the notification kinds `agent_ask`, `agent_ask_reminder`, `skill_proposed`.
 - `domain/asks/` (service, router):
   - create through the SDK only;
   - answer (validation per kind);
@@ -179,7 +179,7 @@ Sizes: S ≈ half a day, M ≈ 1 day, L ≈ 2 days. **e2e** marks slices that en
 - **AC:** every ask kind round-trips; expiry defaults behave; a thread reply answers when certain and asks to confirm when not; guests can't answer.
 
 ### S76-04 Records (L)
-- **Migration 0046, part 1:** `record_types`, `records`, `record_versions` (spec §6.2).
+- **Next migration** (records group, part 1): `record_types`, `records`, `record_versions` (spec §6.2).
 - `domain/records/`:
   - type registry sync at install;
   - create / update with **correction operations** (spec §6.4, `distribute` with Decimal remainder);
@@ -199,7 +199,7 @@ Sizes: S ≈ half a day, M ≈ 1 day, L ≈ 2 days. **e2e** marks slices that en
 - **AC:** a record can't be saved invalid; money never mixes currencies; a guest sees no financial record by any route (API, search, Mo, dashboards, export).
 
 ### S76-05 Entities, skills, pack settings (L)
-- **Migration 0046, part 2:** `entities`, `agent_skills`. **Migration 0045, part 4:** `agent_pack_settings`.
+- **Next migration** (records group, part 2, plus jobs group part 4): `entities`, `agent_skills`, `agent_pack_settings`.
 - `domain/entities/`:
   - create / update / alias / merge / archive with undo;
   - matching (tax id → alias → trigram ≥ 0.6 → candidates);
@@ -307,7 +307,7 @@ Sizes: S ≈ half a day, M ≈ 1 day, L ≈ 2 days. **e2e** marks slices that en
 
 ### S76-12 Coordination: directory cards, plans, consult (L, e2e)
 - `GET /agents/directory`; `GET /agents/{key}/card.json` (A2A-shaped, spec §10.1).
-- **Migration 0047:** `agent_plans`, `agent_plan_steps`, consumer row `plans`.
+- **Next migration** (plans group): `agent_plans`, `agent_plan_steps`, consumer row `plans`.
 - `agents/plans/`:
   - `bindings.py` (parser + type-checker, spec §10.3);
   - the drafter (prompt `agent_planner/v1`, `smart`; code validation; amber fix list);
@@ -350,7 +350,7 @@ Sizes: S ≈ half a day, M ≈ 1 day, L ≈ 2 days. **e2e** marks slices that en
 - **Docs:**
   - this file's exit table;
   - STATUS (Phase 7.6 complete, next Phase 8; handoff; retro);
-  - the INTEGRATION_GUIDE change log (migrations 0045–0047, packs and the SDK, new routes, events, channels, settings, guest rule for financial records, the loop-protection exception for plans);
+  - the INTEGRATION_GUIDE change log (migrations 0046 onward, as built, packs and the SDK, new routes, events, channels, settings, guest rule for financial records, the loop-protection exception for plans);
   - `asana-vs-momentum.md` ("AI agents" rows);
   - `testing-strategy.md` (J20–J24);
   - the `ai-architecture.md` tool table and prompts.
@@ -362,7 +362,7 @@ Sizes: S ≈ half a day, M ≈ 1 day, L ≈ 2 days. **e2e** marks slices that en
 
 Fill in at S76-14. At minimum:
 1. Install and switch Bernie on:
-   - `cd apps/api && uv sync && uv run momentum migrate` (0045–0047);
+   - `cd apps/api && uv sync && uv run momentum migrate` (0046 onward);
    - `uv run momentum agents install --only bernie`;
    - enable Bernie (Agents → Bernie);
    - add him to a test project and confirm the setup checklist;
@@ -416,6 +416,43 @@ phase; `root_package` (singular) never validated forbidden-module names against 
 Removed both. **Gate:** backend lint/format/mypy/import-linter green; `pytest --collect-only`
 clean (1,011 tests collected, 0 from `packs/` yet, as expected); the full `pytest -q` run is
 S76-00's own gate requirement and is reported in the slice's commit, not re-described here.
+
+**S76-01 as built (2026-10-08, local session, mock AI only, $0 gateway spend).** **Migration
+0046** (not 0045: that number is 7.5's `report_runs`; see working rule 7):
+`agents.pack_key` varchar(60), `pack_version` varchar(20); `kind` and `source` gain `pack`;
+`ck_agents_pack` keeps both set iff `kind='pack'`; the downgrade refuses while pack agents exist.
+**`momentum/agents/packs/`:** `manifest.py` (`PackManifest` and its parts, `extra="forbid"` at every
+level; effects checked against the spec §8.1 list, typed effects need their record/entity types;
+`network` must be empty; `autonomy` suggest/confirm only; a dependency-free SDK range parser,
+`>=1.0,<2`); `pack.py` (`Pack`, `PackSettings`, `PackError`; `validate()` refuses code for an
+undeclared capability and a setup item listed twice); `setup.py` (`TaskField`, `Section(unless=)`,
+preview/apply, `items_for`); `loader.py` (entry points, the filter and kill switch, SDK range,
+deployment ceilings: refused, never lowered; test packs by path); `registry.py` (`PackRegistry` on
+the runtime, never a module global; `definitions()` seeds only display and budget fields);
+`check.py`. **`momentum.sdk`** exports `SDK_VERSION`, `Pack`, `PackSettings`, `PackError`,
+`PackManifest`, `Capability`, `TaskField`, `Section`. **Install:** `all_definitions()` merges YAML
+and pack definitions (key collisions refused); the hash ignores unset pack fields, so no existing
+agent looks edited. `POST /agents` refuses `kind: pack` (only install makes them). **Setup:**
+`GET /agents/{id}/setup?project_id=` (preview; 409 `not_member` until the agent is in the project,
+`pack_not_loaded` when its pack isn't on this server) and `POST /agents/{id}/setup` (project
+**admins**, like adding the agent; one `batch_id`, `POST /undo {batch_id}` reverts it). To make
+that possible, `fields.service.create_field` / `attach_field` gained opt-in `batch_id` +
+`undoable` (a new `fields.setup_remove` undo op: detaches the field, archives the definition only
+if the setup created it and no other project uses it, refuses once tasks hold values) and
+`sections.service.create_section` a `batch_id`. Preview actions: create, attach (a library field
+with the same name and type), exists, skip (an `unless` section is present). **Guards until
+S76-02:** a pack agent's run fails with "runs as a durable job, which isn't available yet"; test
+runs refuse it. **CLI:** `momentum packs list|check`; `agents install` includes packs. **Web:**
+types regenerated; the agent edit form treats a pack agent like a handler agent (instructions and
+tools live in code). The pack directory and agent page are S76-07. **Bernie** is still the S76-00
+placeholder: the loader skips it with "not a momentum.sdk.Pack (not built yet?)" and `packs check`
+reports that, until S76-09. **Tests:** `test_packs_loader.py` (13): test packs only on request and
+Bernie refused; filter and kill switch; SDK range and ceilings; strict manifest validation;
+`Pack.validate`; `packs check` incl. the missing-contract rule (the permanent regression test for
+S76-00's contracts); registry definitions; install → unchanged → updated (1.1.0) → drifted on an
+edit → forced (1.2.0); no hand-made pack agents and no test run; setup preview → apply → re-apply
+(no change) → one undo; library-field attach and `unless` skip, with undo keeping the other
+project's field; setup is pack-only and apply needs a project admin.
 
 ## The prompt for the build session
 

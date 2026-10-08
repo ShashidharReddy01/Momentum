@@ -176,16 +176,22 @@ export function EditAgentPage() {
     autonomy: a.autonomy === 'suggest' ? 'suggest' : 'confirm',
     model_alias: a.model_alias,
   };
+  // handler and pack agents are code: their instructions and tools aren't edited here
+  const fromCode = a.kind === 'handler' || a.kind === 'pack';
   return (
     <AgentFormShell title={`Edit ${a.name}`}>
       {a.kind === 'handler' ? (
         <p className="text-sm text-muted">
           {a.name} is code from your app: its instructions and tools live there.
         </p>
+      ) : a.kind === 'pack' ? (
+        <p className="text-sm text-muted">
+          {a.name} comes from an installed pack: what it can do lives in the pack&rsquo;s code.
+        </p>
       ) : null}
       <AgentForm
         initial={initial}
-        handler={a.kind === 'handler'}
+        handler={fromCode}
         editing
         saving={update.isPending}
         submitLabel="Save changes"
@@ -196,7 +202,7 @@ export function EditAgentPage() {
               description: v.description.trim(),
               triggers: toTriggers(v),
               model_alias: v.model_alias,
-              ...(a.kind === 'handler' ? {} : { instructions: v.instructions.trim(), tools: v.tools }),
+              ...(fromCode ? {} : { instructions: v.instructions.trim(), tools: v.tools }),
               expected_version: a.version,
             },
             { onSuccess: () => void navigate(`/agents/${a.id}`) },

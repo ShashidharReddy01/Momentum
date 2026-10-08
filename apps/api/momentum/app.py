@@ -162,6 +162,7 @@ def create_app(
     tools and handler agents (ADR-0009, INTEGRATION_GUIDE §6.7). ``MOMENTUM_AGENT_EXTENSIONS``
     is loaded as well; that setting is how a separate worker process gets them too."""
     from momentum.agents.extensions import Extensions, load_extensions, merge
+    from momentum.agents.packs.registry import PackRegistry
     from momentum.ai.tools.catalog import build_registry
 
     settings = settings or Settings()
@@ -190,6 +191,7 @@ def create_app(
             agent_definition_dirs=tuple(Path(d) for d in ext.definition_dirs),
             tools=build_registry(*ext.tools),
             agent_handlers=dict(ext.handlers),
+            packs=PackRegistry.load(settings),
         )
         app.state.momentum = runtime
         from momentum.ai.llm import build_llm
