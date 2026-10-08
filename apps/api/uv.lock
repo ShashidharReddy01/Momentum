@@ -1372,6 +1372,7 @@ dependencies = [
     { name = "gunicorn" },
     { name = "httpx" },
     { name = "itsdangerous" },
+    { name = "momentum-pack-bernie" },
     { name = "oletools" },
     { name = "openai" },
     { name = "openpyxl" },
@@ -1420,6 +1421,7 @@ requires-dist = [
     { name = "gunicorn", specifier = ">=22" },
     { name = "httpx", specifier = ">=0.27" },
     { name = "itsdangerous", specifier = ">=2.2" },
+    { name = "momentum-pack-bernie", editable = "../../packs/bernie" },
     { name = "oletools", specifier = ">=0.60.2" },
     { name = "openai", specifier = ">=1.40" },
     { name = "openpyxl", specifier = ">=3.1.5" },
@@ -1456,6 +1458,11 @@ dev = [
     { name = "time-machine", specifier = ">=2.14" },
     { name = "types-pyyaml", specifier = ">=6.0.12.20260906" },
 ]
+
+[[package]]
+name = "momentum-pack-bernie"
+version = "0.1.0"
+source = { editable = "../../packs/bernie" }
 
 [[package]]
 name = "msoffcrypto-tool"

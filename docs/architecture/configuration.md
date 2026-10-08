@@ -107,6 +107,25 @@ Frontend build-time variables use the `VITE_MOMENTUM_` prefix, but the SPA prefe
 | `MOMENTUM_AI_AUTO_APPLY_LOW_RISK` | `false` | Workspace default for ⌘K/chat |
 | `MOMENTUM_AI_DEBUG_CAPTURE` | `false` | Store prompts/responses for 7 days (never in prod by default) |
 
+### Agent platform (Phase 7.6, ADR-0012)
+
+| Setting | Default | Description |
+|---|---|---|
+| `MOMENTUM_PACKS_ENABLED` | `true` | Kill switch for every pack: their jobs pause while false. Legacy (`mode='oneshot'`) agents are untouched |
+| `MOMENTUM_PACKS` | `*` | Which installed packs load, by manifest `key`: `*` (every installed package) or a comma list |
+| `MOMENTUM_TEST_PACKS` | `false` | Also load `tests/packs/` (the test-only echo/asker/failer/spawner/consultee/planner_fixture packs). Tests, e2e and the UI audit only; never true in production |
+| `MOMENTUM_AGENT_STEP_TIMEOUT_S` | `300` | Ceiling on a job step's wall-clock time (10–3600s). A pack's own `limits.step_timeout_s` may be lower, never higher |
+| `MOMENTUM_AGENT_JOB_MAX_ACTIVE_S` | `3600` | Ceiling on a job's *running* time, summed across its steps and children (waiting doesn't count); a pack's `limits.max_active_s` may be lower |
+| `MOMENTUM_AGENT_JOB_MAX_AGE_DAYS` | `30` | A job still `waiting` after this many days expires; its open asks are cancelled and the requester is told |
+| `MOMENTUM_AGENT_CHILD_CONCURRENCY` | `4` | Ceiling on how many of one job's children run at once; a pack's `limits.concurrency` may be lower |
+| `MOMENTUM_AGENT_MAX_CHILDREN` | `500` | Ceiling on children per job (e.g. documents per batch); a pack's `limits.max_children` may be lower. Above it the pack must ask the person to split the work |
+| `MOMENTUM_AGENT_STEP_OUTPUT_MAX_KB` | `256` | A step's stored output larger than this goes to blob storage (`output_ref`) instead of the `agent_run_steps` row |
+| `MOMENTUM_ASK_REMIND_HOURS` | `24` | Default reminder delay on an open ask, in the workspace's working hours |
+| `MOMENTUM_ASK_EXPIRE_DAYS` | `7` | Default time before an unanswered ask's `default_on_expiry` applies |
+| `MOMENTUM_PLAN_MAX_STEPS` | `12` | Ceiling on steps in one coordination plan (Mo-drafted or manual) |
+| `MOMENTUM_AGENT_CONSULT_TIMEOUT_S` | `60` | Ceiling on a synchronous `job.consult(...)` call to another pack's consultable capability |
+| `MOMENTUM_RECORD_MAX_ITEMS` | `5000` | Ceiling on items in one record's array field (e.g. an invoice's line items) |
+
 ## Planning (Phase 6)
 
 | Setting | Default | Description |

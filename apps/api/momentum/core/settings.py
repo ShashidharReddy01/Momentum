@@ -155,6 +155,23 @@ class Settings(BaseSettings):
     agent_max_steps: int = Field(default=15, ge=1, le=50)
     agent_timeout_s: int = Field(default=300, ge=10, le=3600)
 
+    # Phase 7.6 (spec §13.4): the agent platform (packs, durable jobs). Ceilings a pack's own
+    # manifest limits may be lower than, never higher than.
+    packs_enabled: bool = True  # false pauses every pack's jobs; legacy (oneshot) agents untouched
+    packs: str = "*"  # which installed packs load: "*" or a comma list of keys
+    test_packs: bool = False  # load tests/packs/ (tests, e2e, UI audit only; never production)
+    agent_step_timeout_s: int = Field(default=300, ge=10, le=3600)
+    agent_job_max_active_s: int = Field(default=3600, ge=60, le=86400)
+    agent_job_max_age_days: int = Field(default=30, ge=1, le=365)
+    agent_child_concurrency: int = Field(default=4, ge=1, le=50)
+    agent_max_children: int = Field(default=500, ge=1, le=5000)
+    agent_step_output_max_kb: int = Field(default=256, ge=1, le=10_000)
+    ask_remind_hours: int = Field(default=24, ge=1, le=240)  # working hours
+    ask_expire_days: int = Field(default=7, ge=1, le=90)
+    plan_max_steps: int = Field(default=12, ge=1, le=50)
+    agent_consult_timeout_s: int = Field(default=60, ge=5, le=600)
+    record_max_items: int = Field(default=5000, ge=1, le=50_000)  # items per array in a record
+
     # S6.4.1: the weekly hours a person can plan against when neither they nor the workspace
     # admin has set one (workload view, Architect's capacity notes).
     workload_default_hours: float = Field(default=30, ge=0, le=80)

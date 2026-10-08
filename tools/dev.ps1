@@ -106,8 +106,8 @@ switch ($Task) {
         Run $Web 'pnpm' @('dev')
     }
     'check' {
-        Run $Api 'uv' @('run', 'ruff', 'format', '--check', 'momentum', 'tests')
-        Run $Api 'uv' @('run', 'ruff', 'check', 'momentum', 'tests')
+        Run $Api 'uv' @('run', 'ruff', 'format', '--check', '--config', 'pyproject.toml', 'momentum', 'tests', '../../packs')
+        Run $Api 'uv' @('run', 'ruff', 'check', '--config', 'pyproject.toml', 'momentum', 'tests', '../../packs')
         Run $Api 'uv' @('run', 'mypy')
         Run $Api 'uv' @('run', 'lint-imports')
         Run $Api 'uv' @('run', 'pytest', '-q')

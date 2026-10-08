@@ -36,10 +36,14 @@ dependencies = [
   "striprtf>=0.0.33",
   "defusedxml>=0.7.1",
   "reportlab>=5.0.1",
+  "momentum-pack-bernie",
 ]
 
 [project.scripts]
 momentum = "momentum.cli:main"
+
+[tool.uv.sources]
+momentum-pack-bernie = { path = "../../packs/bernie", editable = true }
 
 [dependency-groups]
 dev = [
@@ -76,7 +80,7 @@ ignore = ["S101", "B008", "RUF012", "UP046"]  # UP046: keep Generic[T] (pydantic
 strict = true
 python_version = "3.12"
 plugins = ["pydantic.mypy"]
-packages = ["momentum"]
+packages = ["momentum", "momentum_pack_bernie"]
 
 [[tool.mypy.overrides]]
 module = ["procrastinate.*", "uuid_utils.*", "filetype.*", "docx.*", "pypdf.*", "croniter.*", "pptx.*", "pdfplumber.*", "pypdfium2.*", "oletools.*", "extract_msg.*", "striprtf.*", "defusedxml.*", "reportlab.*", "xlrd.*", "openpyxl.*", "olefile.*", "msoffcrypto.*"]
@@ -86,23 +90,23 @@ ignore_missing_imports = true
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "session"
 asyncio_default_test_loop_scope = "session"
-testpaths = ["tests"]
+testpaths = ["tests", "../../packs"]
 filterwarnings = ["ignore::DeprecationWarning:procrastinate.*"]
 
 [tool.importlinter]
-root_package = "momentum"
+root_packages = ["momentum", "momentum_pack_bernie"]
 
 [[tool.importlinter.contracts]]
 name = "Core does not depend on outer layers"
 type = "forbidden"
 source_modules = ["momentum.core"]
-forbidden_modules = ["momentum.domain", "momentum.ai", "momentum.agents", "momentum.integrations", "momentum.auth", "momentum.mcp", "momentum.web", "momentum.app"]
+forbidden_modules = ["momentum.domain", "momentum.ai", "momentum.agents", "momentum.integrations", "momentum.auth", "momentum.web", "momentum.app"]
 
 [[tool.importlinter.contracts]]
 name = "Domain does not depend on AI, agents, integrations, or app wiring"
 type = "forbidden"
 source_modules = ["momentum.domain"]
-forbidden_modules = ["momentum.agents", "momentum.integrations", "momentum.mcp", "momentum.app", "momentum.web"]
+forbidden_modules = ["momentum.agents", "momentum.integrations", "momentum.app", "momentum.web"]
 
 [[tool.importlinter.contracts]]
 name = "Files is infrastructure: it imports only core"
@@ -115,3 +119,15 @@ name = "Reports never import AI (narrative is injected by ai/)"
 type = "forbidden"
 source_modules = ["momentum.reports"]
 forbidden_modules = ["momentum.ai", "momentum.agents", "momentum.integrations", "momentum.web", "momentum.app"]
+
+[[tool.importlinter.contracts]]
+name = "momentum.sdk is the only thing a pack may import from Momentum (ADR-0012)"
+type = "forbidden"
+source_modules = ["momentum_pack_bernie"]
+forbidden_modules = ["momentum.domain", "momentum.ai", "momentum.agents", "momentum.core", "momentum.files", "momentum.reports", "momentum.auth", "momentum.integrations", "momentum.web", "momentum.app"]
+
+[[tool.importlinter.contracts]]
+name = "Nothing in momentum statically imports a named pack (the loader discovers packs by entry point, not by name)"
+type = "forbidden"
+source_modules = ["momentum.sdk", "momentum.core", "momentum.domain", "momentum.ai", "momentum.agents", "momentum.files", "momentum.reports", "momentum.auth", "momentum.integrations", "momentum.web", "momentum.app"]
+forbidden_modules = ["momentum_pack_bernie"]

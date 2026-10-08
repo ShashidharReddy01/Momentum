@@ -1,0 +1,20 @@
+[project]
+name = "momentum-pack-bernie"
+version = "0.1.0"
+description = "Bernie, the invoice agent (Momentum pack)"
+requires-python = ">=3.12"
+# No dependencies beyond momentum.sdk (ADR-0012: a pack imports only the SDK), which is part of
+# the momentum package this pack is installed alongside. Real deps (pypdf, pdfplumber, …) are
+# momentum's own (ADR-0011); a pack must never add a new runtime dependency (D10) without the
+# same review.
+dependencies = []
+
+[project.entry-points."momentum.packs"]
+bernie = "momentum_pack_bernie:pack"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["momentum_pack_bernie"]

@@ -14,6 +14,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 UV_COMPILE_BYTECODE=1 UV_LINK_M
     MOMENTUM_ENV=production MOMENTUM_LOG_FORMAT=json PORT=8000
 COPY --from=ghcr.io/astral-sh/uv:0.8 /uv /usr/local/bin/uv
 WORKDIR /app
+# Phase 7.6 (ADR-0012): packs are a path dependency ("../../packs/<key>" from apps/api/pyproject.toml,
+# i.e. /packs/<key> from WORKDIR /app here), so they must exist on disk before the first `uv sync`.
+COPY packs/ /packs/
 COPY apps/api/pyproject.toml apps/api/uv.lock ./
 RUN uv sync --frozen --no-dev --no-install-project
 COPY apps/api/momentum ./momentum

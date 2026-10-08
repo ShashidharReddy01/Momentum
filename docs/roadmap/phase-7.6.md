@@ -389,6 +389,34 @@ Fill in at S76-14. At minimum:
 
 (One note per slice, added as each slice lands.)
 
+**S76-00 as built (2026-10-08, local session, real gateway available but unused — this slice is
+plumbing only, no AI).** **ADR-0012** (the platform: packs, the SDK facade, durable jobs by
+replay, asks, records, entities/skills, D5's plan exception, governance) and **ADR-0013** (Bernie:
+D4/D9-D11, no PyMuPDF/Tesseract/Presidio, bank details as fingerprint+last4 only). **Settings**
+(spec §13.4): 14 new `MOMENTUM_*` settings in `core/settings.py`, `configuration.md` and
+`.env.example` (packs enabled/filter/test-packs, job/step/child/ask/plan/consult ceilings, record
+array cap). **Packaging:** `packs/README.md`; `packs/bernie/` (pyproject with the `momentum.packs`
+entry point, `momentum_pack_bernie/__init__.py` whose `pack` is a placeholder that imports cleanly
+but raises `NotImplementedError` on any real use until S76-01+); `apps/api/pyproject.toml` depends
+on `momentum-pack-bernie` via `[tool.uv.sources]` path source (editable); `mypy.packages` and
+`pytest.testpaths` (`../../packs`) extended; `ruff`/`mypy` checks (`tools/dev.ps1`, `Makefile`)
+pass `--config pyproject.toml` so packs/ is checked under the API's own rules, not its own
+(nonexistent) config. `infra/docker/Dockerfile` copies `packs/` to `/packs/` before the first
+`uv sync` (the path dependency must exist on disk first). `tests/packs/__init__.py` (empty; the
+test-only fixture packs land from S76-02 on). `momentum/sdk/__init__.py`: just `SDK_VERSION =
+"1.0"` for now. **Import contracts** (import-linter's `root_packages`, not the old singular
+`root_package`, so a pack's own module is a recognised root): a pack may import only
+`momentum.sdk`; nothing in momentum statically imports a named pack (the loader discovers packs by
+entry point). Both proven with a deliberate bad import that failed `lint-imports`, then removed,
+per the slice's own instruction; a permanent regression test for this lands with the loader
+(S76-01, matching the spec's own `test_packs_loader.py` grouping). **Found and fixed:** two
+pre-existing `forbidden_modules` entries named `momentum.mcp`, a module dropped long before this
+phase; `root_package` (singular) never validated forbidden-module names against real modules, but
+`root_packages` (needed for the new pack contracts) does, so it surfaced the stale reference.
+Removed both. **Gate:** backend lint/format/mypy/import-linter green; `pytest --collect-only`
+clean (1,011 tests collected, 0 from `packs/` yet, as expected); the full `pytest -q` run is
+S76-00's own gate requirement and is reported in the slice's commit, not re-described here.
+
 ## The prompt for the build session
 
 Paste this into the browser session (also correct for resuming after a context reset):

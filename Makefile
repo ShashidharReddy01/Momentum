@@ -56,8 +56,8 @@ types: ## Regenerate frontend API types from the backend OpenAPI schema
 check: check-api check-web ## The quality gate (must be green)
 
 check-api: ## Backend: format, lint, types, layering, tests
-	cd $(API) && uv run ruff format --check momentum tests
-	cd $(API) && uv run ruff check momentum tests
+	cd $(API) && uv run ruff format --check --config pyproject.toml momentum tests ../../packs
+	cd $(API) && uv run ruff check --config pyproject.toml momentum tests ../../packs
 	cd $(API) && uv run mypy
 	cd $(API) && uv run lint-imports
 	cd $(API) && uv run pytest -q
