@@ -38,6 +38,7 @@ from momentum.agents.jobs.job import (
     Txn,
     _Done,
 )
+from momentum.agents.jobs.talk import CONVERSE
 from momentum.agents.packs.pack import PackError
 from momentum.agents.runtime import (
     ANSWERING,
@@ -61,6 +62,8 @@ from momentum.core.storage import build_storage
 from momentum.core.telemetry import get_logger
 from momentum.domain.agents.models import Agent, AgentRun, AgentRunStep
 from momentum.domain.agents.runs import recent_statuses
+from momentum.domain.asks import service as asks_service
+from momentum.domain.asks.models import Ask
 from momentum.domain.tasks import service as tasks_service
 from momentum.domain.users.models import User
 
@@ -112,6 +115,7 @@ async def execute_job(
     run_id: uuid.UUID,
     *,
     sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
+    tools: Any = None,
 ) -> str:
     """Run one claimed job for one pass and record what happened; returns the run's status.
     ``packs`` is the app's ``PackRegistry``. ``txn`` opens a committed-on-exit transaction (the
@@ -124,6 +128,7 @@ async def execute_job(
             return "skipped"
         try:
             state, handler = await _prepare(s, llm, settings, packs, run, txn, sleep)
+            state.tools = tools
         except _Stop as stop:
             outcome = stop.outcome
         else:
@@ -156,7 +161,10 @@ async def _prepare(
     pack = packs.packs.get(agent.pack_key) if agent.kind == "pack" and packs is not None else None
     if pack is None:
         raise _Stop(_Outcome("failed", f"{agent.name}'s pack isn't loaded on this server"))
-    handler = pack.capabilities.get(run.capability) if run.capability else pack.run
+    if run.capability == CONVERSE:
+        handler = pack.converse
+    else:
+        handler = pack.capabilities.get(run.capability) if run.capability else pack.run
     if handler is None:
         what = f"capability {run.capability!r}" if run.capability else "a job function"
         raise _Stop(_Outcome("failed", f"{pack.key} has no {what}"))
@@ -319,8 +327,9 @@ async def _finish(
 async def _after_terminal(
     s: AsyncSession, settings: Settings, ctx: Ctx, run: AgentRun, agent: Agent | None
 ) -> None:
-    """A job ended: wake its parent, tell the person who asked when it didn't work out, alert the
-    admins on a budget stop or repeated failures, and announce it."""
+    """A job ended: cancel its open asks, wake its parent, tell the person who asked when it
+    didn't work out, alert the admins on a budget stop or repeated failures, and announce it."""
+    await asks_service.cancel_for_run(s, ctx, run.id)
     if run.parent_run_id is not None:
         await wake_parent(s, settings, run.parent_run_id)
     if agent is not None and run.parent_run_id is None:
@@ -366,6 +375,10 @@ async def _condition_met(s: AsyncSession, waiting_on: dict[str, Any]) -> bool:
         return finished == len(results) if waiting_on.get("mode") != "any" else finished > 0
     if kind == "timer":
         return datetime.fromisoformat(str(waiting_on["until"])) <= datetime.now(UTC)
+    if kind == "ask":
+        ids = [uuid.UUID(x) for x in waiting_on.get("ids") or []]
+        statuses = (await s.execute(select(Ask.status).where(Ask.id.in_(ids)))).scalars().all()
+        return bool(statuses) and all(x != "open" for x in statuses)
     return False
 
 

@@ -28,6 +28,10 @@ NOTIFICATION_KINDS = (
     "digest",
     "agent_alert",
     "unblocked",  # S6.1.3: a task's last blocker is done ("You're up")
+    # Phase 7.6 S76-03: an agent asks you something; a reminder of it; a skill to review (S76-05)
+    "agent_ask",
+    "agent_ask_reminder",
+    "skill_proposed",
 )
 
 

@@ -49,6 +49,7 @@ def _api_router(settings: Settings) -> APIRouter:
     from momentum.api.export import router as export_router
     from momentum.api.undo import router as undo_router
     from momentum.domain.agents.router import router as agents_router
+    from momentum.domain.asks.router import router as asks_router
     from momentum.domain.attachments.router import router as attachments_router
     from momentum.domain.comments.router import router as comments_router
     from momentum.domain.dashboards.router import router as dashboards_router
@@ -111,6 +112,7 @@ def _api_router(settings: Settings) -> APIRouter:
     api.include_router(templates_router)
     api.include_router(mytasks_router)
     api.include_router(notifications_router)
+    api.include_router(asks_router)
     api.include_router(home_router)
     api.include_router(search_router)
     api.include_router(asana_router)

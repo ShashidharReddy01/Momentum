@@ -1,0 +1,25 @@
+# Test-only pack (never shipped): asks every kind of question, and talks about its work (S76-03).
+key: asker
+name: Asker
+title: Test pack
+avatar: teammate
+version: 1.0.0
+sdk: ">=1.0,<2"
+kind: script
+description: Asks a question of the kind it's told, and answers questions about its work. Used only by platform tests.
+capabilities:
+  - key: ask
+    title: Ask one question
+    description: Asks one question of the kind given as its input, then says what it got.
+triggers:
+  - { type: assigned }
+  - { type: manual }
+effects:
+  - comments.create
+commands: [rerun, skip, status]
+data:
+  classification: internal
+limits: { max_steps: 30, step_timeout_s: 30, max_active_s: 120, max_job_usd: 0.10, max_job_tokens: 10000, concurrency: 2, max_children: 5 }
+model_alias: fast
+budget_monthly_usd: 1
+budget_monthly_tokens: 100000

@@ -1,0 +1,84 @@
+# Phase 7.6 S76-03 (spec §5.3): a person replies in the thread instead of using the ask's card.
+# Certain replies (an exact option, yes/no, a lone number, any text for a text ask) are decided in
+# code and must not call the model; everything else is the model's reading, validated against the
+# ask's shape and never marked certain (the person confirms it with one click).
+feature: ask_interpret
+_vendor: &vendor
+  kind: choice
+  title: Which vendor sent this invoice?
+  options:
+    - {value: acme, label: Acme Ltd}
+    - {value: globex, label: Globex Corporation}
+    - {value: initech, label: Initech}
+_amount: &amount
+  kind: form
+  title: The total doesn't add up
+  form: [{name: amount, label: Amount, type: money}]
+_amount_due: &amount_due
+  kind: form
+  title: Two things are missing
+  form:
+    - {name: amount, label: Amount, type: money}
+    - {name: due, label: Due date, type: date}
+_post: &post {kind: confirm, title: "Post this invoice?"}
+cases:
+  - id: exact_label
+    mock: true
+    ask: *vendor
+    reply: "Globex Corporation"
+    expect: {certain: true, answer: globex, no_model_call: true}
+  - id: exact_label_any_case_and_dot
+    mock: true
+    ask: *vendor
+    reply: "initech."
+    expect: {certain: true, answer: initech, no_model_call: true}
+  - id: yes
+    mock: true
+    ask: *post
+    reply: "Yes please"
+    expect: {certain: true, answer: true, no_model_call: true}
+  - id: no
+    mock: true
+    ask: *post
+    reply: "nope"
+    expect: {certain: true, answer: false, no_model_call: true}
+  - id: lone_number_with_separators
+    mock: true
+    ask: *amount
+    reply: "1,250.00"
+    expect: {certain: true, answer: {amount: 1250.0}, no_model_call: true}
+  - id: text_ask_takes_the_reply
+    mock: true
+    ask: {kind: text, title: "What's the PO number?"}
+    reply: "It's PO-7781 from the March order"
+    expect: {certain: true, answer: "It's PO-7781 from the March order", no_model_call: true}
+  - id: paraphrased_option
+    mock: true
+    ask: *vendor
+    reply: "that one's from the Globex people I think"
+    expect: {certain: false, answer: globex, model_called: true}
+  - id: yes_in_a_sentence
+    mock: true
+    ask: *post
+    reply: "sure, go ahead and post it once Priya is back"
+    expect: {certain: false, answer: true, model_called: true}
+  - id: amount_in_words
+    mock: true
+    ask: *amount
+    reply: "make it twelve hundred and fifty"
+    expect: {certain: false, answer: {amount: 1250.0}, model_called: true}
+  - id: two_fields_in_a_sentence
+    mock: true
+    ask: *amount_due
+    reply: "1250 and it's due on the first of November"
+    expect: {certain: false, answer: {amount: 1250.0, due: "2026-11-01"}, model_called: true}
+  - id: reply_that_isnt_an_answer
+    mock: true
+    ask: *vendor
+    reply: "let me check with finance and come back to you"
+    expect: {certain: false, answer: null, model_called: true}
+  - id: reply_naming_no_option
+    mock: true
+    ask: *vendor
+    reply: "none of these, it's Umbrella Corp"
+    expect: {certain: false, answer: null, model_called: true}

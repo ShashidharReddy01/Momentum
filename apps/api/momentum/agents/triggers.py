@@ -34,8 +34,9 @@ from momentum.core.errors import Forbidden, NotFound, ValidationFailed
 from momentum.core.events import ConsumerOffset, OutboxEvent
 from momentum.core.settings import Settings
 from momentum.domain.access import get_visible_project, get_visible_task, task_ancestors
-from momentum.domain.agents.models import Agent
+from momentum.domain.agents.models import Agent, AgentRun
 from momentum.domain.agents.runs import enqueue_run
+from momentum.domain.comments.models import Comment
 from momentum.domain.projects.models import Project, ProjectMember
 from momentum.domain.tasks.models import Task, TaskProject
 from momentum.domain.users.models import User
@@ -353,6 +354,31 @@ def triggers_of(agent: Agent, packs: object = None) -> list[dict[str, Any]]:
     return [t.model_dump(exclude_none=True) for t in pack.manifest.triggers]
 
 
+async def _conversation(
+    session: AsyncSession, agent: Agent, packs: object, task_id: object, comment_id: uuid.UUID
+) -> str | None:
+    """The message when "@Agent …" is a conversation (spec §5.6): a pack agent with a converse
+    handler, on a task that has (or had) one of its jobs. ``None`` otherwise."""
+    if agent.kind != "pack" or not task_id:
+        return None
+    pack = (getattr(packs, "packs", None) or {}).get(agent.pack_key)
+    if pack is None or getattr(pack, "converse", None) is None:
+        return None
+    had_job = await session.scalar(
+        select(AgentRun.id)
+        .where(
+            AgentRun.agent_id == agent.id,
+            AgentRun.mode == "job",
+            AgentRun.trigger["task_id"].astext == str(task_id),
+        )
+        .limit(1)
+    )
+    if had_job is None:
+        return None
+    comment = await session.get(Comment, comment_id)
+    return (comment.body_text or "")[:4000] if comment is not None else None
+
+
 async def _handle(
     session: AsyncSession,
     settings: Settings,
@@ -392,8 +418,6 @@ async def _handle(
             if str(uid) not in by_user:
                 continue
             agent, _user = by_user[str(uid)]
-            if not any(t.get("type") == "mentioned" for t in triggers_of(agent, packs)):
-                continue
             trigger = {
                 "type": "mentioned",
                 "event_id": ev.id,
@@ -403,6 +427,23 @@ async def _handle(
                 "external": _external(ev),
             }
             key = f"mentioned:{ev.entity_id}"
+            message = await _conversation(session, agent, packs, data.get("task_id"), ev.entity_id)
+            if message is not None:
+                # Phase 7.6 (spec §5.6): talking to a pack agent about its work on this task
+                queued += int(
+                    await enqueue_run(
+                        session,
+                        agent,
+                        trigger,
+                        key,
+                        capability="converse",
+                        input={"message": message, "comment_id": str(ev.entity_id)},
+                    )
+                    is not None
+                )
+                continue
+            if not any(t.get("type") == "mentioned" for t in triggers_of(agent, packs)):
+                continue
             queued += int(await enqueue_run(session, agent, trigger, key) is not None)
 
     # event triggers

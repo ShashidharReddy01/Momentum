@@ -1104,6 +1104,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/asks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Agents' questions: mine (default) or all I can see; open ones by default */
+        get: operations["list_asks_api_v1_asks_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/asks/{ask_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One question (for its card) */
+        get: operations["get_ask_api_v1_asks__ask_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/asks/{ask_id}/answer": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Answer a question (only the people it's for; never guests); undoable until the agent uses the answer */
+        post: operations["answer_ask_api_v1_asks__ask_id__answer_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/asks/{ask_id}/interpret": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Read a thread reply as the answer: applied when certain (an exact option, yes/no, a lone number, text), otherwise returned for the person to confirm */
+        post: operations["interpret_ask_reply_api_v1_asks__ask_id__interpret_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/attachments/{attachment_id}": {
         parameters: {
             query?: never;
@@ -5038,6 +5106,17 @@ export interface components {
              */
             task_suggestions: boolean;
         };
+        /** AnswerIn */
+        AnswerIn: {
+            /** Value */
+            value: unknown;
+            /**
+             * Via
+             * @default card
+             * @enum {string}
+             */
+            via: "card" | "thread" | "inbox" | "api";
+        };
         /**
          * ApiTokenCreatedOut
          * @description The only response that ever carries the secret.
@@ -5197,6 +5276,98 @@ export interface components {
             archived: boolean;
             /** Gid */
             gid: string;
+            /** Name */
+            name: string;
+        };
+        /** AskAgentOut */
+        AskAgentOut: {
+            /** Avatar */
+            avatar: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+        };
+        /** AskOut */
+        AskOut: {
+            agent: components["schemas"]["AskAgentOut"];
+            /** Answer */
+            answer?: unknown;
+            /** Answered At */
+            answered_at: string | null;
+            answered_by: components["schemas"]["AskPersonOut"] | null;
+            /** Answered Via */
+            answered_via: string | null;
+            /** Body */
+            body: string;
+            /** Can Answer */
+            can_answer: boolean;
+            /** Comment Id */
+            comment_id: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Default On Expiry */
+            default_on_expiry: {
+                [key: string]: unknown;
+            };
+            /** Evidence */
+            evidence: {
+                [key: string]: unknown;
+            }[];
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /** Form */
+            form: {
+                [key: string]: unknown;
+            }[] | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Kind */
+            kind: string;
+            /** Options */
+            options: {
+                [key: string]: unknown;
+            }[] | null;
+            /** Route */
+            route: string;
+            /** Route Fallback */
+            route_fallback: string | null;
+            /**
+             * Run Id
+             * Format: uuid
+             */
+            run_id: string;
+            /** Status */
+            status: string;
+            /**
+             * Task Id
+             * Format: uuid
+             */
+            task_id: string;
+            /** Title */
+            title: string;
+            /** To */
+            to: components["schemas"]["AskPersonOut"][];
+        };
+        /** AskPersonOut */
+        AskPersonOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
             /** Name */
             name: string;
         };
@@ -7421,6 +7592,29 @@ export interface components {
              */
             outcome: "installed" | "updated" | "unchanged" | "drifted" | "forced";
         };
+        /** InterpretIn */
+        InterpretIn: {
+            /** Text */
+            text: string;
+        };
+        /** InterpretOut */
+        InterpretOut: {
+            /**
+             * Applied
+             * @description True when the reply mapped to an answer with certainty
+             */
+            applied: boolean;
+            ask: components["schemas"]["AskOut"];
+            /** Certain */
+            certain: boolean;
+            /**
+             * Understood
+             * @description The interpretation in words, for the confirm step
+             */
+            understood: string;
+            /** Value */
+            value?: unknown;
+        };
         /** JobOut */
         JobOut: {
             /** Attempts */
@@ -7537,6 +7731,13 @@ export interface components {
         ListOut_ApiTokenOut_: {
             /** Data */
             data: components["schemas"]["ApiTokenOut"][];
+            /** @default {} */
+            meta: components["schemas"]["ListMeta"];
+        };
+        /** ListOut[AskOut] */
+        ListOut_AskOut_: {
+            /** Data */
+            data: components["schemas"]["AskOut"][];
             /** @default {} */
             meta: components["schemas"]["ListMeta"];
         };
@@ -8389,7 +8590,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "assigned" | "mentioned" | "commented" | "completed" | "due_soon" | "overdue" | "rule" | "approval_requested" | "approval_decided" | "agent_proposal" | "digest" | "agent_alert" | "unblocked";
+            kind: "assigned" | "mentioned" | "commented" | "completed" | "due_soon" | "overdue" | "rule" | "approval_requested" | "approval_decided" | "agent_proposal" | "digest" | "agent_alert" | "unblocked" | "agent_ask" | "agent_ask_reminder" | "skill_proposed";
             /** Read At */
             read_at: string | null;
             /** Snippet */
@@ -15033,6 +15234,139 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WriteOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_asks_api_v1_asks_get: {
+        parameters: {
+            query?: {
+                mine?: boolean;
+                status?: "open" | "answered" | "expired" | "cancelled" | "all";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListOut_AskOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_ask_api_v1_asks__ask_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ask_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AskOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    answer_ask_api_v1_asks__ask_id__answer_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ask_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AnswerIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AskOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    interpret_ask_reply_api_v1_asks__ask_id__interpret_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ask_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InterpretIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InterpretOut"];
                 };
             };
             /** @description Validation Error */

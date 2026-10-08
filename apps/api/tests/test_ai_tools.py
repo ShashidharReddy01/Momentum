@@ -93,6 +93,7 @@ def test_catalog_covers_phase_1_2_tools_with_their_risks() -> None:
         "query_metrics": "read",  # S6.5.2
         "get_section_tasks": "read",
         "list_my_tasks": "read",
+        "list_my_asks": "read",  # Phase 7.6 S76-03
         "list_user_tasks": "read",
         "get_project_activity": "read",
         "list_people": "read",

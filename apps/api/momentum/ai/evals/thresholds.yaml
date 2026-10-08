@@ -42,6 +42,8 @@ mock:
   # S75-11 / S75-12
   catch_up: 1.0
   closeout: 1.0
+  # Phase 7.6 S76-03
+  ask_interpret: 1.0
 live:
   command: 0.9
   chat: 0.85
@@ -78,6 +80,8 @@ live:
   nl_filters: 0.9
   dashboard_draft: 0.85
   explain_chart: 0.85
+  # Phase 7.6 S76-03: certainty is code (exact); the model's readings are confirmed by a person
+  ask_interpret: 0.9
   readiness: 0.85
   handoff: 0.85
   catch_up: 0.85

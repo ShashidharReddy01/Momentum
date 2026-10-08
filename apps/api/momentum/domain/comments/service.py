@@ -120,11 +120,22 @@ async def _sync_mentions(
     return new_people
 
 
-def _clean_body(body: object) -> dict[str, Any]:
+def _clean_body(body: object, ctx: Ctx | None = None) -> dict[str, Any]:
     doc = sanitize_doc(body)
     if doc is None:
         raise ValidationFailed("Write something first", code="empty_comment")
+    if (ctx is None or not ctx.actor.is_agent) and _has_node(doc, "askCard"):
+        # Phase 7.6: an ask card is posted by an agent with its ask, never typed by a person
+        raise ValidationFailed("Unsupported content: askCard", code="invalid_rich_text")
     return doc
+
+
+def _has_node(node: Any, node_type: str) -> bool:
+    if not isinstance(node, dict):
+        return False
+    if node.get("type") == node_type:
+        return True
+    return any(_has_node(child, node_type) for child in node.get("content") or [])
 
 
 async def _get_comment(
@@ -181,7 +192,7 @@ async def create_comment(
 ) -> Mutation[Comment]:
     task, placement, role = await get_visible_task(session, ctx, task_id)
     require_project_role(role, "commenter", "comment on this task")
-    doc = _clean_body(body)
+    doc = _clean_body(body, ctx)
     comment = Comment(
         workspace_id=ctx.workspace_id,
         task_id=task.id,
@@ -266,7 +277,7 @@ async def edit_comment(
     comment, task, _ = await _get_comment(session, ctx, comment_id)
     if not can_edit(ctx, comment):
         raise Forbidden("Only the author can edit a comment")
-    doc = _clean_body(body)
+    doc = _clean_body(body, ctx)
     if doc == comment.body:
         return Mutation(comment)
     old = comment.body

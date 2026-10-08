@@ -21,6 +21,9 @@ NotificationKind = Literal[
     "digest",
     "agent_alert",
     "unblocked",
+    "agent_ask",  # Phase 7.6 S76-03
+    "agent_ask_reminder",
+    "skill_proposed",  # Phase 7.6 S76-05
 ]
 
 # The kinds a user can actually toggle in this slice (the rest have no producer yet).

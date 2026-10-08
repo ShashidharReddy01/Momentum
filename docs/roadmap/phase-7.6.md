@@ -498,6 +498,40 @@ everything, permissions, edited-since rows listed, the controls over the API),
 agent test file passes unchanged (126). `test_every_mutation_records_activity` allow-lists the job
 lifecycle events (the run and step rows are the record).
 
+**S76-03 as built (2026-10-09, local session, mock AI only, $0 gateway spend).** **Migration
+0048:** `asks` (spec §5.1, plus `agent_id`, `route_fallback` and `superseded_by`; one live ask per
+waiting step) and the notification kinds `agent_ask`, `agent_ask_reminder`, `skill_proposed`.
+**`domain/asks/`:** schemas (`AskSpec` with per-kind shape rules and a required, valid
+`default_on_expiry`; `validate_answer` per kind: options by value or label, yes/no, form fields by
+type with money like "1,250.00"), service (route resolution with the fallback recorded; the card
+comment; answer, with undo while the job hasn't consumed the answer; `exact_answer` for certain
+thread replies; cancel; `ask_timers` reminders counted in working hours and expiry with value /
+fail / route_to_review / escalate), router (`GET /asks`, `GET /asks/{id}`, `POST
+/asks/{id}/answer`). `core/richtext` gains the `askCard` node (`askId`); the comments service
+refuses it from people. **SDK** (`agents/jobs/talk.py`): `job.ask` → `AskAnswer`, `job.propose`
+→ `Proposed`, `job.message`, `job.classify` → `Intent`, `job.jobs_on_task` → `TaskJob`,
+`job.send_instruction`, `job.wait_for_instruction`, `job.start_job` (the last two need a confirm
+ask answered yes in the same conversation run). The engine wakes a job waiting on an ask the
+moment it's answered (and on the timers' expiry), cancels a job's open asks when it ends, and runs
+`capability="converse"` with `Pack.converse`. Mentions of a pack agent on a task where it has (or
+had) a job become conversation runs (`input.message`, `input.comment_id`). **Thread replies:**
+`POST /asks/{id}/interpret`: certain (code) → answered `via="thread"`; otherwise `ai/ask_interpret.py`
+(prompt `ask_interpret/v1`, `fast`, forced `answer` tool with a closed schema) proposes a reading
+the person confirms. **Mo:** read tool `list_my_asks`. **Evals:** `ask_interpret`, 12 mock cases
+(6 decided in code without a model call, 6 model readings including two that must come back as no
+answer), 12/12. **Test pack** `asker` (every ask kind; waits for an instruction; a converse
+handler with commands). **Deviations:** the interpret endpoint lives in `agents/router.py` (it
+needs the model; the domain router doesn't import AI). `pick_entity` / `pick_record` take their
+candidates as options until entities and records exist (S76-04/05). `send_instruction` delivers
+straight to the waiting job (recorded as its step and queued in one transaction) rather than
+through the outbox. The inbox and Home controls and the card UI are S76-07 (the comment renderer
+already ignores the `askCard` node). **Tests:** `test_asks.py` (23: every kind round-trips with
+its card and notification; validation and who may answer; guests never answer and a route to one
+falls back; each expiry default; escalation to the next route; reminders; working hours; thread
+replies certain vs proposed; undo before and after the job used the answer; a cancelled job
+cancels its asks; my asks over the API and through Mo; people can't post ask cards; proposals;
+conversation questions and confirmed commands; conversation actions need a yes).
+
 ## The prompt for the build session
 
 Paste this into the browser session (also correct for resuming after a context reset):

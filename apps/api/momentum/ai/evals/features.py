@@ -34,6 +34,7 @@ from momentum.ai.chat import run_chat, start_turn
 from momentum.ai.command import run_command
 from momentum.ai.context import Screen
 from momentum.ai.errors import AIUnavailable
+from momentum.ai.evals.ask_features import ASK_FEATURES, run_ask
 from momentum.ai.evals.insight_features import INSIGHT_FEATURES, run_insight
 from momentum.ai.evals.workspace import EvalWorld
 from momentum.ai.from_brief import plan_from_brief
@@ -92,6 +93,8 @@ FEATURES = (
     "report_narrative",
     # Phase 7.5 S75-10: Mo on portfolios and dashboards
     *INSIGHT_FEATURES,
+    # Phase 7.6 S76-03: a thread reply as an agent's answer
+    *ASK_FEATURES,
 )
 # Phase 7.5 (spec §11.3): Ask Mo about files, on the onboarding_v1 eval workspace
 FILE_FEATURES = ("file_qa", "file_tables", "file_vision", "file_injection")
@@ -328,6 +331,8 @@ async def _run(
         obs.citations = [c.to_json() for c in await citations.resolve(session, ctx, obs.text)]
     elif feature in INSIGHT_FEATURES:
         await run_insight(session, llm, world, case, feature, ctx, obs)
+    elif feature in ASK_FEATURES:
+        await run_ask(llm, case, ctx, obs)
     elif feature == "report_narrative":
         # Phase 7.5 (spec §6.1): the builder's facts as the person, then the narrative
         from momentum.ai.report_narrative import citables, narrate

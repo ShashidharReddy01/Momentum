@@ -52,6 +52,7 @@ from momentum.domain.agents.models import AgentRun, AgentRunStep
 
 if TYPE_CHECKING:
     from momentum.agents.jobs.effects import Effects
+    from momentum.agents.jobs.talk import AskAnswer, Intent, Proposed, TaskJob
 
 T = TypeVar("T")
 M = TypeVar("M", bound=BaseModel)
@@ -209,6 +210,8 @@ class JobState:
     done: dict[str, _Done]
     next_seq: int
     sleep: Callable[[float], Awaitable[None]] = asyncio.sleep
+    tools: Any = None  # the tool registry, for job.propose (S76-03)
+    confirmed: bool = False  # a confirm ask was answered yes (conversation actions, S76-03)
     started: float = field(default_factory=time.monotonic)
     seen: set[str] = field(default_factory=set)
     counters: dict[str, int] = field(default_factory=dict)
@@ -784,6 +787,84 @@ class Job:
             return
         state.claim_key(key)
         raise Suspend({"type": "timer", "until": until.isoformat(), "key": key}, resume_at=until)
+
+    # ---------- people (S76-03, spec §5) ----------
+
+    async def ask(
+        self,
+        key: str,
+        *,
+        kind: Literal["choice", "confirm", "form", "text", "pick_entity", "pick_record"],
+        title: str,
+        default_on_expiry: dict[str, Any],
+        body: str = "",
+        options: Sequence[dict[str, Any]] | None = None,
+        form: Sequence[dict[str, Any]] | None = None,
+        evidence: Sequence[dict[str, Any]] | None = None,
+        route: str = "requester",
+        expires_in_days: float | None = None,
+        remind_in_hours: float | None = None,
+    ) -> AskAnswer:
+        """Ask a person (in the task's thread, the inbox and Mo) and wait, durably, for the
+        answer. One question per ask, the likely answers as options, evidence attached; every ask
+        says what happens when nobody answers (``{"value": …}`` or ``{"action": "escalate" |
+        "fail" | "route_to_review"}``)."""
+        from momentum.agents.jobs import talk
+
+        spec: dict[str, Any] = {
+            "kind": kind,
+            "title": title,
+            "body": body,
+            "options": list(options) if options is not None else None,
+            "form": list(form) if form is not None else None,
+            "evidence": list(evidence or []),
+            "route": route,
+            "default_on_expiry": default_on_expiry,
+            "expires_in_days": expires_in_days,
+            "remind_in_hours": remind_in_hours,
+        }
+        return await talk.ask(self._state, key, spec)
+
+    async def propose(
+        self, key: str, tool: str, args: dict[str, Any], *, summary: str | None = None
+    ) -> Proposed:
+        """Propose a change beyond the declared effects to the person who asked (preview →
+        confirm → apply → undo); nothing is applied by the job."""
+        from momentum.agents.jobs import talk
+
+        return await talk.propose(self._state, key, tool, args, summary)
+
+    @property
+    def message(self) -> str:
+        """A conversation run's message (what the person wrote to the agent)."""
+        return str(self._state.input.get("message") or "")
+
+    async def classify(self, key: str = "classify", message: str | None = None) -> Intent:
+        from momentum.agents.jobs import talk
+
+        return await talk.classify(self._state, key, self.message if message is None else message)
+
+    async def jobs_on_task(self, key: str = "jobs") -> list[TaskJob]:
+        from momentum.agents.jobs import talk
+
+        return await talk.jobs_on_task(self._state, key)
+
+    async def send_instruction(self, key: str, run_id: UUID, instruction: dict[str, Any]) -> None:
+        from momentum.agents.jobs import talk
+
+        await talk.send_instruction(self._state, key, run_id, instruction)
+
+    async def wait_for_instruction(self, key: str) -> dict[str, Any]:
+        from momentum.agents.jobs import talk
+
+        return await talk.wait_for_instruction(self._state, key)
+
+    async def start_job(
+        self, key: str, input: dict[str, Any], *, capability: str | None = None
+    ) -> UUID:
+        from momentum.agents.jobs import talk
+
+        return await talk.start_job(self._state, key, input, capability)
 
     async def wait_for_event(
         self, key: str, event: str, *, task_id: UUID | None = None

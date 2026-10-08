@@ -61,6 +61,7 @@ class JobsEnv:
             manifest_path=changes.pop("manifest_path", base.manifest_path),
             run=changes.pop("run", base.run),
             capabilities=changes.pop("capabilities", base.capabilities),
+            converse=changes.pop("converse", base.converse),
         )
         self.packs.packs[key] = variant
         return variant
@@ -123,6 +124,7 @@ class JobsEnv:
                             self.packs,
                             run_id,
                             sleep=self._sleep,
+                            tools=REG,
                         )
                     )
                 else:

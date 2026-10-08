@@ -34,6 +34,7 @@ from momentum.core.undo import undo
 from momentum.domain.access import get_visible_project, get_visible_task
 from momentum.domain.agents.models import Agent, AgentRun, AgentRunStep
 from momentum.domain.agents.runs import restore_from_pause
+from momentum.domain.asks import service as asks_service
 
 OPEN = ("queued", "running", "waiting", "paused")
 
@@ -132,6 +133,8 @@ async def cancel(s: AsyncSession, ctx: Ctx, run_id: uuid.UUID) -> AgentRun:
             r.status, r.finished_at = "cancelled", now
             r.error = f"Cancelled by {who}"
             r.waiting_on = r.resume_at = None
+            if r.id != run.id:
+                await asks_service.cancel_for_run(s, ctx, r.id)
     await s.flush()
     agent = await s.get(Agent, run.agent_id)
     await _after_terminal(s, ctx.settings, system_ctx(run.workspace_id, ctx.settings), run, agent)

@@ -42,7 +42,13 @@ class Claimed:
 
 
 async def enqueue_run(
-    session: AsyncSession, agent: Agent, trigger: dict[str, Any], dedupe_key: str | None
+    session: AsyncSession,
+    agent: Agent,
+    trigger: dict[str, Any],
+    dedupe_key: str | None,
+    *,
+    capability: str | None = None,
+    input: dict[str, Any] | None = None,
 ) -> uuid.UUID | None:
     """Queue a run. With a ``dedupe_key`` the same trigger delivered twice queues once: the
     second insert is ignored and ``None`` is returned. A pack agent's run is a durable job
@@ -61,7 +67,12 @@ async def enqueue_run(
             pack_version=agent.pack_version if is_pack else None,
             request_id=uuid.uuid4(),
             steps=0,
-            input={"text": trigger["input"]} if is_pack and trigger.get("input") else {},
+            capability=capability,
+            input=input
+            if input is not None
+            else {"text": trigger["input"]}
+            if is_pack and trigger.get("input")
+            else {},
             trace=[],
             tokens_in=0,
             tokens_out=0,

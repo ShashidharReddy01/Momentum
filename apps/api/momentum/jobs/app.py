@@ -7,6 +7,7 @@ import procrastinate
 from momentum.core.settings import Settings
 from momentum.jobs import agents as _agents  # noqa: F401 - agent triggers and runs (S5.1.2)
 from momentum.jobs import ai as _ai  # noqa: F401 - registers `expire_ai_actions`
+from momentum.jobs import asks as _asks  # noqa: F401 - ask reminders and expiry (P7.6)
 from momentum.jobs import attachments as _attachments  # noqa: F401 - registers `extract_text`
 from momentum.jobs import due_approaching as _due_approaching  # noqa: F401 - due-approaching scan
 from momentum.jobs import forecasts as _forecasts  # noqa: F401 - nightly forecasts (S6.5.3)

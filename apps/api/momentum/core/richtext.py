@@ -34,6 +34,9 @@ NODES: dict[str, set[str]] = {
     "hardBreak": set(),
     "horizontalRule": set(),
     "mention": {"id", "label", "kind"},
+    # Phase 7.6 S76-03: an agent's question, rendered as its answer card (agents only; the
+    # comments service refuses it from people)
+    "askCard": {"askId"},
 }
 MARKS: dict[str, set[str]] = {
     "bold": set(),

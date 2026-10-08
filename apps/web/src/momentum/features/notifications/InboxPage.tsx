@@ -4,11 +4,14 @@ import {
   ArchiveRestore,
   AtSign,
   Bell,
+  BellRing,
   Bot,
   CircleAlert,
   CircleCheck,
   Clock,
   Inbox as InboxIcon,
+  Lightbulb,
+  MessageCircleQuestion,
   MessageSquare,
   Newspaper,
   Play,
@@ -42,6 +45,9 @@ const KIND_LABEL: Record<Notification['kind'], string> = {
   digest: 'Digest',
   agent_alert: 'Agent alert',
   unblocked: "You're up",
+  agent_ask: 'Agent question',
+  agent_ask_reminder: 'Agent question reminder',
+  skill_proposed: 'Skill to review',
 };
 
 /** One icon per kind, so a list of notifications scans by shape; the titles already say what
@@ -60,6 +66,10 @@ const KIND_ICON: Record<Notification['kind'], { icon: LucideIcon; tone: string }
   digest: { icon: Newspaper, tone: 'text-amber-ink' },
   agent_alert: { icon: Bot, tone: 'text-amber-ink' },
   unblocked: { icon: Play, tone: 'text-ok' },
+  // Phase 7.6: an agent's question (answer controls land in S76-07), its reminder, a skill
+  agent_ask: { icon: MessageCircleQuestion, tone: 'text-amber-ink' },
+  agent_ask_reminder: { icon: BellRing, tone: 'text-amber-ink' },
+  skill_proposed: { icon: Lightbulb, tone: 'text-amber-ink' },
 };
 
 export function InboxPage() {

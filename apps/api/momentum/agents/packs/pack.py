@@ -45,6 +45,8 @@ class Pack:
     capabilities: Mapping[str, JobFn] = field(default_factory=dict)
     settings: type[PackSettings] = PackSettings
     setup: tuple[SetupItem, ...] = ()
+    # S76-03 (spec §5.6): the conversation handler, for "@Agent …" on a task with one of its jobs
+    converse: JobFn | None = None
 
     @cached_property
     def manifest(self) -> PackManifest:
@@ -71,6 +73,8 @@ class Pack:
             )
         if not issubclass(self.settings, PackSettings):
             raise PackError(f"{manifest.key}: settings must subclass momentum.sdk.PackSettings")
+        if manifest.commands and self.converse is None:
+            raise PackError(f"{manifest.key}: declares commands but has no converse handler")
         names = [(i.kind, i.name.casefold()) for i in self.setup]
         if len(set(names)) != len(names):
             raise PackError(f"{manifest.key}: setup lists the same item twice")

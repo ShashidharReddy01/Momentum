@@ -5,7 +5,8 @@ from momentum.core.activity import Activity
 from momentum.core.db import Base
 from momentum.core.events import OutboxEvent
 from momentum.core.idempotency import IdempotencyKey
-from momentum.domain.agents.models import Agent, AgentRun
+from momentum.domain.agents.models import Agent, AgentRun, AgentRunStep
+from momentum.domain.asks.models import Ask
 from momentum.domain.attachments.models import Attachment
 from momentum.domain.comments.models import Comment, Mention, Reaction
 from momentum.domain.dashboards.models import (
@@ -54,10 +55,12 @@ __all__ = [
     "Activity",
     "Agent",
     "AgentRun",
+    "AgentRunStep",
     "AiAction",
     "AiMemory",
     "AiSummary",
     "ApiToken",
+    "Ask",
     "Attachment",
     "Capacity",
     "Comment",

@@ -1,0 +1,17 @@
+# Phase 7.6 S76-03: scripted readings of thread replies (feature ask_interpret). Each matches a
+# phrase of the reply; a reading the ask's shape refuses becomes "no answer" in code.
+responses:
+  - match: {contains: "the Globex people"}
+    tool_calls: [{name: answer, arguments: {value: globex, explanation: "Globex Corporation"}}]
+  - match: {contains: "go ahead and post it"}
+    tool_calls: [{name: answer, arguments: {value: true, explanation: "Post it", unsure: true}}]
+  - match: {contains: "twelve hundred and fifty"}
+    tool_calls: [{name: answer, arguments: {value: {amount: 1250}, explanation: "Amount 1,250"}}]
+  - match: {contains: "first of November"}
+    tool_calls:
+      - name: answer
+        arguments: {value: {amount: 1250, due: "2026-11-01"}, explanation: "1,250, due 1 Nov"}
+  - match: {contains: "check with finance"}
+    tool_calls: [{name: answer, arguments: {value: "", explanation: "No answer yet", unsure: true}}]
+  - match: {contains: "Umbrella Corp"}
+    tool_calls: [{name: answer, arguments: {value: umbrella, explanation: "Umbrella Corp", unsure: true}}]

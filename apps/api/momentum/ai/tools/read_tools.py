@@ -999,7 +999,57 @@ async def query_metrics(tc: ToolContext, args: chart.ChartFilters) -> ToolResult
     return ToolResult.success(res.description, {"metrics": data})
 
 
+class ListMyAsksArgs(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    status: Literal["open", "answered", "expired", "all"] = "open"
+    limit: int = Field(default=20, ge=1, le=50)
+
+
+@tool(
+    name="list_my_asks",
+    description=(
+        "Questions agents are waiting on the user to answer (oldest first): who asks, about which "
+        "task, the question, its options or form fields, and when it expires. Read-only: Mo never "
+        "answers an ask by itself."
+    ),
+    risk="read",
+    scopes=READ,
+)
+async def list_my_asks(tc: ToolContext, args: ListMyAsksArgs) -> ToolResult:
+    from momentum.domain.agents.models import Agent
+    from momentum.domain.asks import service as asks
+
+    if tc.ctx.actor.id is None or tc.ctx.actor.role == "guest":
+        return ToolResult.success("0 question(s)", {"asks": []})
+    rows = await asks.list_asks(
+        tc.session, tc.ctx, mine=True, status=None if args.status == "all" else args.status
+    )
+    out = []
+    for a in rows[: args.limit]:
+        agent = await tc.session.get(Agent, a.agent_id)
+        task = await tc.session.get(Task, a.task_id)
+        item: dict[str, Any] = {
+            "agent": agent.name if agent else None,
+            "task": task_key(task.number) if task else None,
+            "task_title": task.title if task else None,
+            "question": a.title,
+            "kind": a.kind,
+            "status": a.status,
+            "asked": iso(a.created_at),
+            "expires": iso(a.expires_at),
+        }
+        if a.options:
+            item["options"] = [o["label"] for o in a.options]
+        if a.form:
+            item["fields"] = [f["label"] for f in a.form]
+        if a.body:
+            item["details"] = clip(a.body, 400)
+        out.append(item)
+    return ToolResult.success(f"{len(out)} question(s)", {"asks": out})
+
+
 TOOLS = [
+    list_my_asks,
     search_tasks,
     semantic_search,
     get_task,

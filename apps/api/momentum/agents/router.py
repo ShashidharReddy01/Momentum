@@ -20,11 +20,12 @@ from momentum.agents.packs.registry import packs_of
 from momentum.agents.runtime import dry_run
 from momentum.agents.triggers import request_run
 from momentum.ai.agent_draft import MAX_DESCRIPTION, AgentDraftOut, draft_agent
+from momentum.ai.ask_interpret import describe, interpret_reply
 from momentum.ai.router import require_llm
 from momentum.api.deps import CtxDep, RuntimeDep, UowDep
 from momentum.api.schemas import ListOut
 from momentum.core.context import Ctx
-from momentum.core.errors import Forbidden, NotFound, ValidationFailed
+from momentum.core.errors import Conflict, Forbidden, NotFound, ValidationFailed
 from momentum.core.permissions import Action, can
 from momentum.domain.access import get_visible_project
 from momentum.domain.agents import service
@@ -35,6 +36,8 @@ from momentum.domain.agents.schemas import (
     InstallOut,
     InstallRowOut,
 )
+from momentum.domain.asks import service as asks_service
+from momentum.domain.asks.schemas import InterpretIn, InterpretOut
 from momentum.domain.tasks.models import Task
 from momentum.domain.users.models import User
 
@@ -452,4 +455,45 @@ async def apply_setup(
             project_id=body.project_id,
             changes=_changes(result.changes),
             batch_id=result.batch_id,
+        )
+
+
+# ---------- Phase 7.6 S76-03 (spec §5.3): a thread reply as the answer to an ask ----------
+
+
+@router.post(
+    "/asks/{ask_id}/interpret",
+    response_model=InterpretOut,
+    summary="Read a thread reply as the answer: applied when certain (an exact option, yes/no, a"
+    " lone number, text), otherwise returned for the person to confirm",
+)
+async def interpret_ask_reply(
+    ask_id: uuid.UUID, body: InterpretIn, ctx: CtxDep, uow: UowDep, runtime: RuntimeDep
+) -> InterpretOut:
+    async with uow.transaction() as s:
+        ask = await asks_service.get_ask(s, ctx, ask_id)
+        if ctx.actor.role == "guest" or ctx.actor.id not in ask.to_user_ids:
+            raise Forbidden("This question is for someone else")
+        if ask.status != "open":
+            raise Conflict(f"This question is {ask.status}", code="ask_closed")
+        certain, value = asks_service.exact_answer(ask, body.text)
+        if certain:
+            ask = await asks_service.answer_ask(s, ctx, ask.id, value, via="thread")
+            return InterpretOut(
+                applied=True,
+                certain=True,
+                value=ask.answer,
+                understood=describe(ask, ask.answer),
+                ask=await asks_service.ask_out(s, ctx, ask),
+            )
+    llm = require_llm(runtime)
+    reading = await interpret_reply(llm, ctx.with_(via="ai"), ask, body.text)
+    async with uow.transaction() as s:
+        fresh = await asks_service.get_ask(s, ctx, ask_id)
+        return InterpretOut(
+            applied=False,
+            certain=False,
+            value=reading.value,
+            understood=reading.understood,
+            ask=await asks_service.ask_out(s, ctx, fresh),
         )

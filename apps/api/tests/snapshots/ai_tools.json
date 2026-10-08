@@ -1,6 +1,35 @@
 [
   {
     "function": {
+      "description": "Questions agents are waiting on the user to answer (oldest first): who asks, about which task, the question, its options or form fields, and when it expires. Read-only: Mo never answers an ask by itself.",
+      "name": "list_my_asks",
+      "parameters": {
+        "additionalProperties": false,
+        "properties": {
+          "limit": {
+            "default": 20,
+            "maximum": 50,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "status": {
+            "default": "open",
+            "enum": [
+              "open",
+              "answered",
+              "expired",
+              "all"
+            ],
+            "type": "string"
+          }
+        },
+        "type": "object"
+      }
+    },
+    "type": "function"
+  },
+  {
+    "function": {
       "description": "Find tasks the user can see with structured filters (text, project, assignee, status, due range, overdue, blocked). Returns keys like T-123 to use with other tools.",
       "name": "search_tasks",
       "parameters": {
