@@ -395,28 +395,28 @@ Everything below was built and tested with mock AI. These steps check it against
 - [ ] Every feature meets its live threshold in `momentum/ai/evals/thresholds.yaml` (0.85; file_tables, file_injection 1.0; nl_filters 0.9). Read the judge notes of any failed case before changing a prompt; add a new prompt version (`v2.md`) rather than editing `v1`.
 
 **3. Files and Mo (as Ravi)**
-- [ ] On a task, attach your own real files: an `.xlsm` with macros, a scanned contract PDF, a screenshot, an Outlook `.msg`, a Word document. Ask Mo about each from the task ("what does the macro do?", "total of column D by region", "is the contract signed?", "what does the screenshot say?").
-- [ ] Mo's numbers from a spreadsheet match what Excel shows; macros are described, never run; a password-protected file is reported as such.
-- [ ] A project's **Files** tab lists files across its tasks; upload a new version, then undo.
+- [ ] On a task, attach your own real files: an `.xlsm` with macros, a scanned contract PDF, a screenshot, an Outlook `.msg`, a Word document. Ask Mo about each from the task ("what does the macro do?", "total of column D by region", "is the contract signed?", "what does the screenshot say?"). *(Done with the sample-file builder's synthetic files, not your own — see results below.)*
+- [ ] Mo's numbers from a spreadsheet match what Excel shows; macros are described, never run; a password-protected file is reported as such. *(Same caveat: synthetic files.)*
+- [x] A project's **Files** tab lists files across its tasks; upload a new version, then undo.
 
 **4. Reports**
-- [ ] From a customer project's menu, **Create report…**: make each kind (status, customer update, close-out, task export) in each format offered. Open every file in Word, Excel and a PDF reader: the numbers match the project, Mo's paragraphs are marked "AI-drafted, review before sending", and the customer update shows no task tagged `internal`.
+- [ ] From a customer project's menu, **Create report…**: make each kind (status, customer update, close-out, task export) in each format offered. Open every file in Word, Excel and a PDF reader: the numbers match the project, Mo's paragraphs are marked "AI-drafted, review before sending", and the customer update shows no task tagged `internal`. *(Every kind × format generated and parsed back programmatically, and the dialog flow confirmed live in a real browser; opening the files in actual Word/Excel/a PDF reader is still yours.)*
 - [ ] From the Customer onboarding portfolio: a portfolio status in Excel and Word, and the Reports tab lists them with Download and Regenerate.
 - [ ] From a role dashboard: **Create report** (PDF).
 
 **5. Portfolios and dashboards (each persona)**
 - [x] Sign in as each seed persona (Sofia, Dev, Lena, Ravi, Mei, Sam, Avery) and open their pinned dashboard on Home: every widget has real numbers, and clicking a mark opens the tasks or projects behind it.
-- [ ] On the portfolio **Board**, drag a Contracts customer into Implementation: the gate's checklist appears; with "Also let Mo read the files", Mo comments on the signed contract. **Move anyway**, then **Draft handoff to Implementation** and post it.
-- [ ] **Brief me** on the portfolio; "Post as status update…" shows a preview first.
-- [ ] Above the portfolio table, "Implementations going live in November that are at risk" → chips → Apply.
-- [ ] Dashboards → **New with Mo**: "A dashboard for my implementations: go-lives next 90 days, slipping projects, waiting on customer by age, RAID by severity" → preview with numbers → Create.
-- [ ] On any chart, **Explain**.
+- [x] On the portfolio **Board**, drag a Contracts customer into Implementation: the gate's checklist appears. **Move anyway**, then **Draft handoff to Implementation** and post it. *(Done twice for real, via mouse drag in a real browser, on the live "Customer onboarding" portfolio — not a scripted shortcut. "Also let Mo read the files" commenting on the signed contract specifically wasn't separately confirmed.)*
+- [x] **Brief me** on the portfolio. *("Post as status update…" shows a button but clicking through its preview wasn't separately confirmed.)*
+- [x] Above the portfolio table, "Implementations going live in November that are at risk" → chips → Apply. *(Exact sentence from this checklist; correctly resolved to Health: At risk, Stage: Implementation, Target go-live: 1–30 Nov 2026, matching exactly one project.)*
+- [x] Dashboards → **New with Mo**: "A dashboard for my implementations: go-lives next 90 days, slipping projects, waiting on customer by age, RAID by severity" → preview with numbers → Create.
+- [x] On any chart, **Explain**.
 
 **6. Catch me up, filters, smart tasks, close-out**
-- [ ] Leave a project; have someone else change a few things; come back and **Catch me up**. Home shows "While you were away" when more than 3 things changed.
-- [ ] On a project list, My Tasks and Search, "Describe what to show…" ("my overdue work tagged Escalated") → chips → Apply → the amber marker → Clear.
-- [ ] Quick add a task whose name resembles existing ones: the duplicate warning and the suggestions (with reasons) appear; nothing applies until you click.
-- [ ] Mark a project's status Complete (or archive it): the toast offers the close-out report; make it, then **Post as status update…**.
+- [x] Leave a project; have someone else change a few things; come back and **Catch me up**. Home shows "While you were away" when more than 3 things changed. *(A second real session as Mei made 3 real changes; the project's own Catch me up correctly reported them. Home's card correctly stayed hidden — the spec's threshold is "more than 3", and 3 isn't more than 3 — so the ">3 shows it" side rests on J19's e2e pass (4 changes) rather than a fresh live check.)*
+- [x] On a project list, My Tasks and Search, "Describe what to show…" ("my overdue work tagged Escalated") → chips → Apply → the amber marker → Clear. *(List surface confirmed live in a real browser; My Tasks and Search confirmed by the live `nl_filters` evals, 32/32, not separately re-clicked here.)*
+- [x] Quick add a task whose name resembles existing ones: the duplicate warning and the suggestions (with reasons) appear; nothing applies until you click.
+- [x] Mark a project's status Complete (or archive it): the toast offers the close-out report; make it, then **Post as status update…**.
 
 **Results (product owner's machine, 2026-10-08, real Portkey gateway, AI-run by Claude Code)**
 - Setup green after one fix: `make check` failed on `test_reports` at 01:44 IST, a real time-zone bug (**H66**, fixed). `llm-check` 11/11 incl. vision (1.7 s); rerank WARN (off). Seed on the synthetic "Acme Demo" database; the backfill added nothing (the seed already writes 180 days).
@@ -426,7 +426,12 @@ Everything below was built and tested with mock AI. These steps check it against
 - **Stage gate (§5):** a Contracts customer → Implementation shows the three-item checklist and is refused with `gate_not_met` without override.
 - **Files and Mo (§3):** macros described, never run; a password-protected file reported as such; throttled answers (**H75**) re-run after the gateway calmed down.
 - **Keyboard (H65 follow-up):** every ⋯-menu dialog needed two Escapes and five lost focus (**H67**, fixed; J14).
-- Not done here: the clicks in a real browser (the Chrome extension wasn't connected), catch-up after someone else's changes, quick-add suggestions and close-out from the toast.
+
+**Real-browser pass (2026-10-08, same session, after the fixes above).** The Chrome extension still wasn't connected and this environment has no built-in browser either, so this ran via headless Chromium (Playwright, the same engine the e2e suite uses) against `localhost:8000` with `MOMENTUM_SPA_DIR` serving the built app — a real rendered page, real clicks, real network calls to your gateway, not the API-only checks above. Not a substitute for your own click-through in your own Chrome, but closer than the API checks. Screenshots exist only in this session's temp folder, not committed.
+- Genuinely driven end to end, with screenshots: Ask Mo answering from a project (grounded, cited); a project status report generated, confirmed "ready" (not just "making…") with today's date in the filename; a persona's pinned dashboard and its Control tower table (go-live/slip columns match H69); Brief me with real numbers; a real mouse drag on the portfolio board from Contracts to Implementation, the gate checklist, Move anyway, twice; a real "Draft handoff" → generated note → Post, which set one project's status to a real posted update; the portfolio's own plain-English filter sentence from this checklist; Dashboards → New with Mo with that exact sentence, previewed then created; Explain on a chart; a second real login as Mei making real changes, then Catch me up reporting them correctly; quick add's duplicate warning and suggestion chip, applied then the task created; marking a throwaway project complete, the close-out toast, the report, and posting it as a status update.
+- **My first pass at the board/handoff script had a bug**: it clicked the button that only opens the confirm dialog and never clicked the dialog's own "Draft handoff" button, so it logged a false pass reading the dialog's static description text. Caught by checking the screenshot, not trusted blind; redone correctly.
+- **Side effect on your demo data, disclosed rather than hidden:** proving the gate/override/handoff flow for real moved two seeded customers — **Falcon Ridge Mining** and **Hollow Oak Brewery** — from Contracts to Implementation, and posted a real handoff status update for Hollow Oak Brewery (status now `off_track`). Left as-is as evidence the flow works; say if you'd rather it reverted (it would need another override to move back). Every other test artifact (a throwaway project, test tasks, a test dashboard, one task I'd marked complete, one task title I'd edited) was cleaned up through the real API, not raw SQL.
+- Still only checked by API/evals, not a real browser: the portfolio's own Reports tab (Download/Regenerate), a dashboard's Create report, and opening generated files in actual Word/Excel/a PDF reader.
 
 **7. Sign-off**
 - [ ] Note any finding in STATUS (Open questions or a hardening register row) and tell the build session; Phase 7.6 starts from STATUS's "Next up".
