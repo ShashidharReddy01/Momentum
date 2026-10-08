@@ -18,6 +18,29 @@ project_fields:
     type: single_select
     options: ["Pre-sales", "Discovery", "Contracts", "Implementation", "Go-live", "Hypercare"]
   - {name: "Contract value", type: currency}
+# Records (Phase 7.6 S76-04, records_qa evals): bills in Launch Plan, which tom and lena can't see.
+# Money is per currency: the EUR bill is never added to the USD ones. "dated" is days from today.
+record_types:
+  - key: eval_bill
+    label: Bill
+    classification: financial
+    display:
+      title: "{vendor.name} {number}"
+      identity: [vendor.name, number]
+      money: [total, "lines[].amount"]
+      currency_field: currency
+      dates: [dated]
+      arrays: {lines: Lines}
+      columns: [vendor.name, number, dated, total, currency]
+      search: [vendor.name, number, "lines[].description"]
+      amount: total
+      occurred_on: dated
+records:
+  - {type: eval_bill, project: "Launch Plan", status: ready, data: {vendor: {name: "Acme Hosting"}, number: "B-101", total: "1200.00", currency: USD, dated: -40, lines: [{description: "Hosting", amount: "1000.00"}, {description: "Support", amount: "200.00"}]}}
+  - {type: eval_bill, project: "Launch Plan", status: ready, data: {vendor: {name: "Acme Hosting"}, number: "B-102", total: "1200.00", currency: USD, dated: -10, lines: [{description: "Hosting", amount: "1000.00"}, {description: "Support", amount: "200.00"}]}}
+  - {type: eval_bill, project: "Launch Plan", status: needs_review, data: {vendor: {name: "Globex Print"}, number: "G-7", total: "450.50", currency: USD, dated: -5, lines: [{description: "Flyers", amount: "450.50"}]}}
+  - {type: eval_bill, project: "Launch Plan", status: needs_review, data: {vendor: {name: "Globex Print"}, number: "G-8", total: "99.50", currency: USD, dated: -2, lines: [{description: "Posters", amount: "99.50"}]}}
+  - {type: eval_bill, project: "Launch Plan", status: ready, data: {vendor: {name: "Lumen Studio"}, number: "L-1", total: "800.00", currency: EUR, dated: -20, lines: [{description: "Design", amount: "800.00"}]}}
 projects:
   - name: "Launch Plan"
     team: "Product"

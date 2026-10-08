@@ -33,10 +33,18 @@ def _manifest(**changes: Any) -> dict[str, Any]:
     return raw
 
 
+def _echo_types() -> Any:
+    """Echo's record types (its manifest declares records effects for them, S76-04)."""
+    from momentum.agents.packs.loader import _load_test_pack
+
+    pack = _load_test_pack(ECHO)
+    return getattr(pack, "record_types", ())
+
+
 def _pack_in(tmp_path: Path, **changes: Any) -> Pack:
     path = tmp_path / "manifest.yaml"
     path.write_text(yaml.safe_dump(_manifest(**changes)), encoding="utf-8")
-    return Pack(manifest_path=path)
+    return Pack(manifest_path=path, record_types=_echo_types())
 
 
 # ---------- loader ----------
@@ -102,12 +110,17 @@ def test_manifest_validation_is_strict(tmp_path: Path) -> None:
 
 
 def test_pack_validation_rules(tmp_path: Path) -> None:
-    pack = Pack(manifest_path=_pack_in(tmp_path).manifest_path, capabilities={"nope": _noop})
+    pack = Pack(
+        manifest_path=_pack_in(tmp_path).manifest_path,
+        capabilities={"nope": _noop},
+        record_types=_echo_types(),
+    )
     with pytest.raises(PackError, match=r"undeclared capabilities: nope"):
         pack.validate()
     twice = Pack(
         manifest_path=pack.manifest_path,
         setup=(Section(name="Inbox"), Section(name="inbox")),
+        record_types=_echo_types(),
     )
     with pytest.raises(PackError, match=r"same item twice"):
         twice.validate()
@@ -174,7 +187,9 @@ async def test_install_upgrade_and_drift(seeded: None, tmp_path: Path) -> None:
         raw["version"] = "1.1.0"
         (copy / "manifest.yaml").write_text(yaml.safe_dump(raw), encoding="utf-8")
         runtime = app.state.momentum
-        runtime.packs.packs["echo"] = Pack(manifest_path=copy / "manifest.yaml")
+        runtime.packs.packs["echo"] = Pack(
+            manifest_path=copy / "manifest.yaml", record_types=_echo_types()
+        )
         up = await admin.post(f"{B}/agents/install", json={"keys": ["echo"]})
         assert up.json()["results"][0]["outcome"] == "updated"
         after = (await admin.get(f"{B}/agents/{echo['id']}")).json()
@@ -185,7 +200,9 @@ async def test_install_upgrade_and_drift(seeded: None, tmp_path: Path) -> None:
         assert r.status_code == 200, r.text
         raw["version"] = "1.2.0"
         (copy / "manifest.yaml").write_text(yaml.safe_dump(raw), encoding="utf-8")
-        runtime.packs.packs["echo"] = Pack(manifest_path=copy / "manifest.yaml")
+        runtime.packs.packs["echo"] = Pack(
+            manifest_path=copy / "manifest.yaml", record_types=_echo_types()
+        )
         drift = await admin.post(f"{B}/agents/install", json={"keys": ["echo"]})
         assert drift.json()["results"][0]["outcome"] == "drifted"
         forced = await admin.post(f"{B}/agents/install", json={"keys": ["echo"], "force": True})

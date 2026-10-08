@@ -25,6 +25,7 @@ from momentum.domain.dashboards.spec import (
     WidgetKind,
     check_kind,
 )
+from momentum.domain.records.query import Filter as RecordFilter
 
 WidgetKindV2 = Literal[
     "count",
@@ -275,24 +276,53 @@ class SnapshotSpec(_Base):
         return self
 
 
+class RecordsSpec(_Base):
+    """Phase 7.6 S76-04 (spec §6.6): records of one type (``records``) or their list items
+    (``record_lines``, with ``array``). Money measures come out per currency."""
+
+    entity: Literal["records", "record_lines"]
+    type: str = Field(min_length=1, max_length=60)
+    array: str | None = Field(default=None, pattern=r"^[a-z_][a-z0-9_]*$")
+    project_ids: list[uuid.UUID] = Field(default_factory=list, max_length=50)
+    status: list[str] = Field(default_factory=list, max_length=7)
+    filters: list[RecordFilter] = Field(default_factory=list, max_length=10)
+    group_by: str | None = Field(default=None, max_length=200, description="A field path")
+    time_bucket: TimeBucket | None = None
+    time_path: str = Field(default="occurred_on", max_length=200)
+    measure: Literal["count", "sum", "avg", "min", "max"] = "count"
+    measure_path: str | None = Field(default=None, max_length=200)
+    window_days: int = Field(default=365, ge=7, le=730)
+    limit: int = Field(default=8, ge=1, le=50)
+
+    @model_validator(mode="after")
+    def _consistent(self) -> RecordsSpec:
+        if (self.entity == "record_lines") != (self.array is not None):
+            raise ValueError("record_lines widgets name their array (and only they do)")
+        if (self.measure == "count") != (self.measure_path is None):
+            raise ValueError("count takes no measure_path; sum, avg, min and max need one")
+        if self.group_by is not None and self.time_bucket is not None:
+            raise ValueError("Pick one dimension: group_by or time_bucket")
+        return self
+
+
 class NoteSpec(_Base):
     entity: Literal["note"]
     text: str = Field(min_length=1, max_length=4000, description="Markdown, shown as text")
 
 
 SpecV2 = Annotated[
-    TasksSpec | ProjectsSpec | StageSpec | SnapshotSpec | NoteSpec,
+    TasksSpec | ProjectsSpec | StageSpec | SnapshotSpec | RecordsSpec | NoteSpec,
     Field(discriminator="entity"),
 ]
 AnySpec = QuerySpec | SpecV2
 
 # which kinds each entity draws
 KIND_ENTITIES: dict[str, tuple[str, ...]] = {
-    "count": ("tasks", "projects"),
-    "kpi": ("tasks", "projects", "stage_events", "snapshots"),
-    "bar": ("tasks", "projects", "snapshots"),
-    "donut": ("tasks", "projects"),
-    "line": ("tasks", "projects", "stage_events", "snapshots"),
+    "count": ("tasks", "projects", "records", "record_lines"),
+    "kpi": ("tasks", "projects", "stage_events", "snapshots", "records", "record_lines"),
+    "bar": ("tasks", "projects", "snapshots", "records", "record_lines"),
+    "donut": ("tasks", "projects", "records", "record_lines"),
+    "line": ("tasks", "projects", "stage_events", "snapshots", "records", "record_lines"),
     "stacked_bar": ("tasks",),
     "list": ("tasks",),
     "table": ("tasks", "projects"),
@@ -321,7 +351,7 @@ def check_kind_v2(kind: str, spec: Any) -> None:
             raise ValueError("A KPI over stages counts throughput or a median time in stage")
         if kind == "line" and spec.analysis != "throughput":
             raise ValueError("A line over stages shows throughput")
-    if isinstance(spec, TasksSpec | ProjectsSpec):
+    if isinstance(spec, TasksSpec | ProjectsSpec | RecordsSpec):
         grouped = spec.group_by is not None
         timed = spec.time_bucket is not None
         if kind in ("bar", "donut", "stacked_bar") and not grouped:

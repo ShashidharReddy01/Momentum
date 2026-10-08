@@ -29,6 +29,8 @@ export const KINDS: Record<ReportKind, { label: string; formats: ReportFormat[];
   },
   task_export: { label: 'Task export', formats: ['xlsx', 'csv'], hint: 'Every task with its fields' },
   dashboard: { label: 'Dashboard', formats: ['pdf', 'docx'], hint: 'Each chart with its numbers' },
+  // Phase 7.6: offered from the Records tab (S76-08), with its record type
+  records_export: { label: 'Records export', formats: ['xlsx', 'csv'], hint: 'Every record with its lines' },
 };
 export const FORMAT_LABELS: Record<ReportFormat, string> = {
   docx: 'Word',

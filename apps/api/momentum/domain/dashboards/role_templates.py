@@ -44,6 +44,7 @@ ORDER = (
     "implementation_consultant",
     "golive_support",
     "leadership",
+    "accounts_payable",  # Phase 7.6 S76-04: records (invoices from the Bernie pack)
 )
 SPEC = TypeAdapter[Any](AnySpec)
 

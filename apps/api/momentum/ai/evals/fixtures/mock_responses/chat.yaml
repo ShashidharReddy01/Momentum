@@ -226,5 +226,50 @@ responses:
     tool_calls: [{name: query_table, arguments: {file: "J15 invoices.csv", query: {aggregates: [{fn: sum, column: "amount", as: total}]}}}]
   - match: {contains: "what's the total amount in this workbook", turn: 2}
     text: "The amounts add up to {{$last.data.first_row.total}} [F:J15 invoices.csv · s:J15 invoices]."
+  # ---- Phase 7.6 S76-04: records_qa (spend questions answered by query_records) ----
+  - match: {contains: "spent with acme hosting", turn: 1}
+    tool_calls: [{name: query_records, arguments: {type: eval_bill, filters: [{path: vendor.name, value: "Acme Hosting"}], measures: [{op: sum, path: total}]}}]
+  - match: {contains: "spent with acme hosting", turn: 2}
+    text: "We've spent {{$last.data.rows[].values.sum(total)}} {{$last.data.rows[].currency}} with Acme Hosting."
+  - match: {contains: "spend by vendor", turn: 1}
+    tool_calls: [{name: query_records, arguments: {type: eval_bill, group_by: [vendor.name], measures: [{op: sum, path: total}]}}]
+  - match: {contains: "spend by vendor", turn: 2}
+    text: "Spend by vendor, per currency: {{$last.data.rows[].values.sum(total)}} ({{$last.data.rows[].currency}}). Different currencies aren't added together."
+  - match: {contains: "waiting for review", turn: 1}
+    tool_calls: [{name: query_records, arguments: {type: eval_bill, status: [needs_review]}}]
+  - match: {contains: "waiting for review", turn: 2}
+    text: "{{$last.data.rows[].values.count}} bills are waiting for review."
+  - match: {contains: "spend in euros", turn: 1}
+    tool_calls: [{name: query_records, arguments: {type: eval_bill, filters: [{path: currency, value: EUR}], measures: [{op: sum, path: total}]}}]
+  - match: {contains: "spend in euros", turn: 2}
+    text: "We spent {{$last.data.rows[].values.sum(total)}} EUR."
+  - match: {contains: "biggest bill", turn: 1}
+    tool_calls: [{name: query_records, arguments: {type: eval_bill, filters: [{path: currency, value: USD}], measures: [{op: max, path: total}]}}]
+  - match: {contains: "biggest bill", turn: 2}
+    text: "The biggest bill in USD is {{$last.data.rows[].values.max(total)}}."
+  - match: {contains: "average bill", turn: 1}
+    tool_calls: [{name: query_records, arguments: {type: eval_bill, filters: [{path: currency, value: USD}], measures: [{op: avg, path: total}]}}]
+  - match: {contains: "average bill", turn: 2}
+    text: "The average bill in USD is {{$last.data.rows[].values.avg(total)}}."
+  - match: {contains: "hosting line items", turn: 1}
+    tool_calls: [{name: query_records, arguments: {type: eval_bill, array: lines, filters: [{path: "lines[].description", value: Hosting}, {path: currency, value: USD}], measures: [{op: sum, path: "lines[].amount"}]}}]
+  - match: {contains: "hosting line items", turn: 2}
+    text: "Hosting line items add up to {{$last.data.rows[].value}} USD."
+  - match: {contains: "from globex print", turn: 1}
+    tool_calls: [{name: query_records, arguments: {type: eval_bill, filters: [{path: vendor.name, value: "Globex Print"}]}}]
+  - match: {contains: "from globex print", turn: 2}
+    text: "There are {{$last.data.rows[].values.count}} bills from Globex Print."
+  - match: {contains: "bills do we have in total", turn: 1}
+    tool_calls: [{name: query_records, arguments: {type: eval_bill}}]
+  - match: {contains: "bills do we have in total", turn: 2}
+    text: "There are {{$last.data.rows[].values.count}} bills."
+  - match: {contains: "bills from initech", turn: 1}
+    tool_calls: [{name: query_records, arguments: {type: eval_bill, filters: [{path: vendor.name, value: Initech}]}}]
+  - match: {contains: "bills from initech", turn: 2}
+    text: "There are no bills from Initech."
+  - match: {contains: "bills add up to", turn: 1}
+    tool_calls: [{name: query_records, arguments: {type: eval_bill, measures: [{op: sum, path: total}]}}]
+  - match: {contains: "bills add up to", turn: 2}
+    text: "I couldn't find any bills you can see."
 default:
   text: "(mock) I can only answer the demo questions in mock mode."

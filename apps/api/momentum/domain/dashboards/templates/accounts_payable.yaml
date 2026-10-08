@@ -1,0 +1,39 @@
+# Phase 7.6 S76-04 role template (spec §6.6): invoices, as the Bernie pack records them (record
+# type "invoice"). Records widgets don't use the portfolio; each one shows an empty state until
+# there are invoices. Money is per currency, never added across currencies.
+name: Accounts payable
+description: Spend by vendor, invoices by status, what waits for approval, and what the checks blocked.
+persona: Finance
+filters: {}
+widgets:
+  - kind: bar
+    title: Spend by vendor (12 months, per currency)
+    size: md
+    spec: {version: 2, entity: records, type: invoice, group_by: vendor.name, measure: sum,
+           measure_path: stated_total, window_days: 365, limit: 10,
+           status: [ready, approved, needs_review]}
+  - kind: line
+    title: Invoices per month
+    size: md
+    spec: {version: 2, entity: records, type: invoice, time_bucket: month, time_path: occurred_on,
+           window_days: 365}
+  - kind: donut
+    title: Invoices by status
+    size: sm
+    spec: {version: 2, entity: records, type: invoice, group_by: status, window_days: 365}
+  - kind: kpi
+    title: Awaiting approval
+    size: sm
+    spec: {version: 2, entity: records, type: invoice, status: [needs_review, ready],
+           window_days: 730}
+  - kind: bar
+    title: Awaiting approval, by invoice month
+    size: md
+    spec: {version: 2, entity: records, type: invoice, status: [needs_review, ready],
+           group_by: "month:occurred_on", window_days: 730}
+  - kind: bar
+    title: Checks that blocked, by kind
+    size: md
+    spec: {version: 2, entity: record_lines, type: invoice, array: checks, group_by: "checks[].id",
+           filters: [{path: "checks[].severity", value: block}, {path: "checks[].passed", value: "false"}],
+           window_days: 365}

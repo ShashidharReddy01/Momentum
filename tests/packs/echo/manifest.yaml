@@ -23,6 +23,8 @@ triggers:
   - { type: manual }
 effects:
   - comments.create
+  - records.create: [echo_bill]
+  - records.update: [echo_bill]
 data:
   classification: internal
 limits: { max_steps: 10, step_timeout_s: 30, max_active_s: 120, max_job_usd: 0.10, max_job_tokens: 10000, concurrency: 2, max_children: 5 }

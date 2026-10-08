@@ -94,6 +94,9 @@ def test_catalog_covers_phase_1_2_tools_with_their_risks() -> None:
         "get_section_tasks": "read",
         "list_my_tasks": "read",
         "list_my_asks": "read",  # Phase 7.6 S76-03
+        "search_records": "read",  # Phase 7.6 S76-04
+        "get_record": "read",
+        "query_records": "read",
         "list_user_tasks": "read",
         "get_project_activity": "read",
         "list_people": "read",

@@ -532,6 +532,43 @@ replies certain vs proposed; undo before and after the job used the answer; a ca
 cancels its asks; my asks over the API and through Mo; people can't post ask cards; proposals;
 conversation questions and confirmed commands; conversation actions need a yes).
 
+**S76-04 as built (2026-10-09, local session, mock AI only, $0 gateway spend).** **Migration
+0049:** `record_types`, `records`, `record_versions` (spec §6.2; `search_text` + a computed
+`search` tsvector). **`domain/records/`:** `paths` (validated paths, `lines[3].amount` and
+`lines[].amount`), `schemas` (the correction operations as a discriminated union, and the
+`RecordTypeImpl` protocol the domain needs from a pack: validate, recheck, display, JSON Schema),
+`service` (type sync at install; create validated on every write, with derived title, identity
+key, promoted amount/currency/date, entity ids, search text and version 1; update by operations
+with `expected_version` → 409, re-run checks, a version, activity with undo restoring the previous
+version; self-approval refused, approval needs a project admin; visibility by task or project, no
+classified types for guests; `find_duplicates`, `find_similar` with pg_trgm), `query` (the engine:
+per-currency money, array unnesting including the records' own `checks`, date buckets, 50,000
+scanned / 200 groups, a `value` per row for the first measure), router. **SDK:** `RecordModel`,
+`RecordType`, `Money`, `job.effects.records.create/update`, `job.records`
+(`get`/`find_duplicates`/`find_similar`/`query`), `Pack(record_types=…)` (validated against the
+manifest's `records.*` effects); `PackRegistry.record_type`; `sync_record_types` on install (API,
+CLI). **Reports:** `records_export` (xlsx: a Records sheet with money as numbers and the currency
+beside it, a sheet per list; csv: the records), scoped to a project or portfolio like every
+report (editor). **Dashboards v2:** `RecordsSpec` (entities `records` / `record_lines`), count /
+KPI / bar / donut / line, drills listing records; the **Accounts payable** template (spend by
+vendor per currency, invoices per month, by status, awaiting approval, awaiting by invoice month,
+checks that blocked) over type `invoice`: every widget says "No invoice records yet" until Bernie
+records invoices. **Mo:** `search_records`, `get_record`, `query_records`. **Evals:**
+`records_qa`, 11 mock cases over seeded bills in `launch_v1` (type `eval_bill`), 11/11; its scorer
+`states_server_numbers` requires every number the query returned to be said, and nothing else.
+**Echo** has a financial test type `echo_bill` with a recheck. **Deviations:** "Bernie's touch
+rate" on the AP template needs the health numbers (S76-06) and joins there; the web's records UI,
+the record drill panel and the "Records export" choice are S76-08 (the API and the report kind are
+here); "pages … cached" caches the rendered JPEG in storage beside the file. **Tests:**
+`test_records.py` (10) and `test_records_views.py` (6): install registers types; a job creates a
+record through its declared effect; invalid data refused on create and update; every operation
+(including `distribute`'s remainder) with versions and undo; link_entity and the approval rules;
+identity, duplicates and similar; visibility and guests; the query engine (per currency, months,
+lines, numeric filters); the API with 409; pages render and cache; dashboard widgets (per-currency
+groups, a two-currency KPI shown per currency, empty states, drills); the AP template; the export
+(xlsx, csv); Mo's tools; and a guest seeing nothing by any route (API, search, Mo, dashboards,
+exports).
+
 ## The prompt for the build session
 
 Paste this into the browser session (also correct for resuming after a context reset):

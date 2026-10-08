@@ -43,6 +43,7 @@ from momentum.domain.mytasks.service import list_my_tasks as svc_list_my_tasks
 from momentum.domain.portfolios import service as portfolios
 from momentum.domain.projects.models import Project
 from momentum.domain.projects.service import project_members
+from momentum.domain.records.query import RecordQuery
 from momentum.domain.sections.models import Section
 from momentum.domain.sections.service import list_sections
 from momentum.domain.tasks.models import Task, TaskDependency, TaskProject
@@ -1048,7 +1049,112 @@ async def list_my_asks(tc: ToolContext, args: ListMyAsksArgs) -> ToolResult:
     return ToolResult.success(f"{len(out)} question(s)", {"asks": out})
 
 
+# ---------- Phase 7.6 S76-04: records (spec §6.6-§6.7) ----------
+
+
+class SearchRecordsArgs(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    type: str | None = Field(default=None, max_length=60, description="A record type, e.g. invoice")
+    text: str | None = Field(default=None, max_length=200, description="Words in the record")
+    status: list[str] = Field(default_factory=list, max_length=7)
+    project: str | None = Field(default=None, max_length=200)
+    limit: int = Field(default=10, ge=1, le=30)
+
+
+def _record_brief(r: Any) -> dict[str, Any]:
+    out: dict[str, Any] = {
+        "id": str(r.id),
+        "type": r.type,
+        "title": r.title,
+        "status": r.status,
+    }
+    if r.amount is not None:
+        out["amount"] = str(r.amount)
+        out["currency"] = r.currency
+    if r.occurred_on is not None:
+        out["date"] = r.occurred_on.isoformat()
+    return out
+
+
+@tool(
+    name="search_records",
+    description=(
+        "Find records (structured items agents produce, such as invoices) the user can see, by "
+        "type, words, status or project. Returns ids to use with get_record. For totals and "
+        "counts use query_records; never add amounts up yourself."
+    ),
+    risk="read",
+    scopes=READ,
+)
+async def search_records(tc: ToolContext, args: SearchRecordsArgs) -> ToolResult:
+    from momentum.domain.records.service import list_records
+
+    project_id = (await resolve_project(tc, args.project))[0].id if args.project else None
+    rows, total = await list_records(
+        tc.session,
+        tc.ctx,
+        type=args.type,
+        q=args.text,
+        status=args.status or None,
+        project_id=project_id,
+        limit=args.limit,
+    )
+    return ToolResult.success(
+        f"{len(rows)} of {total} record(s)",
+        {"records": [_record_brief(r) for r in rows], "total": total},
+    )
+
+
+class GetRecordArgs(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    id: uuid.UUID
+
+
+@tool(
+    name="get_record",
+    description="One record the user can see: its fields, status, checks and decision.",
+    risk="read",
+    scopes=READ,
+)
+async def get_record(tc: ToolContext, args: GetRecordArgs) -> ToolResult:
+    from momentum.domain.records.service import get_record as svc_get_record
+
+    r = await svc_get_record(tc.session, tc.ctx, args.id)
+    out = _record_brief(r)
+    out["data"] = r.data
+    out["checks"] = [
+        {k: c.get(k) for k in ("id", "severity", "passed", "title") if k in c} for c in r.checks
+    ]
+    if r.decision:
+        out["decision"] = {k: r.decision.get(k) for k in ("decision", "reason") if k in r.decision}
+    return ToolResult.success(r.title, out)
+
+
+@tool(
+    name="query_records",
+    description=(
+        "Count, sum, average, min or max over records the user can see, grouped by fields or by "
+        "month (e.g. spend by vendor). Numbers come from the server; money is per currency, never "
+        "added across currencies. Paths are into the record's fields (vendor.name, stated_total) "
+        "or, with array, its list items (lines[].amount)."
+    ),
+    risk="read",
+    scopes=READ,
+)
+async def query_records(tc: ToolContext, args: RecordQuery) -> ToolResult:
+    from momentum.domain.records.query import run_query
+
+    result = await run_query(tc.session, tc.ctx, args)
+    return ToolResult.success(
+        f"{len(result.rows)} row(s) from {result.matched} record(s)",
+        result.model_dump(mode="json"),
+    )
+
+
 TOOLS = [
+    search_records,
+    get_record,
+    query_records,
     list_my_asks,
     search_tasks,
     semantic_search,

@@ -35,6 +35,7 @@ KEY = re.compile(r"\bT-\d+\b")
 KNOWN = frozenset(
     {
         "answer",  # Phase 7.6 S76-03 (ask_interpret)
+        "states_server_numbers",  # Phase 7.6 S76-04 (records_qa)
         "certain",
         "action_items_recall",
         "risk_level_in",
@@ -645,6 +646,23 @@ def score(obs: Observation, expect: dict[str, Any], *, today: date, asked: str =
         said_nums: list[str] = re.findall(r"\d+(?:\.\d+)?", text)
         unknown = [n for n in said_nums if n not in fact_nums]
         add(Check("numbers_from_facts", not unknown, f"not in facts: {unknown[:8]}"))
+    # Phase 7.6 S76-04: records_qa: every number the records query returned is said, and only those
+    if expect.get("states_server_numbers"):
+        last_q = next(
+            (c.get("output") for c in reversed(calls) if c.get("name") == "query_records"), None
+        )
+        rows = ((last_q or {}).get("data") or {}).get("rows") or []
+        server = _flat_numbers([r.get("values") for r in rows])  # "value" repeats the first
+        heard = set(_numbers(_BRACKETS.sub(" ", text)))
+        missing = [n for n in server if not _close(n, heard)]
+        extra = [n for n in heard if not _close(n, server)]
+        add(
+            Check(
+                "states_server_numbers",
+                bool(server) and not missing and not extra,
+                f"server: {sorted(server)}, said: {sorted(heard)}",
+            )
+        )
     # Phase 7.6 S76-03: ask_interpret
     if "certain" in expect:
         add(Check("certain", obs.data.get("certain") is expect["certain"], f"{obs.data}"))

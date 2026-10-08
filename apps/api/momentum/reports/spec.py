@@ -13,7 +13,13 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from momentum.domain.dashboards.spec import QueryFilters
 
 Kind = Literal[
-    "project_status", "portfolio_status", "task_export", "customer_status", "closeout", "dashboard"
+    "project_status",
+    "portfolio_status",
+    "task_export",
+    "customer_status",
+    "closeout",
+    "dashboard",
+    "records_export",  # Phase 7.6 S76-04
 ]
 Format = Literal["docx", "xlsx", "pdf", "md", "csv"]
 Audience = Literal["internal", "customer"]
@@ -26,6 +32,7 @@ FORMATS: dict[str, tuple[str, ...]] = {
     "customer_status": ("docx", "pdf"),
     "closeout": ("docx", "pdf"),
     "dashboard": ("pdf", "docx"),
+    "records_export": ("xlsx", "csv"),
 }
 SECTIONS: dict[str, tuple[str, ...]] = {
     "project_status": (
@@ -51,6 +58,7 @@ SECTIONS: dict[str, tuple[str, ...]] = {
         "narrative",
     ),
     "dashboard": ("widgets",),
+    "records_export": ("records",),
 }
 NARRATIVE_DEFAULT = {"project_status", "customer_status", "closeout", "portfolio_status"}
 SCOPES: dict[str, tuple[str, ...]] = {
@@ -60,6 +68,7 @@ SCOPES: dict[str, tuple[str, ...]] = {
     "customer_status": ("project",),
     "closeout": ("project",),
     "dashboard": ("dashboard",),
+    "records_export": ("project", "portfolio"),
 }
 
 
@@ -103,6 +112,12 @@ class ReportSpec(BaseModel):
     )
     filters: QueryFilters | None = Field(default=None, description="Task exports only")
     audience: Audience = "internal"
+    record_type: str | None = Field(
+        default=None, max_length=60, description="Records exports: which record type"
+    )
+    record_status: list[str] = Field(
+        default_factory=list, max_length=7, description="Records exports: only these statuses"
+    )
 
     @model_validator(mode="after")
     def _consistent(self) -> ReportSpec:
@@ -122,6 +137,10 @@ class ReportSpec(BaseModel):
                 raise ValueError(f"A {self.kind.replace('_', ' ')} report has no section {s}")
         if self.filters is not None and self.kind != "task_export":
             raise ValueError("Filters are for task exports")
+        if (self.kind == "records_export") != (self.record_type is not None):
+            raise ValueError("A records export names its record type (and only it does)")
+        if self.record_status and self.kind != "records_export":
+            raise ValueError("record_status is for records exports")
         if self.kind == "customer_status":
             self.audience = "customer"
         return self

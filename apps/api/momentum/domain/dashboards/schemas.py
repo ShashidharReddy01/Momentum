@@ -351,6 +351,7 @@ class DrillOut(BaseModel):
     total: int
     entity: str = "tasks"
     projects: list[DrillProjectOut] = Field(default_factory=list)
+    records: list[dict[str, Any]] = Field(default_factory=list)  # Phase 7.6: records widgets
 
 
 # ---------- Phase 7.5: templates, the portfolio tab, members ----------

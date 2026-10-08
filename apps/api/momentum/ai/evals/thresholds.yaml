@@ -44,6 +44,8 @@ mock:
   closeout: 1.0
   # Phase 7.6 S76-03
   ask_interpret: 1.0
+  # Phase 7.6 S76-04
+  records_qa: 1.0
 live:
   command: 0.9
   chat: 0.85
@@ -82,6 +84,8 @@ live:
   explain_chart: 0.85
   # Phase 7.6 S76-03: certainty is code (exact); the model's readings are confirmed by a person
   ask_interpret: 0.9
+  # Phase 7.6 S76-04: numbers must be the server's (always exact)
+  records_qa: 1.0
   readiness: 0.85
   handoff: 0.85
   catch_up: 0.85

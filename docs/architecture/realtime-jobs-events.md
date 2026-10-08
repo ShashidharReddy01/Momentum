@@ -92,6 +92,7 @@ Event payloads share an envelope:
 | `agent_run.progress` | 7.6 | `done`, `total`, `label`; at most one every 2 s per run (always the last). Channels `run:<id>` (+ parent), `task:<id>` |
 | `agent_run.step` | 7.6 | The live timeline: `key`, `kind` (`step`, `spawn`, `ask` only), `status` (`running`, `done`, `failed`), `seq`. Channels `run:<id>` (+ parent), `task:<id>` |
 | `ask.created` / `ask.answered` / `ask.reopened` / `ask.expired` / `ask.escalated` / `ask.cancelled` | 7.6 | Phase 7.6 S76-03: `task_id`, `run_id` (+ `kind` on created, `via` on answered, `default` on expired, `to` (the new ask) on escalated). Channels `task:<id>`, `run:<id>` (+ `user:<id>` of each person asked, on created). `ask.reopened` is an answer undone before the job used it |
+| `record.created` / `record.updated` / `record.deleted` | 7.6 | Phase 7.6 S76-04: `type`, `version`, `status` (+ `task_id` on created). Channels `project:<id>`, `task:<id>`. `record.deleted` is a created record undone |
 | `workspace.settings_changed` | 5 | `timezone`; channel `workspace:<id>` (S5.1.2) |
 | `agent.created` / `agent.updated` | 5 | `key`, `source` (created); `changes` (field names), `version` (updated); channel `workspace:<id>` (S5.1.1). No frontend handler yet (the agents pages arrive in S5.1.3/S5.2.3) |
 | `rule.created` / `rule.updated` / `rule.deleted` / `rule.restored` | 4 | `project_id` (created, deleted); `changes` (names), `version` (updated); channel `project:<id>` or `workspace:<id>` (S4.1.1; frontend handler in `lib/realtime/handlers.ts` since S4.1.3) |

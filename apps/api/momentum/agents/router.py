@@ -16,7 +16,7 @@ from momentum.agents import radar, runs_view
 from momentum.agents.jobs import control
 from momentum.agents.loader import DefinitionError, all_definitions
 from momentum.agents.packs import setup as pack_setup
-from momentum.agents.packs.registry import packs_of
+from momentum.agents.packs.registry import packs_of, sync_record_types
 from momentum.agents.runtime import dry_run
 from momentum.agents.triggers import request_run
 from momentum.ai.agent_draft import MAX_DESCRIPTION, AgentDraftOut, draft_agent
@@ -60,6 +60,7 @@ async def install_agents(
         results = await service.install_definitions(
             s, ctx, definitions, runtime.tools.names, keys=body.keys, force=body.force
         )
+        await sync_record_types(s, ctx.workspace_id, packs_of(runtime))
         return InstallOut(
             results=[
                 InstallRowOut(key=r.key, outcome=r.outcome, agent_id=r.agent.id) for r in results

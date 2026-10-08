@@ -17,6 +17,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict
 
 from momentum.agents.packs.manifest import Capability, PackManifest, load_manifest
+from momentum.agents.packs.records import RecordType
 from momentum.agents.packs.setup import SetupItem
 
 JobFn = Callable[..., Awaitable[Any]]
@@ -47,6 +48,16 @@ class Pack:
     setup: tuple[SetupItem, ...] = ()
     # S76-03 (spec §5.6): the conversation handler, for "@Agent …" on a task with one of its jobs
     converse: JobFn | None = None
+    # S76-04 (spec §6.1): the record types it produces
+    record_types: tuple[RecordType, ...] = ()
+
+    def record_type(self, key: str, version: int | None = None) -> RecordType:
+        found = [t for t in self.record_types if t.key == key]
+        if version is not None:
+            found = [t for t in found if t.version == version]
+        if not found:
+            raise PackError(f"{self.key} has no record type {key!r}")
+        return max(found, key=lambda t: t.version)
 
     @cached_property
     def manifest(self) -> PackManifest:
@@ -73,6 +84,18 @@ class Pack:
             )
         if not issubclass(self.settings, PackSettings):
             raise PackError(f"{manifest.key}: settings must subclass momentum.sdk.PackSettings")
+        types = {t.key for t in self.record_types}
+        if len({(t.key, t.version) for t in self.record_types}) != len(self.record_types):
+            raise PackError(f"{manifest.key}: a record type version is listed twice")
+        for effect in ("records.create", "records.update"):
+            for item in manifest.effects:
+                if isinstance(item, dict) and effect in item:
+                    missing = sorted(set(item[effect]) - types)
+                    if missing:
+                        raise PackError(
+                            f"{manifest.key}: {effect} names record types it doesn't define:"
+                            f" {', '.join(missing)}"
+                        )
         if manifest.commands and self.converse is None:
             raise PackError(f"{manifest.key}: declares commands but has no converse handler")
         names = [(i.kind, i.name.casefold()) for i in self.setup]

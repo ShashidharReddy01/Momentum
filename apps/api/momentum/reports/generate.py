@@ -20,6 +20,7 @@ from momentum.reports.builders.project import (
     build_customer_status,
     build_project_status,
 )
+from momentum.reports.builders.records import build_records_export
 from momentum.reports.builders.tasks import build_task_export
 from momentum.reports.data import now_utc, today_for
 from momentum.reports.document import (
@@ -45,6 +46,7 @@ BUILDERS: dict[str, Callable[[BuildContext], Awaitable[ReportDocument]]] = {
     "portfolio_status": build_portfolio_status,
     "task_export": build_task_export,
     "dashboard": build_dashboard,
+    "records_export": build_records_export,
 }
 MIMES = {
     "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -60,6 +62,7 @@ KIND_WORDS = {
     "portfolio_status": "Portfolio status",
     "task_export": "Tasks",
     "dashboard": "Dashboard",
+    "records_export": "Records",
 }
 
 

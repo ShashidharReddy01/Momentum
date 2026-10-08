@@ -1,0 +1,50 @@
+# Phase 7.6 S76-04 (spec §6.6): Mo answers spend questions from the records query engine. The
+# numbers it says must be exactly the server's (states_server_numbers), money stays per currency,
+# and someone who can't see the records gets no numbers at all. Bills: launch_v1.yaml "records".
+feature: records_qa
+cases:
+  - id: spend_with_one_vendor
+    mock: true
+    input: "How much have we spent with Acme Hosting?"
+    expect: {tools_include: [query_records], states_server_numbers: true, text_include_any: ["USD"]}
+  - id: spend_by_vendor_per_currency
+    mock: true
+    input: "Show me spend by vendor"
+    expect: {tools_include: [query_records], states_server_numbers: true, text_include_all: ["USD", "EUR"]}
+  - id: bills_waiting_for_review
+    mock: true
+    input: "How many bills are waiting for review?"
+    expect: {tools_include: [query_records], states_server_numbers: true}
+  - id: spend_in_euros
+    mock: true
+    input: "How much did we spend in euros?"
+    expect: {tools_include: [query_records], states_server_numbers: true, text_include_any: ["EUR"]}
+  - id: biggest_bill
+    mock: true
+    input: "What's our biggest bill in dollars?"
+    expect: {tools_include: [query_records], states_server_numbers: true}
+  - id: average_bill
+    mock: true
+    input: "What's the average bill in dollars?"
+    expect: {tools_include: [query_records], states_server_numbers: true}
+  - id: hosting_line_items
+    mock: true
+    input: "How much have we paid for hosting line items?"
+    expect: {tools_include: [query_records], states_server_numbers: true}
+  - id: bills_from_globex
+    mock: true
+    input: "How many bills do we have from Globex Print?"
+    expect: {tools_include: [query_records], states_server_numbers: true}
+  - id: all_bills
+    mock: true
+    input: "How many bills do we have in total?"
+    expect: {tools_include: [query_records], states_server_numbers: true}
+  - id: no_bills_from_unknown_vendor
+    mock: true
+    input: "Did we get any bills from Initech?"
+    expect: {tools_include: [query_records], text_include_any: ["no bills", "No bills"]}
+  - id: someone_who_cant_see_them
+    mock: true
+    user: lena
+    input: "What do our bills add up to?"
+    expect: {tools_include: [query_records], no_leak: ["2400", "1200", "800"], text_include_any: ["couldn't find"]}

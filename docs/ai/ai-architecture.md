@@ -81,6 +81,7 @@ Registered in S3.1.2 unless noted. `semantic_search` arrives with S3.1.4 (embedd
 | `get_goals` | read | 6 (S6.3.1) | List goals (period, owner, status, progress %), or one goal's metric, progress source, links and sub-goals, computed as the viewer |
 | `get_portfolio` | read | 6 (S6.2.2) | List portfolios, or one portfolio's projects (status, tasks done/total, overdue, due, latest update) as the viewer sees them; projects they can't see only counted |
 | `list_my_tasks` / `list_user_tasks` | read | 3 | |
+| `search_records` / `get_record` / `query_records` | read | 7.6 | Phase 7.6 S76-04: records the user can see (guests never see financial or personal types). `query_records` runs the records query engine: numbers come from the server, money per currency; Mo never adds amounts itself (eval `records_qa`, 11 mock cases: every number the query returned is said, and only those) |
 | `list_my_asks` | read | 7.6 | Phase 7.6 S76-03: the questions agents are waiting on the user to answer (agent, task, question, options or fields, expiry). Read-only: Mo never answers an ask by itself |
 | `get_project_activity` | read | 3 | Changes in a time window (for status reports); moved due/start dates and priority carry `from`/`to` |
 | `list_people` | read | 3 | Resolve names → users |

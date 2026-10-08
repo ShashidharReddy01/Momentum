@@ -36,6 +36,7 @@ from momentum.domain.portfolios.models import (
     PortfolioView,
 )
 from momentum.domain.projects.models import Favorite, Project, ProjectMember, ProjectSnapshot
+from momentum.domain.records.models import Record, RecordType, RecordVersion
 from momentum.domain.reports.models import ReportRun
 from momentum.domain.rules.models import Rule, RuleRun
 from momentum.domain.sections.models import Section
@@ -99,6 +100,9 @@ __all__ = [
     "ProjectMember",
     "ProjectSnapshot",
     "Reaction",
+    "Record",
+    "RecordType",
+    "RecordVersion",
     "ReportRun",
     "Rule",
     "RuleRun",

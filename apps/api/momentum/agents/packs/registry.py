@@ -3,12 +3,16 @@ kept on the runtime, never as a module global)."""
 
 from __future__ import annotations
 
+import uuid
 from dataclasses import dataclass, field
 from decimal import Decimal
+
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from momentum.agents.packs.loader import Loaded, PackLoadError, load_packs
 from momentum.agents.packs.manifest import Capability
 from momentum.agents.packs.pack import Pack, PackError
+from momentum.agents.packs.records import RecordType
 from momentum.core.settings import Settings
 from momentum.domain.agents.schemas import AgentDefinition
 
@@ -31,6 +35,14 @@ class PackRegistry:
 
     def capability(self, pack_key: str, capability_key: str) -> Capability:
         return self.get(pack_key).capability(capability_key)
+
+    def record_type(self, key: str, version: int | None = None) -> RecordType | None:
+        """A loaded record type by key (and version), from whichever pack defines it."""
+        for pack in self.packs.values():
+            for t in pack.record_types:
+                if t.key == key and (version is None or t.version == version):
+                    return pack.record_type(key, version)
+        return None
 
     def capabilities(self) -> list[tuple[str, Capability]]:
         """Every loaded capability as ``(pack key, capability)``, in pack order."""
@@ -63,6 +75,19 @@ class PackRegistry:
                 )
             )
         return out
+
+
+async def sync_record_types(
+    session: AsyncSession, workspace_id: uuid.UUID, registry: PackRegistry
+) -> int:
+    """Register every loaded pack's record types for the workspace (spec §6.1: at install)."""
+    from momentum.domain.records.service import sync_types
+
+    changed = 0
+    for key, pack in sorted(registry.packs.items()):
+        if pack.record_types:
+            changed += await sync_types(session, workspace_id, key, list(pack.record_types))
+    return changed
 
 
 def packs_of(runtime: object) -> PackRegistry:

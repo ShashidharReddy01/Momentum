@@ -158,10 +158,111 @@ def _option_ids(kind: str, options: Any, value: Any) -> Any:
 
 
 class Effects:
-    """``job.effects``: comments, tasks and attachments (records, entities and skills join in
-    S76-04/05)."""
+    """``job.effects``: comments, tasks, attachments and records (entities and skills join in
+    S76-05)."""
 
     def __init__(self, state: JobState) -> None:
         self.comments = _Comments(state)
         self.tasks = _Tasks(state)
         self.attachments = _Attachments(state)
+        self.records = _Records(state)
+
+
+class _Records:
+    """``job.effects.records``: create and update records of the types the pack declares
+    (``records.create: [invoice]``), as the agent, validated on every write."""
+
+    def __init__(self, state: JobState) -> None:
+        self._state = state
+
+    async def _project(self, s: AsyncSession, task_id: uuid.UUID | None) -> uuid.UUID:
+        state = self._state
+        if task_id is not None:
+            _task, placement, _role = await get_visible_task(s, state.ctx, task_id)
+            if placement is not None:
+                return placement.project_id
+        if state.project_id is not None:
+            return state.project_id
+        raise ValidationFailed("A record lives in a project; this job has none")
+
+    async def create(
+        self,
+        type: str,
+        data: dict[str, Any] | Any,
+        *,
+        task_id: uuid.UUID | None = None,
+        project_id: uuid.UUID | None = None,
+        provenance: dict[str, Any] | None = None,
+        checks: list[dict[str, Any]] | None = None,
+        decision: dict[str, Any] | None = None,
+        confidence: float | None = None,
+        status: str = "draft",
+        source_attachment_id: uuid.UUID | None = None,
+        source_sha256: str | None = None,
+        source_locator: str | None = None,
+    ) -> uuid.UUID:
+        from momentum.domain.records.service import create_record
+
+        state = self._state
+        s = _session(state, "records.create", type)
+        impl = state.pack.record_type(type)
+        task = task_id or state.task_id
+        record = await create_record(
+            s,
+            state.ctx,
+            impl,
+            project_id=project_id or await self._project(s, task),
+            task_id=task,
+            data=data.model_dump(mode="json") if hasattr(data, "model_dump") else data,
+            provenance=provenance,
+            checks=checks,
+            decision=decision,
+            confidence=confidence,
+            status=status,
+            source_attachment_id=source_attachment_id,
+            source_sha256=source_sha256,
+            source_locator=source_locator,
+            run_id=state.run_id,
+        )
+        return record.id
+
+    async def update(
+        self,
+        record_id: uuid.UUID,
+        ops: list[dict[str, Any]],
+        *,
+        expected_version: int,
+        reason: str | None = None,
+        checks: list[dict[str, Any]] | None = None,
+        decision: dict[str, Any] | None = None,
+        confidence: float | None = None,
+    ) -> int:
+        """Apply correction operations (and/or new checks, decision, confidence); returns the
+        new version."""
+        from pydantic import TypeAdapter
+
+        from momentum.domain.records.models import Record
+        from momentum.domain.records.schemas import Op
+        from momentum.domain.records.service import update_record
+
+        state = self._state
+        if state.scope is None:
+            raise PackError("job.effects.records.update can only be called inside a step")
+        current = await state.scope.session.get(Record, record_id)
+        if current is None:
+            raise ValidationFailed("No such record")
+        s = _session(state, "records.update", current.type)
+        impl = state.pack.record_type(current.type, current.type_version)
+        record = await update_record(
+            s,
+            state.ctx,
+            impl,
+            record_id,
+            TypeAdapter(list[Op]).validate_python(ops),
+            expected_version=expected_version,
+            reason=reason,
+            checks=checks,
+            decision=decision,
+            confidence=confidence,
+        )
+        return record.version

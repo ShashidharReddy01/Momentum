@@ -640,6 +640,9 @@ class Job:
         self.llm = JobLLM(state)
         self.prompts = JobPrompts(state.pack)
         self.effects: Effects = Effects(state)
+        from momentum.agents.jobs.records import JobRecords
+
+        self.records = JobRecords(state)
 
     # ---------- what the job is about ----------
 

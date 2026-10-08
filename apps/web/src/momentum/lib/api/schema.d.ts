@@ -3272,6 +3272,75 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/records": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Records you can see (by type, project, task, status, entity, text, date range) */
+        get: operations["list_records_api_v1_records_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/records/query": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Count, sum, average, min or max over records you can see (per currency for money) */
+        post: operations["query_records_api_v1_records_query_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/records/{record_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One record with its versions, provenance, checks, decision and duplicates */
+        get: operations["get_record_api_v1_records__record_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Correct a record with operations (set, add_item, remove_item, move_item, distribute, set_status, link_entity); a stale expected_version is a 409 */
+        patch: operations["patch_record_api_v1_records__record_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/records/{record_id}/pages/{page}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A page of the record's source file as an image (rendered once, then cached) */
+        get: operations["record_page_api_v1_records__record_id__pages__page__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/reports": {
         parameters: {
             query?: never;
@@ -4428,6 +4497,22 @@ export interface components {
             subject?: components["schemas"]["FeedSubject"] | null;
             /** Verb */
             verb: string;
+        };
+        /** AddItemOp */
+        AddItemOp: {
+            /** Array */
+            array: string;
+            /** At */
+            at?: number | null;
+            /** Item */
+            item: {
+                [key: string]: unknown;
+            };
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            op: "add_item";
         };
         /** AdminAiSettingsOut */
         AdminAiSettingsOut: {
@@ -6328,6 +6413,20 @@ export interface components {
             /** Verb */
             verb: string;
         };
+        /** DistributeOp */
+        DistributeOp: {
+            /** Array */
+            array: string;
+            /** Field */
+            field: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            op: "distribute";
+            /** Total */
+            total: number | string;
+        };
         /** DraftIn */
         DraftIn: {
             /** Description */
@@ -6365,7 +6464,7 @@ export interface components {
              */
             kind: "count" | "bar" | "line" | "donut" | "list" | "kpi" | "stacked_bar" | "table" | "funnel" | "stage_time" | "aging" | "timeline" | "note";
             /** Query Spec */
-            query_spec: components["schemas"]["QuerySpec"] | (components["schemas"]["TasksSpec"] | components["schemas"]["ProjectsSpec"] | components["schemas"]["StageSpec"] | components["schemas"]["SnapshotSpec"] | components["schemas"]["NoteSpec"]);
+            query_spec: components["schemas"]["QuerySpec"] | (components["schemas"]["TasksSpec"] | components["schemas"]["ProjectsSpec"] | components["schemas"]["StageSpec"] | components["schemas"]["SnapshotSpec"] | components["schemas"]["RecordsSpec"] | components["schemas"]["NoteSpec"]);
             result: components["schemas"]["QueryResultOut"] | null;
             /** Title */
             title: string;
@@ -6390,7 +6489,7 @@ export interface components {
             /** Project Id */
             project_id?: string | null;
             /** Query Spec */
-            query_spec: components["schemas"]["QuerySpec"] | (components["schemas"]["TasksSpec"] | components["schemas"]["ProjectsSpec"] | components["schemas"]["StageSpec"] | components["schemas"]["SnapshotSpec"] | components["schemas"]["NoteSpec"]);
+            query_spec: components["schemas"]["QuerySpec"] | (components["schemas"]["TasksSpec"] | components["schemas"]["ProjectsSpec"] | components["schemas"]["StageSpec"] | components["schemas"]["SnapshotSpec"] | components["schemas"]["RecordsSpec"] | components["schemas"]["NoteSpec"]);
             /**
              * Split Key
              * @description A stacked bar's split value (its segment)
@@ -6408,6 +6507,10 @@ export interface components {
             label: string;
             /** Projects */
             projects?: components["schemas"]["DrillProjectOut"][];
+            /** Records */
+            records?: {
+                [key: string]: unknown;
+            }[];
             /** Tasks */
             tasks: components["schemas"]["TaskRowOut"][];
             /** Total */
@@ -6797,6 +6900,22 @@ export interface components {
              * @enum {string}
              */
             type: "project" | "task" | "comment" | "portfolio";
+        };
+        /** Filter */
+        Filter: {
+            /**
+             * Op
+             * @default eq
+             * @enum {string}
+             */
+            op: "eq" | "ne" | "in" | "gte" | "lte" | "contains" | "empty" | "set";
+            /**
+             * Path
+             * @description A data path, or a column: status, currency…
+             */
+            path: string;
+            /** Value */
+            value?: unknown;
         };
         /** FilterDraftOut */
         FilterDraftOut: {
@@ -7686,6 +7805,21 @@ export interface components {
             /** Title */
             title: string;
         };
+        /** LinkEntityOp */
+        LinkEntityOp: {
+            /**
+             * Entity Id
+             * Format: uuid
+             */
+            entity_id: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            op: "link_entity";
+            /** Role */
+            role: string;
+        };
         /** LinkOut */
         LinkOut: {
             /**
@@ -7923,6 +8057,13 @@ export interface components {
             /** @default {} */
             meta: components["schemas"]["ListMeta"];
         };
+        /** ListOut[RecordOut] */
+        ListOut_RecordOut_: {
+            /** Data */
+            data: components["schemas"]["RecordOut"][];
+            /** @default {} */
+            meta: components["schemas"]["ListMeta"];
+        };
         /** ListOut[RuleOut] */
         ListOut_RuleOut_: {
             /** Data */
@@ -8023,6 +8164,17 @@ export interface components {
         MeOut: {
             user: components["schemas"]["UserOut"];
             workspace: components["schemas"]["WorkspaceOut"];
+        };
+        /** MeasureSpec */
+        MeasureSpec: {
+            /**
+             * Op
+             * @default count
+             * @enum {string}
+             */
+            op: "count" | "sum" | "avg" | "min" | "max";
+            /** Path */
+            path?: string | null;
         };
         /** MemberIn */
         MemberIn: {
@@ -8190,6 +8342,20 @@ export interface components {
             fast: string;
             /** Smart */
             smart: string;
+        };
+        /** MoveItemOp */
+        MoveItemOp: {
+            /** Array */
+            array: string;
+            /** From */
+            from: number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            op: "move_item";
+            /** To */
+            to: number;
         };
         /** MutationMeta */
         MutationMeta: {
@@ -9935,6 +10101,25 @@ export interface components {
             /** Tag Ids */
             tag_ids?: string[];
         };
+        /** QueryResult */
+        QueryResult: {
+            /** Group By */
+            group_by: string[];
+            /** Matched */
+            matched: number;
+            /** Measures */
+            measures: string[];
+            /** Notes */
+            notes?: string[];
+            /** Rows */
+            rows: components["schemas"]["QueryRow"][];
+            /** Scanned */
+            scanned: number;
+            /** Truncated */
+            truncated: boolean;
+            /** Type */
+            type: string;
+        };
         /**
          * QueryResultOut
          * @description One widget's numbers, computed as the viewer. ``value`` for a count, ``groups`` for a bar
@@ -10010,6 +10195,24 @@ export interface components {
             unestimated: number;
             /** Value */
             value?: number | null;
+        };
+        /** QueryRow */
+        QueryRow: {
+            /** Currency */
+            currency?: string | null;
+            /** Group */
+            group: {
+                [key: string]: unknown;
+            };
+            /**
+             * Value
+             * @description The first measure's value
+             */
+            value?: number | null;
+            /** Values */
+            values: {
+                [key: string]: number | null;
+            };
         };
         /**
          * QuerySpec
@@ -10356,6 +10559,297 @@ export interface components {
              */
             week_start: string;
         };
+        /** RecordDetailOut */
+        RecordDetailOut: {
+            /** Amount */
+            amount: string | null;
+            /** Checks */
+            checks: {
+                [key: string]: unknown;
+            }[];
+            /** Classification */
+            classification: string;
+            /** Confidence */
+            confidence: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Created Via */
+            created_via: string;
+            /** Currency */
+            currency: string | null;
+            /** Data */
+            data: {
+                [key: string]: unknown;
+            };
+            /** Decision */
+            decision: {
+                [key: string]: unknown;
+            } | null;
+            /**
+             * Duplicates
+             * @description Other records with the same identity (you can see)
+             */
+            duplicates?: string[];
+            /** Entity Ids */
+            entity_ids: string[];
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Occurred On */
+            occurred_on: string | null;
+            /**
+             * Project Id
+             * Format: uuid
+             */
+            project_id: string;
+            /** Provenance */
+            provenance: {
+                [key: string]: unknown;
+            };
+            /** Run Id */
+            run_id: string | null;
+            /** Source Attachment Id */
+            source_attachment_id: string | null;
+            /** Source Locator */
+            source_locator: string | null;
+            /** Status */
+            status: string;
+            /** Task Id */
+            task_id: string | null;
+            /** Title */
+            title: string;
+            /** Type */
+            type: string;
+            /** Type Label */
+            type_label: string;
+            /** Type Version */
+            type_version: number;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Version */
+            version: number;
+            /** Versions */
+            versions: components["schemas"]["RecordVersionOut"][];
+        };
+        /** RecordOut */
+        RecordOut: {
+            /** Amount */
+            amount: string | null;
+            /** Checks */
+            checks: {
+                [key: string]: unknown;
+            }[];
+            /** Classification */
+            classification: string;
+            /** Confidence */
+            confidence: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Created Via */
+            created_via: string;
+            /** Currency */
+            currency: string | null;
+            /** Data */
+            data: {
+                [key: string]: unknown;
+            };
+            /** Decision */
+            decision: {
+                [key: string]: unknown;
+            } | null;
+            /** Entity Ids */
+            entity_ids: string[];
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Occurred On */
+            occurred_on: string | null;
+            /**
+             * Project Id
+             * Format: uuid
+             */
+            project_id: string;
+            /** Provenance */
+            provenance: {
+                [key: string]: unknown;
+            };
+            /** Run Id */
+            run_id: string | null;
+            /** Source Attachment Id */
+            source_attachment_id: string | null;
+            /** Source Locator */
+            source_locator: string | null;
+            /** Status */
+            status: string;
+            /** Task Id */
+            task_id: string | null;
+            /** Title */
+            title: string;
+            /** Type */
+            type: string;
+            /** Type Label */
+            type_label: string;
+            /** Type Version */
+            type_version: number;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Version */
+            version: number;
+        };
+        /** RecordPatchIn */
+        RecordPatchIn: {
+            /** Expected Version */
+            expected_version: number;
+            /** Ops */
+            ops: (components["schemas"]["SetOp"] | components["schemas"]["AddItemOp"] | components["schemas"]["RemoveItemOp"] | components["schemas"]["MoveItemOp"] | components["schemas"]["DistributeOp"] | components["schemas"]["SetStatusOp"] | components["schemas"]["LinkEntityOp"])[];
+            /** Reason */
+            reason?: string | null;
+        };
+        /** RecordQuery */
+        RecordQuery: {
+            /** Array */
+            array?: string | null;
+            /** Date From */
+            date_from?: string | null;
+            /** Date To */
+            date_to?: string | null;
+            /** Entity Id */
+            entity_id?: string | null;
+            /** Filters */
+            filters?: components["schemas"]["Filter"][];
+            /** Group By */
+            group_by?: string[];
+            /**
+             * Limit
+             * @default 50
+             */
+            limit: number;
+            /** Measures */
+            measures?: components["schemas"]["MeasureSpec"][];
+            /**
+             * Order
+             * @default value_desc
+             * @enum {string}
+             */
+            order: "value_desc" | "value_asc" | "group";
+            /** Project Ids */
+            project_ids?: string[];
+            /** Status */
+            status?: string[];
+            /** Type */
+            type: string;
+        };
+        /** RecordVersionOut */
+        RecordVersionOut: {
+            /** Change */
+            change: {
+                [key: string]: unknown;
+            };
+            /** Changed By */
+            changed_by: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Reason */
+            reason: string | null;
+            /** Status */
+            status: string;
+            /** Version */
+            version: number;
+            /** Via */
+            via: string;
+        };
+        /**
+         * RecordsSpec
+         * @description Phase 7.6 S76-04 (spec §6.6): records of one type (``records``) or their list items
+         *     (``record_lines``, with ``array``). Money measures come out per currency.
+         */
+        RecordsSpec: {
+            /** Array */
+            array?: string | null;
+            /**
+             * Compare Previous
+             * @description KPI: compare with the previous period of the same length
+             * @default false
+             */
+            compare_previous: boolean;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            entity: "record_lines" | "records";
+            /** Filters */
+            filters?: components["schemas"]["Filter"][];
+            /**
+             * Group By
+             * @description A field path
+             */
+            group_by?: string | null;
+            /**
+             * Limit
+             * @default 8
+             */
+            limit: number;
+            /**
+             * Measure
+             * @default count
+             * @enum {string}
+             */
+            measure: "count" | "sum" | "avg" | "min" | "max";
+            /** Measure Path */
+            measure_path?: string | null;
+            /**
+             * Period
+             * @description The window as a calendar period (a dashboard period replaces it)
+             */
+            period?: ("this_week" | "this_month" | "last_30_days" | "this_quarter") | null;
+            /** Project Ids */
+            project_ids?: string[];
+            /** Status */
+            status?: string[];
+            /**
+             * Target
+             * @description KPI: a target (progress ring)
+             */
+            target?: number | null;
+            /** Time Bucket */
+            time_bucket?: ("day" | "week" | "month") | null;
+            /**
+             * Time Path
+             * @default occurred_on
+             */
+            time_path: string;
+            /** Type */
+            type: string;
+            /**
+             * Version
+             * @constant
+             */
+            version: 2;
+            /**
+             * Window Days
+             * @default 365
+             */
+            window_days: number;
+        };
         /**
          * RecurrenceIn
          * @description A repeat rule, stored as given (S3.2.1). S4.4.2 generates the next occurrence from it.
@@ -10437,6 +10931,18 @@ export interface components {
              */
             workdays_only: boolean;
         };
+        /** RemoveItemOp */
+        RemoveItemOp: {
+            /** Array */
+            array: string;
+            /** Index */
+            index: number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            op: "remove_item";
+        };
         /** ReportIn */
         ReportIn: {
             spec: components["schemas"]["ReportSpec"];
@@ -10509,7 +11015,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "project_status" | "portfolio_status" | "task_export" | "customer_status" | "closeout" | "dashboard";
+            kind: "project_status" | "portfolio_status" | "task_export" | "customer_status" | "closeout" | "dashboard" | "records_export";
             /**
              * Narrative
              * @description Default: on for status, customer and close-out reports
@@ -10517,6 +11023,16 @@ export interface components {
             narrative?: boolean | null;
             /** @description Default: the last 7 days (status), the whole life (close-out) */
             period?: components["schemas"]["Period"] | null;
+            /**
+             * Record Status
+             * @description Records exports: only these statuses
+             */
+            record_status?: string[];
+            /**
+             * Record Type
+             * @description Records exports: which record type
+             */
+            record_type?: string | null;
             scope?: components["schemas"]["Scope"];
             /**
              * Sections
@@ -11132,6 +11648,33 @@ export interface components {
             /** Label */
             label: string;
         };
+        /** SetOp */
+        SetOp: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            op: "set";
+            /** Path */
+            path: string;
+            /** Value */
+            value?: unknown;
+        };
+        /** SetStatusOp */
+        SetStatusOp: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            op: "set_status";
+            /** Reason */
+            reason?: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "approved" | "rejected" | "void" | "needs_review" | "ready";
+        };
         /** SetupAppliedOut */
         SetupAppliedOut: {
             /**
@@ -11419,7 +11962,7 @@ export interface components {
              */
             kind: "count" | "bar" | "line" | "donut" | "list" | "kpi" | "stacked_bar" | "table" | "funnel" | "stage_time" | "aging" | "timeline" | "note";
             /** Query Spec */
-            query_spec: components["schemas"]["QuerySpec"] | (components["schemas"]["TasksSpec"] | components["schemas"]["ProjectsSpec"] | components["schemas"]["StageSpec"] | components["schemas"]["SnapshotSpec"] | components["schemas"]["NoteSpec"]);
+            query_spec: components["schemas"]["QuerySpec"] | (components["schemas"]["TasksSpec"] | components["schemas"]["ProjectsSpec"] | components["schemas"]["StageSpec"] | components["schemas"]["SnapshotSpec"] | components["schemas"]["RecordsSpec"] | components["schemas"]["NoteSpec"]);
             /** Title */
             title: string;
             viz: components["schemas"]["VizIn"];
@@ -12420,7 +12963,7 @@ export interface components {
              */
             kind: "count" | "bar" | "line" | "donut" | "list" | "kpi" | "stacked_bar" | "table" | "funnel" | "stage_time" | "aging" | "timeline" | "note";
             /** Query Spec */
-            query_spec: components["schemas"]["QuerySpec"] | (components["schemas"]["TasksSpec"] | components["schemas"]["ProjectsSpec"] | components["schemas"]["StageSpec"] | components["schemas"]["SnapshotSpec"] | components["schemas"]["NoteSpec"]);
+            query_spec: components["schemas"]["QuerySpec"] | (components["schemas"]["TasksSpec"] | components["schemas"]["ProjectsSpec"] | components["schemas"]["StageSpec"] | components["schemas"]["SnapshotSpec"] | components["schemas"]["RecordsSpec"] | components["schemas"]["NoteSpec"]);
             /** Title */
             title: string;
             viz: components["schemas"]["VizIn"];
@@ -12780,7 +13323,7 @@ export interface components {
              */
             kind: "count" | "bar" | "line" | "donut" | "list" | "kpi" | "stacked_bar" | "table" | "funnel" | "stage_time" | "aging" | "timeline" | "note";
             /** Query Spec */
-            query_spec: components["schemas"]["QuerySpec"] | (components["schemas"]["TasksSpec"] | components["schemas"]["ProjectsSpec"] | components["schemas"]["StageSpec"] | components["schemas"]["SnapshotSpec"] | components["schemas"]["NoteSpec"]);
+            query_spec: components["schemas"]["QuerySpec"] | (components["schemas"]["TasksSpec"] | components["schemas"]["ProjectsSpec"] | components["schemas"]["StageSpec"] | components["schemas"]["SnapshotSpec"] | components["schemas"]["RecordsSpec"] | components["schemas"]["NoteSpec"]);
             /** Title */
             title: string;
             viz?: components["schemas"]["VizIn"];
@@ -12807,7 +13350,7 @@ export interface components {
              */
             kind: "count" | "bar" | "line" | "donut" | "list" | "kpi" | "stacked_bar" | "table" | "funnel" | "stage_time" | "aging" | "timeline" | "note";
             /** Query Spec */
-            query_spec: components["schemas"]["QuerySpec"] | (components["schemas"]["TasksSpec"] | components["schemas"]["ProjectsSpec"] | components["schemas"]["StageSpec"] | components["schemas"]["SnapshotSpec"] | components["schemas"]["NoteSpec"]);
+            query_spec: components["schemas"]["QuerySpec"] | (components["schemas"]["TasksSpec"] | components["schemas"]["ProjectsSpec"] | components["schemas"]["StageSpec"] | components["schemas"]["SnapshotSpec"] | components["schemas"]["RecordsSpec"] | components["schemas"]["NoteSpec"]);
             /** Title */
             title: string;
             /** Version */
@@ -12822,7 +13365,7 @@ export interface components {
             /** Kind */
             kind?: ("count" | "bar" | "line" | "donut" | "list" | "kpi" | "stacked_bar" | "table" | "funnel" | "stage_time" | "aging" | "timeline" | "note") | null;
             /** Query Spec */
-            query_spec?: components["schemas"]["QuerySpec"] | (components["schemas"]["TasksSpec"] | components["schemas"]["ProjectsSpec"] | components["schemas"]["StageSpec"] | components["schemas"]["SnapshotSpec"] | components["schemas"]["NoteSpec"]) | null;
+            query_spec?: components["schemas"]["QuerySpec"] | (components["schemas"]["TasksSpec"] | components["schemas"]["ProjectsSpec"] | components["schemas"]["StageSpec"] | components["schemas"]["SnapshotSpec"] | components["schemas"]["RecordsSpec"] | components["schemas"]["NoteSpec"]) | null;
             /** Title */
             title?: string | null;
             viz?: components["schemas"]["VizIn"] | null;
@@ -12845,7 +13388,7 @@ export interface components {
              */
             project_id?: string | null;
             /** Query Spec */
-            query_spec: components["schemas"]["QuerySpec"] | (components["schemas"]["TasksSpec"] | components["schemas"]["ProjectsSpec"] | components["schemas"]["StageSpec"] | components["schemas"]["SnapshotSpec"] | components["schemas"]["NoteSpec"]);
+            query_spec: components["schemas"]["QuerySpec"] | (components["schemas"]["TasksSpec"] | components["schemas"]["ProjectsSpec"] | components["schemas"]["StageSpec"] | components["schemas"]["SnapshotSpec"] | components["schemas"]["RecordsSpec"] | components["schemas"]["NoteSpec"]);
         };
         /** WorkloadOut */
         WorkloadOut: {
@@ -20478,6 +21021,176 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["OkOut"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_records_api_v1_records_get: {
+        parameters: {
+            query?: {
+                type?: string | null;
+                project_id?: string | null;
+                task_id?: string | null;
+                status?: string[];
+                entity_id?: string | null;
+                q?: string | null;
+                from?: string | null;
+                to?: string | null;
+                limit?: number;
+                /** @description An offset */
+                cursor?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListOut_RecordOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    query_records_api_v1_records_query_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecordQuery"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueryResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_record_api_v1_records__record_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                record_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecordDetailOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    patch_record_api_v1_records__record_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                record_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecordPatchIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecordOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    record_page_api_v1_records__record_id__pages__page__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                record_id: string;
+                page: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

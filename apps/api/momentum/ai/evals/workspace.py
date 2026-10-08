@@ -225,6 +225,7 @@ async def _build_one(session: AsyncSession, settings: Settings, name: str) -> No
             ),
         )
 
+    await _records(session, settings, world, spec)  # Phase 7.6 S76-04: records_qa
     # Phase 7.5: workspace project fields (Stage…), for rules that set a project's stage
     for f in spec.get("project_fields", []):
         exists = (
@@ -246,6 +247,79 @@ async def _build_one(session: AsyncSession, settings: Settings, name: str) -> No
                     [SelectOptionIn(label=o) for o in f["options"]] if f.get("options") else None
                 ),
             ),
+        )
+
+
+@dataclass(frozen=True)
+class _SeedRecordType:
+    """A record type for the eval workspace only (Phase 7.6 S76-04): its data is synthetic and
+    trusted, so it validates as given."""
+
+    key: str
+    version: int
+    label: str
+    classification: str
+    spec: dict[str, Any]
+
+    def validate(self, data: dict[str, Any]) -> dict[str, Any]:
+        return data
+
+    def recheck(self, data: dict[str, Any]) -> list[dict[str, Any]] | None:
+        return None
+
+    def display(self) -> dict[str, Any]:
+        return self.spec
+
+    def json_schema(self) -> dict[str, Any]:
+        return {"title": self.label, "type": "object"}
+
+
+async def _records(
+    session: AsyncSession, settings: Settings, world: EvalWorld, spec: dict[str, Any]
+) -> None:
+    """Record types and records (bills) for the records_qa evals, once per eval database."""
+    from momentum.domain.records.models import Record
+    from momentum.domain.records.service import create_record, sync_types
+
+    types = {
+        t["key"]: _SeedRecordType(
+            key=t["key"],
+            version=1,
+            label=t["label"],
+            classification=t.get("classification", "internal"),
+            spec=t["display"],
+        )
+        for t in spec.get("record_types", [])
+    }
+    if not types:
+        return
+    ravi = world.ctx("ravi", settings)
+    await sync_types(session, ravi.workspace_id, "eval", list(types.values()))
+    for r in spec.get("records", []):
+        owner = world.ctx(r.get("owner", "ravi"), settings)
+        today = datetime.now(UTC).astimezone(ZoneInfo(owner.actor.timezone)).date()
+        data = dict(r["data"])
+        data["dated"] = (today + timedelta(days=int(data["dated"]))).isoformat()
+        exists = (
+            await session.execute(
+                select(Record.id).where(
+                    Record.type == r["type"],
+                    Record.data["number"].astext == str(data["number"]),
+                )
+            )
+        ).scalar_one_or_none()
+        if exists is not None:
+            continue
+        project_id = (
+            await session.execute(select(Project.id).where(Project.name == r["project"]))
+        ).scalar_one()
+        await create_record(
+            session,
+            owner,
+            types[r["type"]],
+            project_id=project_id,
+            data=data,
+            status=r.get("status", "ready"),
         )
 
 

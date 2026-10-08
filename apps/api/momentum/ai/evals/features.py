@@ -95,6 +95,8 @@ FEATURES = (
     *INSIGHT_FEATURES,
     # Phase 7.6 S76-03: a thread reply as an agent's answer
     *ASK_FEATURES,
+    # Phase 7.6 S76-04: Mo answers spend questions from the records query engine
+    "records_qa",
 )
 # Phase 7.5 (spec §11.3): Ask Mo about files, on the onboarding_v1 eval workspace
 FILE_FEATURES = ("file_qa", "file_tables", "file_vision", "file_injection")
@@ -256,8 +258,10 @@ async def _run(
             now=now,
             emit=emit,
         )
-    elif feature == "chat":
+    elif feature in ("chat", "records_qa"):
         screen = screen_for(case.get("screen"), world)
+        if feature == "records_qa":  # its scorer reads what query_records returned
+            registry = RecordingRegistry(registry)
         questions = [*case.get("history", []), inp]  # earlier questions, then the scored one
         conv_id: uuid.UUID | None = None
         for i, question in enumerate(questions):
@@ -274,6 +278,8 @@ async def _run(
                 now=now,
                 emit=emit if last else _ignore,
             )
+        if isinstance(registry, RecordingRegistry):
+            obs.data["tool_calls"] = registry.calls
     elif feature == "summarize_thread":
         r = await summarize.summarize_thread(
             session, llm, ctx, world.task_ids[case["task"]], now=now

@@ -1,6 +1,266 @@
 [
   {
     "function": {
+      "description": "Find records (structured items agents produce, such as invoices) the user can see, by type, words, status or project. Returns ids to use with get_record. For totals and counts use query_records; never add amounts up yourself.",
+      "name": "search_records",
+      "parameters": {
+        "additionalProperties": false,
+        "properties": {
+          "limit": {
+            "default": 10,
+            "maximum": 30,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "project": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "status": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 7,
+            "type": "array"
+          },
+          "text": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Words in the record"
+          },
+          "type": {
+            "anyOf": [
+              {
+                "maxLength": 60,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "A record type, e.g. invoice"
+          }
+        },
+        "type": "object"
+      }
+    },
+    "type": "function"
+  },
+  {
+    "function": {
+      "description": "One record the user can see: its fields, status, checks and decision.",
+      "name": "get_record",
+      "parameters": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      }
+    },
+    "type": "function"
+  },
+  {
+    "function": {
+      "description": "Count, sum, average, min or max over records the user can see, grouped by fields or by month (e.g. spend by vendor). Numbers come from the server; money is per currency, never added across currencies. Paths are into the record's fields (vendor.name, stated_total) or, with array, its list items (lines[].amount).",
+      "name": "query_records",
+      "parameters": {
+        "additionalProperties": false,
+        "properties": {
+          "array": {
+            "anyOf": [
+              {
+                "pattern": "^[a-z_][a-z0-9_]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "date_from": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "date_to": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "entity_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "filters": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "op": {
+                  "default": "eq",
+                  "enum": [
+                    "eq",
+                    "ne",
+                    "in",
+                    "gte",
+                    "lte",
+                    "contains",
+                    "empty",
+                    "set"
+                  ],
+                  "type": "string"
+                },
+                "path": {
+                  "description": "A data path, or a column: status, currency…",
+                  "maxLength": 200,
+                  "type": "string"
+                },
+                "value": {
+                  "default": null
+                }
+              },
+              "required": [
+                "path"
+              ],
+              "type": "object"
+            },
+            "maxItems": 10,
+            "type": "array"
+          },
+          "group_by": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 2,
+            "type": "array"
+          },
+          "limit": {
+            "default": 50,
+            "maximum": 200,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "measures": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "op": {
+                  "default": "count",
+                  "enum": [
+                    "count",
+                    "sum",
+                    "avg",
+                    "min",
+                    "max"
+                  ],
+                  "type": "string"
+                },
+                "path": {
+                  "anyOf": [
+                    {
+                      "maxLength": 200,
+                      "pattern": "^[a-z_][a-z0-9_]*(\\[\\d*\\])?(\\.[a-z_][a-z0-9_]*(\\[\\d*\\])?)*$",
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null
+                }
+              },
+              "type": "object"
+            },
+            "maxItems": 4,
+            "minItems": 1,
+            "type": "array"
+          },
+          "order": {
+            "default": "value_desc",
+            "enum": [
+              "value_desc",
+              "value_asc",
+              "group"
+            ],
+            "type": "string"
+          },
+          "project_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 200,
+            "type": "array"
+          },
+          "status": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 7,
+            "type": "array"
+          },
+          "type": {
+            "maxLength": 60,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "type"
+        ],
+        "type": "object"
+      }
+    },
+    "type": "function"
+  },
+  {
+    "function": {
       "description": "Questions agents are waiting on the user to answer (oldest first): who asks, about which task, the question, its options or form fields, and when it expires. Read-only: Mo never answers an ask by itself.",
       "name": "list_my_asks",
       "parameters": {
@@ -3958,7 +4218,8 @@
               "task_export",
               "customer_status",
               "closeout",
-              "dashboard"
+              "dashboard",
+              "records_export"
             ],
             "type": "string"
           },

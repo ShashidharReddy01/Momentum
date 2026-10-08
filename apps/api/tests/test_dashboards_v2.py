@@ -388,7 +388,8 @@ async def test_template_preview_drops_what_does_not_bind(as_user: Clients) -> No
     ravi = await as_user("ravi")
     folio = await _portfolio(ravi, await _project(ravi, "Bind lab"))
     catalog = (await ravi.get(f"{B}/dashboards/templates")).json()["data"]
-    assert [t["key"] for t in catalog] == list(ROLE_DASHBOARDS)
+    # the seeded roles, plus Accounts payable (Phase 7.6: records; not seeded, no invoices there)
+    assert [t["key"] for t in catalog] == [*ROLE_DASHBOARDS, "accounts_payable"]
     stage = (
         await ravi.post(
             f"{B}/project-fields",

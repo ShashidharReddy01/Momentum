@@ -34,6 +34,7 @@ from momentum.domain.dashboards.query_projects import (
     project_rows,
     run_projects,
 )
+from momentum.domain.dashboards.query_records import drill_records, run_records
 from momentum.domain.dashboards.query_scope import (
     now_utc,
     period_bounds,
@@ -55,6 +56,7 @@ from momentum.domain.dashboards.schemas_v2 import (
     DashboardFilters,
     NoteSpec,
     ProjectsSpec,
+    RecordsSpec,
     SnapshotSpec,
     StageSpec,
     TasksSpec,
@@ -149,6 +151,11 @@ def apply_filters(spec: Any, f: DashboardFilters | None) -> Applied:
         if days is not None and spec.time_bucket is not None:
             upd["window_days"] = _clamp(days, 7, 730)
         out.spec = spec.model_copy(update={**upd, "filters": pf})
+    elif isinstance(spec, RecordsSpec):
+        if days is not None:
+            out.window = _clamp(days, 7, 730)
+        if f.portfolio_id or f.owner or f.assignee or f.fields:
+            out.notes.append("Records widgets take only the period filter.")
     elif isinstance(spec, StageSpec | SnapshotSpec):
         upd = {}
         if f.portfolio_id is not None:
@@ -210,6 +217,8 @@ async def run_any(
         out = await run_stages(session, ctx, kind, s, window_days=a.window, period=a.period)
     elif isinstance(s, SnapshotSpec):
         out = await run_snapshots(session, ctx, kind, s, window_days=a.window, period=a.period)
+    elif isinstance(s, RecordsSpec):
+        out = await run_records(session, ctx, kind, s, window=a.window)
     elif isinstance(s, NoteSpec):
         out = QueryResultOut(
             kind="note",
@@ -328,6 +337,8 @@ async def drill_any(
             entity="projects",
             projects=await _project_out(session, ids, body.limit),
         )
+    if isinstance(s, RecordsSpec):
+        return await drill_records(session, ctx, s, body.key, body.limit)
     raise ValidationFailed("A note has nothing to drill into")
 
 

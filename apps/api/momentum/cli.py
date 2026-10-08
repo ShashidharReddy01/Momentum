@@ -528,7 +528,7 @@ def agents_install(
     as drifted and kept (unless --force)."""
     from momentum.agents.extensions import load_extensions
     from momentum.agents.loader import DefinitionError, all_definitions
-    from momentum.agents.packs.registry import PackRegistry
+    from momentum.agents.packs.registry import PackRegistry, sync_record_types
     from momentum.ai.tools.catalog import build_registry
     from momentum.core.context import Actor, Ctx
     from momentum.core.db import UnitOfWork, create_engine, create_session_factory
@@ -538,9 +538,8 @@ def agents_install(
     settings = Settings()
     ext = load_extensions(settings)  # MOMENTUM_AGENT_EXTENSIONS (S5.1.5)
     try:
-        definitions = all_definitions(
-            [*definitions_dir, *ext.definition_dirs], PackRegistry.load(settings)
-        )
+        packs = PackRegistry.load(settings)
+        definitions = all_definitions([*definitions_dir, *ext.definition_dirs], packs)
     except DefinitionError as e:
         raise typer.BadParameter(str(e)) from e
 
@@ -564,6 +563,7 @@ def agents_install(
                     keys=only or None,
                     force=force,
                 )
+                await sync_record_types(session, ws.id, packs)
                 return [f"{r.outcome:<10} {r.key}  ({r.agent.name})" for r in results]
         finally:
             await uow.close()
