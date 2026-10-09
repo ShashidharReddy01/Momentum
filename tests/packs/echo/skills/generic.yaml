@@ -1,0 +1,8 @@
+# Echo's starter skills (S76-05 tests): generic rules only, never about a real vendor.
+- key: tax_row_is_not_a_line
+  kind: hint
+  field: lines
+  content: {text: "A row labelled VAT, GST, Tax or Sales tax is never a line item."}
+- key: date_order
+  kind: rule
+  content: {date_order: DMY}

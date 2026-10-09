@@ -11,6 +11,7 @@ from momentum.jobs import asks as _asks  # noqa: F401 - ask reminders and expiry
 from momentum.jobs import attachments as _attachments  # noqa: F401 - registers `extract_text`
 from momentum.jobs import due_approaching as _due_approaching  # noqa: F401 - due-approaching scan
 from momentum.jobs import forecasts as _forecasts  # noqa: F401 - nightly forecasts (S6.5.3)
+from momentum.jobs import memory as _memory  # noqa: F401 - entity profiles, skill digest
 from momentum.jobs import recurrence as _recurrence  # noqa: F401 - scheduled recurrence scan
 from momentum.jobs import reports as _reports  # noqa: F401 - report generation (P7.5)
 from momentum.jobs import rules as _rules  # noqa: F401 - registers `run_rules`

@@ -6,6 +6,7 @@ from __future__ import annotations
 import re
 import uuid
 from datetime import datetime
+from typing import Any
 
 from fastapi import APIRouter, status
 from pydantic import BaseModel, ConfigDict, Field
@@ -38,6 +39,7 @@ from momentum.domain.agents.schemas import (
 )
 from momentum.domain.asks import service as asks_service
 from momentum.domain.asks.schemas import InterpretIn, InterpretOut
+from momentum.domain.pack_settings import service as settings_service
 from momentum.domain.tasks.models import Task
 from momentum.domain.users.models import User
 
@@ -60,7 +62,7 @@ async def install_agents(
         results = await service.install_definitions(
             s, ctx, definitions, runtime.tools.names, keys=body.keys, force=body.force
         )
-        await sync_record_types(s, ctx.workspace_id, packs_of(runtime))
+        await sync_record_types(s, ctx.workspace_id, packs_of(runtime), runtime.settings)
         return InstallOut(
             results=[
                 InstallRowOut(key=r.key, outcome=r.outcome, agent_id=r.agent.id) for r in results
@@ -498,3 +500,92 @@ async def interpret_ask_reply(
             understood=reading.understood,
             ask=await asks_service.ask_out(s, ctx, fresh),
         )
+
+
+# ---------- Phase 7.6 S76-05 (spec §8.3): a pack agent's settings ----------
+
+
+class PackSettingsOut(BaseModel):
+    agent_id: uuid.UUID
+    pack_key: str
+    project_id: uuid.UUID | None
+    form: dict[str, Any] = Field(description="The settings' JSON Schema (the form to render)")
+    workspace: dict[str, Any] = Field(description="The workspace's own values")
+    project: dict[str, Any] | None = Field(description="This project's own values")
+    effective: dict[str, Any] = Field(description="Defaults, then workspace, then project")
+    can_edit: bool
+
+
+class PackSettingsIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    values: dict[str, Any]
+
+
+async def _settings_out(
+    s: AsyncSession, ctx: Ctx, agent: Any, model: Any, project_id: uuid.UUID | None
+) -> PackSettingsOut:
+    ws, proj = await settings_service.stored(s, ctx.workspace_id, agent.pack_key, project_id)
+    return PackSettingsOut(
+        agent_id=agent.id,
+        pack_key=agent.pack_key,
+        project_id=project_id,
+        form=model.model_json_schema(),
+        workspace=ws,
+        project=proj if project_id else None,
+        effective=settings_service.effective(model, ws, proj).model_dump(mode="json"),
+        can_edit=await settings_service.can_edit(s, ctx, agent.pack_key, project_id),
+    )
+
+
+def _pack_settings_model(runtime: Any, agent: Any) -> Any:
+    if agent.kind != "pack" or not agent.pack_key:
+        raise ValidationFailed(f"{agent.name} isn't a pack agent, so it has no pack settings")
+    pack = packs_of(runtime).packs.get(agent.pack_key)
+    if pack is None:
+        raise Conflict(f"{agent.name}'s pack isn't loaded on this server", code="pack_not_loaded")
+    return pack.settings
+
+
+@router.get(
+    "/agents/{agent_id}/settings",
+    response_model=PackSettingsOut,
+    summary="A pack agent's settings: the form, the workspace and project values, the result",
+)
+async def get_pack_settings(
+    agent_id: uuid.UUID,
+    ctx: CtxDep,
+    uow: UowDep,
+    runtime: RuntimeDep,
+    project_id: uuid.UUID | None = None,
+) -> PackSettingsOut:
+    async with uow.transaction() as s:
+        if ctx.actor.role == "guest":
+            raise Forbidden("Guests can't see agents' settings")
+        agent = await service.get_agent(s, ctx, agent_id)
+        model = _pack_settings_model(runtime, agent)
+        if project_id is not None:
+            await get_visible_project(s, ctx, project_id)
+        return await _settings_out(s, ctx, agent, model, project_id)
+
+
+@router.put(
+    "/agents/{agent_id}/settings",
+    response_model=PackSettingsOut,
+    summary="Set a pack agent's workspace values (admins, stewards) or a project's (its admins);"
+    " keys left out fall back",
+)
+async def put_pack_settings(
+    agent_id: uuid.UUID,
+    body: PackSettingsIn,
+    ctx: CtxDep,
+    uow: UowDep,
+    runtime: RuntimeDep,
+    project_id: uuid.UUID | None = None,
+) -> PackSettingsOut:
+    async with uow.transaction() as s:
+        agent = await service.get_agent(s, ctx, agent_id)
+        model = _pack_settings_model(runtime, agent)
+        await settings_service.put_values(
+            s, ctx, model, str(agent.pack_key), project_id, body.values
+        )
+        return await _settings_out(s, ctx, agent, model, project_id)

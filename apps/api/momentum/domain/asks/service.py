@@ -93,7 +93,18 @@ async def _route_users(
     task_id: uuid.UUID,
     project_id: uuid.UUID | None,
     requested_by: uuid.UUID | None,
+    pack_key: str | None = None,
 ) -> list[uuid.UUID]:
+    if route in ("approver", "stewards") and pack_key:
+        from momentum.domain.pack_settings.service import people
+
+        return await people(
+            session,
+            workspace_id,
+            pack_key,
+            "approvers" if route == "approver" else "stewards",
+            project_id,
+        )
     if route == "requester":
         return [requested_by] if requested_by else []
     if route == "project_owner":
@@ -130,8 +141,7 @@ async def _route_users(
             except ValueError:
                 continue
         return out
-    # approver / stewards are pack settings (S76-05): unresolved until then, so they fall back
-    return []
+    return []  # a pack without approvers or stewards set: the route falls back
 
 
 async def resolve_route(
@@ -143,6 +153,7 @@ async def resolve_route(
     task_id: uuid.UUID,
     project_id: uuid.UUID | None,
     requested_by: uuid.UUID | None,
+    pack_key: str | None = None,
 ) -> tuple[list[uuid.UUID], str | None]:
     """The people who may answer, and the fallback route used when ``route`` gave nobody."""
     if project_id is None:  # the task's home project
@@ -157,6 +168,7 @@ async def resolve_route(
             task_id=task_id,
             project_id=project_id,
             requested_by=requested_by,
+            pack_key=pack_key,
         )
         people = []
         for uid in dict.fromkeys(ids):
@@ -250,6 +262,7 @@ async def create_ask(
         task_id=task_id,
         project_id=project_id,
         requested_by=uuid.UUID(str(requested)) if requested else None,
+        pack_key=agent.pack_key,
     )
     now = datetime.now(UTC)
     days = spec.expires_in_days or ctx.settings.ask_expire_days

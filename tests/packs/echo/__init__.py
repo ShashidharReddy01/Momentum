@@ -7,7 +7,11 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
+from pydantic import Field
+
 from momentum.sdk import (
+    EntityModel,
+    EntityType,
     Job,
     Money,
     Pack,
@@ -75,8 +79,58 @@ ECHO_BILL = RecordType(
 )
 
 
+class EchoVendorAttributes(EntityModel):
+    """A test entity type (S76-05)."""
+
+    tax_ids: list[str] = []
+    country: str | None = None
+    bank: dict[str, Any] | None = None  # fingerprint + last4 only, set through set_bank
+
+
+def _vendor_profile(entity: dict[str, Any], records: list[dict[str, Any]]) -> dict[str, Any]:
+    totals = sorted(Decimal(r["total"]) for r in records if r.get("total"))
+    return {
+        "records": len(records),
+        "median_total": str(totals[len(totals) // 2]) if totals else None,
+    }
+
+
+ECHO_VENDOR = EntityType(
+    key="echo_vendor",
+    model=EchoVendorAttributes,
+    label="Echo vendor",
+    profile_fn=_vendor_profile,
+)
+
+
 class EchoSettings(PackSettings):
-    """No settings yet; settings forms are exercised from S76-05."""
+    """Settings forms, stewards and approvers are exercised by S76-05's tests."""
+
+    stewards: list[str] = Field(
+        default_factory=list,
+        title="Stewards",
+        description="People who look after Echo: review its skills, change its settings",
+        json_schema_extra={"ui": "people"},
+    )
+    approvers: list[str] = Field(
+        default_factory=list,
+        title="Approvers",
+        description="Who approves what Echo prepares",
+        json_schema_extra={"ui": "people"},
+    )
+    threshold: int = Field(
+        default=100,
+        ge=0,
+        title="Threshold",
+        description="A number",
+        json_schema_extra={"ui": "int"},
+    )
+    tone: str = Field(
+        default="plain",
+        title="Tone",
+        description="How Echo writes",
+        json_schema_extra={"ui": "enum", "options": ["plain", "friendly"]},
+    )
 
 
 @step
@@ -84,6 +138,23 @@ async def _reply(job: Job, text: str) -> str:
     if job.task_id is not None:
         await job.effects.comments.create(job.task_id, f"Echo: {text}")
     return text
+
+
+async def tryout(job: Job) -> str:
+    """A canned tryout: the skill fixed one field and broke nothing."""
+    skill_id = str(job.input["skill_id"])
+
+    @step
+    async def _record() -> None:
+        import uuid
+
+        await job.effects.skills.record_tryout(
+            uuid.UUID(skill_id),
+            {"status": "done", "before": {"wrong": 1}, "after": {"wrong": 0}, "regressions": []},
+        )
+
+    await job.step("record", _record)
+    return skill_id
 
 
 async def run(job: Job) -> str:
@@ -96,6 +167,8 @@ pack = Pack(
     run=run,
     settings=EchoSettings,
     record_types=(ECHO_BILL,),
+    entity_types=(ECHO_VENDOR,),
+    capabilities={"tryout": tryout},
     setup=(
         TaskField(name="Echo status", type="single_select", options=("Waiting", "Done")),
         Section(name="Echo inbox", unless=("Inbox",)),

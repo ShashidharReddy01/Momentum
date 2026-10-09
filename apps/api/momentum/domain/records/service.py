@@ -588,6 +588,8 @@ async def update_record(
         "fields": sorted(set(touched)),
     }
     await _write_version(session, ctx, record, via=_via(ctx), change=change, reason=reason)
+    if new_status == "approved" and before["status"] != "approved":
+        await _score_skills(session, record)
     act = await record_activity(
         session,
         ctx,
@@ -617,6 +619,25 @@ async def update_record(
     )
     await session.refresh(record, attribute_names=["created_at", "updated_at"])
     return record
+
+
+async def _score_skills(session: AsyncSession, record: Record) -> None:
+    """S76-05 (spec §7.2): approved, so the skills it used are scored once: helped when a person
+    didn't correct their field, hurt when they did. A pack lists what it used under
+    ``provenance["skills_used"]`` (skill id → fields)."""
+    from momentum.domain.skills.service import score_outcome
+
+    used = (record.provenance or {}).get("skills_used") or {}
+    if not used or (record.provenance or {}).get("skills_scored"):
+        return
+    rows = await session.execute(
+        select(RecordVersion.change).where(
+            RecordVersion.record_id == record.id, RecordVersion.via.in_(("review", "api"))
+        )
+    )
+    corrected = {f for change in rows.scalars() for f in (change or {}).get("fields") or []}
+    await score_outcome(session, used, corrected)
+    record.provenance = {**(record.provenance or {}), "skills_scored": True}
 
 
 @undo_handler("records.restore_version")

@@ -569,6 +569,31 @@ groups, a two-currency KPI shown per currency, empty states, drills); the AP tem
 (xlsx, csv); Mo's tools; and a guest seeing nothing by any route (API, search, Mo, dashboards,
 exports).
 
+**S76-05 as built (2026-10-09, local session, mock AI only, $0 gateway spend).** **Migration
+0050:** `entities` (with `match_text` under a trigram index), `agent_skills`,
+`agent_pack_settings`. **`domain/entities/`** (create, update, alias, bank, merge, archive, each
+with activity and undo; matching; the bank fingerprint HMAC'd with the workspace secret, removed
+from every response and from activity diffs, only "•••• 4821" shown), **`domain/skills/`**
+(propose with the scrubber, author, decide incl. edit-and-approve as a new version, undo for
+each, `active_for` most specific first, use counts, helped/hurt scored when a record that used a
+skill is approved, the `may_be_hurting` flag, starter skills, the daily digest),
+**`domain/pack_settings/`** (layers, permissions incl. stewards, validation against the whole
+model, undo). **`core/scrub.py`** (exported as `momentum.sdk.scrub`). **SDK:** `EntityType`,
+`EntityModel`, `job.entities`, `job.effects.entities`, `job.skills`, `job.effects.skills`,
+`job.settings()`; `Pack(entity_types=…)`, `Pack.starter_skills` (`skills/*.yaml`), validated
+against the manifest's `entities.*` effects; install also installs starter skills. **Jobs:**
+`compute_entity_profiles` (02:45), `skill_digest` (07:30). Asks: `approver` / `stewards` routes
+now resolve. **Echo** gained `echo_vendor`, settings (`stewards`, `approvers`, `threshold`,
+`tone`), starter skills and a `tryout` capability. **Deviations:** `tryout` runs as a child job
+of the proposing job (no plan needed: same pack); the steward role is the pack setting
+`stewards` (spec §5.4 left its home open); a full data export (portability) still contains the
+fingerprint, as it's a backup of the server's own data, never a web response. **Tests:**
+`test_scrub.py` (14), `test_entities.py` (6), `test_skills.py` (7), `test_pack_settings.py` (4):
+the ACs (a hint with a record value or an email is refused with its reason; merge moves records
+and skills and undoes cleanly; the bank fingerprint appears in no API response, list, detail or
+activity) plus matching, permissions, profiles, tryouts, decisions with undo, scoring, the digest,
+settings layers, the settings API, `job.settings()` and the new ask routes.
+
 ## The prompt for the build session
 
 Paste this into the browser session (also correct for resuming after a context reset):

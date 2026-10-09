@@ -16,6 +16,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
+from momentum.agents.packs.entities import EntityType, load_starter_skills
 from momentum.agents.packs.manifest import Capability, PackManifest, load_manifest
 from momentum.agents.packs.records import RecordType
 from momentum.agents.packs.setup import SetupItem
@@ -50,6 +51,19 @@ class Pack:
     converse: JobFn | None = None
     # S76-04 (spec §6.1): the record types it produces
     record_types: tuple[RecordType, ...] = ()
+    # S76-05 (spec §7.1, §8.3): the entity types it knows about
+    entity_types: tuple[EntityType, ...] = ()
+
+    @cached_property
+    def starter_skills(self) -> list[dict[str, Any]]:
+        """``skills/*.yaml`` next to the manifest (spec §7.2: generic rules only)."""
+        return load_starter_skills(Path(self.manifest_path).parent)
+
+    def entity_type(self, key: str) -> EntityType:
+        for t in self.entity_types:
+            if t.key == key:
+                return t
+        raise PackError(f"{self.key} has no entity type {key!r}")
 
     def record_type(self, key: str, version: int | None = None) -> RecordType:
         found = [t for t in self.record_types if t.key == key]
@@ -87,13 +101,19 @@ class Pack:
         types = {t.key for t in self.record_types}
         if len({(t.key, t.version) for t in self.record_types}) != len(self.record_types):
             raise PackError(f"{manifest.key}: a record type version is listed twice")
-        for effect in ("records.create", "records.update"):
+        entities = {t.key for t in self.entity_types}
+        for effect, known in (
+            ("records.create", types),
+            ("records.update", types),
+            ("entities.create", entities),
+            ("entities.update", entities),
+        ):
             for item in manifest.effects:
                 if isinstance(item, dict) and effect in item:
-                    missing = sorted(set(item[effect]) - types)
+                    missing = sorted(set(item[effect]) - known)
                     if missing:
                         raise PackError(
-                            f"{manifest.key}: {effect} names record types it doesn't define:"
+                            f"{manifest.key}: {effect} names types it doesn't define:"
                             f" {', '.join(missing)}"
                         )
         if manifest.commands and self.converse is None:

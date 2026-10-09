@@ -16,6 +16,7 @@ from momentum.domain.dashboards.models import (
     DashboardWidget,
     UserVisit,
 )
+from momentum.domain.entities.models import Entity
 from momentum.domain.fields.models import (
     FieldDef,
     FieldValue,
@@ -29,6 +30,7 @@ from momentum.domain.goals.models import Goal, GoalLink
 from momentum.domain.integrations.models import ExternalLink, ImportJob
 from momentum.domain.mytasks.models import MyTaskPlacement
 from momentum.domain.notifications.models import Notification
+from momentum.domain.pack_settings.models import PackSettingsRow
 from momentum.domain.portfolios.models import (
     Portfolio,
     PortfolioItem,
@@ -40,6 +42,7 @@ from momentum.domain.records.models import Record, RecordType, RecordVersion
 from momentum.domain.reports.models import ReportRun
 from momentum.domain.rules.models import Rule, RuleRun
 from momentum.domain.sections.models import Section
+from momentum.domain.skills.models import Skill
 from momentum.domain.status_updates.models import StatusUpdate
 from momentum.domain.tags.models import Tag, TaskTag
 from momentum.domain.tasks.models import Follower, Task, TaskDependency, TaskProject
@@ -71,6 +74,7 @@ __all__ = [
     "DashboardPin",
     "DashboardWidget",
     "Embedding",
+    "Entity",
     "ExternalLink",
     "Favorite",
     "FieldDef",
@@ -89,6 +93,7 @@ __all__ = [
     "MyTaskPlacement",
     "Notification",
     "OutboxEvent",
+    "PackSettingsRow",
     "Portfolio",
     "PortfolioItem",
     "PortfolioMember",
@@ -107,6 +112,7 @@ __all__ = [
     "Rule",
     "RuleRun",
     "Section",
+    "Skill",
     "StatusUpdate",
     "Tag",
     "Task",

@@ -18,6 +18,7 @@ from __future__ import annotations
 import uuid
 from typing import TYPE_CHECKING, Any
 
+from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -158,14 +159,15 @@ def _option_ids(kind: str, options: Any, value: Any) -> Any:
 
 
 class Effects:
-    """``job.effects``: comments, tasks, attachments and records (entities and skills join in
-    S76-05)."""
+    """``job.effects``: comments, tasks, attachments, records, entities and skills."""
 
     def __init__(self, state: JobState) -> None:
         self.comments = _Comments(state)
         self.tasks = _Tasks(state)
         self.attachments = _Attachments(state)
         self.records = _Records(state)
+        self.entities = _Entities(state)
+        self.skills = _Skills(state)
 
 
 class _Records:
@@ -266,3 +268,152 @@ class _Records:
             confidence=confidence,
         )
         return record.version
+
+
+class BankSeen(BaseModel):
+    changed: bool  # a different account than the one on file
+    last4: str
+
+
+class SkillProposal(BaseModel):
+    id: uuid.UUID
+    status: str  # proposed, or rejected when the scrubber refused it
+    note: str | None = None
+
+
+class _Entities:
+    """``job.effects.entities``: vendors and other entities of the types the pack declares."""
+
+    def __init__(self, state: JobState) -> None:
+        self._state = state
+
+    async def create(
+        self,
+        type: str,
+        name: str,
+        *,
+        aliases: list[str] | None = None,
+        attributes: dict[str, Any] | None = None,
+    ) -> uuid.UUID:
+        from momentum.domain.entities.service import create_entity
+
+        state = self._state
+        s = _session(state, "entities.create", type)
+        e = await create_entity(
+            s,
+            state.ctx,
+            state.pack.entity_type(type),
+            pack_key=state.pack.key,
+            name=name,
+            aliases=aliases,
+            attributes=attributes,
+        )
+        return e.id
+
+    async def _type(self, s: AsyncSession, entity_id: uuid.UUID) -> str:
+        from momentum.domain.entities.service import get_entity
+
+        return (await get_entity(s, self._state.ctx, entity_id)).type
+
+    async def update(
+        self,
+        entity_id: uuid.UUID,
+        *,
+        name: str | None = None,
+        attributes: dict[str, Any] | None = None,
+    ) -> None:
+        from momentum.domain.entities.service import update_entity
+
+        state = self._state
+        if state.scope is None:
+            raise PackError("job.effects.entities.update can only be called inside a step")
+        type_ = await self._type(state.scope.session, entity_id)
+        s = _session(state, "entities.update", type_)
+        await update_entity(
+            s, state.ctx, state.pack.entity_type(type_), entity_id, name=name, attributes=attributes
+        )
+
+    async def add_alias(self, entity_id: uuid.UUID, alias: str) -> None:
+        from momentum.domain.entities.service import add_alias
+
+        state = self._state
+        if state.scope is None:
+            raise PackError("job.effects.entities.add_alias can only be called inside a step")
+        s = _session(state, "entities.update", await self._type(state.scope.session, entity_id))
+        await add_alias(s, state.ctx, entity_id, alias)
+
+    async def set_bank(self, entity_id: uuid.UUID, account: str) -> BankSeen:
+        """Record the bank account seen for an entity (only a fingerprint and the last four
+        digits are kept); says whether it differs from the one on file."""
+        from momentum.domain.entities.service import set_bank
+
+        state = self._state
+        if state.scope is None:
+            raise PackError("job.effects.entities.set_bank can only be called inside a step")
+        s = _session(state, "entities.update", await self._type(state.scope.session, entity_id))
+        changed, last4 = await set_bank(s, state.ctx, entity_id, account)
+        return BankSeen(changed=changed, last4=last4)
+
+
+class _Skills:
+    """``job.effects.skills``: proposing what was learned (``skills.propose: [hint, rule]``)."""
+
+    def __init__(self, state: JobState) -> None:
+        self._state = state
+
+    async def propose(
+        self,
+        kind: str,
+        content: dict[str, Any],
+        *,
+        scope: str = "workspace",
+        scope_id: uuid.UUID | None = None,
+        field: str | None = None,
+        provenance: dict[str, Any] | None = None,
+        record_values: Any = None,
+    ) -> SkillProposal:
+        """Propose a skill for review. Text carrying a value from ``record_values``, an email, a
+        bank or card number… is refused (kept as rejected, with the reason). A pack with a
+        ``tryout`` capability gets a child job to try the skill out."""
+        from momentum.agents.jobs.engine import create_child
+        from momentum.domain.skills.service import propose
+
+        state = self._state
+        s = _session(state, "skills.propose", kind)
+        skill = await propose(
+            s,
+            state.ctx,
+            pack_key=state.pack.key,
+            scope_type=scope,
+            scope_id=scope_id,
+            kind=kind,
+            content=content,
+            field=field,
+            provenance={"run_id": str(state.run_id), **(provenance or {})},
+            record_values=record_values,
+        )
+        if skill.status == "proposed" and "tryout" in state.pack.capabilities:
+            await create_child(
+                s,
+                state,
+                "tryout",
+                {"skill_id": str(skill.id)},
+                title="Try out a proposed skill",
+                key=f"tryout:{skill.id}",
+                task=None,
+            )
+        return SkillProposal(id=skill.id, status=skill.status, note=skill.decision_note)
+
+    async def record_tryout(self, skill_id: uuid.UUID, result: dict[str, Any]) -> None:
+        """A tryout's results (``{status, before, after, regressions}``) for the reviewers."""
+        from momentum.domain.skills.models import Skill
+        from momentum.domain.skills.service import set_tryout
+
+        state = self._state
+        if state.scope is None:
+            raise PackError("job.effects.skills.record_tryout can only be called inside a step")
+        skill = await state.scope.session.get(Skill, skill_id)
+        if skill is None or skill.pack_key != state.pack.key:
+            raise ValidationFailed("No such skill for this pack")
+        _session(state, "skills.propose", skill.kind)
+        await set_tryout(state.scope.session, skill_id, result)

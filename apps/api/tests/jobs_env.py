@@ -66,7 +66,7 @@ class JobsEnv:
         definitions = [d for d in self.packs.definitions() if d[0].key == key]
         async with self.uow.transaction() as s:
             [r] = await service.install_definitions(s, admin, definitions, REG.names)
-            await sync_record_types(s, admin.workspace_id, self.packs)  # as install does
+            await sync_record_types(s, admin.workspace_id, self.packs, self.settings)  # as install
             await service.update_agent(s, admin, r.agent.id, AgentPatchIn(enabled=True), REG.names)
             if access:
                 await service.add_to_project(

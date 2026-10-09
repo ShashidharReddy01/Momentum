@@ -12,6 +12,7 @@ from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
 import httpx
+import time_machine
 from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -455,6 +456,15 @@ def _has_data(kind: str, x: dict[str, Any]) -> bool:
 
 
 async def test_every_role_template_fills_every_widget_for_its_persona(
+    uow: UnitOfWork, settings: Settings, as_user: Clients
+) -> None:
+    # "this week" widgets need days left in the week: on a Friday or a weekend a 2-day window
+    # can hold none of the seeded due dates, so the run is pinned to a Tuesday (2026-10-09 fix)
+    with time_machine.travel(datetime(2026, 10, 6, 9, 0, tzinfo=UTC), tick=True):
+        await _every_role_template_fills_every_widget(uow, settings, as_user)
+
+
+async def _every_role_template_fills_every_widget(
     uow: UnitOfWork, settings: Settings, as_user: Clients
 ) -> None:
     async with uow.transaction() as s:

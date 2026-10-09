@@ -13,26 +13,37 @@ S76-02 adds the durable `Job` (steps, `job.llm`, `job.effects`, children, waitin
 `Intent`, `job.jobs_on_task` → `TaskJob`, `send_instruction`, `wait_for_instruction`,
 `start_job`); S76-04 adds records: `RecordModel`, `RecordType`, `Money`,
 `job.effects.records.create/update` and `job.records` (`get`, `find_duplicates`, `find_similar`,
-`query`).
+`query`); S76-05 adds `EntityType` / `EntityModel`, `job.entities` (`match`, `get`,
+`bank_matches`), `job.effects.entities` (`create`, `update`, `add_alias`, `set_bank`),
+`job.skills` (`for_`, `propose`), `job.effects.skills`, `job.settings()` and `scrub`.
 """
 
 from __future__ import annotations
 
+from momentum.agents.jobs.effects import BankSeen, SkillProposal
 from momentum.agents.jobs.job import ChildRef, ChildResult, Job, document_block, step
+from momentum.agents.jobs.memory import EntityMatch, EntityView, SkillView
 from momentum.agents.jobs.records import RecordView, Similar
 from momentum.agents.jobs.talk import AskAnswer, Intent, Proposed, TaskJob
+from momentum.agents.packs.entities import EntityModel, EntityType
 from momentum.agents.packs.loader import SDK_VERSION
 from momentum.agents.packs.manifest import Capability, PackManifest
 from momentum.agents.packs.pack import Pack, PackError, PackSettings
 from momentum.agents.packs.records import Money, RecordModel, RecordType
 from momentum.agents.packs.setup import Section, TaskField
+from momentum.core.scrub import ScrubResult, scrub
 
 __all__ = [
     "SDK_VERSION",
     "AskAnswer",
+    "BankSeen",
     "Capability",
     "ChildRef",
     "ChildResult",
+    "EntityMatch",
+    "EntityModel",
+    "EntityType",
+    "EntityView",
     "Intent",
     "Job",
     "Money",
@@ -44,10 +55,14 @@ __all__ = [
     "RecordModel",
     "RecordType",
     "RecordView",
+    "ScrubResult",
     "Section",
     "Similar",
+    "SkillProposal",
+    "SkillView",
     "TaskField",
     "TaskJob",
     "document_block",
+    "scrub",
     "step",
 ]

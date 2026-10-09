@@ -643,6 +643,10 @@ class Job:
         from momentum.agents.jobs.records import JobRecords
 
         self.records = JobRecords(state)
+        from momentum.agents.jobs.memory import JobEntities, JobSkills
+
+        self.entities = JobEntities(state)
+        self.skills = JobSkills(state)
 
     # ---------- what the job is about ----------
 
@@ -868,6 +872,13 @@ class Job:
         from momentum.agents.jobs import talk
 
         return await talk.start_job(self._state, key, input, capability)
+
+    async def settings(self, key: str = "settings") -> Any:
+        """The pack's settings for this job's project (its ``PackSettings`` model): defaults,
+        then the workspace's values, then the project's, field by field."""
+        from momentum.agents.jobs import memory
+
+        return await memory.settings(self._state, key)
 
     async def wait_for_event(
         self, key: str, event: str, *, task_id: UUID | None = None

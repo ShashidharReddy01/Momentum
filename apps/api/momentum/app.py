@@ -53,6 +53,7 @@ def _api_router(settings: Settings) -> APIRouter:
     from momentum.domain.attachments.router import router as attachments_router
     from momentum.domain.comments.router import router as comments_router
     from momentum.domain.dashboards.router import router as dashboards_router
+    from momentum.domain.entities.router import router as entities_router
     from momentum.domain.fields.router import router as fields_router
     from momentum.domain.forecasts.router import router as forecasts_router
     from momentum.domain.forms.router import public_router as forms_public_router
@@ -69,6 +70,7 @@ def _api_router(settings: Settings) -> APIRouter:
     from momentum.domain.rules.router import router as rules_router
     from momentum.domain.search.router import router as search_router
     from momentum.domain.sections.router import router as sections_router
+    from momentum.domain.skills.router import router as skills_router
     from momentum.domain.status_updates.router import router as status_updates_router
     from momentum.domain.tags.router import router as tags_router
     from momentum.domain.tasks.csv_import_router import router as csv_import_router
@@ -115,6 +117,8 @@ def _api_router(settings: Settings) -> APIRouter:
     api.include_router(notifications_router)
     api.include_router(asks_router)
     api.include_router(records_router)
+    api.include_router(entities_router)
+    api.include_router(skills_router)
     api.include_router(home_router)
     api.include_router(search_router)
     api.include_router(asana_router)

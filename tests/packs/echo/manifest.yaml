@@ -18,6 +18,9 @@ capabilities:
     output: { text: true }
     examples: ["Echo hello"]
     typical_duration_s: 1
+  - key: tryout
+    title: Try out a skill
+    description: Records a canned before/after for a proposed skill (S76-05 tests).
 triggers:
   - { type: assigned }
   - { type: manual }
@@ -25,6 +28,9 @@ effects:
   - comments.create
   - records.create: [echo_bill]
   - records.update: [echo_bill]
+  - entities.create: [echo_vendor]
+  - entities.update: [echo_vendor]
+  - skills.propose: [hint, rule]
 data:
   classification: internal
 limits: { max_steps: 10, step_timeout_s: 30, max_active_s: 120, max_job_usd: 0.10, max_job_tokens: 10000, concurrency: 2, max_children: 5 }

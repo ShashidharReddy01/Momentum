@@ -563,7 +563,7 @@ def agents_install(
                     keys=only or None,
                     force=force,
                 )
-                await sync_record_types(session, ws.id, packs)
+                await sync_record_types(session, ws.id, packs, settings)
                 return [f"{r.outcome:<10} {r.key}  ({r.agent.name})" for r in results]
         finally:
             await uow.close()

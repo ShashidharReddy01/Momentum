@@ -9,6 +9,7 @@ from decimal import Decimal
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from momentum.agents.packs.entities import EntityType
 from momentum.agents.packs.loader import Loaded, PackLoadError, load_packs
 from momentum.agents.packs.manifest import Capability
 from momentum.agents.packs.pack import Pack, PackError
@@ -42,6 +43,14 @@ class PackRegistry:
             for t in pack.record_types:
                 if t.key == key and (version is None or t.version == version):
                     return pack.record_type(key, version)
+        return None
+
+    def entity_type(self, key: str) -> EntityType | None:
+        """A loaded entity type by key, from whichever pack defines it."""
+        for pack in self.packs.values():
+            for t in pack.entity_types:
+                if t.key == key:
+                    return t
         return None
 
     def capabilities(self) -> list[tuple[str, Capability]]:
@@ -78,15 +87,28 @@ class PackRegistry:
 
 
 async def sync_record_types(
-    session: AsyncSession, workspace_id: uuid.UUID, registry: PackRegistry
+    session: AsyncSession,
+    workspace_id: uuid.UUID,
+    registry: PackRegistry,
+    settings: Settings | None = None,
 ) -> int:
-    """Register every loaded pack's record types for the workspace (spec §6.1: at install)."""
+    """At install: register every loaded pack's record types for the workspace (spec §6.1) and
+    install its starter skills as active (spec §7.2), each once."""
+    from momentum.core.context import Actor, Ctx
     from momentum.domain.records.service import sync_types
+    from momentum.domain.skills.service import install_starters
 
+    system = Ctx(
+        actor=Actor(id=None, workspace_id=workspace_id),
+        settings=settings or Settings(),
+        via="system",
+    )
     changed = 0
     for key, pack in sorted(registry.packs.items()):
         if pack.record_types:
             changed += await sync_types(session, workspace_id, key, list(pack.record_types))
+        if pack.starter_skills:
+            changed += await install_starters(session, system, key, pack.starter_skills)
     return changed
 
 
