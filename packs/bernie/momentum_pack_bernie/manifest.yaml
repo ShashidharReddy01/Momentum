@@ -1,0 +1,52 @@
+# Bernie, the invoice agent (Phase 7.6, spec §3.2 and §9). The single source for the directory,
+# the agent page, install, the effect policy and `packs check`.
+key: bernie
+name: Bernie
+title: Invoice agent
+avatar: teammate
+version: 1.0.0
+sdk: ">=1.0,<2"
+kind: pipeline
+description: Reads invoices (PDF, scans, images, e-invoices, zips) into checked invoice records you can export to Excel, one per invoice, line by line.
+charter: |
+  I'm Bernie. I turn invoices into checked records. I transcribe exactly what's printed and never
+  compute or guess a value; the arithmetic is checked by code, not by me. I read the text first,
+  OCR a scan, and only look at the page image when I have to. When something doesn't add up and
+  I can't resolve it from the document, I ask you, with the page in front of you. I learn each
+  vendor's layout from your corrections, so the next invoice from them comes out right.
+capabilities:
+  - key: extract_invoice
+    title: Extract and check invoices
+    description: Turn invoice files into checked invoice records, one per invoice, with every line item.
+    input: { files: [pdf, image, zip, xml, email], text: optional }
+    output: { records: [invoice], files: [xlsx, csv] }
+    examples: ["Process the attached invoices", "Extract this Bloomberg invoice"]
+    typical_duration_s: 60
+    manual_minutes_per_item: 12
+triggers:
+  - { type: assigned }
+  - { type: manual }
+  - { type: event, event: attachment.created, setting: watch_uploads }
+effects:
+  - records.create: [invoice]
+  - records.update: [invoice]
+  - entities.create: [vendor]
+  - entities.update: [vendor]
+  - skills.propose: [hint, rule, example]
+  - tasks.create_subtask
+  - tasks.set_fields
+  - tasks.rename
+  - tasks.move_to_review
+  - tasks.request_approval
+  - attachments.create
+  - comments.create
+data:
+  classification: financial
+  personal_data: low
+  reads_external_content: true
+limits: { max_steps: 400, step_timeout_s: 300, max_active_s: 3600, max_job_usd: 2.00, max_job_tokens: 400000, concurrency: 4, max_children: 500 }
+model_alias: default
+budget_monthly_usd: 150
+budget_monthly_tokens: 40000000
+autonomy: confirm
+queue: ai

@@ -186,6 +186,13 @@ class Settings(BaseSettings):
     llm_supports_vision: bool = True
     ai_max_images_per_call: int = Field(default=5, ge=1, le=20)
     ai_max_images_per_conversation: int = Field(default=20, ge=1, le=200)
+    # Phase 7.6 S76-09 (ADR-0014): OCR of scanned pages with a local Tesseract before vision.
+    # Off, or the binary missing, means scans go straight to vision. `tesseract_cmd` is the
+    # binary's path when it isn't on PATH (on Windows, e.g.
+    # C:/Program Files/Tesseract-OCR/tesseract.exe).
+    ocr_enabled: bool = True
+    tesseract_cmd: str | None = None
+    ocr_languages: str = Field(default="eng", pattern=r"^[a-z_]{3,8}(\+[a-z_]{3,8})*$")
     # File parsing (on request only, never on upload): a worker-thread timeout and a row cap per
     # sheet; beyond the cap a sheet is marked truncated.
     file_parse_timeout_s: float = Field(default=20, gt=0, le=300)

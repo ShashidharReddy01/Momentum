@@ -13,6 +13,13 @@ FROM python:3.12-slim AS runtime
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy \
     MOMENTUM_ENV=production MOMENTUM_LOG_FORMAT=json PORT=8000
 COPY --from=ghcr.io/astral-sh/uv:0.8 /uv /usr/local/bin/uv
+# Phase 7.6 (ADR-0014): Tesseract for Bernie's OCR of scanned invoices (English, German, French,
+# Spanish, Italian, Dutch; add language packs here and to MOMENTUM_OCR_LANGUAGES as needed).
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends tesseract-ocr tesseract-ocr-eng \
+       tesseract-ocr-deu tesseract-ocr-fra tesseract-ocr-spa tesseract-ocr-ita tesseract-ocr-nld \
+    && rm -rf /var/lib/apt/lists/*
+ENV MOMENTUM_OCR_LANGUAGES=eng+deu+fra+spa+ita+nld
 WORKDIR /app
 # Phase 7.6 (ADR-0012): packs are a path dependency ("../../packs/<key>" from apps/api/pyproject.toml,
 # i.e. /packs/<key> from WORKDIR /app here), so they must exist on disk before the first `uv sync`.

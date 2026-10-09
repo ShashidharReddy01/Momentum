@@ -106,7 +106,7 @@ async def test_dashboard_widgets_over_records(
                 window_days=730,
             ),
         )
-        missing = await run_any(s, world.ravi, "count", _spec(type="invoice"))
+        missing = await run_any(s, world.ravi, "count", _spec(type="receipt"))  # no pack has it
         drill = await drill_any(
             s,
             world.ravi,
@@ -128,7 +128,7 @@ async def test_dashboard_widgets_over_records(
         "Widgets · USD": 60.0,
         "Gadgets · USD": 40.0,
     }
-    assert missing.value is None and missing.notes == ["No invoice records yet"]
+    assert missing.value is None and missing.notes == ["No receipt records yet"]
     assert drill.entity == "records" and drill.total == 2
     assert {r["title"] for r in drill.records} == {"Acme Ltd INV-0041", "Acme Ltd 2"}
 

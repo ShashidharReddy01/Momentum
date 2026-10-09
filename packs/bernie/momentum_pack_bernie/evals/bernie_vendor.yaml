@@ -1,0 +1,22 @@
+# Bernie's vendor recognition (spec §9.3.7): deterministic signals first (folder, tax id,
+# letterhead), the model only on a closed list. `known` are the vendors on file; `expect` is the
+# vendor recognised (a name), "candidates" when two are close, or null for a new vendor.
+feature: bernie_vendor
+threshold: 1.0
+known:
+  - {id: "1", name: Northwind Data Ltd, aliases: [Northwind], tax_ids: [GB123456789], folder_names: [northwind_data]}
+  - {id: "2", name: Bloomberg Finance LP}
+  - {id: "3", name: Acme Analytics Inc, aliases: [ACME Analytics], tax_ids: [94-1234567]}
+  - {id: "4", name: Contoso Markets GmbH, tax_ids: [DE123456789]}
+cases:
+  - {id: folder_hint, hint: northwind_data, page: "anything at all", expect: "1", method: folder, mock: true}
+  - {id: folder_hint_from_alias, hint: acme_analytics, page: "x", expect: "3", method: folder, mock: true}
+  - {id: tax_id_with_spaces, page: "SOMEONE\nVAT No: GB 123 456 789\nINVOICE", expect: "1", method: tax_id, mock: true}
+  - {id: german_vat_id, page: "Contoso\nUSt-IdNr: DE123456789\nRechnung", expect: "4", method: tax_id, mock: true}
+  - {id: ein, page: "ACME\nEIN: 94-1234567", expect: "3", method: tax_id, mock: true}
+  - {id: letterhead_name, page: "NORTHWIND DATA LTD\n12 Fleet Street\nINVOICE", expect: "1", method: letterhead, mock: true}
+  - {id: letterhead_alias, page: "ACME ANALYTICS\nInvoice AA-1", expect: "3", method: letterhead, mock: true}
+  - {id: two_names_are_candidates, page: "Northwind Data Ltd resells Acme Analytics Inc", expect: candidates, mock: true}
+  - {id: brand_in_a_line_is_not_the_issuer, page: "RESELLER CO\n<pad>\nBloomberg Finance LP terminal x2", expect: null, mock: true}
+  - {id: new_vendor, page: "Totally Unknown GmbH\nRechnung 1", expect: null, mock: true}
+  - {id: generic_words_dont_make_candidates, page: "Adatum Data Corp\nInvoice 20262", expect: null, model_pool: 0, mock: true}

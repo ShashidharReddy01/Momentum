@@ -667,6 +667,9 @@ class Job:
 
         self.entities = JobEntities(state)
         self.skills = JobSkills(state)
+        from momentum.agents.jobs.files import JobFiles
+
+        self.files = JobFiles(state)  # S76-09
 
     # ---------- what the job is about ----------
 
@@ -702,6 +705,42 @@ class Job:
     @property
     def agent_user_id(self) -> UUID:
         return self._state.agent_user_id
+
+    # ---------- OCR (S76-09, ADR-0014) ----------
+
+    @property
+    def ocr_available(self) -> bool:
+        """Whether this server can OCR (Tesseract installed and OCR on)."""
+        from momentum.files import ocr
+
+        return ocr.available(self._state.settings)
+
+    def ocr(self, image: bytes) -> Any:
+        """OCR one page image (PNG/JPEG bytes): its text and words with pixel positions
+        (``momentum.files.ocr.OcrPage``). Raises when OCR isn't available; check
+        ``ocr_available`` first."""
+        from momentum.files import ocr
+
+        return ocr.ocr_image(self._state.settings, image)
+
+    def render_page(self, data: bytes, page: int) -> Any:
+        """A PDF page (1-based) as a JPEG for the vision model: 150 DPI, long edge at most
+        1568 px, metadata dropped (``momentum.files.render.Rendered``: jpeg, width, height)."""
+        from momentum.files import render
+
+        return render.render_pdf_page(data, page)
+
+    def render_image(self, data: bytes) -> Any:
+        """An image file re-encoded for the vision model, the same way as a page."""
+        from momentum.files import render
+
+        return render.render_image(data)
+
+    def render_page_for_ocr(self, data: bytes, page: int) -> tuple[bytes, float]:
+        """A PDF page (1-based) as a 300 DPI grey PNG for OCR, and the pixels per PDF point."""
+        from momentum.files import render
+
+        return render.render_pdf_page_for_ocr(data, page)
 
     # ---------- steps ----------
 

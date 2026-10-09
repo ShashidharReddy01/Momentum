@@ -1,30 +1,36 @@
-"""Bernie, the invoice agent (ADR-0013). Reads invoices (PDF, scans, e-invoices, zips), checks
-every number, asks when unsure, and routes them for approval.
-
-**Not built yet.** This is the S76-00 packaging skeleton only, so the pack installs and imports
-cleanly; the real pack (manifest, pipeline, records, prompts) is built in S76-01 through S76-09+
-(see docs/roadmap/phase-7.6.md). Importing this module must always succeed — the loader (S76-01)
-is what will refuse to load an unbuilt pack — but using `pack` before then raises clearly.
-"""
+"""Bernie, the invoice agent (ADR-0013, ADR-0014): reads invoices (PDF, scans, images,
+e-invoices, zips, emails) into checked invoice records, one per invoice, line by line. A faithful
+port of the COAP notebook's pipeline onto Momentum's agent platform; see `pipeline.py` for the
+steps and `docs/agents/bernie.md` for the user guide."""
 
 from __future__ import annotations
 
-from typing import Any, NoReturn
+from pathlib import Path
 
-NOT_BUILT_YET = (
-    "Bernie is not built yet (Phase 7.6, S76-01 onward); see docs/roadmap/phase-7.6.md "
-    "and docs/superpowers/specs/2026-10-06-phase-7-6-agent-platform-bernie-design.md"
+from momentum.sdk import Pack, Section, TaskField
+from momentum_pack_bernie.entities import VENDOR
+from momentum_pack_bernie.pipeline import run
+from momentum_pack_bernie.records import INVOICE
+from momentum_pack_bernie.settings import BernieSettings
+
+pack = Pack(
+    manifest_path=Path(__file__).parent / "manifest.yaml",
+    run=run,
+    capabilities={"extract_invoice": run},
+    settings=BernieSettings,
+    record_types=(INVOICE,),
+    entity_types=(VENDOR,),
+    setup=(
+        TaskField(name="Vendor", type="text"),
+        TaskField(name="Invoice #", type="text"),
+        TaskField(name="Invoice date", type="date"),
+        TaskField(name="Amount", type="number"),
+        TaskField(name="Currency", type="text"),
+        TaskField(
+            name="Invoice status",
+            type="single_select",
+            options=("Needs review", "Ready", "Approved", "Rejected", "On hold"),
+        ),
+        Section(name="Review", unless=("Review", "In review")),
+    ),
 )
-
-
-class _NotBuiltYet:
-    """Stands in for the real `momentum.sdk.Pack` object until S76-01+ builds it."""
-
-    def __getattr__(self, name: str) -> NoReturn:
-        raise NotImplementedError(NOT_BUILT_YET)
-
-    def __repr__(self) -> str:
-        return f"<momentum_pack_bernie.pack: {NOT_BUILT_YET}>"
-
-
-pack: Any = _NotBuiltYet()

@@ -54,6 +54,7 @@ async def attach_file(
     filename: str,
     data: bytes,
     mime: str = "text/plain",
+    source: str | None = None,
 ) -> uuid.UUID:
     """Store ``data`` and attach it to a task as ``ctx``'s actor, with its text extracted for
     search and ``get_attachment_text``. Used by handlers and by long agent answers (S5.2.1)."""
@@ -73,6 +74,7 @@ async def attach_file(
         mime=mime,
         size_bytes=len(data),
         sha256=hashlib.sha256(data).hexdigest(),
+        source=source,
     )
     await attachments.record_text_extract(
         session, m.entity.id, attachments.extract_text_from_bytes(data, mime)

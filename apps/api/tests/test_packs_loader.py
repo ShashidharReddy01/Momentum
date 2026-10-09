@@ -57,14 +57,14 @@ def _pack_in(tmp_path: Path, **changes: Any) -> Pack:
 # ---------- loader ----------
 
 
-def test_test_packs_load_only_when_asked_and_bernie_is_refused_until_built() -> None:
+def test_test_packs_load_only_when_asked_and_bernie_always() -> None:
     off = load_packs(make_settings())
     assert "echo" not in off.packs
     on = load_packs(make_settings(test_packs=True))
     assert "echo" in on.packs and "echo" in on.test_keys
-    # the S76-00 skeleton isn't a Pack yet: refused with a reason, never half-loaded
-    assert any("bernie" in e.source and "not a momentum.sdk.Pack" in e.reason for e in on.errors)
-    assert "bernie" not in on.packs
+    # Bernie is a real pack (S76-09): installed as a package, loaded by its entry point
+    assert "bernie" in off.packs and "bernie" in on.packs and "bernie" not in on.test_keys
+    assert on.errors == []
 
 
 def test_filter_and_kill_switch() -> None:
@@ -141,8 +141,8 @@ async def _noop(job: Any) -> None:
 
 def test_packs_check_reports_problems_and_the_contract_rule(tmp_path: Path) -> None:
     problems = check_packs(make_settings(test_packs=True))
-    # Bernie isn't built yet (S76-09); its import-linter contract already exists
-    assert any("bernie" in p and "not a momentum.sdk.Pack" in p for p in problems)
+    # Bernie (S76-09) passes: its contract exists and it has an injection eval
+    assert not any("bernie" in p for p in problems), problems
     assert not any("no import-linter contract" in p for p in problems)
     # a pyproject without the contract is reported
     empty = tmp_path / "pyproject.toml"

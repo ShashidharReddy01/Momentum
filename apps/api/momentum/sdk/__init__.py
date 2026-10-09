@@ -15,13 +15,16 @@ S76-02 adds the durable `Job` (steps, `job.llm`, `job.effects`, children, waitin
 `job.effects.records.create/update` and `job.records` (`get`, `find_duplicates`, `find_similar`,
 `query`); S76-05 adds `EntityType` / `EntityModel`, `job.entities` (`match`, `get`,
 `bank_matches`), `job.effects.entities` (`create`, `update`, `add_alias`, `set_bank`),
-`job.skills` (`for_`, `propose`), `job.effects.skills`, `job.settings()` and `scrub`.
+`job.skills` (`for_`, `propose`), `job.effects.skills`, `job.settings()` and `scrub`; S76-09 adds
+`job.files` (`list`, `read`) and `FileRef`, `job.ocr` and page rendering, and `StepFailed` (a
+step that failed, for a pack that can carry on without it).
 """
 
 from __future__ import annotations
 
 from momentum.agents.jobs.effects import BankSeen, SkillProposal
-from momentum.agents.jobs.job import ChildRef, ChildResult, Job, document_block, step
+from momentum.agents.jobs.files import FileRef
+from momentum.agents.jobs.job import ChildRef, ChildResult, Job, StepFailed, document_block, step
 from momentum.agents.jobs.memory import EntityMatch, EntityView, SkillView
 from momentum.agents.jobs.records import RecordView, Similar
 from momentum.agents.jobs.talk import AskAnswer, Intent, Proposed, TaskJob
@@ -44,6 +47,7 @@ __all__ = [
     "EntityModel",
     "EntityType",
     "EntityView",
+    "FileRef",
     "Intent",
     "Job",
     "Money",
@@ -60,6 +64,7 @@ __all__ = [
     "Similar",
     "SkillProposal",
     "SkillView",
+    "StepFailed",
     "TaskField",
     "TaskJob",
     "document_block",

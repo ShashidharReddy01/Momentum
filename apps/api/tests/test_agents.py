@@ -197,14 +197,17 @@ async def test_install_creates_disabled_agents_with_their_own_accounts(
     as_user: Clients, uow: UnitOfWork
 ) -> None:
     admin = await as_user("admin")
-    assert await _install(admin) == {k: "installed" for k in STARTERS}
+    everyone = STARTERS | {"bernie"}  # Phase 7.6: the shipped Bernie pack installs too
+    assert await _install(admin) == {k: "installed" for k in everyone}
     agents = await _agents(admin)
-    assert set(agents) == STARTERS
-    assert all(not a["enabled"] and a["source"] == "starter" for a in agents.values())
+    assert set(agents) == everyone
+    assert all(not a["enabled"] for a in agents.values())
+    assert {k for k, a in agents.items() if a["source"] == "starter"} == STARTERS
+    assert agents["bernie"]["source"] == "pack"
     assert not any(a["drifted"] for a in agents.values())
     async with uow.transaction() as s:
         accounts = list((await s.execute(select(User).where(User.is_agent.is_(True)))).scalars())
-        assert len(accounts) == len(STARTERS)
+        assert len(accounts) == len(everyone)
         by_user = {a["user_id"]: a for a in agents.values()}
         for u in accounts:
             assert u.email.endswith("@agents.momentum.invalid")
@@ -217,12 +220,12 @@ async def test_install_creates_disabled_agents_with_their_own_accounts(
         events = await s.scalar(
             select(func.count()).select_from(OutboxEvent).where(OutboxEvent.type == "agent.created")
         )
-        assert created == events == len(STARTERS)
+        assert created == events == len(everyone)
     # agents still don't show up as people (people pickers are for humans until S5.2.1)
     people = (await admin.get(f"{BASE}/users")).json()["data"]
     assert not any(p.get("is_agent") for p in people)
     # safe to re-run
-    assert await _install(admin) == {k: "unchanged" for k in STARTERS}
+    assert await _install(admin) == {k: "unchanged" for k in everyone}
 
 
 async def test_reinstall_keeps_an_admins_edits_unless_forced(as_user: Clients) -> None:

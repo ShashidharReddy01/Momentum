@@ -112,3 +112,30 @@ def embedded_images(data: bytes, filename: str) -> list[tuple[str, bytes]]:
                 if shape.shape_type == MSO_SHAPE_TYPE.PICTURE:
                     out.append((f"slide {n}", shape.image.blob))
     return out
+
+
+OCR_DPI = 300
+
+
+def render_pdf_page_for_ocr(data: bytes, page: int, dpi: int = OCR_DPI) -> tuple[bytes, float]:
+    """Phase 7.6 S76-09 (ADR-0014): a 1-based page as a grey PNG at ``dpi`` (no downscaling; OCR
+    reads small print best at about 300 DPI), and the pixels per PDF point, so OCR word boxes can
+    be mapped back to page coordinates."""
+    import pypdfium2 as pdfium
+
+    doc = pdfium.PdfDocument(data)
+    try:
+        if not 1 <= page <= len(doc):
+            raise ValueError(f"The PDF has {len(doc)} pages")
+        p = doc[page - 1]
+        w_pt, h_pt = p.get_size()
+        scale = dpi / 72
+        if (w_pt * scale) * (h_pt * scale) > MAX_IMAGE_PIXELS:
+            scale = (MAX_IMAGE_PIXELS / (w_pt * h_pt)) ** 0.5
+        im = p.render(scale=scale, grayscale=True).to_pil()
+        p.close()
+    finally:
+        doc.close()
+    out = io.BytesIO()
+    im.save(out, format="PNG")
+    return out.getvalue(), scale

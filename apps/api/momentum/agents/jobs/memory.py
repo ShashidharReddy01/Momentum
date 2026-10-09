@@ -94,6 +94,19 @@ class JobEntities:
 
         return cast(EntityMatch, await state.run_step(key, "step", body, TypeAdapter(EntityMatch)))
 
+    async def list(self, key: str, type: str) -> list[EntityView]:
+        """S76-09: the workspace's active entities of ``type`` (names, aliases, attributes),
+        for recognising them in a document before any model call."""
+        state = self._state
+
+        async def body(s: AsyncSession, _meta: dict[str, Any]) -> list[EntityView]:
+            rows = await entities.list_entities(s, state.ctx, type=type, limit=500)
+            return [_entity_view(e) for e in rows]
+
+        return cast(
+            list[EntityView], await state.run_step(key, "step", body, TypeAdapter(list[EntityView]))
+        )
+
     async def get(self, key: str, entity_id: uuid.UUID) -> EntityView:
         state = self._state
 

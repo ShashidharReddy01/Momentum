@@ -688,6 +688,42 @@ workspace admins in the UI (stewards can use the API; the server checks both). S
 toast without Undo (their activity is undoable from the audit trail). **Tests:**
 `test_records_review.py` (3), `records.test.tsx` (13), J14 extended.
 
+**S76-09 as built (2026-10-10, local session, mock AI only, $0 gateway spend).** No migration.
+Built around the product owner's direction for Bernie: extraction quality first (target 99.99%
+field accuracy, measured), into records and the Excel export, different per vendor, porting the
+COAP notebook faithfully. **Platform:** `job.files` (`list`, `read`; files a job attaches are
+`source="agent"` so a rerun never reads them as input), `job.entities.list`, `job.records.by_source`,
+`job.ocr` / `job.ocr_available` and `job.render_page` / `render_image` / `render_page_for_ocr`,
+`StepFailed` in the SDK; `momentum/files/ocr.py` (Tesseract via `pytesseract`, local, words with
+positions) and settings `MOMENTUM_OCR_ENABLED`, `MOMENTUM_TESSERACT_CMD`, `MOMENTUM_OCR_LANGUAGES`;
+Tesseract in the Docker image (**ADR-0014**, amending ADR-0013 D10 for OCR only). **Pack**
+(`packs/bernie/momentum_pack_bernie/`): manifest, `InvoiceV1` + `INVOICE` (a superset of the
+notebook's fields), vendor entity with a nightly profile, `BernieSettings`, `ingest.py` (the
+notebook's boundary rules unchanged, pypdf splitting, zip limits and bomb guard, .eml/.msg, images,
+XML), `einvoice.py` (CII/UBL), `read.py` (text → OCR → vision per page), `vendors.py`,
+`extract.py` (paths and the notebook's merge), `locate.py`, `checks_math.py`, `pipeline.py`,
+prompts `bernie_extract/v1`, `bernie_extract_chunk/v1`, `bernie_vendor/v1`, `quality.py`, setup
+checklist (Vendor, Invoice #, Invoice date, Amount, Currency, Invoice status; a Review section).
+**Accuracy fixes over the notebook**, from its own 81-invoice batch (66 clean; most "needs review"
+were its checks' false alarms): the row check rebuilt on word positions (a quantity-1 line's only
+figure is no longer "used up"; a price under a wrapped description and a table split across columns
+are found); line totals that include tax accepted when subtotal, tax and total agree (and never
+when a line is really a tax or total row); vendor candidates ignore generic company words. **Plan
+changes:** the `record` step (S76-10's step 16) is built now so one assignment already gives a
+checked record; risk checks, the critic, asks, policy and outputs stay in S76-10. The manifest's
+`commands` and the @mention trigger wait for S76-11's `converse`. The `bernie_paths` eval is the
+`method` each `bernie_extract` case expects (one runner); `bernie_extract` also carries the
+injection case `packs check` requires. Pack tests that need a database live in
+`apps/api/tests/test_bernie_*.py` (async fixtures don't carry into a conftest outside it). **Tests:**
+`packs/bernie/tests/` (`test_ingest`, `test_checks_math`, `test_locate`, `test_extract_paths`,
+`test_einvoice`, `test_vendor`, `test_read` incl. real OCR when Tesseract is installed,
+`test_vendor_evals`), `test_bernie_pipeline.py` (7: one invoice → a record equal to the truth;
+a zip → 3 children and records; Factur-X with no model call; an e-invoice/page mismatch; 300 lines
+chunked; a scan OCR'd with its hostile footer flagged; no file), `test_bernie_evals.py` (the 13
+mock cases scored: field accuracy, line recall and precision 1.0); the synthetic generator
+`packs/bernie/tests/synth/build.py` (the spec's six fictional vendors plus Proseware, Adatum and
+Litware, which reproduce the layouts that tripped the notebook).
+
 ## The prompt for the build session
 
 Paste this into the browser session (also correct for resuming after a context reset):

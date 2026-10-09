@@ -35,6 +35,7 @@ dependencies = [
   "extract-msg>=0.56.1",
   "striprtf>=0.0.33",
   "defusedxml>=0.7.1",
+  "pytesseract>=0.3.13",  # Phase 7.6 S76-09: Bernie OCRs scans before vision (ADR-0014; Tesseract binary in the image)
   "reportlab>=5.0.1",
   "momentum-pack-bernie",
 ]
@@ -83,7 +84,7 @@ plugins = ["pydantic.mypy"]
 packages = ["momentum", "momentum_pack_bernie"]
 
 [[tool.mypy.overrides]]
-module = ["procrastinate.*", "uuid_utils.*", "filetype.*", "docx.*", "pypdf.*", "croniter.*", "pptx.*", "pdfplumber.*", "pypdfium2.*", "oletools.*", "extract_msg.*", "striprtf.*", "defusedxml.*", "reportlab.*", "xlrd.*", "openpyxl.*", "olefile.*", "msoffcrypto.*"]
+module = ["procrastinate.*", "uuid_utils.*", "filetype.*", "docx.*", "pypdf.*", "croniter.*", "pptx.*", "pdfplumber.*", "pypdfium2.*", "oletools.*", "extract_msg.*", "striprtf.*", "defusedxml.*", "pytesseract.*", "reportlab.*", "xlrd.*", "openpyxl.*", "olefile.*", "msoffcrypto.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
@@ -125,6 +126,9 @@ name = "momentum.sdk is the only thing a pack may import from Momentum (ADR-0012
 type = "forbidden"
 source_modules = ["momentum_pack_bernie"]
 forbidden_modules = ["momentum.domain", "momentum.ai", "momentum.agents", "momentum.core", "momentum.files", "momentum.reports", "momentum.auth", "momentum.integrations", "momentum.web", "momentum.app"]
+# A pack imports the SDK, and the SDK necessarily reaches Momentum's internals; what's forbidden
+# is a pack importing them directly (S76-09: Bernie is the first real pack this checks)
+allow_indirect_imports = "True"
 
 [[tool.importlinter.contracts]]
 name = "Nothing in momentum statically imports a named pack (the loader discovers packs by entry point, not by name)"

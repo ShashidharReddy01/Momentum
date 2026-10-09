@@ -134,6 +134,9 @@ Frontend build-time variables use the `VITE_MOMENTUM_` prefix, but the SPA prefe
 | `MOMENTUM_FORECAST_RUNS` | `10000` | Monte Carlo runs per project forecast (100–200,000). About 0.2 s per project at the default (pure Python) (S6.5.3) |
 | `MOMENTUM_FORECASTS_ENABLED` | `true` | The nightly forecast job's kill switch (`compute_forecasts`, nightly at 02:30 on the worker's clock). When off, a forecast can still be refreshed from a project's overview (S6.5.3) |
 | `MOMENTUM_LLM_SUPPORTS_VISION` | `true` | Whether the gateway model accepts images. Mo's `look_at` tool sends a rendered page or picture only when a person asks; off = `look_at` answers `not_supported` and Mo explains (Phase 7.5, ADR-0011) |
+| `MOMENTUM_OCR_ENABLED` | `true` | OCR scanned invoice pages with a local Tesseract before falling back to vision (Phase 7.6, ADR-0014). Off, or no binary installed, sends scans straight to vision; nothing breaks |
+| `MOMENTUM_TESSERACT_CMD` | unset | The Tesseract binary's path when it isn't on `PATH` (the Docker image installs it on `PATH`; on Windows, e.g. `C:/Program Files/Tesseract-OCR/tesseract.exe`) |
+| `MOMENTUM_OCR_LANGUAGES` | `eng` | Tesseract languages, `+`-joined (e.g. `eng+deu+fra`); each needs its language pack in the image |
 | `MOMENTUM_AI_MAX_IMAGES_PER_CALL` | `5` | Images attached to one model call (1–20). Each image counts `(w*h)/750` input tokens toward usage and budgets (Phase 7.5) |
 | `MOMENTUM_AI_MAX_IMAGES_PER_CONVERSATION` | `20` | Images over a whole Ask Mo conversation (1–200) (Phase 7.5) |
 | `MOMENTUM_FILE_PARSE_TIMEOUT_S` | `20` | Seconds a file parse may take (worker thread) before it's recorded as failed and Mo says the file took too long (Phase 7.5) |

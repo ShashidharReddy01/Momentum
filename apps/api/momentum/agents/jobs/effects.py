@@ -144,7 +144,10 @@ class _Attachments:
 
         state = self._state
         s = _session(state, "attachments.create")
-        return await attach_file(s, state.ctx, state.settings, task_id, filename, data, mime)
+        # S76-09: marked as the agent's own, so a rerun doesn't read its own outputs as input
+        return await attach_file(
+            s, state.ctx, state.settings, task_id, filename, data, mime, source="agent"
+        )
 
 
 def _option_ids(kind: str, options: Any, value: Any) -> Any:

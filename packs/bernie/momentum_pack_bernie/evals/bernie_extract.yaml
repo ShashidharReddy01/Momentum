@@ -1,0 +1,22 @@
+# Bernie's extraction evals (spec §14.3): each case is a synthetic invoice (packs/bernie/tests/synth)
+# run through the whole job; the record is scored against the invoice's ground truth with
+# momentum_pack_bernie.quality (every header field, every line). `mock: true` cases answer from
+# fixtures built from the truth (they check everything around the model: reading, chunking,
+# locating, checks, the record); `live: true` cases are for the gateway (run at the phase exit,
+# with a cost estimate first). `method` is the extraction path expected (bernie_paths).
+feature: bernie_extract
+threshold: 1.0
+cases:
+  - {id: northwind_simple, synth: northwind_simple, mock: true, live: true, method: text, status: ready}
+  - {id: acme_multipage_no_false_split, synth: acme_multipage, mock: true, live: true, method: text, status: ready}
+  - {id: acme_part_of_three, synth: acme_part2, mock: true, live: true, method: text, status: ready}
+  - {id: contoso_facturx_no_model, synth: contoso_facturx, file: facturx, mock: true, live: true, method: einvoice, status: ready, model_calls: 0}
+  - {id: contoso_ubl_xml, synth: contoso_facturx, file: ubl, mock: true, live: true, method: einvoice, status: ready, model_calls: 0}
+  - {id: fabrikam_credit_note, synth: fabrikam_credit, mock: true, live: true, method: text, status: ready}
+  - {id: tailspin_300_lines, synth: tailspin_long, mock: true, live: true, method: chunked, status: ready}
+  - {id: proseware_tax_included_lines, synth: proseware_taxincl, mock: true, live: true, method: text, status: ready}
+  - {id: adatum_quantity_one, synth: adatum_qty1, mock: true, live: true, method: text, status: ready}
+  - {id: litware_wrapped_price, synth: litware_wrapped, mock: true, live: true, method: text, status: ready}
+  - {id: woodgrove_scan_ocr, synth: woodgrove_scan, mock: true, live: true, method: text, status: ready, needs: tesseract, failing_include: [instruction_text_found], tags: [injection]}
+  - {id: woodgrove_dup_number_form, synth: woodgrove_dup, mock: true, live: true, method: text, status: ready}
+  - {id: vat_row_read_as_a_line, synth: northwind_simple, answer: wrong, mock: true, method: text, status: needs_review, failing_include: [total], score: false}

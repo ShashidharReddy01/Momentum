@@ -74,6 +74,31 @@ class JobRecords:
 
         return cast(RecordView, await state.run_step(key, "step", body, TypeAdapter(RecordView)))
 
+    async def by_source(self, key: str, sha256: str) -> list[RecordView]:
+        """S76-09: live records made from a file with this content (any type), oldest first —
+        the same file processed before."""
+        state = self._state
+
+        async def body(s: AsyncSession, _meta: dict[str, Any]) -> list[RecordView]:
+            from sqlalchemy import select
+
+            rows = await s.execute(
+                select(Record)
+                .where(
+                    Record.workspace_id == state.workspace_id,
+                    Record.source_sha256 == sha256,
+                    Record.deleted_at.is_(None),
+                    Record.status.notin_(("void", "superseded")),
+                )
+                .order_by(Record.created_at)
+            )
+            return [_view(r) for r in rows.scalars()]
+
+        return cast(
+            list[RecordView],
+            await state.run_step(key, "step", body, TypeAdapter(list[RecordView])),
+        )
+
     async def find_duplicates(
         self,
         key: str,
