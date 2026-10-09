@@ -38,6 +38,7 @@ import {
 import { Icon } from '@/components/ui/Icon';
 import { IconButton } from '@/components/ui/IconButton';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { TaskJobs } from '@/features/agents';
 import { useWriteHelp } from '@/features/ai';
 import { useMe } from '@/features/auth';
 import { FieldValueEditor, useProjectFields, useSetFieldValue, useTaskFieldValues } from '@/features/fields';
@@ -452,6 +453,7 @@ function PaneBody({
           </button>
         ) : null}
         <TitleField task={task} canEdit={canEdit} onSave={(title) => m.update.mutate({ patch: { title } })} />
+        <TaskJobs taskId={task.id} />
         {canEdit && task.project && Date.now() - Date.parse(task.created_at) < NEW_TASK_MS ? (
           <NewTaskSuggestions
             task={task}

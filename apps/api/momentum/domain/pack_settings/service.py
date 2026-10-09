@@ -167,9 +167,9 @@ async def put_values(
     pack_key: str,
     project_id: uuid.UUID | None,
     values: dict[str, Any],
-) -> dict[str, Any]:
+) -> uuid.UUID:
     """Replace one level's values (a project's own, or the workspace's). Keys left out fall back
-    to the level below. Returns the effective values."""
+    to the level below. Returns the activity id (the change is undoable)."""
     if project_id is not None:
         await get_visible_project(session, ctx, project_id)  # NotFound when hidden
     if not await can_edit(session, ctx, pack_key, project_id):
@@ -213,7 +213,7 @@ async def put_values(
         channels=[f"workspace:{ctx.workspace_id}"],
         activity_id=act.id,
     )
-    return checked.model_dump(mode="json")
+    return act.id
 
 
 @undo_handler("pack_settings.restore")

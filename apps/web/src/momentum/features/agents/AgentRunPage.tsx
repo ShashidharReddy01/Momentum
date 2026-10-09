@@ -1,19 +1,32 @@
+import { useQueryClient } from '@tanstack/react-query';
+import { useState } from 'react';
 import { Link, useParams } from 'react-router';
+import { toast } from 'sonner';
 import { AICallout } from '@/components/common/AI';
 import { MoMark } from '@/components/common/MoMark';
 import { EmptyState, ErrorState } from '@/components/common/States';
-import { Icon } from '@/components/ui/Icon';
+import { Button } from '@/components/ui/Button';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { PreviewCard } from '@/features/ai';
 import { cn } from '@/lib/cn';
-import { useAgentRun, type AgentRunDetail, type RunStep } from './queries';
-import { RUN_STATUS, STEP_LABEL, TRIGGER_LABEL, money, when } from './runMeta';
+import { useChannel } from '@/lib/realtime';
+import { undoMessage } from './JobCard';
+import { useJobControl } from './platform';
+import { agentKeys, useAgentRun, type AgentRunDetail, type RunStep } from './queries';
+import { StepTimeline } from './StepTimeline';
+import { STEP_LABEL, TRIGGER_LABEL, duration, money, when } from './runMeta';
+
+export { StatusBadge } from './StatusBadge';
+import { StatusBadge } from './StatusBadge';
 
 /** S5.1.3 `/agents/runs/:runId`: everything one agent run did, so every action it took can be
  * explained — why it ran, each step, what it proposed or changed, its answer, cost and errors. */
 export function AgentRunPage() {
   const { runId } = useParams();
+  const qc = useQueryClient();
   const run = useAgentRun(runId!);
+  // spec §4.6: a job's page follows it live
+  useChannel(`run:${runId}`, () => void qc.invalidateQueries({ queryKey: agentKeys.run(runId!) }));
   if (run.isPending) {
     return (
       <div className="mx-auto w-full max-w-3xl px-6 py-8">
@@ -24,20 +37,6 @@ export function AgentRunPage() {
   }
   if (run.isError) return <ErrorState error={run.error} onRetry={() => void run.refetch()} />;
   return <RunDetail run={run.data} />;
-}
-
-export function StatusBadge({ status }: { status: string }) {
-  const s = RUN_STATUS[status] ?? RUN_STATUS.queued!;
-  return (
-    <span className={cn('inline-flex items-center gap-1 text-sm font-medium', s.className)}>
-      <Icon
-        icon={s.icon}
-        size={15}
-        className={status === 'running' ? 'animate-spin motion-reduce:animate-none' : undefined}
-      />
-      {s.label}
-    </span>
-  );
 }
 
 function RunDetail({ run }: { run: AgentRunDetail }) {
@@ -92,7 +91,32 @@ function RunDetail({ run }: { run: AgentRunDetail }) {
             {run.steps} model step{run.steps === 1 ? '' : 's'} ·{' '}
             {(run.tokens_in + run.tokens_out).toLocaleString()} tokens · {money(run.cost_usd)}
           </dd>
+          {run.mode === 'job' ? (
+            <>
+              <dt className="text-muted">Working time</dt>
+              <dd>
+                {duration(run.active_seconds)}
+                {run.attempt ? ` · attempt ${run.attempt + 1}` : ''}
+              </dd>
+            </>
+          ) : null}
+          {run.progress ? (
+            <>
+              <dt className="text-muted">Progress</dt>
+              <dd>
+                {run.progress.done} of {run.progress.total}
+                {run.progress.label ? ` ${run.progress.label}` : ''}
+              </dd>
+            </>
+          ) : null}
+          {run.waiting_on ? (
+            <>
+              <dt className="text-muted">Waiting on</dt>
+              <dd>{WAITING[run.waiting_on] ?? run.waiting_on}</dd>
+            </>
+          ) : null}
         </dl>
+        {run.mode === 'job' && !run.parent_run_id ? <JobControls run={run} /> : null}
       </header>
 
       {run.error ? (
@@ -116,24 +140,28 @@ function RunDetail({ run }: { run: AgentRunDetail }) {
         </AICallout>
       ) : null}
 
-      <section aria-label="Steps" className="flex flex-col gap-2">
-        <h2 className="text-sm font-semibold">Steps</h2>
-        {run.detail === 'summary' ? (
-          <p className="text-xs text-muted">
-            This run used the agent’s own access, so step details are shown only to admins and the person it
-            ran for.
-          </p>
-        ) : null}
-        {run.trace.length ? (
-          <ol className="flex flex-col">
-            {run.trace.map((step, i) => (
-              <StepRow key={i} step={step} />
-            ))}
-          </ol>
-        ) : (
-          <EmptyState title="No steps recorded yet">The run hasn’t started.</EmptyState>
-        )}
-      </section>
+      {run.mode === 'job' ? <StepTimeline run={run} /> : null}
+
+      {run.mode === 'job' && !run.trace.length ? null : (
+        <section aria-label="Steps" className="flex flex-col gap-2">
+          <h2 className="text-sm font-semibold">Steps</h2>
+          {run.detail === 'summary' ? (
+            <p className="text-xs text-muted">
+              This run used the agent’s own access, so step details are shown only to admins and the person it
+              ran for.
+            </p>
+          ) : null}
+          {run.trace.length ? (
+            <ol className="flex flex-col">
+              {run.trace.map((step, i) => (
+                <StepRow key={i} step={step} />
+              ))}
+            </ol>
+          ) : (
+            <EmptyState title="No steps recorded yet">The run hasn’t started.</EmptyState>
+          )}
+        </section>
+      )}
 
       {others.length ? (
         <section aria-label="Changes" className="flex flex-col gap-2">
@@ -174,5 +202,75 @@ function StepRow({ step }: { step: RunStep }) {
         {step.summary ? <p className="text-muted">{step.summary}</p> : null}
       </div>
     </li>
+  );
+}
+
+const WAITING: Record<string, string> = {
+  ask: 'An answer to its question',
+  children: 'Its sub-jobs',
+  timer: 'A timer',
+  event: 'Something to happen',
+  instruction: 'An instruction',
+  paused: 'Someone to resume it',
+  agent_off: 'The agent to be turned back on',
+  packs_off: 'Agent packs to be turned back on',
+};
+
+const FINISHED = new Set(['succeeded', 'failed', 'cancelled', 'budget_exceeded', 'expired']);
+
+/** Pause, resume, cancel, retry, and "Undo everything" (spec §4.7) for a job. */
+function JobControls({ run }: { run: AgentRunDetail }) {
+  const control = useJobControl(run.id);
+  const [confirm, setConfirm] = useState(false);
+  const busy = control.act.isPending || control.undoAll.isPending;
+  const open = !FINISHED.has(run.status);
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {run.status === 'paused' ? (
+        <Button size="sm" disabled={busy} onClick={() => control.act.mutate('resume')}>
+          Resume
+        </Button>
+      ) : open ? (
+        <Button size="sm" disabled={busy} onClick={() => control.act.mutate('pause')}>
+          Pause
+        </Button>
+      ) : null}
+      {open ? (
+        <Button size="sm" disabled={busy} onClick={() => control.act.mutate('cancel')}>
+          Cancel
+        </Button>
+      ) : null}
+      {run.status === 'failed' ? (
+        <Button size="sm" disabled={busy} onClick={() => control.act.mutate('retry')}>
+          Retry
+        </Button>
+      ) : null}
+      {confirm ? (
+        <>
+          <Button
+            size="sm"
+            variant="danger"
+            disabled={busy}
+            onClick={() =>
+              control.undoAll.mutate(undefined, {
+                onSuccess: (r) => {
+                  setConfirm(false);
+                  toast.success(undoMessage(r));
+                },
+              })
+            }
+          >
+            Undo all of it
+          </Button>
+          <Button size="sm" variant="text" onClick={() => setConfirm(false)}>
+            Keep
+          </Button>
+        </>
+      ) : (
+        <Button size="sm" variant="text" disabled={busy} onClick={() => setConfirm(true)}>
+          Undo everything {run.agent.name} did
+        </Button>
+      )}
+    </div>
   );
 }

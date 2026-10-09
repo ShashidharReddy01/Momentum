@@ -3,6 +3,7 @@ import { UserMinus, UserRound } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { Icon } from '@/components/ui/Icon';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/Popover';
+import { CapabilityChips, useDirectory } from '@/features/agents';
 import { useMe } from '@/features/auth';
 import { PeopleCommand, peopleItemClass } from '@/features/people';
 
@@ -36,6 +37,9 @@ export function AssigneePicker({
   children: ReactNode;
 }) {
   const me = useMe().data?.user;
+  // Phase 7.6 (spec §12.3): agents show what they can do; loaded once the picker opens
+  const directory = useDirectory({}, open);
+  const cards = new Map((directory.data ?? []).map((c) => [c.user_id, c]));
   const pick = (user: { id: string; name: string; is_agent?: boolean } | null) => {
     onOpenChange(false);
     if (allowClear || (user?.id ?? null) !== assigneeId) onChange(user);
@@ -47,6 +51,15 @@ export function AssigneePicker({
         <PeopleCommand
           placeholder="Assign to…"
           agents="assigned"
+          agentExtra={(p) => {
+            const card = cards.get(p.id);
+            return card?.capabilities.length
+              ? {
+                  chips: <CapabilityChips card={card} max={2} />,
+                  keywords: card.capabilities.map((c) => c.title).join(' '),
+                }
+              : null;
+          }}
           selectedId={assigneeId}
           onSelect={(p) => pick(p)}
           before={

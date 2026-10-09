@@ -15,6 +15,7 @@ export function PeopleCommand({
   before,
   selectedId,
   agents,
+  agentExtra,
 }: {
   onSelect: (person: Person) => void;
   exclude?: string[];
@@ -23,6 +24,8 @@ export function PeopleCommand({
   selectedId?: string | null;
   /** Also offer the agents that act on this trigger (S5.2.1). */
   agents?: 'assigned' | 'mentioned';
+  /** Phase 7.6: extra for an agent's row (its capability chips) and words to find it by. */
+  agentExtra?: (person: Person) => { chips: ReactNode; keywords: string } | null;
 }) {
   const people = usePeople('', agents);
   const options = (people.data ?? []).filter((p) => !exclude.includes(p.id));
@@ -37,23 +40,29 @@ export function PeopleCommand({
           {people.isPending ? 'Loading…' : 'No one found'}
         </Command.Empty>
         {before}
-        {options.map((p) => (
-          <Command.Item
-            key={p.id}
-            value={`${p.name} ${p.email}`}
-            onSelect={() => onSelect(p)}
-            className={ITEM}
-            aria-current={selectedId === p.id ? 'true' : undefined}
-          >
-            <Avatar name={p.name} src={p.avatar_url} size={22} isAgent={p.is_agent} />
-            <span className="min-w-0 flex-1 truncate">{p.name}</span>
-            {p.is_agent ? (
-              <span className="shrink-0 text-xs text-amber-ink">✦ Agent</span>
-            ) : (
-              <span className="truncate text-xs text-muted">{p.email}</span>
-            )}
-          </Command.Item>
-        ))}
+        {options.map((p) => {
+          const extra = p.is_agent ? (agentExtra?.(p) ?? null) : null;
+          return (
+            <Command.Item
+              key={p.id}
+              value={`${p.name} ${p.email}${extra ? ` ${extra.keywords}` : ''}`}
+              onSelect={() => onSelect(p)}
+              className={ITEM}
+              aria-current={selectedId === p.id ? 'true' : undefined}
+            >
+              <Avatar name={p.name} src={p.avatar_url} size={22} isAgent={p.is_agent} />
+              <span className="flex min-w-0 flex-1 flex-col">
+                <span className="truncate">{p.name}</span>
+                {extra?.chips}
+              </span>
+              {p.is_agent ? (
+                <span className="shrink-0 text-xs text-amber-ink">✦ Agent</span>
+              ) : (
+                <span className="truncate text-xs text-muted">{p.email}</span>
+              )}
+            </Command.Item>
+          );
+        })}
       </Command.List>
     </Command>
   );

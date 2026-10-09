@@ -354,6 +354,11 @@ export function taskHandlers(
       c.reactions = c.reactions.filter((x) => x.user_ids.length);
       return HttpResponse.json({ data: c, meta: {} });
     }),
+    // Phase 7.6 S76-07: no agent jobs or questions unless a test adds them (mocks/asks.ts)
+    http.get(`*${base}/api/v1/tasks/:id/jobs`, () =>
+      HttpResponse.json({ data: [], meta: { next_cursor: null } }),
+    ),
+    http.get(`*${base}/api/v1/asks`, () => HttpResponse.json({ data: [], meta: { next_cursor: null } })),
     http.get(`*${base}/api/v1/tasks/:id/feed`, ({ params }) => {
       const t = tasks.find((x) => x.id === params.id);
       const created = t

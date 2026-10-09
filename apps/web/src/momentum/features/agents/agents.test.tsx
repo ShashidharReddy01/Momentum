@@ -107,7 +107,7 @@ describe('Agent runs (S5.1.3)', () => {
       task: null,
     });
     const agents = agentHandlers({ agent: agentFixture(), runs: [ok, failed] });
-    const user = boot('/agents/agent-1', agents);
+    const user = boot('/agents/agent-1?tab=runs', agents);
     expect(await screen.findByRole('heading', { name: 'Teammate' })).toBeInTheDocument();
     expect(
       screen.getByText(/Asks before changing · budget \$5\.00\/month · works in Website Revamp/),
@@ -133,7 +133,7 @@ describe('Agent runs (S5.1.3)', () => {
 
   it('lets an admin turn the agent off and set its budget, but not promote it before it has earned it', async () => {
     const agents = agentHandlers();
-    const user = boot('/agents/agent-1', agents, [], 'admin');
+    const user = boot('/agents/agent-1?tab=settings', agents, [], 'admin');
     const panel = await screen.findByRole('region', { name: 'Agent settings' });
     expect(
       await within(panel).findByText(/Accepted 11 of its last 12 proposals \(92%\)/),
@@ -165,7 +165,7 @@ describe('Agent runs (S5.1.3)', () => {
         reasons: [],
       }),
     });
-    const user = boot('/agents/agent-1', agents, [], 'admin');
+    const user = boot('/agents/agent-1?tab=settings', agents, [], 'admin');
     const panel = await screen.findByRole('region', { name: 'Agent settings' });
     expect(await within(panel).findByText('It can be promoted to act on its own.')).toBeInTheDocument();
     await user.selectOptions(within(panel).getByLabelText('Autonomy'), 'auto');
@@ -205,7 +205,7 @@ describe('Agent gallery and creation (S5.2.3)', () => {
 
   it('test-runs an agent and says nothing was changed', async () => {
     const agents = agentHandlers();
-    const user = boot('/agents/agent-1', agents, [], 'admin');
+    const user = boot('/agents/agent-1?tab=settings', agents, [], 'admin');
     await user.type(await screen.findByLabelText('Task key'), 'T-12');
     await user.click(screen.getByRole('button', { name: /Test run/ }));
     expect(await screen.findByText(/nothing was changed/)).toBeInTheDocument();

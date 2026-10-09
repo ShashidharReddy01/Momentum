@@ -1,3 +1,4 @@
+import { WaitingOnYou } from '@/features/agents';
 import { useVisitBeacon, WhileYouWereAway } from '@/features/ai';
 import { useQueryClient } from '@tanstack/react-query';
 import {
@@ -143,6 +144,8 @@ function HomeContent() {
       {home.data && (home.data.has_projects || home.data.priorities.length) ? (
         <OnboardingChecklist onNewProject={() => setNewProject(true)} />
       ) : null}
+
+      <WaitingOnYou className="mt-4" />
 
       {home.isPending ? (
         <div className="mt-6 grid gap-4 md:grid-cols-3">

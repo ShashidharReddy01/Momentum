@@ -29,7 +29,7 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from momentum.core.activity import record_activity
+from momentum.core.activity import Activity, record_activity
 from momentum.core.context import Actor, Ctx
 from momentum.core.errors import Conflict, Forbidden, NotFound, ValidationFailed
 from momentum.core.events import emit
@@ -368,6 +368,22 @@ async def ask_out(session: AsyncSession, ctx: Ctx, ask: Ask) -> AskOut:
         ).scalars()
     }
     answered = people.get(ask.answered_by) if ask.answered_by else None
+    change = None
+    if ask.status == "answered" and ask.answered_by == ctx.actor.id:
+        used = await session.scalar(
+            select(AgentRunStep.id).where(
+                AgentRunStep.run_id == ask.run_id,
+                AgentRunStep.key == ask.step_key,
+                AgentRunStep.status == "done",
+            )
+        )
+        if used is None:
+            change = await session.scalar(
+                select(Activity.id)
+                .where(Activity.entity_id == ask.id, Activity.verb == "ask.answered")
+                .order_by(Activity.id.desc())
+                .limit(1)
+            )
     return AskOut(
         id=ask.id,
         run_id=ask.run_id,
@@ -396,6 +412,7 @@ async def ask_out(session: AsyncSession, ctx: Ctx, ask: Ask) -> AskOut:
         created_at=ask.created_at,
         answered_at=ask.answered_at,
         expires_at=ask.expires_at,
+        change_activity_id=change,
     )
 
 

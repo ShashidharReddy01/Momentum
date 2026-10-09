@@ -13,7 +13,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from momentum.agents import health, radar, runs_view
+from momentum.agents import directory, health, radar, runs_view
 from momentum.agents.jobs import control
 from momentum.agents.loader import DefinitionError, all_definitions
 from momentum.agents.packs import setup as pack_setup
@@ -114,7 +114,8 @@ async def run_agent(
 @router.get(
     "/agents/{agent_id}/runs",
     response_model=ListOut[runs_view.AgentRunOut],
-    summary="An agent's recent runs you may see, newest first (filter by status or trigger)",
+    summary="An agent's recent runs you may see, newest first (filter by status, trigger, project"
+    " or capability)",
 )
 async def list_agent_runs(
     agent_id: uuid.UUID,
@@ -122,10 +123,20 @@ async def list_agent_runs(
     uow: UowDep,
     status: str | None = None,
     trigger: str | None = None,
+    project_id: uuid.UUID | None = None,
+    capability: str | None = None,
 ) -> ListOut[runs_view.AgentRunOut]:
     async with uow.transaction() as s:
         return ListOut(
-            data=await runs_view.list_runs(s, ctx, agent_id, status=status, trigger=trigger)
+            data=await runs_view.list_runs(
+                s,
+                ctx,
+                agent_id,
+                status=status,
+                trigger=trigger,
+                project_id=project_id,
+                capability=capability,
+            )
         )
 
 
@@ -514,6 +525,9 @@ class PackSettingsOut(BaseModel):
     project: dict[str, Any] | None = Field(description="This project's own values")
     effective: dict[str, Any] = Field(description="Defaults, then workspace, then project")
     can_edit: bool
+    activity_id: uuid.UUID | None = Field(
+        default=None, description="After a change: its activity, for undo"
+    )
 
 
 class PackSettingsIn(BaseModel):
@@ -585,10 +599,12 @@ async def put_pack_settings(
     async with uow.transaction() as s:
         agent = await service.get_agent(s, ctx, agent_id)
         model = _pack_settings_model(runtime, agent)
-        await settings_service.put_values(
+        activity_id = await settings_service.put_values(
             s, ctx, model, str(agent.pack_key), project_id, body.values
         )
-        return await _settings_out(s, ctx, agent, model, project_id)
+        out = await _settings_out(s, ctx, agent, model, project_id)
+        out.activity_id = activity_id
+        return out
 
 
 # ---------- Phase 7.6 S76-06 (spec §8.8): an agent's health ----------
@@ -609,3 +625,60 @@ async def agent_health(
     async with uow.transaction() as s:
         agent = await service.get_agent(s, ctx, agent_id)
         return await health.compute(s, ctx, agent, packs_of(runtime), days)
+
+
+# ---------- Phase 7.6 S76-07 (spec §12.1-12.3): directory, profile, jobs on a task ----------
+
+
+@router.get(
+    "/agents/directory",
+    response_model=ListOut[directory.DirectoryCardOut],
+    summary='The agents directory: search by what agents can do ("who can read invoices?"),'
+    " filter by capability, data class and on/off",
+)
+async def agents_directory(
+    ctx: CtxDep,
+    uow: UowDep,
+    runtime: RuntimeDep,
+    q: str | None = Query(default=None, max_length=200),
+    capability: str | None = Query(default=None, max_length=80),
+    data_class: str | None = Query(default=None, max_length=20),
+    enabled: bool | None = None,
+) -> ListOut[directory.DirectoryCardOut]:
+    async with uow.transaction() as s:
+        agents = await service.list_agents(s, ctx)
+        return ListOut(
+            data=await directory.directory(
+                s,
+                ctx,
+                agents,
+                packs_of(runtime),
+                q=q,
+                capability=capability,
+                data_class=data_class,
+                enabled=enabled,
+            )
+        )
+
+
+@router.get(
+    "/agents/{agent_id}/profile",
+    response_model=directory.ProfileOut,
+    summary="What an agent is for: charter, capabilities, what it may do, what wakes it",
+)
+async def agent_profile(
+    agent_id: uuid.UUID, ctx: CtxDep, uow: UowDep, runtime: RuntimeDep
+) -> directory.ProfileOut:
+    async with uow.transaction() as s:
+        agent = await service.get_agent(s, ctx, agent_id)
+        return directory.profile(agent, packs_of(runtime))
+
+
+@router.get(
+    "/tasks/{task_id}/jobs",
+    response_model=ListOut[runs_view.TaskJobOut],
+    summary="Agent jobs running or waiting on a task (its job card)",
+)
+async def task_jobs(task_id: uuid.UUID, ctx: CtxDep, uow: UowDep) -> ListOut[runs_view.TaskJobOut]:
+    async with uow.transaction() as s:
+        return ListOut(data=await runs_view.list_task_jobs(s, ctx, task_id))

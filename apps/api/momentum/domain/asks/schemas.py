@@ -227,6 +227,11 @@ class AskOut(BaseModel):
     created_at: datetime
     answered_at: datetime | None
     expires_at: datetime
+    change_activity_id: uuid.UUID | None = Field(
+        default=None,
+        description="For the person who answered, while the agent hasn't used the answer: undo"
+        " this activity to change it",
+    )
 
 
 class AnswerIn(_Strict):

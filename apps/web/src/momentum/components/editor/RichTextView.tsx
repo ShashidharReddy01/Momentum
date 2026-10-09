@@ -1,5 +1,5 @@
 import type { JSONContent } from '@tiptap/react';
-import type { ReactNode } from 'react';
+import { createContext, useContext, type ReactNode } from 'react';
 import { Link } from 'react-router';
 import { cn } from '@/lib/cn';
 
@@ -12,14 +12,30 @@ export function RichTextView({
   doc,
   className,
   personName,
+  askCard,
 }: {
   doc: JSONContent | null | undefined;
   className?: string;
   /** Display name for user mentions (falls back to the label stored in the mention). */
   personName?: (id: string) => string | undefined;
+  /** Phase 7.6: renders an agent's `askCard` node (a question with answer controls). */
+  askCard?: (askId: string) => ReactNode;
 }) {
   if (!doc) return null;
-  return <div className={cn('mo-prose mo-prose-compact', className)}>{renderChildren(doc, personName)}</div>;
+  return (
+    <AskSlot.Provider value={askCard ?? null}>
+      <div className={cn('mo-prose mo-prose-compact', className)}>{renderChildren(doc, personName)}</div>
+    </AskSlot.Provider>
+  );
+}
+
+const AskSlot = createContext<((askId: string) => ReactNode) | null>(null);
+
+function AskCardNode({ node }: { node: JSONContent }) {
+  const render = useContext(AskSlot);
+  const id = String(node.attrs?.askId ?? '');
+  if (!render || !id) return <p className="text-xs text-muted">(An agent’s question)</p>;
+  return <>{render(id)}</>;
 }
 
 const SAFE = /^(https?:|mailto:)/i;
@@ -71,6 +87,8 @@ function Node({ node, personName }: { node: JSONContent; personName?: (id: strin
       return <hr />;
     case 'mention':
       return <Mention node={node} personName={personName} />;
+    case 'askCard':
+      return <AskCardNode node={node} />;
     case 'text':
       return <Text node={node} />;
     default:

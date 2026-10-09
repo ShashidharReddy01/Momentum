@@ -3,6 +3,126 @@ import type { Agent, AgentRun, AgentRunDetail } from '@/features/agents';
 import type { components } from '@/lib/api/schema';
 
 type AgentStats = components['schemas']['AgentStatsOut'];
+type DirectoryCard = components['schemas']['DirectoryCardOut'];
+type AgentProfile = components['schemas']['ProfileOut'];
+type AgentHealth = components['schemas']['HealthOut'];
+type PackSettings = components['schemas']['PackSettingsOut'];
+
+/** Phase 7.6 S76-07: a directory card built from an agent (synthetic). */
+export function cardFixture(agent: Agent, over: Partial<DirectoryCard> = {}): DirectoryCard {
+  return {
+    id: agent.id,
+    user_id: agent.user_id,
+    key: agent.key,
+    name: agent.name,
+    avatar: agent.avatar,
+    description: agent.description,
+    enabled: agent.enabled,
+    source: agent.source,
+    title: null,
+    capabilities: [],
+    data_class: null,
+    health: null,
+    ...over,
+  };
+}
+
+export function profileFixture(over: Partial<AgentProfile> = {}): AgentProfile {
+  return {
+    agent_id: 'agent-1',
+    is_pack: false,
+    title: null,
+    charter: 'A general-purpose teammate.',
+    capabilities: [],
+    effects: [],
+    triggers: ['When a task is assigned to it'],
+    data_class: null,
+    personal_data: null,
+    reads_external_content: false,
+    has_settings: false,
+    can_assign: true,
+    can_mention: false,
+    can_run: false,
+    ...over,
+  };
+}
+
+export function healthFixture(over: Partial<AgentHealth> = {}): AgentHealth {
+  return {
+    agent_id: 'agent-1',
+    days: 30,
+    detail: false,
+    jobs: 0,
+    items: 0,
+    success_rate: null,
+    median_active_seconds: null,
+    median_waiting_seconds: null,
+    asks_per_item: null,
+    median_answer_seconds: null,
+    human_touch_rate: null,
+    auto_approved_rate: null,
+    cost_per_item_usd: null,
+    skills: null,
+    time_saved_minutes: null,
+    time_saved_is_estimate: true,
+    top_corrected_fields: null,
+    calibration: null,
+    top_failure_reasons: null,
+    ...over,
+  };
+}
+
+/** A pack's settings as the server returns them (echo-like: every widget kind). */
+export function packSettingsFixture(over: Partial<PackSettings> = {}): PackSettings {
+  return {
+    agent_id: 'agent-1',
+    pack_key: 'echo',
+    project_id: null,
+    form: {
+      title: 'EchoSettings',
+      type: 'object',
+      properties: {
+        stewards: {
+          title: 'Stewards',
+          description: 'People who look after Echo',
+          type: 'array',
+          ui: 'people',
+        },
+        threshold: { title: 'Threshold', description: 'A number', type: 'integer', ui: 'int', default: 100 },
+        watch_uploads: {
+          title: 'Watch uploads',
+          description: 'Run on every upload',
+          type: 'boolean',
+          ui: 'bool',
+        },
+        tone: {
+          title: 'Tone',
+          description: 'How Echo writes',
+          type: 'string',
+          ui: 'enum',
+          options: ['plain', 'friendly'],
+        },
+        confidence_floor: { title: 'Confidence floor', type: 'number', ui: 'percent', default: 0.85 },
+        materiality: { title: 'Materiality', type: 'object', ui: 'money_by_currency' },
+        sections: { title: 'Watched sections', type: 'array', ui: 'text_list' },
+      },
+    },
+    workspace: {},
+    project: null,
+    effective: {
+      stewards: [],
+      threshold: 100,
+      watch_uploads: false,
+      tone: 'plain',
+      confidence_floor: 0.85,
+      materiality: { USD: '5000' },
+      sections: [],
+    },
+    can_edit: true,
+    activity_id: null,
+    ...over,
+  };
+}
 
 /** Synthetic agent fixtures (S5.1.3). */
 export function agentFixture(over: Partial<Agent> = {}): Agent {
@@ -107,6 +227,10 @@ export function agentHandlers(
     run?: AgentRunDetail;
     stats?: AgentStats;
     list?: Agent[];
+    cards?: DirectoryCard[];
+    profile?: AgentProfile;
+    health?: AgentHealth;
+    settings?: PackSettings;
   } = {},
 ) {
   let agent = opts.agent ?? agentFixture();
@@ -119,7 +243,53 @@ export function agentHandlers(
   const runsNow: unknown[] = [];
   const added: unknown[] = [];
   const list = opts.list ?? [agent];
+  const cards = opts.cards ?? list.map((a) => cardFixture(a));
+  const directoryQueries: URLSearchParams[] = [];
+  const settingsPuts: { projectId: string | null; values: unknown }[] = [];
+  let settings = opts.settings ?? packSettingsFixture();
   const handlers = [
+    // Phase 7.6 S76-07: directory, profile, health, pack settings
+    http.get('*/api/v1/agents/directory', ({ request }) => {
+      const q = new URL(request.url).searchParams;
+      directoryQueries.push(q);
+      const words = (q.get('q') ?? '')
+        .toLowerCase()
+        .split(/\W+/)
+        .filter((w) => w.length > 3);
+      const data = cards.filter(
+        (c) =>
+          (!q.get('enabled') || String(c.enabled) === q.get('enabled')) &&
+          (!q.get('data_class') || c.data_class === q.get('data_class')) &&
+          (!q.get('capability') || c.capabilities.some((x) => x.key === q.get('capability'))) &&
+          words.every((w) =>
+            `${c.name} ${c.title ?? ''} ${c.description} ${c.capabilities.map((x) => `${x.title} ${x.description}`).join(' ')}`
+              .toLowerCase()
+              .includes(w.replace(/s$/, '')),
+          ),
+      );
+      return HttpResponse.json({ data, meta: { next_cursor: null } });
+    }),
+    http.get('*/api/v1/agents/:agentId/profile', () => HttpResponse.json(opts.profile ?? profileFixture())),
+    http.get('*/api/v1/agents/:agentId/health', ({ request }) => {
+      const days = Number(new URL(request.url).searchParams.get('days') ?? 30);
+      return HttpResponse.json({ ...(opts.health ?? healthFixture()), days });
+    }),
+    http.get('*/api/v1/agents/:agentId/settings', ({ request }) => {
+      const projectId = new URL(request.url).searchParams.get('project_id');
+      return HttpResponse.json({ ...settings, project_id: projectId, project: projectId ? {} : null });
+    }),
+    http.put('*/api/v1/agents/:agentId/settings', async ({ request }) => {
+      const projectId = new URL(request.url).searchParams.get('project_id');
+      const { values } = (await request.json()) as { values: Record<string, unknown> };
+      settingsPuts.push({ projectId, values });
+      settings = {
+        ...settings,
+        workspace: projectId ? settings.workspace : values,
+        effective: { ...settings.effective, ...values },
+        activity_id: 'act-settings',
+      };
+      return HttpResponse.json(settings);
+    }),
     // S5.2.3: gallery, tools, draft, create, test run
     http.get('*/api/v1/agents', () => HttpResponse.json({ data: list, meta: { next_cursor: null } })),
     http.get('*/api/v1/agents/tools', () =>
@@ -219,5 +389,5 @@ export function agentHandlers(
       });
     }),
   ];
-  return { handlers, queries, patches, creates, testRuns, runsNow, added };
+  return { handlers, queries, patches, creates, testRuns, runsNow, added, directoryQueries, settingsPuts };
 }

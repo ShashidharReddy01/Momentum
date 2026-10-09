@@ -90,6 +90,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/agents/directory": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The agents directory: search by what agents can do ("who can read invoices?"), filter by capability, data class and on/off */
+        get: operations["agents_directory_api_v1_agents_directory_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/agents/draft": {
         parameters: {
             query?: never;
@@ -278,6 +295,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/agents/{agent_id}/profile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** What an agent is for: charter, capabilities, what it may do, what wakes it */
+        get: operations["agent_profile_api_v1_agents__agent_id__profile_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/agents/{agent_id}/projects": {
         parameters: {
             query?: never;
@@ -336,7 +370,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** An agent's recent runs you may see, newest first (filter by status or trigger) */
+        /** An agent's recent runs you may see, newest first (filter by status, trigger, project or capability) */
         get: operations["list_agent_runs_api_v1_agents__agent_id__runs_get"];
         put?: never;
         post?: never;
@@ -4038,6 +4072,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/tasks/{task_id}/jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Agent jobs running or waiting on a task (its job card) */
+        get: operations["task_jobs_api_v1_tasks__task_id__jobs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tasks/{task_id}/likes": {
         parameters: {
             query?: never;
@@ -5602,6 +5653,11 @@ export interface components {
             body: string;
             /** Can Answer */
             can_answer: boolean;
+            /**
+             * Change Activity Id
+             * @description For the person who answered, while the agent hasn't used the answer: undo this activity to change it
+             */
+            change_activity_id?: string | null;
             /** Comment Id */
             comment_id: string | null;
             /**
@@ -5923,6 +5979,21 @@ export interface components {
             note?: string | null;
             /** Reviewed */
             reviewed: number;
+        };
+        /** CapabilityOut */
+        CapabilityOut: {
+            /** Description */
+            description: string;
+            /** Examples */
+            examples: string[];
+            /** Files */
+            files: string[];
+            /** Key */
+            key: string;
+            /** Title */
+            title: string;
+            /** Typical Duration S */
+            typical_duration_s: number | null;
         };
         /** CatchUpIn */
         CatchUpIn: {
@@ -6656,6 +6727,38 @@ export interface components {
             label: string;
             /** Verb */
             verb: string;
+        };
+        /** DirectoryCardOut */
+        DirectoryCardOut: {
+            /** Avatar */
+            avatar: string;
+            /** Capabilities */
+            capabilities: components["schemas"]["CapabilityOut"][];
+            /** Data Class */
+            data_class: ("public" | "internal" | "financial" | "personal") | null;
+            /** Description */
+            description: string;
+            /** Enabled */
+            enabled: boolean;
+            health: components["schemas"]["HealthSummaryOut"] | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Key */
+            key: string;
+            /** Name */
+            name: string;
+            /** Source */
+            source: string;
+            /** Title */
+            title: string | null;
+            /**
+             * User Id
+             * Format: uuid
+             */
+            user_id: string;
         };
         /** DistributeOp */
         DistributeOp: {
@@ -7928,6 +8031,15 @@ export interface components {
                 number
             ][] | null;
         };
+        /** HealthSummaryOut */
+        HealthSummaryOut: {
+            /** Items */
+            items: number;
+            /** Jobs */
+            jobs: number;
+            /** Success Rate */
+            success_rate: number | null;
+        };
         /** HomeCounts */
         HomeCounts: {
             /** Due Today */
@@ -8286,6 +8398,13 @@ export interface components {
             /** @default {} */
             meta: components["schemas"]["ListMeta"];
         };
+        /** ListOut[DirectoryCardOut] */
+        ListOut_DirectoryCardOut_: {
+            /** Data */
+            data: components["schemas"]["DirectoryCardOut"][];
+            /** @default {} */
+            meta: components["schemas"]["ListMeta"];
+        };
         /** ListOut[EntityOut] */
         ListOut_EntityOut_: {
             /** Data */
@@ -8465,6 +8584,13 @@ export interface components {
         ListOut_TaskFieldValueOut_: {
             /** Data */
             data: components["schemas"]["TaskFieldValueOut"][];
+            /** @default {} */
+            meta: components["schemas"]["ListMeta"];
+        };
+        /** ListOut[TaskJobOut] */
+        ListOut_TaskJobOut_: {
+            /** Data */
+            data: components["schemas"]["TaskJobOut"][];
             /** @default {} */
             meta: components["schemas"]["ListMeta"];
         };
@@ -9336,6 +9462,11 @@ export interface components {
         /** PackSettingsOut */
         PackSettingsOut: {
             /**
+             * Activity Id
+             * @description After a change: its activity, for undo
+             */
+            activity_id?: string | null;
+            /**
              * Agent Id
              * Format: uuid
              */
@@ -9908,6 +10039,40 @@ export interface components {
             name?: string | null;
             /** Sort */
             sort?: components["schemas"]["SortIn"][] | null;
+        };
+        /** ProfileOut */
+        ProfileOut: {
+            /**
+             * Agent Id
+             * Format: uuid
+             */
+            agent_id: string;
+            /** Can Assign */
+            can_assign: boolean;
+            /** Can Mention */
+            can_mention: boolean;
+            /** Can Run */
+            can_run: boolean;
+            /** Capabilities */
+            capabilities: components["schemas"]["CapabilityOut"][];
+            /** Charter */
+            charter: string;
+            /** Data Class */
+            data_class: ("public" | "internal" | "financial" | "personal") | null;
+            /** Effects */
+            effects: string[];
+            /** Has Settings */
+            has_settings: boolean;
+            /** Is Pack */
+            is_pack: boolean;
+            /** Personal Data */
+            personal_data: string | null;
+            /** Reads External Content */
+            reads_external_content: boolean;
+            /** Title */
+            title: string | null;
+            /** Triggers */
+            triggers: string[];
         };
         /**
          * ProjectCondition
@@ -13006,6 +13171,76 @@ export interface components {
             /** Type */
             type: string;
         };
+        /** TaskJobOut */
+        TaskJobOut: {
+            /**
+             * Active Seconds
+             * @default 0
+             */
+            active_seconds: number;
+            agent: components["schemas"]["RunAgentOut"];
+            /** Applied */
+            applied: number;
+            /**
+             * Asks For Me
+             * @default 0
+             */
+            asks_for_me: number;
+            /**
+             * Attempt
+             * @default 0
+             */
+            attempt: number;
+            /** Capability */
+            capability?: string | null;
+            /** Cost Usd */
+            cost_usd: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Current Step */
+            current_step?: string | null;
+            /** Error */
+            error: string | null;
+            /** Finished At */
+            finished_at: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Mode
+             * @default oneshot
+             */
+            mode: string;
+            /** Parent Run Id */
+            parent_run_id?: string | null;
+            progress?: components["schemas"]["RunProgressOut"] | null;
+            project: components["schemas"]["RunProjectOut"] | null;
+            /** Proposals */
+            proposals: number;
+            requested_by: components["schemas"]["RunPersonOut"] | null;
+            /** Started At */
+            started_at: string | null;
+            /** Status */
+            status: string;
+            /** Steps */
+            steps: number;
+            task: components["schemas"]["RunTaskOut"] | null;
+            /** Tokens In */
+            tokens_in: number;
+            /** Tokens Out */
+            tokens_out: number;
+            /** Trigger */
+            trigger: string;
+            /** Waiting On */
+            waiting_on?: string | null;
+            /** Waiting Reason */
+            waiting_reason?: string | null;
+        };
         /** TaskLikeIn */
         TaskLikeIn: {
             /**
@@ -14209,6 +14444,40 @@ export interface operations {
             };
         };
     };
+    agents_directory_api_v1_agents_directory_get: {
+        parameters: {
+            query?: {
+                q?: string | null;
+                capability?: string | null;
+                data_class?: string | null;
+                enabled?: boolean | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListOut_DirectoryCardOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     draft_agent_from_description_api_v1_agents_draft_post: {
         parameters: {
             query?: never;
@@ -14580,6 +14849,37 @@ export interface operations {
             };
         };
     };
+    agent_profile_api_v1_agents__agent_id__profile_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                agent_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProfileOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     add_agent_project_api_v1_agents__agent_id__projects_post: {
         parameters: {
             query?: never;
@@ -14687,6 +14987,8 @@ export interface operations {
             query?: {
                 status?: string | null;
                 trigger?: string | null;
+                project_id?: string | null;
+                capability?: string | null;
             };
             header?: never;
             path: {
@@ -23487,6 +23789,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MutationOut_FollowersOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    task_jobs_api_v1_tasks__task_id__jobs_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListOut_TaskJobOut_"];
                 };
             };
             /** @description Validation Error */

@@ -102,6 +102,9 @@ async def test_the_settings_api(make_env: Callable[..., JobsEnv], world: World) 
         put = await admin.put(url, json={"values": {"threshold": 7}})
         assert put.status_code == 200, put.text
         assert put.json()["workspace"] == {"threshold": 7}
+        undo = await admin.post(f"{B}/undo", json={"activity_id": put.json()["activity_id"]})
+        assert undo.status_code == 200, undo.text
+        assert (await admin.get(url)).json()["workspace"] == {}
         ana = await clients("ana")
         assert (await ana.get(url)).json()["can_edit"] is False
         assert (await ana.put(url, json={"values": {"threshold": 1}})).status_code == 403

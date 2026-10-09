@@ -616,6 +616,32 @@ with packs off jobs wait; a financial pack's logs and errors scrubbed; the injec
 GenAI names), `test_agent_health.py` (3: every metric on constructed data with exact answers,
 calibration with 20 reviewed items, summary vs detail by role).
 
+**S76-07 as built (2026-10-09, local session, mock AI only, $0 gateway spend).** No migration.
+**API:** `GET /agents/directory?q=&capability=&data_class=&enabled=` (`agents/directory.py`: cards
+with capabilities, data class and a 30-day health summary; the search drops filler words and
+needs every remaining word, lightly stemmed, somewhere in the name, title, description or
+capabilities), `GET /agents/{id}/profile` (charter, capabilities with examples, effects as plain
+English sentences, triggers as sentences, how to hand it work), `GET /tasks/{id}/jobs` (the job
+card: open top-level jobs and ones that failed in the last day, with `current_step`,
+`waiting_reason` and `asks_for_me`), `project_id` / `capability` filters on an agent's runs,
+`activity_id` on `PUT /agents/{id}/settings` (undo), and `AskOut.change_activity_id` (for the
+person who answered, until the agent uses the answer: undoing it is the card's "Change").
+**Web:** the directory, the tabbed agent page (Overview, Runs, Health, Settings with the JSON
+Schema form), the run page's step timeline with nested sub-jobs, live on `run:<id>`, and job
+controls; on tasks the job card (live from `task:<id>`), ask cards in the thread (an `askCard`
+slot on `RichTextView`), the composer's "Use this as the answer" chip and the confirm step; inbox
+`agent_ask` / `agent_ask_reminder` rows with inline controls (once per task); Home's "Waiting on
+you"; capability chips in the assignee picker. **Deviations:** the Health tab uses number tiles
+styled like the 7.5 KPI widget rather than the dashboard widgets themselves (those take the
+dashboard engine's `QueryResult`; health is computed by `agents/health.py`); evidence pills don't
+link to the review viewer yet (that's S76-08's page viewer); "Skills" is S76-08's tab. E2E runs
+with `MOMENTUM_TEST_PACKS=true` (`tools/e2e/serve.sh`) so J24 has a pack agent with settings (Echo);
+J10 now opens the Settings tab for the admin panel. **Tests:** `test_agent_directory.py` (3:
+plain-English effects; question search; directory filters and health summary, profile, task
+jobs with the waiting reason and asks for me, "Change" by undo, runs filtered by project),
+`test_pack_settings.py` (save returns an activity that undoes), `platform.test.tsx` (13),
+`inbox.test.tsx` (+1), `agents.test.tsx` updated for tabs, `j24-agent-platform.e2e.ts` (part 1).
+
 ## The prompt for the build session
 
 Paste this into the browser session (also correct for resuming after a context reset):

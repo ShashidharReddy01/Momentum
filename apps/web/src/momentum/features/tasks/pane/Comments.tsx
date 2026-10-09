@@ -8,6 +8,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/Popover
 import { Skeleton } from '@/components/ui/Skeleton';
 import { Segmented } from '@/components/ui/Tabs';
 import { SummaryButton } from '@/features/ai';
+import { AskCard, useReplyAsAnswer } from '@/features/agents';
 import { useMe } from '@/features/auth';
 import { usePeople } from '@/features/people';
 import { useSections } from '@/features/sections';
@@ -37,6 +38,7 @@ export function Comments({ task }: { task: TaskDetail }) {
   const sections = useSections(task.project?.id ?? '', !!task.project).data;
   const nameOf = (id: string | null | undefined) => people.find((p) => p.id === id)?.name;
   const m = useCommentMutations(task.id, meId);
+  const reply = useReplyAsAnswer(task.id);
   const canComment = task.my_role === 'admin' || task.my_role === 'editor' || task.my_role === 'commenter';
   const [filter, setFilterState] = useState<FeedFilter>(() => {
     try {
@@ -137,8 +139,13 @@ export function Comments({ task }: { task: TaskDetail }) {
           <CommentEditor
             draftId={task.id}
             submitLabel="Comment"
-            onSubmit={async (body) => !!(await m.create.mutateAsync(body).catch(() => null))}
+            onSubmit={async (body) => {
+              const ok = !!(await m.create.mutateAsync(body).catch(() => null));
+              if (ok) reply.afterSend(body);
+              return ok;
+            }}
           />
+          {reply.ui}
         </div>
       ) : (
         <p className="mt-3 text-xs text-muted">You can view this task but not comment on it.</p>
@@ -252,7 +259,12 @@ function CommentItem({
             />
           </div>
         ) : (
-          <RichTextView doc={comment.body} personName={nameOf} className="mt-0.5 text-sm" />
+          <RichTextView
+            doc={comment.body}
+            personName={nameOf}
+            className="mt-0.5 text-sm"
+            askCard={(id) => <AskCard askId={id} />}
+          />
         )}
         {comment.reactions.length ? (
           <div className="mt-1.5 flex flex-wrap gap-1">

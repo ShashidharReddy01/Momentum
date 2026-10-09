@@ -9,6 +9,9 @@ export MOMENTUM_ENV=local
 # Journeys are written for the mock fixtures; a developer's apps/api/.env must not switch them to a real gateway.
 export MOMENTUM_LLM_MODE=mock
 export MOMENTUM_SPA_DIR="$ROOT/apps/web/dist"
+# J24 (Phase 7.6): the test packs (echo & co.) give the agent platform journeys a pack agent with
+# settings; they are synthetic and never load outside tests, e2e and the UI audit.
+export MOMENTUM_TEST_PACKS=true
 cd "$ROOT/apps/api"
 uv run python "$ROOT/tools/e2e/reset_db.py"
 uv run momentum migrate

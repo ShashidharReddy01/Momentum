@@ -13,6 +13,8 @@ export type AgentPatch = components['schemas']['AgentPatchIn'];
 export interface RunFilters {
   status?: string;
   trigger?: string;
+  project_id?: string;
+  capability?: string;
 }
 
 export const agentKeys = {
@@ -45,7 +47,12 @@ export function useAgentRuns(id: string, filters: RunFilters) {
         await api.GET('/api/v1/agents/{agent_id}/runs', {
           params: {
             path: { agent_id: id },
-            query: { status: filters.status || undefined, trigger: filters.trigger || undefined },
+            query: {
+              status: filters.status || undefined,
+              trigger: filters.trigger || undefined,
+              project_id: filters.project_id || undefined,
+              capability: filters.capability || undefined,
+            },
           },
         })
       ).data!.data,

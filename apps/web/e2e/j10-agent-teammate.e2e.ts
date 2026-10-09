@@ -27,6 +27,7 @@ test('J10: assign a task to Teammate and get the work back for review', async ({
     .getByRole('list', { name: 'Agents' })
     .getByRole('link', { name: /^Teammate/ })
     .click();
+  await admin.getByRole('tab', { name: 'Settings' }).click(); // Phase 7.6: the agent page has tabs
   const settings = admin.getByRole('region', { name: 'Agent settings' });
   const on = settings.getByRole('checkbox', { name: /Teammate is on/ });
   if (!(await on.isChecked())) await on.click();

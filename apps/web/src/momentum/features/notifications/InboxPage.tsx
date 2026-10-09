@@ -25,6 +25,7 @@ import { EmptyState } from '@/components/common/States';
 import { IconButton } from '@/components/ui/IconButton';
 import { Icon } from '@/components/ui/Icon';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { InboxAskControls } from '@/features/agents';
 import { SummaryButton } from '@/features/ai';
 import { TaskNavProvider, TaskPane, useTaskNav } from '@/features/tasks';
 import { cn } from '@/lib/cn';
@@ -66,7 +67,7 @@ const KIND_ICON: Record<Notification['kind'], { icon: LucideIcon; tone: string }
   digest: { icon: Newspaper, tone: 'text-amber-ink' },
   agent_alert: { icon: Bot, tone: 'text-amber-ink' },
   unblocked: { icon: Play, tone: 'text-ok' },
-  // Phase 7.6: an agent's question (answer controls land in S76-07), its reminder, a skill
+  // Phase 7.6: an agent's question (answered inline, S76-07), its reminder, a skill
   agent_ask: { icon: MessageCircleQuestion, tone: 'text-amber-ink' },
   agent_ask_reminder: { icon: BellRing, tone: 'text-amber-ink' },
   skill_proposed: { icon: Lightbulb, tone: 'text-amber-ink' },
@@ -207,6 +208,10 @@ function InboxBody() {
                     </li>
                   ))}
                 </ul>
+                {tab === 'active' &&
+                items.some((n) => n.kind === 'agent_ask' || n.kind === 'agent_ask_reminder') ? (
+                  <InboxAskControls taskId={entityId} />
+                ) : null}
               </li>
             ))}
           </ul>

@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { setupServer } from 'msw/node';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { MomentumApp } from '@/MomentumApp';
+import { askFixture, askHandlers } from '@/mocks/asks';
 import { authHandlers } from '@/mocks/handlers';
 import { notificationHandlers } from '@/mocks/notifications';
 import { projectHandlers } from '@/mocks/projects';
@@ -31,14 +32,15 @@ const NOTE = {
   created_at: new Date().toISOString(),
 };
 
-async function boot(path = '/inbox') {
+async function boot(path = '/inbox', extra: Parameters<typeof server.use> = [], notes = [{ ...NOTE }]) {
   server.use(
+    ...extra,
     ...authHandlers({ loggedIn: true }).handlers,
     ...teamHandlers(),
     ...projectHandlers('', undefined, [{ name: 'Website Revamp', my_role: 'admin' }]),
     ...sectionHandlers('', { 'seed-1': ['Backlog'] }),
     ...taskHandlers('', { 'seed-1': { 'sec-1': ['First'] } }),
-    ...notificationHandlers('', [{ ...NOTE }]),
+    ...notificationHandlers('', notes),
   );
   window.history.replaceState(null, '', path);
   render(<MomentumApp />);
@@ -74,5 +76,22 @@ describe('Inbox (S2.5.2)', () => {
 
     await user.click(screen.getByRole('tab', { name: 'Archive' }));
     await waitFor(() => expect(screen.getByText('You were assigned "First"')).toBeInTheDocument());
+  });
+});
+
+describe('Agent questions in the inbox (S76-07, spec §12.8)', () => {
+  it('answers an agent’s question from its inbox row without opening the task', async () => {
+    const asks = askHandlers({ asks: [askFixture({ task_id: 'task-1' })] });
+    const user = await boot('/inbox', asks.handlers, [
+      { ...NOTE, id: 'note-a', kind: 'agent_ask', title: 'Echo asks: Which vendor is this?' },
+      { ...NOTE, id: 'note-r', kind: 'agent_ask_reminder', title: 'Reminder: Echo is still waiting' },
+    ]);
+    await screen.findByText('Echo asks: Which vendor is this?');
+    // one set of controls per task, however many notifications point at it
+    const globex = await screen.findAllByRole('button', { name: 'Globex' });
+    expect(globex).toHaveLength(1);
+    await user.click(globex[0]!);
+    await waitFor(() => expect(asks.answers).toEqual([{ id: 'ask-1', value: 'globex', via: 'inbox' }]));
+    expect(screen.queryByRole('complementary', { name: 'Task details' })).toBeNull();
   });
 });

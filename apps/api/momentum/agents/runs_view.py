@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Any, Literal
 
@@ -231,6 +231,8 @@ async def list_runs(
     *,
     status: str | None = None,
     trigger: str | None = None,
+    project_id: uuid.UUID | None = None,
+    capability: str | None = None,
     limit: int = HISTORY_LIMIT,
 ) -> list[AgentRunOut]:
     """An agent's runs the viewer may see, newest first."""
@@ -245,6 +247,10 @@ async def list_runs(
         stmt = stmt.where(AgentRun.status == status)
     if trigger is not None:
         stmt = stmt.where(AgentRun.trigger["type"].astext == trigger)
+    if project_id is not None:
+        stmt = stmt.where(AgentRun.trigger["project_id"].astext == str(project_id))
+    if capability is not None:
+        stmt = stmt.where(AgentRun.capability == capability)
     rows = await session.execute(
         stmt.order_by(AgentRun.created_at.desc(), AgentRun.id.desc()).limit(limit * 4)
     )
@@ -365,3 +371,105 @@ async def get_run(
         job_steps=job_steps,
         children=children,
     )
+
+
+# ---------- Phase 7.6 S76-07 (spec §12.3): the job card on a task ----------
+
+OPEN_JOB = ("queued", "running", "waiting", "paused")
+
+
+class TaskJobOut(AgentRunOut):
+    current_step: str | None = None
+    waiting_reason: str | None = None
+    asks_for_me: int = 0
+
+
+async def _waiting_reason(session: AsyncSession, run: AgentRun) -> str | None:
+    """What a waiting or paused job waits for, in a few words."""
+    from momentum.domain.asks.models import Ask
+
+    w = run.waiting_on or {}
+    if run.status == "paused":
+        kind = w.get("type")
+        return {
+            "agent_off": "Paused: the agent is turned off",
+            "packs_off": "Paused: agent packs are turned off",
+        }.get(str(kind), "Paused")
+    if run.status != "waiting":
+        return None
+    kind = w.get("type")
+    if kind == "ask":
+        titles = (
+            await session.execute(
+                select(Ask.title).where(Ask.id.in_([uuid.UUID(i) for i in w.get("ids") or []]))
+            )
+        ).scalars()
+        named = ", ".join(f"“{t}”" for t in titles)
+        return f"Waiting for an answer: {named}" if named else "Waiting for an answer"
+    if kind == "children":
+        n = len(w.get("ids") or [])
+        return f"Waiting for {n} sub-job{'' if n == 1 else 's'}"
+    if kind == "timer":
+        return f"Waiting until {w.get('until')}"
+    if kind == "event":
+        return "Waiting for something to happen"
+    if kind == "instruction":
+        return "Waiting for your instruction"
+    return "Waiting"
+
+
+async def list_task_jobs(session: AsyncSession, ctx: Ctx, task_id: uuid.UUID) -> list[TaskJobOut]:
+    """The top-level jobs working on a task the viewer can see (open ones, and ones that failed
+    in the last day so they can be retried), oldest first."""
+    from momentum.domain.asks.models import Ask
+
+    _require_member(ctx)
+    await get_visible_task(session, ctx, task_id)
+    rows = await session.execute(
+        select(AgentRun)
+        .where(
+            AgentRun.workspace_id == ctx.workspace_id,
+            AgentRun.mode == "job",
+            AgentRun.parent_run_id.is_(None),
+            AgentRun.status.in_(OPEN_JOB)
+            | (
+                (AgentRun.status == "failed")
+                & (AgentRun.finished_at >= datetime.now(UTC) - timedelta(days=1))
+            ),
+            AgentRun.trigger["task_id"].astext == str(task_id),
+        )
+        .order_by(AgentRun.created_at, AgentRun.id)
+    )
+    out: list[TaskJobOut] = []
+    for run in rows.scalars():
+        seen = await _seen(session, ctx, run)
+        agent = await session.get(Agent, run.agent_id)
+        if seen is None or agent is None:
+            continue
+        step = (
+            await session.execute(
+                select(AgentRunStep.key)
+                .where(AgentRunStep.run_id == run.id)
+                .order_by(AgentRunStep.seq.desc())
+                .limit(1)
+            )
+        ).scalar_one_or_none()
+        asks = (
+            await session.execute(
+                select(Ask.to_user_ids).where(
+                    Ask.status == "open",
+                    (Ask.run_id == run.id)
+                    | Ask.run_id.in_(select(AgentRun.id).where(AgentRun.parent_run_id == run.id)),
+                )
+            )
+        ).scalars()
+        mine = sum(1 for to in asks if ctx.actor.id in (to or []))
+        out.append(
+            TaskJobOut(
+                **await _summary(session, run, agent, seen, await _actions(session, run.id)),
+                current_step=step or (run.waiting_on or {}).get("key"),
+                waiting_reason=await _waiting_reason(session, run),
+                asks_for_me=mine,
+            )
+        )
+    return out
