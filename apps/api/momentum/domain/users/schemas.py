@@ -115,8 +115,13 @@ class ProjectViewPrefs(BaseModel):
     # S2.2.3: the tab this user last had open (list-view filter/sort/group above are unrelated
     # to *which* view is showing). None = never chosen here yet: fall back to the project's
     # default_view, distinct from explicitly picking "list".
+    # Phase 7.6 S76-08: "records" (the Records tab) can be remembered too, though it's never a
+    # project's default_view (that tab only shows when the project has records)
     view: (
-        Literal["list", "board", "calendar", "timeline", "overview", "files", "dashboard"] | None
+        Literal[
+            "list", "board", "calendar", "timeline", "overview", "files", "dashboard", "records"
+        ]
+        | None
     ) = None
 
 

@@ -45,6 +45,7 @@ import { CsvImportDialog } from '@/features/csvImport';
 import { FieldsDialog } from '@/features/fields';
 import { SaveAsTemplateDialog, TaskTemplatesDialog } from '@/features/templates';
 import { StatusChip, type Status } from '@/features/status';
+import { useRecordTypes } from '@/features/records';
 import { useMomentumConfig } from '@/lib/config';
 import {
   useProject,
@@ -78,6 +79,7 @@ const ReportDialog = lazy(() => import('@/features/reports').then((m) => ({ defa
 const TimelineView = lazy(() => import('@/features/timeline').then((m) => ({ default: m.TimelineView })));
 // Lazy too: dashboards and their charts (Recharts) load only when the tab opens.
 const FilesView = lazy(() => import('@/features/files').then((m) => ({ default: m.FilesView })));
+const RecordsTab = lazy(() => import('@/features/records').then((m) => ({ default: m.RecordsTab })));
 const ProjectDashboard = lazy(() =>
   import('@/features/dashboards').then((m) => ({ default: m.ProjectDashboard })),
 );
@@ -90,6 +92,8 @@ const VIEWS = [
   { key: 'overview', label: 'Overview' },
   { key: 'files', label: 'Files' },
   { key: 'dashboard', label: 'Dashboard' },
+  // Phase 7.6 S76-08: only shown when the project has records (never a default view)
+  { key: 'records', label: 'Records' },
 ] as const;
 type LiveView = Exclude<(typeof VIEWS)[number], { phase: number }>['key'];
 const LIVE_VIEWS: ReadonlySet<string> = new Set(
@@ -108,6 +112,8 @@ export function ProjectPage() {
   const { archive, remove } = useProjectLifecycle(projectId);
   const favorite = useToggleFavorite();
   const { lastView, ready: lastViewReady, save: saveLastView } = useLastView(projectId);
+  const recordTypes = useRecordTypes(projectId);
+  const hasRecords = (recordTypes.data ?? []).some((t) => t.count > 0);
   const navigate = useNavigate();
   const { ai_enabled: aiEnabled, api_base } = useMomentumConfig();
   const [share, setShare] = useState(false);
@@ -237,9 +243,9 @@ export function ProjectPage() {
                   <DropdownMenuLabel>Default view</DropdownMenuLabel>
                   <DropdownMenuRadioGroup
                     value={p.default_view}
-                    onValueChange={(v) => update.mutate({ default_view: v as ViewKey })}
+                    onValueChange={(v) => update.mutate({ default_view: v as Exclude<ViewKey, 'records'> })}
                   >
-                    {VIEWS.filter((v) => !('phase' in v)).map((v) => (
+                    {VIEWS.filter((v) => !('phase' in v) && v.key !== 'records').map((v) => (
                       <DropdownMenuRadioItem key={v.key} value={v.key}>
                         {v.label}
                       </DropdownMenuRadioItem>
@@ -310,7 +316,7 @@ export function ProjectPage() {
             aria-label="Project views"
             className="mt-1 flex gap-1 overflow-x-auto [scrollbar-width:none]"
           >
-            {VIEWS.map((v) =>
+            {VIEWS.filter((v) => v.key !== 'records' || hasRecords || effectiveView === 'records').map((v) =>
               'phase' in v ? (
                 <Tooltip key={v.key} content={`Arrives in Phase ${v.phase}`}>
                   <span className="flex h-9 cursor-default items-center border-b-2 border-transparent px-2 text-body text-muted-2">
@@ -485,6 +491,10 @@ function ProjectBody({
               canEdit={canEdit}
               isAdmin={project.my_role === 'admin'}
             />
+          </Suspense>
+        ) : view === 'records' ? (
+          <Suspense fallback={<Skeleton className="h-64" />}>
+            <RecordsTab key={projectId} projectId={projectId} projectName={project.name} canEdit={canEdit} />
           </Suspense>
         ) : view === 'overview' ? (
           <Suspense fallback={<Skeleton className="h-64" />}>

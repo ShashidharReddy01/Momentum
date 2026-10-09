@@ -359,6 +359,11 @@ export function taskHandlers(
       HttpResponse.json({ data: [], meta: { next_cursor: null } }),
     ),
     http.get(`*${base}/api/v1/asks`, () => HttpResponse.json({ data: [], meta: { next_cursor: null } })),
+    // Phase 7.6 S76-08: no records unless a test adds them (mocks/records.ts)
+    http.get(`*${base}/api/v1/records`, () => HttpResponse.json({ data: [], meta: { next_cursor: null } })),
+    http.get(`*${base}/api/v1/records/types`, () =>
+      HttpResponse.json({ data: [], meta: { next_cursor: null } }),
+    ),
     http.get(`*${base}/api/v1/tasks/:id/feed`, ({ params }) => {
       const t = tasks.find((x) => x.id === params.id);
       const created = t

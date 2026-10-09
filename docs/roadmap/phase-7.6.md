@@ -661,6 +661,33 @@ cases). Tests: `test_record_tool_words.py` (16), per-currency sums over `amount`
 tokens (the 43-tool catalog), $0.13–0.26 each; the exit's full live run will cost more than the
 7.5-era estimate.
 
+**S76-08 as built (2026-10-09, local session, mock AI only, $0 gateway spend).** No migration.
+**API:** `GET /records/types?project_id=` (each type's JSON Schema, display spec and how many
+records the viewer can see), `GET /records/{id}/source` (the source file's pages with their
+sizes; **provenance `bbox` is `[x0, top, x1, bottom]` in the page's own units: PDF points with a
+top-left origin as pdfplumber reports words, pixels for an image**, a delegated decision S76-09's
+`locate` follows), `can_edit` / `can_decide` / `decide_blocked` on `GET /records/{id}`,
+`activity_id` on `PATCH /records/{id}` (undo), `POST /records/status` (send to review or void as
+one undoable batch; `update_record` takes a `batch_id`), `GET /entities/{id}/activity`, and
+"records" accepted as a remembered project view (`me/prefs/views`; never a `default_view`).
+**Web:** `features/records/`: the review screen (page viewer with provenance highlights both ways,
+the generated record form, the array grid with keyboard moves and a totals row, checks, decision,
+entity, history, save as operations, 409 reload-and-reapply, approve / reject with a reason), the
+project Records tab (type switcher, filters incl. linked entity and dates, per-currency totals from
+the server, export, bulk send-to-review / void with one undo), the task's record panel, the
+entities list and page (aliases, bank display, profile, records, skills, activity, merge,
+archive); `features/agents/SkillsAdmin.tsx` (the agent page's Skills tab: proposed with tryout,
+active with metrics and the hurting flag, history; filters). **E2E:** `tools/e2e/seed_records.py`
+(run by `serve.sh`: installs the agents as "Install starter agents" does, then as Echo two bills,
+a vendor and a proposed skill; refuses a database not ending in `_e2e`); J14 adds the review
+screen, Records tab, entities and skills admin to the axe pages and a keyboard journey on the
+review screen (highlight → field, edit, grid ↓, save, undo); the webServer timeout is 240 s (three
+seeds). **Deviations:** the grid's totals row is computed in the browser (exact cents) because it
+totals unsaved edits; saved totals everywhere else come from the server. Merge and archive show to
+workspace admins in the UI (stewards can use the API; the server checks both). Skill decisions
+toast without Undo (their activity is undoable from the audit trail). **Tests:**
+`test_records_review.py` (3), `records.test.tsx` (13), J14 extended.
+
 ## The prompt for the build session
 
 Paste this into the browser session (also correct for resuming after a context reset):

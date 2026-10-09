@@ -131,6 +131,23 @@ export function buildRoutes(config: RuntimeConfig): RouteObject[] {
           handle: { crumb: 'Agent' },
         },
         {
+          path: 'records/:recordId',
+          lazy: async () => ({
+            Component: (await import('@/features/records/RecordReviewPage')).RecordReviewPage,
+          }),
+          handle: { crumb: 'Record' },
+        },
+        {
+          path: 'entities',
+          lazy: async () => ({ Component: (await import('@/features/records/EntitiesPage')).EntitiesPage }),
+          handle: { crumb: 'Entities' },
+        },
+        {
+          path: 'entities/:entityId',
+          lazy: async () => ({ Component: (await import('@/features/records/EntitiesPage')).EntityPage }),
+          handle: { crumb: 'Entity' },
+        },
+        {
           path: 'search',
           lazy: async () => ({ Component: (await import('@/features/search/SearchPage')).SearchPage }),
           handle: { crumb: 'Search' },

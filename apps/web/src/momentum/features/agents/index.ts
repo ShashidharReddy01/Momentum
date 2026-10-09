@@ -5,6 +5,7 @@ export { AgentRunPage } from './AgentRunPage';
 export { AskBox, AskCard, AskControls, describeAnswer } from './AskCard';
 export { CapabilityChips } from './AgentsGallery';
 export { JobCard, TaskJobs } from './JobCard';
+export { SkillsAdmin, skillText, useSkills, type Skill } from './SkillsAdmin';
 export { useReplyAsAnswer } from './ReplyAsAnswer';
 export { InboxAskControls, WaitingOnYou } from './WaitingOnYou';
 export { docText, useDirectory, useMyAsks, type Ask, type DirectoryCard, type TaskJob } from './platform';

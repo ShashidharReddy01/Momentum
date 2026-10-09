@@ -149,3 +149,58 @@ class RecordDetailOut(RecordOut):
     duplicates: list[uuid.UUID] = Field(
         default_factory=list, description="Other records with the same identity (you can see)"
     )
+    # S76-08 (spec §12.4): what the review screen may offer this viewer
+    can_edit: bool = False
+    can_decide: bool = False
+    decide_blocked: str | None = Field(default=None, description="Why approving isn't offered")
+
+
+class RecordPatchOut(RecordOut):
+    activity_id: uuid.UUID | None = Field(default=None, description="The change, for undo")
+
+
+class RecordTypeOut(BaseModel):
+    """A record type for the review form and the Records tab (S76-08): its JSON Schema and
+    display spec (columns, money and date paths, arrays, title template), and how many records
+    of it the viewer can see."""
+
+    key: str
+    version: int
+    label: str
+    classification: str
+    schema_: dict[str, Any] = Field(alias="schema", serialization_alias="schema")
+    display: dict[str, Any]
+    count: int
+
+    model_config = {"populate_by_name": True}
+
+
+class PageOut(BaseModel):
+    n: int
+    width: float = Field(description="In PDF points (or pixels for an image); bbox uses the same")
+    height: float
+
+
+class RecordSourceOut(BaseModel):
+    """The record's source file for the page viewer. Provenance ``bbox`` values are
+    ``[x0, top, x1, bottom]`` in the page's own units (PDF points, top-left origin, as
+    pdfplumber reports words; pixels for an image)."""
+
+    attachment_id: uuid.UUID
+    filename: str
+    mime: str
+    locator: str | None
+    pages: list[PageOut]
+
+
+class BulkStatusIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    ids: list[uuid.UUID] = Field(min_length=1, max_length=200)
+    status: Literal["needs_review", "void"]
+    reason: str | None = Field(default=None, max_length=1000)
+
+
+class BulkStatusOut(BaseModel):
+    updated: int
+    skipped: list[dict[str, str]]
+    batch_id: uuid.UUID | None

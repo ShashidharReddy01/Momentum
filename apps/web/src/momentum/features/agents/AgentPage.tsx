@@ -14,11 +14,12 @@ import { triggerSummary } from './AgentsGallery';
 import { useAgentProfile } from './platform';
 import { useAgent, useAgentRuns, type Agent, type AgentRun, type RunFilters } from './queries';
 import { RunNowPanel } from './RunNowPanel';
+import { SkillsAdmin } from './SkillsAdmin';
 import { StatusBadge } from './StatusBadge';
 import { TestRunPanel } from './TestRunPanel';
 import { AUTONOMY_LABEL, RUN_STATUS, TRIGGER_LABEL, money, when } from './runMeta';
 
-const TABS = ['overview', 'runs', 'health', 'settings'] as const;
+const TABS = ['overview', 'runs', 'health', 'skills', 'settings'] as const;
 type Tab = (typeof TABS)[number];
 
 /** `/agents/:agentId` (S5.1.3, tabs in Phase 7.6 spec §12.2): Overview (what it's for, how to
@@ -89,6 +90,7 @@ export function AgentPage() {
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="runs">Runs</TabsTrigger>
           <TabsTrigger value="health">Health</TabsTrigger>
+          {a.pack_key ? <TabsTrigger value="skills">Skills</TabsTrigger> : null}
           <TabsTrigger value="settings">Settings</TabsTrigger>
         </TabsList>
         <TabsContent value="overview" className="flex flex-col gap-6 pt-5">
@@ -102,6 +104,11 @@ export function AgentPage() {
         <TabsContent value="health" className="pt-5">
           <AgentHealthPanel agent={a} />
         </TabsContent>
+        {a.pack_key ? (
+          <TabsContent value="skills" className="pt-5">
+            <SkillsAdmin packKey={a.pack_key} />
+          </TabsContent>
+        ) : null}
         <TabsContent value="settings" className="flex flex-col gap-6 pt-5">
           <SettingsTab agent={a} isAdmin={isAdmin} />
         </TabsContent>

@@ -28,7 +28,7 @@ export default defineConfig({
     command: 'bash ../../tools/e2e/serve.sh', // via bash so Windows (cmd.exe) can start it too
     url: `http://localhost:${PORT}/healthz`,
     env: { E2E_PORT: String(PORT) },
-    timeout: 120_000,
+    timeout: 240_000, // reset, migrate, three seeds (S76-08 adds the records seed)
     reuseExistingServer: false,
     stdout: 'ignore',
     stderr: 'pipe',

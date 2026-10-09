@@ -4,13 +4,16 @@ only as "•••• 4821" (the fingerprint is never sent)."""
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
 from typing import Any
 
 from fastapi import APIRouter, Query
 from pydantic import BaseModel, ConfigDict, Field
+from sqlalchemy import select
 
 from momentum.api.deps import CtxDep, RuntimeDep, UowDep
 from momentum.api.schemas import ListOut
+from momentum.core.activity import Activity
 from momentum.core.errors import Conflict
 from momentum.domain.entities import service
 from momentum.domain.entities.service import EntityOut, entity_out
@@ -61,6 +64,52 @@ async def list_entities(
 async def get_entity(entity_id: uuid.UUID, ctx: CtxDep, uow: UowDep) -> EntityOut:
     async with uow.transaction() as s:
         return entity_out(await service.get_entity(s, ctx, entity_id))
+
+
+class EntityActivityOut(BaseModel):
+    id: uuid.UUID
+    verb: str
+    actor_id: uuid.UUID | None
+    actor_kind: str
+    diff: dict[str, Any]
+    created_at: datetime
+
+
+@router.get(
+    "/entities/{entity_id}/activity",
+    response_model=ListOut[EntityActivityOut],
+    summary="What happened to an entity, newest first (S76-08, its page's timeline)",
+)
+async def entity_activity(
+    entity_id: uuid.UUID, ctx: CtxDep, uow: UowDep
+) -> ListOut[EntityActivityOut]:
+    async with uow.transaction() as s:
+        e = await service.get_entity(s, ctx, entity_id)
+        rows = (
+            await s.execute(
+                select(Activity)
+                .where(
+                    Activity.workspace_id == ctx.workspace_id,
+                    Activity.entity_type == "entity",
+                    Activity.entity_id == e.id,
+                )
+                .order_by(Activity.id.desc())
+                .limit(50)
+            )
+        ).scalars()
+        return ListOut(
+            data=[
+                EntityActivityOut(
+                    id=a.id,
+                    verb=a.verb,
+                    actor_id=a.actor_id,
+                    actor_kind=a.actor_kind,
+                    diff=a.diff or {},
+                    created_at=a.created_at,
+                )
+                for a in rows
+            ]
+        )
 
 
 @router.patch(

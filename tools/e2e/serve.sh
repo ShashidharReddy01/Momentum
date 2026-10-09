@@ -18,6 +18,9 @@ uv run momentum migrate
 uv run momentum seed
 # J16 (Phase 7.5): the onboarding template, 12 customers and the lifecycle portfolio
 uv run momentum seed --onboarding --small
+# J14/J24 (Phase 7.6 S76-08): the agents installed (all off), and synthetic records, a vendor and a
+# proposed skill made by the Echo test pack
+uv run python "$ROOT/tools/e2e/seed_records.py"
 
 # J6's recorded-fixture Asana API (see asana_fixture_server.py's own docstring). Runs alongside
 # the app for the lifetime of this script; killed on exit since it's a throwaway per-run process.

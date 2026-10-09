@@ -1777,6 +1777,23 @@ export interface paths {
         patch: operations["patch_entity_api_v1_entities__entity_id__patch"];
         trace?: never;
     };
+    "/api/v1/entities/{entity_id}/activity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** What happened to an entity, newest first (S76-08, its page's timeline) */
+        get: operations["entity_activity_api_v1_entities__entity_id__activity_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/entities/{entity_id}/aliases": {
         parameters: {
             query?: never;
@@ -3461,6 +3478,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/records/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Send records to review, or void them, as one undoable batch (editors) */
+        post: operations["bulk_status_api_v1_records_status_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/records/types": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Record types with their form schema and display spec, and how many records of each you can see (in a project, with project_id) */
+        get: operations["record_types_api_v1_records_types_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/records/{record_id}": {
         parameters: {
             query?: never;
@@ -3488,6 +3539,23 @@ export interface paths {
         };
         /** A page of the record's source file as an image (rendered once, then cached) */
         get: operations["record_page_api_v1_records__record_id__pages__page__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/records/{record_id}/source": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The record's source file for the page viewer: its pages and their sizes */
+        get: operations["record_source_api_v1_records__record_id__source_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -5971,6 +6039,29 @@ export interface components {
             /** Updated */
             updated: number;
         };
+        /** BulkStatusIn */
+        BulkStatusIn: {
+            /** Ids */
+            ids: string[];
+            /** Reason */
+            reason?: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "needs_review" | "void";
+        };
+        /** BulkStatusOut */
+        BulkStatusOut: {
+            /** Batch Id */
+            batch_id: string | null;
+            /** Skipped */
+            skipped: {
+                [key: string]: string;
+            }[];
+            /** Updated */
+            updated: number;
+        };
         /** Calibration */
         Calibration: {
             /** Bands */
@@ -6926,6 +7017,29 @@ export interface components {
             enabled: boolean;
             /** Monthly Budget Usd */
             monthly_budget_usd: number;
+        };
+        /** EntityActivityOut */
+        EntityActivityOut: {
+            /** Actor Id */
+            actor_id: string | null;
+            /** Actor Kind */
+            actor_kind: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Diff */
+            diff: {
+                [key: string]: unknown;
+            };
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Verb */
+            verb: string;
         };
         /** EntityOut */
         EntityOut: {
@@ -8405,6 +8519,13 @@ export interface components {
             /** @default {} */
             meta: components["schemas"]["ListMeta"];
         };
+        /** ListOut[EntityActivityOut] */
+        ListOut_EntityActivityOut_: {
+            /** Data */
+            data: components["schemas"]["EntityActivityOut"][];
+            /** @default {} */
+            meta: components["schemas"]["ListMeta"];
+        };
         /** ListOut[EntityOut] */
         ListOut_EntityOut_: {
             /** Data */
@@ -8535,6 +8656,13 @@ export interface components {
         ListOut_RecordOut_: {
             /** Data */
             data: components["schemas"]["RecordOut"][];
+            /** @default {} */
+            meta: components["schemas"]["ListMeta"];
+        };
+        /** ListOut[RecordTypeOut] */
+        ListOut_RecordTypeOut_: {
+            /** Data */
+            data: components["schemas"]["RecordTypeOut"][];
             /** @default {} */
             meta: components["schemas"]["ListMeta"];
         };
@@ -9505,6 +9633,18 @@ export interface components {
             workspace: {
                 [key: string]: unknown;
             };
+        };
+        /** PageOut */
+        PageOut: {
+            /** Height */
+            height: number;
+            /** N */
+            n: number;
+            /**
+             * Width
+             * @description In PDF points (or pixels for an image); bbox uses the same
+             */
+            width: number;
         };
         /** Period */
         Period: {
@@ -10506,7 +10646,7 @@ export interface components {
             /** Tags */
             tags?: string[];
             /** View */
-            view?: ("list" | "board" | "calendar" | "timeline" | "overview" | "files" | "dashboard") | null;
+            view?: ("list" | "board" | "calendar" | "timeline" | "overview" | "files" | "dashboard" | "records") | null;
         };
         /** ProjectsSpec */
         ProjectsSpec: {
@@ -11147,6 +11287,16 @@ export interface components {
         RecordDetailOut: {
             /** Amount */
             amount: string | null;
+            /**
+             * Can Decide
+             * @default false
+             */
+            can_decide: boolean;
+            /**
+             * Can Edit
+             * @default false
+             */
+            can_edit: boolean;
             /** Checks */
             checks: {
                 [key: string]: unknown;
@@ -11168,6 +11318,11 @@ export interface components {
             data: {
                 [key: string]: unknown;
             };
+            /**
+             * Decide Blocked
+             * @description Why approving isn't offered
+             */
+            decide_blocked?: string | null;
             /** Decision */
             decision: {
                 [key: string]: unknown;
@@ -11305,6 +11460,84 @@ export interface components {
             /** Reason */
             reason?: string | null;
         };
+        /** RecordPatchOut */
+        RecordPatchOut: {
+            /**
+             * Activity Id
+             * @description The change, for undo
+             */
+            activity_id?: string | null;
+            /** Amount */
+            amount: string | null;
+            /** Checks */
+            checks: {
+                [key: string]: unknown;
+            }[];
+            /** Classification */
+            classification: string;
+            /** Confidence */
+            confidence: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Created Via */
+            created_via: string;
+            /** Currency */
+            currency: string | null;
+            /** Data */
+            data: {
+                [key: string]: unknown;
+            };
+            /** Decision */
+            decision: {
+                [key: string]: unknown;
+            } | null;
+            /** Entity Ids */
+            entity_ids: string[];
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Occurred On */
+            occurred_on: string | null;
+            /**
+             * Project Id
+             * Format: uuid
+             */
+            project_id: string;
+            /** Provenance */
+            provenance: {
+                [key: string]: unknown;
+            };
+            /** Run Id */
+            run_id: string | null;
+            /** Source Attachment Id */
+            source_attachment_id: string | null;
+            /** Source Locator */
+            source_locator: string | null;
+            /** Status */
+            status: string;
+            /** Task Id */
+            task_id: string | null;
+            /** Title */
+            title: string;
+            /** Type */
+            type: string;
+            /** Type Label */
+            type_label: string;
+            /** Type Version */
+            type_version: number;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Version */
+            version: number;
+        };
         /** RecordQuery */
         RecordQuery: {
             /** Array */
@@ -11338,6 +11571,53 @@ export interface components {
             status?: string[];
             /** Type */
             type: string;
+        };
+        /**
+         * RecordSourceOut
+         * @description The record's source file for the page viewer. Provenance ``bbox`` values are
+         *     ``[x0, top, x1, bottom]`` in the page's own units (PDF points, top-left origin, as
+         *     pdfplumber reports words; pixels for an image).
+         */
+        RecordSourceOut: {
+            /**
+             * Attachment Id
+             * Format: uuid
+             */
+            attachment_id: string;
+            /** Filename */
+            filename: string;
+            /** Locator */
+            locator: string | null;
+            /** Mime */
+            mime: string;
+            /** Pages */
+            pages: components["schemas"]["PageOut"][];
+        };
+        /**
+         * RecordTypeOut
+         * @description A record type for the review form and the Records tab (S76-08): its JSON Schema and
+         *     display spec (columns, money and date paths, arrays, title template), and how many records
+         *     of it the viewer can see.
+         */
+        RecordTypeOut: {
+            /** Classification */
+            classification: string;
+            /** Count */
+            count: number;
+            /** Display */
+            display: {
+                [key: string]: unknown;
+            };
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Schema */
+            schema: {
+                [key: string]: unknown;
+            };
+            /** Version */
+            version: number;
         };
         /** RecordVersionOut */
         RecordVersionOut: {
@@ -18073,6 +18353,37 @@ export interface operations {
             };
         };
     };
+    entity_activity_api_v1_entities__entity_id__activity_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entity_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListOut_EntityActivityOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     add_alias_api_v1_entities__entity_id__aliases_post: {
         parameters: {
             query?: never;
@@ -22224,6 +22535,70 @@ export interface operations {
             };
         };
     };
+    bulk_status_api_v1_records_status_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkStatusIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkStatusOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    record_types_api_v1_records_types_get: {
+        parameters: {
+            query?: {
+                project_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListOut_RecordTypeOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_record_api_v1_records__record_id__get: {
         parameters: {
             query?: never;
@@ -22276,7 +22651,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["RecordOut"];
+                    "application/json": components["schemas"]["RecordPatchOut"];
                 };
             };
             /** @description Validation Error */
@@ -22308,6 +22683,37 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    record_source_api_v1_records__record_id__source_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                record_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecordSourceOut"];
+                };
             };
             /** @description Validation Error */
             422: {

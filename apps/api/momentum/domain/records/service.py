@@ -248,6 +248,33 @@ async def _require_visible(
     return role
 
 
+async def viewer_role(session: AsyncSession, ctx: Ctx, record: Record) -> str:
+    """S76-07/08: the viewer's role on a record they can see (``NotFound`` otherwise)."""
+    return await _require_visible(session, ctx, record)
+
+
+def can_decide(ctx: Ctx, record: Record, role: str) -> tuple[bool, str | None]:
+    """Whether this viewer may approve or reject the record (spec §6.7), and why not."""
+    if record.status in ("void", "superseded", "approved", "rejected"):
+        return False, f"This record is {record.status}"
+    if role != "admin" and not ctx.actor.is_admin:
+        return False, "Approving or rejecting a record needs a project admin"
+    if record.created_by == ctx.actor.id and record.created_via != "agent":
+        return False, "You can't approve a record you made yourself"
+    return True, None
+
+
+async def type_counts(
+    session: AsyncSession, ctx: Ctx, project_id: uuid.UUID | None
+) -> dict[str, int]:
+    """How many records of each type the viewer can see (in one project, or anywhere)."""
+    stmt = select(Record.type, func.count()).where(await visible(session, ctx))
+    if project_id is not None:
+        stmt = stmt.where(Record.project_id == project_id)
+    rows = await session.execute(stmt.group_by(Record.type))
+    return {t: int(n) for t, n in rows.all()}
+
+
 def visible_clause(ctx: Ctx, classified_types: list[str]) -> ColumnElement[bool]:
     """Records in projects the viewer can see; a guest never gets classified types."""
     clause = and_(
@@ -546,6 +573,7 @@ async def update_record(
     checks: list[dict[str, Any]] | None = None,
     decision: dict[str, Any] | None = None,
     confidence: float | Decimal | None = None,
+    batch_id: uuid.UUID | None = None,
 ) -> Record:
     """Correction operations (people and agents); an agent may also replace the checks, the
     decision and the confidence in the same version (``ops`` may then be empty)."""
@@ -606,6 +634,7 @@ async def update_record(
             version=before["version"],
             expect=record.version,
         ),
+        batch_id=batch_id,
     )
     await emit(
         session,

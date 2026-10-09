@@ -36,7 +36,7 @@ async function serious(page: Page) {
 
 for (const scheme of ['light', 'dark'] as const) {
   test(`J14: no serious axe violations (${scheme})`, async ({ page }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(180_000);
     await page.emulateMedia({ colorScheme: scheme, reducedMotion: 'reduce' });
     await login(page, 'Avery Admin');
     const found: string[] = [];
@@ -110,12 +110,30 @@ for (const scheme of ['light', 'dark'] as const) {
       .click();
     await expect(page.getByRole('complementary', { name: 'Task details' })).toBeVisible();
     found.push(...(await serious(page)).map((v) => `Task pane: ${v}`));
-    // last: opening Files makes the project remember that view
     const projects = (await (await page.request.get('/api/v1/projects')).json()).data as {
       id: string;
       name: string;
     }[];
     const revamp = projects.find((p) => p.name === 'Website Revamp')!.id;
+    // Phase 7.6 S76-08: the review screen, the Records tab, entities and the skills admin
+    const bill = await firstBill(page);
+    await page.goto(`/records/${bill}`);
+    await expect(page.getByRole('grid', { name: 'Lines grid' })).toBeVisible();
+    found.push(...(await serious(page)).map((v) => `Record review: ${v}`));
+    await page.goto(`/projects/${revamp}/records`);
+    await expect(page.getByRole('table', { name: 'Echo bill records' })).toBeVisible();
+    found.push(...(await serious(page)).map((v) => `Records tab: ${v}`));
+    await page.goto('/entities');
+    await expect(page.getByRole('list', { name: 'Entities' })).toBeVisible();
+    found.push(...(await serious(page)).map((v) => `Entities: ${v}`));
+    const agents = (await (await page.request.get('/api/v1/agents')).json()).data as {
+      id: string;
+      key: string;
+    }[];
+    await page.goto(`/agents/${agents.find((a) => a.key === 'echo')!.id}?tab=skills`);
+    await expect(page.getByRole('region', { name: 'Skills' })).toBeVisible();
+    found.push(...(await serious(page)).map((v) => `Skills admin: ${v}`));
+    // last: opening Files makes the project remember that view
     await page.goto(`/projects/${revamp}/files`);
     await expect(page.getByRole('toolbar', { name: 'Files' })).toBeVisible();
     found.push(...(await serious(page)).map((v) => `Project files: ${v}`));
@@ -126,6 +144,38 @@ for (const scheme of ['light', 'dark'] as const) {
     expect(found).toEqual([]);
   });
 }
+
+async function firstBill(page: Page): Promise<string> {
+  const rows = (await (await page.request.get('/api/v1/records?type=echo_bill&q=INV-0041')).json()).data as {
+    id: string;
+  }[];
+  return rows[0]!.id;
+}
+
+test('J14: the review screen from the keyboard: highlight → field, edit, save, undo', async ({ page }) => {
+  await login(page, 'Avery Admin');
+  await page.goto(`/records/${await firstBill(page)}`);
+  // every highlight has a text equivalent and is a keyboard stop
+  const box = page.getByRole('button', { name: /^Number: page 1, top right$/ });
+  await box.focus();
+  await page.keyboard.press('Enter');
+  const number = page.getByRole('textbox', { name: /^Number/ });
+  await expect(number).toBeFocused();
+  await page.keyboard.press('ControlOrMeta+a');
+  await page.keyboard.type('INV-0041A');
+  // the lines grid: ↓ moves to the same column in the next row
+  const grid = page.getByRole('grid', { name: 'Lines grid' });
+  await grid.getByRole('textbox', { name: 'Amount, row 1' }).focus();
+  await page.keyboard.press('ArrowDown');
+  await expect(grid.getByRole('textbox', { name: 'Amount, row 2' })).toBeFocused();
+  const save = page.getByRole('button', { name: /^Save \(1 change\)/ });
+  await save.focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByText('Saved')).toBeVisible();
+  await expect(number).toHaveValue('INV-0041A');
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await expect(number).toHaveValue('INV-0041');
+});
 
 test('J14: list → pane → back to the row, from the keyboard', async ({ page }) => {
   await login(page);
