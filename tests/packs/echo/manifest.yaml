@@ -18,6 +18,7 @@ capabilities:
     output: { text: true }
     examples: ["Echo hello"]
     typical_duration_s: 1
+    manual_minutes_per_item: 6
   - key: tryout
     title: Try out a skill
     description: Records a canned before/after for a proposed skill (S76-05 tests).

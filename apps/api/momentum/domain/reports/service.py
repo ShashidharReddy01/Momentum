@@ -26,6 +26,7 @@ from typing import Any
 from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from momentum.core.activity import record_activity
 from momentum.core.context import Ctx
 from momentum.core.errors import Forbidden, NotFound, ValidationFailed
 from momentum.core.events import emit
@@ -98,6 +99,19 @@ async def request_report(
     )
     session.add(run)
     await session.flush()
+    if spec.kind == "records_export" and spec.record_type:
+        # Phase 7.6 (spec §8.5): every export of personal records is on the record
+        from momentum.domain.records.service import classifications
+
+        if (await classifications(session, ctx.workspace_id)).get(spec.record_type) == "personal":
+            await record_activity(
+                session,
+                ctx,
+                entity_type="report_run",
+                entity_id=run.id,
+                verb="records.exported",
+                changes={"type": (None, spec.record_type), "format": (None, spec.format)},
+            )
     return run
 
 

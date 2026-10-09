@@ -594,6 +594,28 @@ and skills and undoes cleanly; the bank fingerprint appears in no API response, 
 activity) plus matching, permissions, profiles, tryouts, decisions with undo, scoring, the digest,
 settings layers, the settings API, `job.settings()` and the new ask routes.
 
+**S76-06 as built (2026-10-09, local session, mock AI only, $0 gateway spend).** No migration.
+**Consent:** `PackTrigger.setting` now also gates event triggers; `pack_settings.consent()`
+(project value, else workspace); `evaluate_schedules` and the event consumer read pack agents'
+manifest triggers, skip projects where the setting is off and record `consent` on the run.
+**Policy engine:** `agents/packs/policy.py`, exported as `momentum.sdk.policy`. **Classified
+packs:** `job.log` text and step and job errors scrubbed; exports of personal records record
+`records.exported`. **`packs check`:** the injection-eval rule (`has_injection_eval`).
+**Telemetry:** GenAI names on every step. **Kill switch:** `agents.service.remove_from_project`
+cancels the agent's open jobs there (`runs.cancel_jobs_in_project`, their asks too). **Health:**
+`agents/health.py` + `GET /agents/{id}/health`; echo's capability gained
+`manual_minutes_per_item: 6` for the time-saved estimate. **Deviations:** "Bernie's touch rate"
+(deferred from S76-04's AP template) lives on the health page as the human-touch rate rather than a
+dashboard widget: it's a property of the agent's records and their versions, which the dashboard
+query engine doesn't model; S76-07 shows it on the agent page. Mo answering personal values "only
+when asked directly" waits for a pack that has personal data (none ships in 7.6). **Tests:**
+`test_effects_policy.py` (12: the policy engine incl. a rule that raises; setting-gated event and
+schedule triggers naming who consented; undeclared effects raise `PackError`; `complete_own` only
+for the agent's own subtask; agents never delete; taking an agent off a project cancels its job;
+with packs off jobs wait; a financial pack's logs and errors scrubbed; the injection-eval rule;
+GenAI names), `test_agent_health.py` (3: every metric on constructed data with exact answers,
+calibration with 20 reviewed items, summary vs detail by role).
+
 ## The prompt for the build session
 
 Paste this into the browser session (also correct for resuming after a context reset):

@@ -43,6 +43,8 @@ class JobsEnv:
         **settings: Any,
     ) -> None:
         self.uow, self.sf, self.tmp, self.world = uow, sf, tmp, world
+        # read now: a step that fails rolls back and expires the loaded world objects
+        self.project_id = world.project.id
         self.settings = make_settings(
             **{"llm_fixtures_dir": str(tmp), "test_packs": True, **settings}
         )
@@ -70,7 +72,7 @@ class JobsEnv:
             await service.update_agent(s, admin, r.agent.id, AgentPatchIn(enabled=True), REG.names)
             if access:
                 await service.add_to_project(
-                    s, self.world.ravi, r.agent.id, self.world.project.id, "editor"
+                    s, self.world.ravi, r.agent.id, self.project_id, "editor"
                 )
             self.agent = r.agent
         return self.agent

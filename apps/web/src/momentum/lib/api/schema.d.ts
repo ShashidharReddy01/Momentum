@@ -261,6 +261,23 @@ export interface paths {
         patch: operations["patch_agent_api_v1_agents__agent_id__patch"];
         trace?: never;
     };
+    "/api/v1/agents/{agent_id}/health": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** An agent's health over the last N days (members: summary; admins, stewards: detail) */
+        get: operations["agent_health_api_v1_agents__agent_id__health_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/agents/{agent_id}/projects": {
         parameters: {
             query?: never;
@@ -5751,6 +5768,17 @@ export interface components {
             /** Verb */
             verb: string;
         };
+        /** Band */
+        Band: {
+            /** Actual */
+            actual: number;
+            /** Band */
+            band: string;
+            /** Items */
+            items: number;
+            /** Predicted */
+            predicted: number;
+        };
         /**
          * BlockedTaskOut
          * @description One task id with an incomplete blocker — the shape the bulk per-project endpoint returns,
@@ -5886,6 +5914,15 @@ export interface components {
             skipped: number;
             /** Updated */
             updated: number;
+        };
+        /** Calibration */
+        Calibration: {
+            /** Bands */
+            bands: components["schemas"]["Band"][];
+            /** Note */
+            note?: string | null;
+            /** Reviewed */
+            reviewed: number;
         };
         /** CatchUpIn */
         CatchUpIn: {
@@ -7839,6 +7876,57 @@ export interface components {
             status_update: components["schemas"]["StatusUpdateIn"];
             /** To Stage */
             to_stage: string | null;
+        };
+        /** HealthOut */
+        HealthOut: {
+            /**
+             * Agent Id
+             * Format: uuid
+             */
+            agent_id: string;
+            /** Asks Per Item */
+            asks_per_item: number | null;
+            /** Auto Approved Rate */
+            auto_approved_rate: number | null;
+            calibration?: components["schemas"]["Calibration"] | null;
+            /** Cost Per Item Usd */
+            cost_per_item_usd: number | null;
+            /** Days */
+            days: number;
+            /** Detail */
+            detail: boolean;
+            /** Human Touch Rate */
+            human_touch_rate: number | null;
+            /** Items */
+            items: number;
+            /** Jobs */
+            jobs: number;
+            /** Median Active Seconds */
+            median_active_seconds: number | null;
+            /** Median Answer Seconds */
+            median_answer_seconds: number | null;
+            /** Median Waiting Seconds */
+            median_waiting_seconds: number | null;
+            skills: components["schemas"]["SkillStats"] | null;
+            /** Success Rate */
+            success_rate: number | null;
+            /**
+             * Time Saved Is Estimate
+             * @default true
+             */
+            time_saved_is_estimate: boolean;
+            /** Time Saved Minutes */
+            time_saved_minutes: number | null;
+            /** Top Corrected Fields */
+            top_corrected_fields?: [
+                string,
+                number
+            ][] | null;
+            /** Top Failure Reasons */
+            top_failure_reasons?: [
+                string,
+                number
+            ][] | null;
         };
         /** HomeCounts */
         HomeCounts: {
@@ -12165,6 +12253,17 @@ export interface components {
             /** Version */
             version: number;
         };
+        /** SkillStats */
+        SkillStats: {
+            /** Active */
+            active: number;
+            /** Helped */
+            helped: number;
+            /** Hurt */
+            hurt: number;
+            /** Proposed */
+            proposed: number;
+        };
         /** SnapshotSpec */
         SnapshotSpec: {
             /**
@@ -14435,6 +14534,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MutationOut_AgentOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    agent_health_api_v1_agents__agent_id__health_get: {
+        parameters: {
+            query?: {
+                days?: number;
+            };
+            header?: never;
+            path: {
+                agent_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HealthOut"];
                 };
             };
             /** @description Validation Error */

@@ -37,6 +37,7 @@ from momentum.domain.access import get_visible_project, get_visible_task, task_a
 from momentum.domain.agents.models import Agent, AgentRun
 from momentum.domain.agents.runs import enqueue_run
 from momentum.domain.comments.models import Comment
+from momentum.domain.pack_settings.service import consent
 from momentum.domain.projects.models import Project, ProjectMember
 from momentum.domain.tasks.models import Task, TaskProject
 from momentum.domain.users.models import User
@@ -135,10 +136,12 @@ async def _per_project(
     index: int,
     minute: datetime,
     zone: str,
+    setting: str | None = None,
 ) -> int:
     """S5.3.3: a ``per: project`` schedule queues one run for each live project the agent's
     account is a member of and may act on (its scope), for the project's owner (the person its
-    proposals go to; none when the owner is gone, so it only reports)."""
+    proposals go to; none when the owner is gone, so it only reports). A pack schedule gated by a
+    ``setting`` runs only where that setting is on, and the run names who turned it on."""
     rows = (
         await session.execute(
             select(Project)
@@ -157,12 +160,19 @@ async def _per_project(
     for project in rows:
         if not await in_scope(session, agent, ctx, [project.id]):
             continue
+        given = None
+        if setting and agent.pack_key:
+            given = await consent(session, agent.workspace_id, agent.pack_key, setting, project.id)
+            if given is None:
+                continue
         trigger: dict[str, Any] = {
             "type": "schedule",
             "fire_time": minute.isoformat(),
             "timezone": zone,
             "project_id": str(project.id),
         }
+        if given is not None:
+            trigger["consent"] = given
         owner = await session.get(User, project.owner_id) if project.owner_id else None
         if owner is not None and owner.status == "active" and not owner.is_agent:
             trigger["requested_by"] = str(owner.id)
@@ -198,7 +208,7 @@ def _wall(minute: datetime, zone: str) -> str:
 
 
 async def evaluate_schedules(
-    session: AsyncSession, settings: Settings, now: datetime
+    session: AsyncSession, settings: Settings, now: datetime, *, packs: object = None
 ) -> TriggerStats:
     """Queue the scheduled runs due in this minute (and the one before, in case the periodic job
     ran late; dedupe keeps that from doubling)."""
@@ -207,7 +217,7 @@ async def evaluate_schedules(
         return stats
     minutes = [_minute(now), _minute(now) - timedelta(minutes=1)]
     for agent, account in await _enabled_agents(session):
-        for index, trig in enumerate(agent.triggers or []):
+        for index, trig in enumerate(triggers_of(agent, packs)):
             if trig.get("type") != "schedule":
                 continue
             cron, tz = str(trig["cron"]), str(trig.get("timezone") or "workspace")
@@ -234,7 +244,14 @@ async def evaluate_schedules(
                         continue
                     if trig.get("per") == "project":
                         stats.queued += await _per_project(
-                            session, settings, agent, account, index, minute, zone
+                            session,
+                            settings,
+                            agent,
+                            account,
+                            index,
+                            minute,
+                            zone,
+                            trig.get("setting"),
                         )
                         continue
                     trigger: dict[str, Any] = {
@@ -471,6 +488,16 @@ async def _handle(
             session, agent, agent_ctx(agent, user, settings), projects
         ):
             continue
+        given = None
+        gate = next((t.get("setting") for t in wanted if t.get("setting")), None)
+        if gate and agent.pack_key:
+            # spec §8.1: an event trigger's consent is the project setting that turned it on
+            for pid in projects:
+                given = await consent(session, agent.workspace_id, agent.pack_key, gate, pid)
+                if given is not None:
+                    break
+            if given is None:
+                continue
         trigger = {
             "type": "event",
             "event_id": ev.id,
@@ -484,6 +511,8 @@ async def _handle(
             trigger["task_id"] = str(data["task_id"])
         if projects:
             trigger["project_id"] = str(projects[0])
+        if given is not None:
+            trigger["consent"] = given
         queued += int(await enqueue_run(session, agent, trigger, f"event:{ev.id}") is not None)
     return queued
 

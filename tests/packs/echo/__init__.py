@@ -125,6 +125,12 @@ class EchoSettings(PackSettings):
         description="A number",
         json_schema_extra={"ui": "int"},
     )
+    watch_uploads: bool = Field(
+        default=False,
+        title="Watch uploads",
+        description="Run on every file uploaded to the project (a consent switch, S76-06)",
+        json_schema_extra={"ui": "bool"},
+    )
     tone: str = Field(
         default="plain",
         title="Tone",

@@ -234,3 +234,46 @@ def restore_from_pause(run: AgentRun) -> None:
         run.status, run.waiting_on, run.resume_at = "waiting", was, None
     else:
         run.status, run.waiting_on, run.resume_at = "queued", None, None
+
+
+async def cancel_jobs_in_project(
+    session: AsyncSession, ctx: Any, agent: Agent, project_id: uuid.UUID
+) -> int:
+    """Spec §8.9: an agent taken off a project stops working there. Its open jobs about the
+    project (or a task in it) are cancelled with a note, and their open asks with them."""
+    from momentum.domain.asks.service import cancel_for_run
+    from momentum.domain.tasks.models import TaskProject
+
+    task_ids = {
+        str(t)
+        for t in (
+            await session.execute(
+                select(TaskProject.task_id).where(TaskProject.project_id == project_id)
+            )
+        ).scalars()
+    }
+    rows = (
+        await session.execute(
+            select(AgentRun)
+            .where(
+                AgentRun.agent_id == agent.id,
+                AgentRun.mode == "job",
+                AgentRun.status.in_(("queued", "running", "waiting", "paused")),
+            )
+            .with_for_update()
+        )
+    ).scalars()
+    now = datetime.now(UTC)
+    n = 0
+    for run in rows:
+        t = run.trigger or {}
+        if (
+            str(t.get("project_id") or "") != str(project_id)
+            and str(t.get("task_id") or "") not in task_ids
+        ):
+            continue
+        run.status, run.finished_at, run.waiting_on, run.resume_at = "cancelled", now, None, None
+        run.error = f"{agent.name} was taken off the project"
+        await cancel_for_run(session, ctx, run.id)
+        n += 1
+    return n

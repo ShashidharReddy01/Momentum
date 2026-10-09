@@ -46,6 +46,7 @@ from momentum.ai.types import Completion
 from momentum.core.context import Ctx
 from momentum.core.events import emit
 from momentum.core.ids import new_id
+from momentum.core.scrub import scrub
 from momentum.core.settings import Settings
 from momentum.core.storage import StorageBackend
 from momentum.domain.agents.models import AgentRun, AgentRunStep
@@ -226,6 +227,11 @@ class JobState:
     def limits(self) -> Any:
         return self.pack.manifest.limits
 
+    @property
+    def classified(self) -> bool:
+        """A financial or personal pack: its traces and errors are scrubbed (spec §8.5)."""
+        return self.pack.manifest.data.classification in ("financial", "personal")
+
     def channels(self) -> list[str]:
         out = [f"run:{self.run_id}"]
         if self.root_run_id != self.run_id:
@@ -316,6 +322,16 @@ class JobState:
         self.check_time()
         self.fresh = True
         now = datetime.now(UTC)
+        # spec §8.8: OpenTelemetry GenAI names on every step
+        attrs = {
+            "gen_ai.operation.name": {
+                "llm": "chat",
+                "tool": "execute_tool",
+                "effect": "execute_tool",
+            }.get(kind, "invoke_agent"),
+            "gen_ai.agent.name": self.agent_name,
+            **(attrs or {}),
+        }
         async with self.txn() as s:
             current = await s.scalar(select(AgentRun.status).where(AgentRun.id == self.run_id))
             if current != "running":
@@ -382,6 +398,8 @@ class JobState:
             raise StepFailed(key, message) from e
         except Exception as e:
             message = f"{type(e).__name__}: {e}"[:2000]
+            if self.classified:  # spec §8.5: the job's error never carries a value either
+                message = scrub(message).redacted
             await self._mark_failed(step_id, key, kind, seq, message)
             raise StepFailed(key, message) from e
         self.done[key] = _Done(kind, output, ref)
@@ -392,6 +410,8 @@ class JobState:
     ) -> None:
         """A step that didn't finish: kept as ``failed`` with its error (the effects it made
         rolled back with its transaction). Retry clears it and runs it again."""
+        if message and self.classified:
+            message = scrub(message).redacted  # spec §8.5: no values from classified data
         async with self.txn() as s:
             await s.execute(
                 update(AgentRunStep)
@@ -904,6 +924,8 @@ class Job:
     def log(self, message: str) -> None:
         """A line for the run's trace (kept once, not on every replay)."""
         if self._state.fresh or not self._state.done:
+            if self._state.classified:
+                message = scrub(message).redacted
             self._state.logs.append(
                 {"at": datetime.now(UTC).isoformat(), "kind": "log", "summary": message[:300]}
             )

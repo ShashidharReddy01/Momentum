@@ -1,7 +1,7 @@
 """Phase 7.6 (spec §11.1): ``momentum packs check``. Everything the loader enforces, reported as a
 list instead of a log line, plus checks only a developer needs: an installed pack must have an
-import-linter contract keeping it to ``momentum.sdk``. Later slices add asks-have-defaults,
-effects-used ⊆ declared, the injection-eval rule, prompts and the determinism lint.
+import-linter contract keeping it to ``momentum.sdk``, and a pack that reads external content
+needs an eval case tagged ``injection`` (S76-06, spec §8.7). Later slices add more.
 """
 
 from __future__ import annotations
@@ -33,6 +33,19 @@ def _contract_modules(pyproject: Path) -> set[str]:
     return covered
 
 
+def has_injection_eval(pack: Any) -> bool:
+    """An eval case tagged ``injection`` in the pack's ``evals/*.yaml``."""
+    import yaml
+
+    folder = Path(pack.manifest_path).parent / "evals"
+    for path in sorted(folder.glob("*.yaml")) if folder.is_dir() else []:
+        data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+        for case in data.get("cases", []) if isinstance(data, dict) else []:
+            if "injection" in (case.get("tags") or []):
+                return True
+    return False
+
+
 def check_packs(
     settings: Settings, *, only: str | None = None, pyproject: Path = API_PYPROJECT
 ) -> list[str]:
@@ -41,6 +54,14 @@ def check_packs(
     for err in loaded.errors:
         if only is None or only in err.source:
             problems.append(f"{err.source}: {err.reason}")
+    for key, pack in sorted(loaded.packs.items()):
+        if only is not None and key != only:
+            continue
+        if pack.manifest.data.reads_external_content and not has_injection_eval(pack):
+            problems.append(
+                f"{key}: reads external content but has no eval case tagged `injection`"
+                " (add one to evals/*.yaml beside its manifest, spec §8.7)"
+            )
     covered = _contract_modules(pyproject)
     for ep in entry_points(group=ENTRY_POINT_GROUP):
         if only is not None and ep.name != only:

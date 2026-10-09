@@ -22,7 +22,7 @@ async def agent_triggers(timestamp: int) -> None:
     packs = PackRegistry.load(settings)
     async with job_session() as session:
         scheduled = await evaluate_schedules(
-            session, settings, datetime.fromtimestamp(timestamp, UTC)
+            session, settings, datetime.fromtimestamp(timestamp, UTC), packs=packs
         )
         events = await consume_events(session, settings, packs=packs)
         woken = await wake_on_events(session, settings)

@@ -107,8 +107,12 @@ class PackTrigger(_Strict):
             raise ValueError("A schedule trigger needs `cron`")
         if self.type not in ("event",) and (self.event or self.filter):
             raise ValueError("`event` / `filter` belong to event triggers")
-        if self.type != "schedule" and (self.cron or self.timezone or self.per or self.setting):
-            raise ValueError("`cron` / `timezone` / `per` / `setting` belong to schedule triggers")
+        if self.type != "schedule" and (self.cron or self.timezone or self.per):
+            raise ValueError("`cron` / `timezone` / `per` belong to schedule triggers")
+        if self.setting and self.type not in ("event", "schedule"):
+            raise ValueError(
+                "`setting` (the consent switch) belongs to event and schedule triggers"
+            )
         return self
 
 

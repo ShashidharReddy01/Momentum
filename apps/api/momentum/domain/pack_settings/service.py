@@ -107,6 +107,35 @@ async def people(
     return out
 
 
+async def consent(
+    session: AsyncSession,
+    workspace_id: uuid.UUID,
+    pack_key: str,
+    setting: str,
+    project_id: uuid.UUID | None,
+) -> dict[str, Any] | None:
+    """Spec §8.1: an event or schedule trigger's consent is the setting that turned it on (the
+    project's value, else the workspace's). Who set it, and when, is named on every run it
+    starts. ``None`` when the setting is off."""
+    rows = [
+        r
+        for r in (
+            await _row(session, workspace_id, pack_key, project_id) if project_id else None,
+            await _row(session, workspace_id, pack_key, None),
+        )
+        if r is not None and setting in (r.values or {})
+    ]
+    if not rows or not rows[0].values.get(setting):
+        return None
+    row = rows[0]
+    return {
+        "setting": setting,
+        "by": str(row.updated_by) if row.updated_by else None,
+        "at": row.updated_at.isoformat() if row.updated_at else None,
+        "level": "project" if row.project_id else "workspace",
+    }
+
+
 async def is_steward(
     session: AsyncSession, workspace_id: uuid.UUID, pack_key: str, user_id: uuid.UUID | None
 ) -> bool:

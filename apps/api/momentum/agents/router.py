@@ -8,12 +8,12 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from fastapi import APIRouter, status
+from fastapi import APIRouter, Query, status
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from momentum.agents import radar, runs_view
+from momentum.agents import health, radar, runs_view
 from momentum.agents.jobs import control
 from momentum.agents.loader import DefinitionError, all_definitions
 from momentum.agents.packs import setup as pack_setup
@@ -589,3 +589,23 @@ async def put_pack_settings(
             s, ctx, model, str(agent.pack_key), project_id, body.values
         )
         return await _settings_out(s, ctx, agent, model, project_id)
+
+
+# ---------- Phase 7.6 S76-06 (spec §8.8): an agent's health ----------
+
+
+@router.get(
+    "/agents/{agent_id}/health",
+    response_model=health.HealthOut,
+    summary="An agent's health over the last N days (members: summary; admins, stewards: detail)",
+)
+async def agent_health(
+    agent_id: uuid.UUID,
+    ctx: CtxDep,
+    uow: UowDep,
+    runtime: RuntimeDep,
+    days: int = Query(default=30, ge=1, le=365),
+) -> health.HealthOut:
+    async with uow.transaction() as s:
+        agent = await service.get_agent(s, ctx, agent_id)
+        return await health.compute(s, ctx, agent, packs_of(runtime), days)

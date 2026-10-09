@@ -39,7 +39,7 @@ from momentum.core.mutation import Mutation
 from momentum.core.permissions import Action, can
 from momentum.domain.access import visible_projects_clause
 from momentum.domain.agents.models import Agent
-from momentum.domain.agents.runs import pause_jobs_of, resume_jobs_of
+from momentum.domain.agents.runs import cancel_jobs_in_project, pause_jobs_of, resume_jobs_of
 from momentum.domain.agents.schemas import (
     AgentConfig,
     AgentDefinition,
@@ -437,7 +437,10 @@ async def remove_from_project(
     agent = await _load(session, ctx, agent_id)
     if agent.user_id == ctx.actor.id:
         raise Forbidden("An agent can't change its own access")
-    return await projects_service.remove_member(session, ctx, project_id, agent.user_id)
+    out = await projects_service.remove_member(session, ctx, project_id, agent.user_id)
+    # Phase 7.6 (spec §8.9): taking an agent off a project cancels its open jobs there
+    await cancel_jobs_in_project(session, ctx, agent, project_id)
+    return out
 
 
 async def demote(session: AsyncSession, ctx: Ctx, agent: Agent, reason: str) -> Mutation[Agent]:
