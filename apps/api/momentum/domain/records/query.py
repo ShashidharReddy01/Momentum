@@ -107,7 +107,9 @@ class _Paths:
         self.item = item
 
     def is_money(self, path: str) -> bool:
-        return path in self.money
+        # the record's own ``amount`` column is money too (found live, S76-07: a sum over it
+        # came back across currencies and the model added dollars and euros together)
+        return path in self.money or (path == "amount" and self.array is None)
 
     def text(self, path: str) -> ColumnElement[Any]:
         if path in COLUMNS:

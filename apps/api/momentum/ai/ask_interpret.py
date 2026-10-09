@@ -2,7 +2,8 @@
 
 Certainty is decided in code (``asks.service.exact_answer``: an exact option, yes/no, a lone
 number, any text for a text ask). Everything else goes through one ``fast`` call with the ask's
-shape as a closed schema (prompt ``ask_interpret/v1``); its reading is validated in code and is
+shape as a closed schema (prompt ``ask_interpret/v2``, with today's date for dates without a
+year, and ``no_answer`` for a reply that doesn't answer); its reading is validated in code and is
 only ever **proposed**: the person confirms it with one click. It's never applied silently.
 """
 
@@ -10,7 +11,9 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
+from datetime import UTC, date, datetime
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from momentum.ai.llm import LLM
 from momentum.ai.prompts import load
@@ -83,8 +86,15 @@ def _question(ask: Ask) -> str:
     return json.dumps(shape, ensure_ascii=False)
 
 
-async def interpret_reply(llm: LLM, ctx: Ctx, ask: Ask, text: str) -> Reading:
+NO_MATCH = "I couldn't match the reply to the question; please answer on the card"
+
+
+async def interpret_reply(
+    llm: LLM, ctx: Ctx, ask: Ask, text: str, *, today: date | None = None
+) -> Reading:
     prompt = load(FEATURE)
+    if today is None:
+        today = datetime.now(UTC).astimezone(ZoneInfo(ctx.actor.timezone)).date()
     tool = {
         "type": "function",
         "function": {
@@ -94,10 +104,14 @@ async def interpret_reply(llm: LLM, ctx: Ctx, ask: Ask, text: str) -> Reading:
                 "type": "object",
                 "properties": {
                     "value": value_schema(ask),
+                    "no_answer": {
+                        "type": "boolean",
+                        "description": "True when the reply doesn't answer the question",
+                    },
                     "explanation": {"type": "string"},
                     "unsure": {"type": "boolean"},
                 },
-                "required": ["value", "explanation"],
+                "required": ["explanation"],
             },
         },
     }
@@ -109,7 +123,8 @@ async def interpret_reply(llm: LLM, ctx: Ctx, ask: Ask, text: str) -> Reading:
             {"role": "system", "content": prompt.body},
             {
                 "role": "user",
-                "content": f'<data source="question">{_question(ask)}</data>\n'
+                "content": f'<data source="today">{today.isoformat()} ({today:%A})</data>\n'
+                f'<data source="question">{_question(ask)}</data>\n'
                 f'<data source="reply">{text}</data>',
             },
         ],
@@ -121,9 +136,9 @@ async def interpret_reply(llm: LLM, ctx: Ctx, ask: Ask, text: str) -> Reading:
     )
     try:
         args = out.tool_calls[0].args() if out.tool_calls else {}
+        if args.get("no_answer") or "value" not in args:
+            return Reading(None, NO_MATCH)
         value = validate_answer(ask.kind, ask.options, ask.form, args.get("value"))
     except (ValueError, ValidationFailed, IndexError):
-        return Reading(
-            None, "I couldn't match the reply to the question; please answer on the card"
-        )
+        return Reading(None, NO_MATCH)
     return Reading(value, describe(ask, value))

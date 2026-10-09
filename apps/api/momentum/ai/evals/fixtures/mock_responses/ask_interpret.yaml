@@ -12,6 +12,6 @@ responses:
       - name: answer
         arguments: {value: {amount: 1250, due: "2026-11-01"}, explanation: "1,250, due 1 Nov"}
   - match: {contains: "check with finance"}
-    tool_calls: [{name: answer, arguments: {value: "", explanation: "No answer yet", unsure: true}}]
+    tool_calls: [{name: answer, arguments: {no_answer: true, explanation: "They will check with finance first"}}]
   - match: {contains: "Umbrella Corp"}
-    tool_calls: [{name: answer, arguments: {value: umbrella, explanation: "Umbrella Corp", unsure: true}}]
+    tool_calls: [{name: answer, arguments: {no_answer: true, explanation: "Umbrella Corp is not one of the options"}}]

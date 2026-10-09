@@ -1,7 +1,7 @@
 [
   {
     "function": {
-      "description": "Find records (structured items agents produce, such as invoices) the user can see, by type, words, status or project. Returns ids to use with get_record. For totals and counts use query_records; never add amounts up yourself.",
+      "description": "Find records (structured items agents produce, such as invoices or bills) the user can see, by type, words, status or project. Returns ids to use with get_record. For \"how many\", totals and averages use query_records; never add amounts up yourself. An empty result lists the record types and statuses that exist.",
       "name": "search_records",
       "parameters": {
         "additionalProperties": false,
@@ -25,6 +25,7 @@
             "default": null
           },
           "status": {
+            "description": "draft, needs_review (waiting for review), ready, approved, rejected, void, superseded",
             "items": {
               "type": "string"
             },
@@ -42,7 +43,7 @@
               }
             ],
             "default": null,
-            "description": "Words in the record"
+            "description": "Words in the record itself (a vendor, a number), not its type or status"
           },
           "type": {
             "anyOf": [
@@ -55,7 +56,7 @@
               }
             ],
             "default": null,
-            "description": "A record type, e.g. invoice"
+            "description": "A record type by key or name, e.g. invoice"
           }
         },
         "type": "object"
@@ -85,7 +86,7 @@
   },
   {
     "function": {
-      "description": "Count, sum, average, min or max over records the user can see, grouped by fields or by month (e.g. spend by vendor). Numbers come from the server; money is per currency, never added across currencies. Paths are into the record's fields (vendor.name, stated_total) or, with array, its list items (lines[].amount).",
+      "description": "Count, sum, average, min or max over records the user can see, grouped by fields or by month (e.g. spend by vendor; how many bills wait for review: status needs_review). Numbers come from the server; money is per currency, never added across currencies. type is a record type's key or name; status takes draft, needs_review, ready, approved, rejected, void, superseded. Paths are into the record's fields (vendor.name, stated_total) or, with array, its list items (lines[].amount).",
       "name": "query_records",
       "parameters": {
         "additionalProperties": false,

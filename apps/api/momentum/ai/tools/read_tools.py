@@ -1051,12 +1051,144 @@ async def list_my_asks(tc: ToolContext, args: ListMyAsksArgs) -> ToolResult:
 
 # ---------- Phase 7.6 S76-04: records (spec §6.6-§6.7) ----------
 
+# Live evals (S76-07) showed the model asking for "bills" or "waiting for review" and getting
+# nothing back, then telling the person there were none. The record tools now take the words
+# people use: a type by its key or label (singular or plural), a status by its key or an everyday
+# phrase; and an empty answer says which types and statuses exist, so the next call can be right.
+_STATUS_WORDS: dict[str, str] = {
+    "review": "needs_review",
+    "waiting": "needs_review",
+    "pending": "needs_review",
+    "to_review": "needs_review",
+    "unreviewed": "needs_review",
+    "ready_to_approve": "ready",
+    "voided": "void",
+    "cancelled": "void",
+    "canceled": "void",
+    "replaced": "superseded",
+    "declined": "rejected",
+}
+
+
+def _stem(word: str) -> str:
+    """bills → bill, invoices → invoice, entries → entry, boxes → box."""
+    w = word.lower().strip()
+    if len(w) <= 3:
+        return w
+    if w.endswith("ies"):
+        return w[:-3] + "y"
+    if w.endswith(("sses", "xes", "ches", "shes")):
+        return w[:-2]
+    if w.endswith("s") and not w.endswith("ss"):
+        return w[:-1]
+    return w
+
+
+async def _record_types(tc: ToolContext, *, listing: bool = True) -> list[dict[str, str]]:
+    """The record types in this workspace (key and label). ``listing``: only the ones worth
+    naming to this user (a guest never hears of financial or personal types); matching uses all
+    of them, so a guest asking for one gets the same empty answer as before."""
+    from momentum.domain.records.models import RecordType
+    from momentum.domain.records.service import CLASSIFIED
+
+    rows = (
+        await tc.session.execute(
+            select(RecordType.key, RecordType.label, RecordType.classification)
+            .where(RecordType.workspace_id == tc.ctx.workspace_id)
+            .order_by(RecordType.key, RecordType.version.desc())
+        )
+    ).all()
+    seen: dict[str, dict[str, str]] = {}
+    for key, label, cls in rows:
+        if key in seen or (listing and tc.ctx.actor.role == "guest" and cls in CLASSIFIED):
+            continue
+        seen[key] = {"key": key, "label": label}
+    return list(seen.values())
+
+
+def _match_type(raw: str, types: list[dict[str, str]]) -> str | None:
+    want = _stem(raw.replace("-", " ").replace("_", " "))
+    for t in types:
+        if raw == t["key"] or raw.lower() == t["label"].lower():
+            return t["key"]
+    hits = [
+        t["key"]
+        for t in types
+        if want
+        and (
+            want in {_stem(w) for w in t["label"].lower().split()}
+            or want in {_stem(w) for w in t["key"].split("_")}
+            or want == _stem(t["label"])
+        )
+    ]
+    return hits[0] if len(hits) == 1 else None
+
+
+def _match_status(raw: str) -> str | None:
+    from momentum.domain.records.models import RECORD_STATUSES
+
+    norm = "_".join(raw.lower().replace("-", " ").split())
+    if norm in RECORD_STATUSES:
+        return norm
+    if norm in _STATUS_WORDS:
+        return _STATUS_WORDS[norm]
+    for word, status in _STATUS_WORDS.items():
+        if word in norm.split("_"):
+            return status
+    return None
+
+
+async def _vocab(tc: ToolContext) -> dict[str, Any]:
+    from momentum.domain.records.models import RECORD_STATUSES
+
+    return {"types": await _record_types(tc), "statuses": list(RECORD_STATUSES)}
+
+
+async def _resolve(
+    tc: ToolContext, type_: str | None, statuses: list[str]
+) -> tuple[str | None, list[str]] | ToolResult:
+    """The type key and status keys for the words given, or a failure that lists the choices."""
+    key = None
+    if type_:
+        key = _match_type(type_, await _record_types(tc, listing=False))
+        if key is None:
+            types = await _record_types(tc)
+            return ToolResult.failure(
+                "unknown_record_type",
+                f"No record type matches {type_!r}. Types: "
+                + (", ".join(f"{t['key']} ({t['label']})" for t in types) or "none yet"),
+                candidates=types,
+            )
+    keys: list[str] = []
+    for raw in statuses:
+        st = _match_status(raw)
+        if st is None:
+            from momentum.domain.records.models import RECORD_STATUSES
+
+            return ToolResult.failure(
+                "unknown_status",
+                f"No record status matches {raw!r}. Statuses: {', '.join(RECORD_STATUSES)}",
+            )
+        keys.append(st)
+    return key, keys
+
 
 class SearchRecordsArgs(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    type: str | None = Field(default=None, max_length=60, description="A record type, e.g. invoice")
-    text: str | None = Field(default=None, max_length=200, description="Words in the record")
-    status: list[str] = Field(default_factory=list, max_length=7)
+    type: str | None = Field(
+        default=None, max_length=60, description="A record type by key or name, e.g. invoice"
+    )
+    text: str | None = Field(
+        default=None,
+        max_length=200,
+        description="Words in the record itself (a vendor, a number), not its type or status",
+    )
+    status: list[str] = Field(
+        default_factory=list,
+        max_length=7,
+        description="draft, needs_review (waiting for review), ready, approved, rejected, void,"
+        " superseded",
+    )
     project: str | None = Field(default=None, max_length=200)
     limit: int = Field(default=10, ge=1, le=30)
 
@@ -1079,9 +1211,10 @@ def _record_brief(r: Any) -> dict[str, Any]:
 @tool(
     name="search_records",
     description=(
-        "Find records (structured items agents produce, such as invoices) the user can see, by "
-        "type, words, status or project. Returns ids to use with get_record. For totals and "
-        "counts use query_records; never add amounts up yourself."
+        "Find records (structured items agents produce, such as invoices or bills) the user can "
+        "see, by type, words, status or project. Returns ids to use with get_record. For "
+        '"how many", totals and averages use query_records; never add amounts up yourself. '
+        "An empty result lists the record types and statuses that exist."
     ),
     risk="read",
     scopes=READ,
@@ -1089,20 +1222,24 @@ def _record_brief(r: Any) -> dict[str, Any]:
 async def search_records(tc: ToolContext, args: SearchRecordsArgs) -> ToolResult:
     from momentum.domain.records.service import list_records
 
+    resolved = await _resolve(tc, args.type, args.status)
+    if isinstance(resolved, ToolResult):
+        return resolved
+    type_key, statuses = resolved
     project_id = (await resolve_project(tc, args.project))[0].id if args.project else None
     rows, total = await list_records(
         tc.session,
         tc.ctx,
-        type=args.type,
+        type=type_key,
         q=args.text,
-        status=args.status or None,
+        status=statuses or None,
         project_id=project_id,
         limit=args.limit,
     )
-    return ToolResult.success(
-        f"{len(rows)} of {total} record(s)",
-        {"records": [_record_brief(r) for r in rows], "total": total},
-    )
+    data: dict[str, Any] = {"records": [_record_brief(r) for r in rows], "total": total}
+    if not total:
+        data.update(await _vocab(tc))
+    return ToolResult.success(f"{len(rows)} of {total} record(s)", data)
 
 
 class GetRecordArgs(BaseModel):
@@ -1134,9 +1271,11 @@ async def get_record(tc: ToolContext, args: GetRecordArgs) -> ToolResult:
     name="query_records",
     description=(
         "Count, sum, average, min or max over records the user can see, grouped by fields or by "
-        "month (e.g. spend by vendor). Numbers come from the server; money is per currency, never "
-        "added across currencies. Paths are into the record's fields (vendor.name, stated_total) "
-        "or, with array, its list items (lines[].amount)."
+        "month (e.g. spend by vendor; how many bills wait for review: status needs_review). "
+        "Numbers come from the server; money is per currency, never added across currencies. "
+        "type is a record type's key or name; status takes draft, needs_review, ready, approved, "
+        "rejected, void, superseded. Paths are into the record's fields (vendor.name, "
+        "stated_total) or, with array, its list items (lines[].amount)."
     ),
     risk="read",
     scopes=READ,
@@ -1144,11 +1283,19 @@ async def get_record(tc: ToolContext, args: GetRecordArgs) -> ToolResult:
 async def query_records(tc: ToolContext, args: RecordQuery) -> ToolResult:
     from momentum.domain.records.query import run_query
 
-    result = await run_query(tc.session, tc.ctx, args)
-    return ToolResult.success(
-        f"{len(result.rows)} row(s) from {result.matched} record(s)",
-        result.model_dump(mode="json"),
+    resolved = await _resolve(tc, args.type, args.status)
+    if isinstance(resolved, ToolResult):
+        return resolved
+    type_key, statuses = resolved
+    result = await run_query(
+        tc.session,
+        tc.ctx,
+        args.model_copy(update={"type": type_key or args.type, "status": statuses}),
     )
+    data = result.model_dump(mode="json")
+    if not result.matched:
+        data.update(await _vocab(tc))
+    return ToolResult.success(f"{len(result.rows)} row(s) from {result.matched} record(s)", data)
 
 
 TOOLS = [

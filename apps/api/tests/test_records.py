@@ -346,6 +346,17 @@ async def test_the_query_engine(make_env: Callable[..., JobsEnv], world: World) 
     assert got[("Acme Ltd", "EUR")] == {"sum(total)": 70.0, "count": 1.0}
     assert got[("Globex", "USD")] == {"sum(total)": 10.0, "count": 1.0}
     assert any("per currency" in n for n in out.notes)
+    # the record's own amount column is money too (found by the S76-07 live evals)
+    async with env.uow.transaction() as s:
+        by_amount = await rq.run_query(
+            s,
+            world.ravi,
+            rq.RecordQuery(type="echo_bill", measures=[rq.MeasureSpec(op="sum", path="amount")]),
+        )
+    assert {r.currency: r.values["sum(amount)"] for r in by_amount.rows} == {
+        "USD": 160.0,
+        "EUR": 70.0,
+    }
     async with env.uow.transaction() as s:
         months = await rq.run_query(
             s,

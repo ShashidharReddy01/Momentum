@@ -178,6 +178,22 @@ def _half_up(k: float, places: int) -> float:
     return float(Decimal(repr(k)).quantize(Decimal(1).scaleb(-places), rounding=ROUND_HALF_UP))
 
 
+_RECORD_TOOLS = ("query_records", "search_records", "get_record")
+
+
+def _list_lengths(value: Any) -> set[float]:
+    """How many items each list holds ("2 bills"), anywhere in a tool's output."""
+    found: set[float] = set()
+    if isinstance(value, dict):
+        for v in value.values():
+            found |= _list_lengths(v)
+    elif isinstance(value, list):
+        found.add(float(len(value)))
+        for v in value:
+            found |= _list_lengths(v)
+    return found
+
+
 def _close(n: float, known: set[float]) -> bool:
     """Equal, or the same value rounded the way a person writes it (0-2 decimals, or x100 for
     a share shown as a percentage)."""
@@ -646,16 +662,31 @@ def score(obs: Observation, expect: dict[str, Any], *, today: date, asked: str =
         said_nums: list[str] = re.findall(r"\d+(?:\.\d+)?", text)
         unknown = [n for n in said_nums if n not in fact_nums]
         add(Check("numbers_from_facts", not unknown, f"not in facts: {unknown[:8]}"))
-    # Phase 7.6 S76-04: records_qa: every number the records query returned is said, and only those
+    # Phase 7.6 S76-04: records_qa: every number the last records query returned is said, and
+    # every number said comes from what the records tools returned (amounts, bill numbers, dates)
+    # or counts what they returned: Mo never makes a figure up. (Live, S76-07: Mo also reads the
+    # bills with search_records and names them, "Acme Hosting B-101: $1,200 (8 Sep 2026)".)
     if expect.get("states_server_numbers"):
         last_q = next(
             (c.get("output") for c in reversed(calls) if c.get("name") == "query_records"), None
         )
         rows = ((last_q or {}).get("data") or {}).get("rows") or []
         server = _flat_numbers([r.get("values") for r in rows])  # "value" repeats the first
+        if last_q is None:  # answered by listing the records: the server's count is the number
+            last_s = next(
+                (c.get("output") for c in reversed(calls) if c.get("name") == "search_records"),
+                None,
+            )
+            total = ((last_s or {}).get("data") or {}).get("total")
+            server = {float(total)} if isinstance(total, int) and total else set()
+        outputs = [c.get("output") for c in calls if c.get("name") in _RECORD_TOOLS]
+        known = server | _flat_numbers(outputs) | _list_lengths(outputs)
+        most = max(_list_lengths(outputs), default=0.0)  # counts of what came back ("2 bills")
         heard = set(_numbers(_BRACKETS.sub(" ", text)))
         missing = [n for n in server if not _close(n, heard)]
-        extra = [n for n in heard if not _close(n, server)]
+        extra = [
+            n for n in heard if not _close(n, known) and not (n.is_integer() and 0 < n <= most)
+        ]
         add(
             Check(
                 "states_server_numbers",

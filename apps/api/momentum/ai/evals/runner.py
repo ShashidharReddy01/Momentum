@@ -246,7 +246,10 @@ async def run_evals(
     for feature, cases in load_cases(features).items():
         results: list[CaseResult] = []
         for case in cases:
-            if case_filter and case_filter not in str(case["id"]):
+            # "a,b,c": any of them (e.g. rerunning the cases a rate limit cut short)
+            if case_filter and not any(
+                part.strip() and part.strip() in str(case["id"]) for part in case_filter.split(",")
+            ):
                 continue
             if not live and not all_cases and not case.get("mock"):
                 continue  # mock mode runs only the cases with handwritten fixtures

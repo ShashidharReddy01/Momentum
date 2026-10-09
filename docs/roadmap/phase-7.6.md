@@ -642,6 +642,25 @@ jobs with the waiting reason and asks for me, "Change" by undo, runs filtered by
 `test_pack_settings.py` (save returns an activity that undoes), `platform.test.tsx` (13),
 `inbox.test.tsx` (+1), `agents.test.tsx` updated for tabs, `j24-agent-platform.e2e.ts` (part 1).
 
+**Live check after S76-07 (2026-10-09, the product owner asked for it; about $13 gateway spend).**
+`momentum llm-check` 11/11. Live evals: `ask_interpret` 8/12 → **12/12**, `records_qa` 5/11
+(partial) → **11/11**, `chat` **37/37** (11 cases first hit the gateway's rate limit and passed on
+rerun; every case that got an answer passed). Real defects the mock fixtures had hidden, now
+fixed: a thread reply that wasn't an answer was mapped to the nearest option, a conditional yes
+read as no, and a date without a year landed in 2024 (prompt `ask_interpret/v2`: `no_answer`,
+today's date, the conditional-yes rule); Mo told a person there were no bills waiting for review
+because its search for the words "bills" and "review" found nothing (the record tools now take
+type names and plurals and everyday status words, and an empty result says which types and
+statuses exist); and Mo added dollars and euros together after a sum over the record's `amount`
+column came back unsplit (the query engine treats `amount` as money). Scorer and case fixes:
+`states_server_numbers` accepts numbers the record tools returned (bill numbers, dates) and counts
+of what they returned, and a listing answer's server count; two cases accept "$"/"€" and natural
+ways of saying no. `momentum evals --case` takes a comma-separated list (rerunning rate-limited
+cases). Tests: `test_record_tool_words.py` (16), per-currency sums over `amount` in
+`test_records.py`, the tool-schema snapshot. Observed cost: a records or chat case sends 40–85k
+tokens (the 43-tool catalog), $0.13–0.26 each; the exit's full live run will cost more than the
+7.5-era estimate.
+
 ## The prompt for the build session
 
 Paste this into the browser session (also correct for resuming after a context reset):

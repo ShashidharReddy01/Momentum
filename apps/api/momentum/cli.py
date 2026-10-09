@@ -253,7 +253,9 @@ def evals(
         False, "--live", help="Call the configured gateway (default: mock fixtures only)"
     ),
     feature: list[str] = typer.Option([], "--feature", help="Only these features (repeatable)"),
-    case: str = typer.Option("", "--case", help="Only cases whose id contains this"),
+    case: str = typer.Option(
+        "", "--case", help="Only cases whose id contains this (comma-separate several)"
+    ),
     report_dir: str = typer.Option("reports/evals", help="Where to write the JSON report"),
     all_cases: bool = typer.Option(
         False, "--all", help="Mock mode: also run the live-only cases (a plumbing check)"
