@@ -16,7 +16,7 @@ deletes, no completing others' tasks, no deciding approvals. Anything else goes 
 from __future__ import annotations
 
 import uuid
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 from pydantic import BaseModel
 from sqlalchemy import func, select
@@ -72,13 +72,38 @@ class _Tasks:
             )
         return m.entity.id
 
+    async def request_approval(
+        self,
+        parent_id: uuid.UUID,
+        title: str,
+        *,
+        approver_id: uuid.UUID,
+        description: str = "",
+    ) -> uuid.UUID:
+        """S76-10: an approval subtask of ``parent_id``, assigned to the approver. Only a person
+        decides it (``decide_approval`` refuses agents); the job waits for ``approval.decided``."""
+        from momentum.domain.tasks.service import _text_doc, convert_task_type
+
+        state = self._state
+        s = _session(state, "tasks.request_approval")
+        m = await tasks_service.create_subtask(s, state.ctx, parent_id, title)
+        await convert_task_type(s, state.ctx, m.entity.id, "approval")
+        patch: dict[str, Any] = {"assignee_id": approver_id}
+        if description:
+            patch["description"] = _text_doc(description)
+        await tasks_service.update_task(s, state.ctx, m.entity.id, patch)
+        return m.entity.id
+
     async def rename(self, task_id: uuid.UUID, title: str) -> None:
         s = _session(self._state, "tasks.rename")
         await tasks_service.update_task(s, self._state.ctx, task_id, {"title": title})
 
-    async def set_fields(self, task_id: uuid.UUID, values: dict[str, Any]) -> None:
+    async def set_fields(
+        self, task_id: uuid.UUID, values: dict[str, Any], *, skip_missing: bool = False
+    ) -> list[str]:
         """Set task fields by name (``{"Vendor": "Acme", "Status": "Checked"}``). Select fields
-        take option labels (or ids); a name the task's project doesn't have is an error."""
+        take option labels (or ids); a name the task's project doesn't have is an error, or, with
+        ``skip_missing``, skipped. Returns the names set."""
         state = self._state
         s = _session(state, "tasks.set_fields")
         task, placement, _role = await get_visible_task(s, state.ctx, task_id)
@@ -90,21 +115,28 @@ class _Tasks:
                 s, state.ctx, placement.project_id
             )
         }
+        done: list[str] = []
         for name, value in values.items():
             field = fields.get(name.casefold())
             if field is None:
+                if skip_missing:
+                    continue
                 raise ValidationFailed(f"The project has no field {name!r}")
             await fields_service.set_task_field_value(
                 s, state.ctx, task.id, field.id, _option_ids(field.type, field.options, value)
             )
+            done.append(name)
+        return done
 
-    async def move_to_review(self, task_id: uuid.UUID) -> None:
-        """Move a task to its project's Review (or In review) section."""
+    async def move_to_review(self, task_id: uuid.UUID) -> bool:
+        """Move a task to its project's Review (or In review) section; False (nothing moved)
+        when the task isn't in a project's section (a subtask) or the project has no such
+        section."""
         state = self._state
         s = _session(state, "tasks.move_to_review")
         task, placement, _role = await get_visible_task(s, state.ctx, task_id)
         if placement is None:
-            raise ValidationFailed("This task isn't in a project")
+            return False
         review = await s.scalar(
             select(Section)
             .where(
@@ -116,9 +148,10 @@ class _Tasks:
             .limit(1)
         )
         if review is None:
-            raise ValidationFailed("The project has no Review section")
+            return False
         if placement.section_id != review.id:
             await tasks_service.move_tasks(s, state.ctx, [task.id], section_id=review.id)
+        return True
 
     async def complete_own(self, task_id: uuid.UUID) -> None:
         """Complete a task the agent made and is assigned (its own subtask), never anyone
@@ -241,9 +274,14 @@ class _Records:
         checks: list[dict[str, Any]] | None = None,
         decision: dict[str, Any] | None = None,
         confidence: float | None = None,
+        authority: Literal["policy", "approval", "ask"] | None = None,
+        approval_task_id: uuid.UUID | None = None,
+        ask_id: uuid.UUID | None = None,
     ) -> int:
         """Apply correction operations (and/or new checks, decision, confidence); returns the
-        new version."""
+        new version. Setting ``approved``/``rejected`` takes an ``authority``: a person's
+        decided approval subtask, an ``allow`` policy decision (approve only), or a person's
+        answer to this job's ask on the record's task (reject only)."""
         from pydantic import TypeAdapter
 
         from momentum.domain.records.models import Record
@@ -269,13 +307,18 @@ class _Records:
             checks=checks,
             decision=decision,
             confidence=confidence,
+            authority=authority,
+            approval_task_id=approval_task_id,
+            ask_id=ask_id,
+            run_id=state.run_id,
         )
         return record.version
 
 
 class BankSeen(BaseModel):
-    changed: bool  # a different account than the one on file
+    changed: bool  # a different account than the one on file (kept as pending, not replacing it)
     last4: str
+    last4_on_file: str | None = None
 
 
 class SkillProposal(BaseModel):
@@ -355,7 +398,22 @@ class _Entities:
             raise PackError("job.effects.entities.set_bank can only be called inside a step")
         s = _session(state, "entities.update", await self._type(state.scope.session, entity_id))
         changed, last4 = await set_bank(s, state.ctx, entity_id, account)
-        return BankSeen(changed=changed, last4=last4)
+        from momentum.domain.entities.models import Entity
+
+        row = await state.scope.session.get(Entity, entity_id)
+        on_file = ((row.attributes if row else None) or {}).get("bank") or {}
+        return BankSeen(changed=changed, last4=last4, last4_on_file=on_file.get("last4"))
+
+    async def confirm_bank(self, entity_id: uuid.UUID, last4: str) -> bool:
+        """After a person confirmed it with the vendor (an answered ask), the pending account
+        ending ``last4`` becomes the one on file."""
+        from momentum.domain.entities.service import confirm_bank
+
+        state = self._state
+        if state.scope is None:
+            raise PackError("job.effects.entities.confirm_bank can only be called inside a step")
+        s = _session(state, "entities.update", await self._type(state.scope.session, entity_id))
+        return await confirm_bank(s, state.ctx, entity_id, last4)
 
 
 class _Skills:

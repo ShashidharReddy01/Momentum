@@ -84,6 +84,9 @@ class Capability(_Strict):
     typical_duration_s: int | None = Field(default=None, ge=1, le=86_400)
     manual_minutes_per_item: float | None = Field(default=None, ge=0, le=10_000)
     consultable: bool = False
+    # S76-10: a step of the pack's own work (e.g. waiting for an approval), started only by the
+    # pack's jobs; never in the directory, never offered to people, plans or other agents.
+    internal: bool = False
 
 
 class PackTrigger(_Strict):

@@ -129,8 +129,18 @@ async def test_bank_details_are_a_fingerprint_that_never_leaves_the_server(
         assert not await entities.bank_matches(s, agent, v.id, "GB33BUKB20201555555555")
         changed, _ = await entities.set_bank(s, agent, v.id, "GB33BUKB20201555555555")
         assert changed is True  # a different account than the one on file
+        # it doesn't replace the one on file until a person confirms it (S76-10)
+        assert await entities.bank_matches(s, agent, v.id, IBAN)
         row = await s.get(Entity, v.id, populate_existing=True)
         assert row is not None
+        assert row.attributes["bank"]["pending"]["last4"] == "5555"
+        assert not await entities.confirm_bank(s, agent, v.id, "0000")
+        assert await entities.confirm_bank(s, agent, v.id, "5555")
+        assert await entities.bank_matches(s, agent, v.id, "GB33BUKB20201555555555")
+        row = await s.get(Entity, v.id, populate_existing=True)
+        assert row is not None
+        assert row.attributes["bank"]["previous_last4"] == "5432"
+        assert "pending" not in row.attributes["bank"]
         fp = row.attributes["bank"]["fingerprint"]
         assert len(fp) == 64 and IBAN.replace(" ", "") not in json.dumps(row.attributes)
         history = [

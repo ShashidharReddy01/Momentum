@@ -332,20 +332,49 @@ async def set_bank(
     session: AsyncSession, ctx: Ctx, entity_id: uuid.UUID, account: str, *, seen: date | None = None
 ) -> tuple[bool, str]:
     """Record the bank account an entity was seen with. Returns ``(changed, last4)``: whether it
-    differs from the one on file (a new or different account), and its last four digits."""
+    differs from the one on file, and its last four digits.
+
+    The first account becomes the one on file. A **different** one never replaces it here (S76-10:
+    an invoice must not be able to vouch for its own bank details): it's kept as ``pending``
+    until a person confirms it with the vendor (``confirm_bank``)."""
     e = await get_entity(session, ctx, entity_id, lock=True)
     fp, last4 = bank_fingerprint(ctx.settings, ctx.workspace_id, account)
     on_file = (e.attributes or {}).get("bank") or {}
     day = (seen or datetime.now(UTC).date()).isoformat()
-    changed = bool(on_file) and on_file.get("fingerprint") != fp
+    changed = bool(on_file.get("fingerprint")) and on_file.get("fingerprint") != fp
     if on_file.get("fingerprint") == fp:
         bank = {**on_file, "seen_last": day}
+    elif changed:
+        bank = {**on_file, "pending": {"fingerprint": fp, "last4": last4, "seen": day}}
     else:
         bank = {"fingerprint": fp, "last4": last4, "seen_first": day, "seen_last": day}
     before = _snapshot(e)
     e.attributes = {**(e.attributes or {}), "bank": bank}
     await _changed(session, ctx, e, before)
     return changed, last4
+
+
+async def confirm_bank(session: AsyncSession, ctx: Ctx, entity_id: uuid.UUID, last4: str) -> bool:
+    """A person confirmed the pending account (the one ending ``last4``) with the vendor: it
+    becomes the one on file. False when there's no such pending account."""
+    e = await get_entity(session, ctx, entity_id, lock=True)
+    on_file = (e.attributes or {}).get("bank") or {}
+    pending = on_file.get("pending") or {}
+    if not pending.get("fingerprint") or pending.get("last4") != last4:
+        return False
+    before = _snapshot(e)
+    e.attributes = {
+        **(e.attributes or {}),
+        "bank": {
+            "fingerprint": pending["fingerprint"],
+            "last4": pending["last4"],
+            "seen_first": pending.get("seen"),
+            "seen_last": pending.get("seen"),
+            "previous_last4": on_file.get("last4"),
+        },
+    }
+    await _changed(session, ctx, e, before)
+    return True
 
 
 async def bank_matches(

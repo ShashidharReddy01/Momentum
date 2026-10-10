@@ -20,7 +20,7 @@ import re
 import uuid
 from datetime import UTC, date, datetime, timedelta
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import ValidationError
 from sqlalchemy import ColumnElement, and_, func, or_, select
@@ -561,6 +561,58 @@ def apply_ops(
     return data, provenance, status, [t.split(".")[0].split("[")[0] for t in touched]
 
 
+async def _check_authority(
+    session: AsyncSession,
+    ctx: Ctx,
+    record: Record,
+    status: str,
+    authority: str,
+    approval_task_id: uuid.UUID | None,
+    decision: dict[str, Any] | None,
+    *,
+    ask_id: uuid.UUID | None = None,
+    run_id: uuid.UUID | None = None,
+) -> None:
+    from momentum.domain.asks.models import Ask
+    from momentum.domain.tasks.models import Task
+    from momentum.domain.users.models import User
+
+    if not ctx.actor.is_agent:
+        raise Forbidden("Only an agent acts on an approval or a policy decision")
+    if authority == "ask":
+        ask = await session.get(Ask, ask_id) if ask_id else None
+        who = await session.get(User, ask.answered_by) if ask and ask.answered_by else None
+        if (
+            status != "rejected"
+            or ask is None
+            or ask.workspace_id != ctx.workspace_id
+            or ask.run_id != run_id
+            or ask.task_id != record.task_id
+            or ask.status != "answered"
+            or who is None
+            or who.is_agent
+        ):
+            raise Forbidden("No person's answer lets this record be rejected")
+        return
+    if authority == "policy":
+        current = decision if decision is not None else record.decision or {}
+        if status != "approved" or current.get("decision") != "allow":
+            raise Forbidden("The policy didn't allow approving this record")
+        return
+    task = await session.get(Task, approval_task_id) if approval_task_id else None
+    if (
+        task is None
+        or task.workspace_id != ctx.workspace_id
+        or task.type != "approval"
+        or task.parent_id is None
+        or task.parent_id != record.task_id
+        or task.approval_state in (None, "pending")
+    ):
+        raise Forbidden("No decided approval for this record")
+    if status != ("approved" if task.approval_state == "approved" else "rejected"):
+        raise Forbidden("The status doesn't match the approval's decision")
+
+
 async def update_record(
     session: AsyncSession,
     ctx: Ctx,
@@ -574,9 +626,19 @@ async def update_record(
     decision: dict[str, Any] | None = None,
     confidence: float | Decimal | None = None,
     batch_id: uuid.UUID | None = None,
+    authority: Literal["policy", "approval", "ask"] | None = None,
+    approval_task_id: uuid.UUID | None = None,
+    ask_id: uuid.UUID | None = None,
+    run_id: uuid.UUID | None = None,
 ) -> Record:
     """Correction operations (people and agents); an agent may also replace the checks, the
-    decision and the confidence in the same version (``ops`` may then be empty)."""
+    decision and the confidence in the same version (``ops`` may then be empty).
+
+    An agent sets ``approved`` / ``rejected`` only with an ``authority`` (S76-10): ``approval``,
+    when a person decided the approval subtask of the record's task (``approved`` → approved,
+    anything else → rejected), ``policy``, when the record's policy decision is ``allow``
+    (approve only), or ``ask``, when a person answered this agent run's ask on the record's task
+    (reject only). Without one, approving still needs a project admin."""
     record = await session.get(Record, record_id, with_for_update=True)
     if record is None or record.workspace_id != ctx.workspace_id or record.deleted_at is not None:
         raise NotFound("Record not found")
@@ -593,7 +655,19 @@ async def update_record(
     )
     new_status = record.status
     if status_op is not None:
-        if status_op.status in ("approved", "rejected"):
+        if status_op.status in ("approved", "rejected") and authority is not None:
+            await _check_authority(
+                session,
+                ctx,
+                record,
+                status_op.status,
+                authority,
+                approval_task_id,
+                decision,
+                ask_id=ask_id,
+                run_id=run_id,
+            )
+        elif status_op.status in ("approved", "rejected"):
             if role != "admin" and not ctx.actor.is_admin:
                 raise Forbidden("Approving or rejecting a record needs a project admin")
             if record.created_by == ctx.actor.id and record.created_via not in ("agent",):

@@ -80,11 +80,20 @@ async def build_records_export(bc: BuildContext) -> ReportDocument:
             )
         ).scalars()
     )
+    doc = bc.doc(f"{where}: {row.label} records", f"Exported {day(bc.today)}")
+    add_records(doc, row.label, display, records)
+    return doc
+
+
+def add_records(
+    doc: ReportDocument, label_: str, display: dict[str, Any], records: list[Record]
+) -> None:
+    """The Records sheet (with totals per currency) and one sheet per list, for these records
+    (also used for an agent's batch catalogue, ``job.records.export``)."""
     money = set(display.get("money") or [])
     dates = set(display.get("dates") or [])
     currency_field = display.get("currency_field")
     columns = [c for c in display.get("columns") or [] if "[" not in c] or ["title"]
-    doc = bc.doc(f"{where}: {row.label} records", f"Exported {day(bc.today)}")
     head = ["Title", "Status", *[_header(c) for c in columns if c != currency_field]]
     if currency_field:
         head.append("Currency")
@@ -109,8 +118,8 @@ async def build_records_export(bc: BuildContext) -> ReportDocument:
                 *[Kpi(f"Total {cur}", f"{amt:,.2f}", float(amt)) for cur, amt in totals.items()],
             ]
         ),
-        Heading(row.label, 2),
-        Table(f"{row.label} records", head, rows, sheet="Records"),
+        Heading(label_, 2),
+        Table(f"{label_} records", head, rows, sheet="Records"),
     )
     for array, label in (display.get("arrays") or {}).items():
         prefix = f"{array}[]."
@@ -152,4 +161,3 @@ async def build_records_export(bc: BuildContext) -> ReportDocument:
                 sheet=str(label)[:31],
             )
         )
-    return doc

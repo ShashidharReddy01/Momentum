@@ -54,8 +54,14 @@ class PackRegistry:
         return None
 
     def capabilities(self) -> list[tuple[str, Capability]]:
-        """Every loaded capability as ``(pack key, capability)``, in pack order."""
-        return [(k, c) for k, p in sorted(self.packs.items()) for c in p.manifest.capabilities]
+        """Every loaded capability as ``(pack key, capability)``, in pack order (internal ones,
+        a pack's own steps, left out)."""
+        return [
+            (k, c)
+            for k, p in sorted(self.packs.items())
+            for c in p.manifest.capabilities
+            if not c.internal
+        ]
 
     def definitions(self) -> list[tuple[AgentDefinition, str]]:
         """Each pack as the agent definition it installs (source ``pack``). Only the display and

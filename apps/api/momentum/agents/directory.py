@@ -165,6 +165,7 @@ def _capabilities(manifest: PackManifest | None) -> list[CapabilityOut]:
             typical_duration_s=c.typical_duration_s,
         )
         for c in manifest.capabilities
+        if not c.internal
     ]
 
 

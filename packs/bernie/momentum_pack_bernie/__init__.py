@@ -8,6 +8,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from momentum.sdk import Pack, Section, TaskField
+from momentum_pack_bernie import decide
 from momentum_pack_bernie.entities import VENDOR
 from momentum_pack_bernie.pipeline import run
 from momentum_pack_bernie.records import INVOICE
@@ -16,7 +17,7 @@ from momentum_pack_bernie.settings import BernieSettings
 pack = Pack(
     manifest_path=Path(__file__).parent / "manifest.yaml",
     run=run,
-    capabilities={"extract_invoice": run},
+    capabilities={"extract_invoice": run, "await_decision": decide.run},
     settings=BernieSettings,
     record_types=(INVOICE,),
     entity_types=(VENDOR,),

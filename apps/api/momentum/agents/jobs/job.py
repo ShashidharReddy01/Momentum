@@ -44,6 +44,7 @@ from momentum.ai.models import LlmCall
 from momentum.ai.prompts import Prompt, parse_prompt
 from momentum.ai.types import Completion
 from momentum.core.context import Ctx
+from momentum.core.errors import Conflict
 from momentum.core.events import emit
 from momentum.core.ids import new_id
 from momentum.core.scrub import scrub
@@ -593,6 +594,44 @@ class JobLLM:
 
         return cast(M, await state.run_step(key, "llm", body, TypeAdapter(schema)))
 
+    async def tools(
+        self,
+        key: str,
+        *,
+        messages: Sequence[dict[str, Any]],
+        tools: Sequence[dict[str, Any]],
+        alias: Literal["fast", "default", "smart"] | None = None,
+        max_tokens: int = 2000,
+        prompt_version: str | None = None,
+    ) -> dict[str, Any]:
+        """S76-09/10: one model turn that may call the given tools (a pack's own bounded tool
+        loop, e.g. Bernie's investigator). Returns ``{"text", "tool_calls": [{"id", "name",
+        "arguments"}]}``; the pack runs the tools itself and calls again with their results.
+        Each turn is its own recorded step, so a replayed loop takes the same path."""
+        state = self._state
+        msgs = self._messages(None, messages)
+
+        async def body(s: AsyncSession, meta: dict[str, Any]) -> dict[str, Any]:
+            await state.check_budget(s)
+            out = await state.complete(
+                meta,
+                alias=self._alias(alias),
+                messages=msgs,
+                tools=list(tools),
+                max_tokens=max_tokens,
+                temperature=0.0,
+                prompt_version=prompt_version,
+            )
+            return {
+                "text": out.text,
+                "cost_usd": str(out.cost_usd),
+                "tool_calls": [
+                    {"id": c.id, "name": c.name, "arguments": c.arguments} for c in out.tool_calls
+                ],
+            }
+
+        return cast(dict[str, Any], await state.run_step(key, "llm", body, TypeAdapter(dict)))
+
     async def vision(
         self,
         key: str,
@@ -931,6 +970,33 @@ class Job:
         from momentum.agents.jobs import talk
 
         return await talk.start_job(self._state, key, input, capability)
+
+    async def people(self, key: str, route: str) -> list[UUID]:
+        """S76-10: who a route (``requester``, ``approver``, ``stewards``, ``project_owner``,
+        ``admins``) names for this job's task, with the same escalation an ask uses."""
+        from momentum.domain.asks.service import resolve_route
+
+        state = self._state
+
+        async def body(s: AsyncSession, _meta: dict[str, Any]) -> list[UUID]:
+            if state.task_id is None:
+                return []
+            try:
+                ids, _fallback = await resolve_route(
+                    s,
+                    state.settings,
+                    route,
+                    workspace_id=state.workspace_id,
+                    task_id=state.task_id,
+                    project_id=state.project_id,
+                    requested_by=self.requested_by,
+                    pack_key=state.pack.key,
+                )
+            except Conflict:  # nobody at all can act on the task
+                return []
+            return ids
+
+        return cast(list[UUID], await state.run_step(key, "step", body, TypeAdapter(list[UUID])))
 
     async def settings(self, key: str = "settings") -> Any:
         """The pack's settings for this job's project (its ``PackSettings`` model): defaults,

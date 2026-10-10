@@ -67,6 +67,7 @@ class Extraction(RecordModel):
     vision_pages: list[int] = []
     chunks: int = 1
     attempts: int = 0
+    investigator_steps: int = 0
     model_alias: str | None = None
     text_confidence: float | None = None
 

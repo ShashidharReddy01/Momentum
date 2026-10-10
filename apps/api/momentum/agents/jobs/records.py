@@ -4,13 +4,16 @@ step (reads between steps would make a replay take a different path)."""
 from __future__ import annotations
 
 import uuid
-from datetime import date
+from collections.abc import Sequence
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any, cast
 
 from pydantic import BaseModel, TypeAdapter
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from momentum.agents.packs.pack import PackError
 from momentum.domain.records import query as records_query
 from momentum.domain.records import service as records_service
 from momentum.domain.records.models import Record
@@ -36,6 +39,7 @@ class RecordView(BaseModel):
     occurred_on: date | None
     task_id: uuid.UUID | None
     identity_key: str | None
+    confidence: float | None = None
 
 
 def _view(r: Record) -> RecordView:
@@ -54,6 +58,7 @@ def _view(r: Record) -> RecordView:
         occurred_on=r.occurred_on,
         task_id=r.task_id,
         identity_key=r.identity_key,
+        confidence=float(r.confidence) if r.confidence is not None else None,
     )
 
 
@@ -159,6 +164,59 @@ class JobRecords:
         return cast(
             list[Similar], await state.run_step(key, "step", body, TypeAdapter(list[Similar]))
         )
+
+    async def load(self, record_ids: Sequence[uuid.UUID]) -> list[RecordView]:
+        """S76-10: these records (the ones this job can see), read inside a pack step (e.g. to
+        build a file from them in the same step)."""
+        from momentum.domain.records.service import visible
+
+        state = self._state
+        if state.scope is None:
+            raise PackError("job.records.load can only be called inside a step")
+        s = state.scope.session
+        rows = (
+            await s.execute(
+                select(Record).where(await visible(s, state.ctx), Record.id.in_(list(record_ids)))
+            )
+        ).scalars()
+        return [_view(r) for r in rows]
+
+    async def export(
+        self, record_ids: Sequence[uuid.UUID], *, title: str, fmt: str = "xlsx"
+    ) -> bytes:
+        """S76-10: an export of these records (the ``records_export`` sheets: a Records sheet and
+        one per list), as ``xlsx`` or ``csv`` bytes, e.g. a batch's catalogue to attach. Called
+        inside a pack step (the bytes are never kept in a step); only records this job can
+        see."""
+        from momentum.domain.records.service import visible
+        from momentum.reports.builders.records import add_records
+        from momentum.reports.document import ReportDocument
+        from momentum.reports.generate import render
+
+        state = self._state
+        if state.scope is None:
+            raise PackError("job.records.export can only be called inside a step")
+        s = state.scope.session
+        rows = list(
+            (
+                await s.execute(
+                    select(Record)
+                    .where(await visible(s, state.ctx), Record.id.in_(list(record_ids)))
+                    .order_by(Record.created_at)
+                )
+            ).scalars()
+        )
+        doc = ReportDocument(
+            title=title,
+            subtitle=f"{len(rows)} record{'s' if len(rows) != 1 else ''}",
+            generated_at=datetime.now(UTC),
+            generated_by=state.agent_name,
+            scope_note="",
+        )
+        for t in sorted({r.type for r in rows}):
+            row = await records_query.type_display(s, state.ctx, t)
+            add_records(doc, row.label, row.display, [r for r in rows if r.type == t])
+        return render(doc, "csv" if fmt == "csv" else "xlsx")
 
     async def query(self, key: str, q: dict[str, Any]) -> records_query.QueryResult:
         """A ``RecordQuery`` run as the job (its visibility)."""

@@ -1,0 +1,23 @@
+# Bernie's risk checks (spec §9.3.14): deterministic, so every case runs the same in mock and live.
+# Each case changes the usual invoice (`data`) or its context and names every check that should
+# fail; nothing else may fail.
+feature: bernie_risk
+threshold: 1.0
+cases:
+  - {id: usual_invoice_is_clean, expect: [], mock: true}
+  - {id: duplicate_on_file, duplicates: 1, expect: [duplicate], mock: true}
+  - {id: look_alike_on_file, similar: 1, expect: [possible_duplicate], mock: true}
+  - {id: bank_changed, bank: {changed: true, last4: "5555", last4_on_file: "4321"}, expect: [bank_changed], mock: true}
+  - {id: first_bank_details, bank: {changed: false, last4: "5555"}, had_bank: false, expect: [bank_new], mock: true}
+  - {id: same_bank_as_on_file, bank: {changed: false, last4: "4321"}, expect: [], mock: true}
+  - {id: total_far_above_usual, data: {stated_total: "3000.00"}, expect: [amount_anomaly], mock: true}
+  - {id: total_far_below_usual, data: {stated_total: "400.00"}, expect: [amount_anomaly], mock: true}
+  - {id: too_few_invoices_for_an_anomaly, data: {stated_total: "3000.00"}, profile: few, expect: [], mock: true}
+  - {id: currency_change, data: {currency: EUR}, expect: [currency_change], mock: true}
+  - {id: first_invoice_from_vendor, profile: none, expect: [first_invoice], mock: true}
+  - {id: future_dated, data: {invoice_date: "2026-10-20"}, expect: [future_dated], mock: true}
+  - {id: two_days_ahead_is_fine, data: {invoice_date: "2026-10-12"}, expect: [], mock: true}
+  - {id: stale, data: {invoice_date: "2025-09-01"}, expect: [stale], mock: true}
+  - {id: tax_rate_unusual, data: {tax_amount: "50.00", stated_total: "1050.00"}, expect: [tax_rate_unusual], mock: true}
+  - {id: round_total_without_lines, data: {stated_total: "5000.00", lines: []}, expect: [round_total, amount_anomaly], mock: true}
+  - {id: missing_number_and_currency, data: {invoice_number: null, currency: ""}, expect: [missing_fields], mock: true}

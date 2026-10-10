@@ -724,6 +724,47 @@ mock cases scored: field accuracy, line recall and precision 1.0); the synthetic
 `packs/bernie/tests/synth/build.py` (the spec's six fictional vendors plus Proseware, Adatum and
 Litware, which reproduce the layouts that tripped the notebook).
 
+**S76-10 as built (2026-10-10, local session, mock AI only, $0 gateway spend).** No migration.
+Steps 11-19 of spec §9.3, after the math checks. **Critic** (`critic.py`, `bernie_critic/v1`, ported
+from the notebook's `self_check.py`): the exact failing checks, the closed list of root causes, at
+most 3 attempts; a correction is kept only when it validates, **every new figure is printed on a
+readable page** (checked in code; stronger than the notebook) and it doesn't make more checks fail.
+**Investigator** (`investigate.py`, `bernie_investigate/v1`, `smart`, at most 8 turns, the new
+`investigate_budget_usd` setting): read tools over this document only (`page_text`, `rows`,
+`find`, `sum`) and `propose_fix` on a scratch copy; **a value no tool showed is refused in code**,
+and its fix is kept only when every check passes. **Ask** (`ask_gap.py`): one form ask (requester,
+or stewards when an agent asked) with what's printed vs the sum, what was tried, the totals area
+as evidence, and the four answers (review as extracted, the default on expiry; the total is; pages
+are a separate invoice, which re-splits into child jobs; a line should be). **Risk checks**
+(`risk.py`, every row of §9.3.14; `due_before_issue` is the math checks' `due_after_issue`) and a
+**hostile-text detector in code** (`instruction_text_found` no longer depends on the model noticing).
+**Confidence** (`confidence.py`, versioned weights, per-field signals). **Policy** (`policy.py`,
+the spec's rules plus `warnings`: auto-approval never covers a failed warning). **Outputs**
+(`outputs.py`): task fields, rename (batch subtasks), move to Review, the approval subtask for the
+first matching **approval tier** or the approvers (`approval_tiers`, `approvers` settings), the
+comment, and the **catalogue**: `invoices-<date>.xlsx` (the `records_export` sheets, through the
+new `job.records.export`) and `.csv` in the notebook's column order, for a single invoice too.
+**Deciding** (`decide.py`, the internal capability `await_decision`): waiting for the approval or a
+hold's answer is its own small job on the invoice's task, so a batch's summary and catalogue don't
+wait for every approval. **Platform:** `job.llm.tools` (one recorded tool-calling turn),
+`job.people(route)`, `job.records.load` / `export` (inside a step), `tasks.request_approval`,
+`set_fields(skip_missing=)`, `move_to_review` returns False instead of failing, capability
+`internal: true` (never in the directory, never offered to people, plans or other agents),
+`RecordView.confidence`. **Security decisions** (recorded in STATUS): an agent sets a record
+`approved`/`rejected` only with an **authority**: a person's decided approval subtask of the
+record's task, an `allow` policy decision (approve only), or a person's answer to the job's own ask
+on that task (reject only). A **different bank account never replaces the one on file** from an
+invoice: it's kept as `pending` until a steward confirms it with the vendor (`confirm_bank`).
+**Tests:** `packs/bernie/tests/` `test_investigate`, `test_checks_risk`, `test_policy`,
+`test_ask_gap`, `test_outputs`, `test_decision_evals`; `apps/api/tests/test_bernie_e2e_service.py`
+(5: approval approves; the critic fixes a VAT row; a gap asked once and the answer fixes it; a bank
+change held for the stewards and confirmed; INV-0041 then INV41 held as a duplicate, the hostile
+footer flagged and nothing it said done); `test_entities.py` (pending bank). **Evals** (mock at
+1.0): `bernie_risk` (17), `bernie_policy` (15), `bernie_asks` (13), `bernie_investigate` (12),
+`bernie_injection` (13, all tagged `injection`). **Deferred:** the investigator's `look_at` (an
+image of a region) and `page_tables` tools (`rows` covers tables from word positions); the live
+runs of the new evals, with the 81-invoice benchmark near the exit.
+
 ## The prompt for the build session
 
 Paste this into the browser session (also correct for resuming after a context reset):

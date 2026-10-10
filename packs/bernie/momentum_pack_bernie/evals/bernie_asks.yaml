@@ -1,0 +1,19 @@
+# Bernie's gap ask (spec §9.3.13): the answer a person gives (validated by the asks service, as
+# the card would send it) and what Bernie does with it: correction operations, a re-split of the
+# document's pages, or review as extracted. The invoice has 2 lines and 6 pages.
+feature: bernie_asks
+threshold: 1.0
+cases:
+  - {id: review_as_extracted, answer: {action: review}, expect: {ops: []}, mock: true}
+  - {id: expiry_default_is_review, answer: expiry, expect: {ops: []}, mock: true}
+  - {id: the_total_is, answer: {action: total, total: "1240.00"}, expect: {ops: [{op: set, path: stated_total, value: "1240.00"}]}, mock: true}
+  - {id: total_written_without_cents, answer: {action: total, total: "1240"}, expect: {ops: [{op: set, path: stated_total, value: "1240.00"}]}, mock: true}
+  - {id: total_of_a_credit_note, answer: {action: total, total: "-310.50"}, expect: {ops: [{op: set, path: stated_total, value: "-310.50"}]}, mock: true}
+  - {id: total_chosen_but_left_empty, answer: {action: total}, expect: {ops: []}, mock: true}
+  - {id: a_line_should_be, answer: {action: line, line: "2", line_amount: "50.00"}, expect: {ops: [{op: set, path: "lines[1].amount", value: "50.00"}]}, mock: true}
+  - {id: a_line_that_does_not_exist, answer: {action: line, line: "9", line_amount: "50.00"}, expect: {ops: []}, mock: true}
+  - {id: pages_are_a_separate_invoice, answer: {action: split, pages: "3-4"}, expect: {split: [3, 4]}, mock: true}
+  - {id: pages_written_backwards, answer: {action: split, pages: "pages 6 to 5"}, expect: {split: [5, 6]}, mock: true}
+  - {id: one_page_split, answer: {action: split, pages: "2"}, expect: {split: [2, 2]}, mock: true}
+  - {id: the_whole_document_is_not_a_split, answer: {action: split, pages: "1-6"}, expect: {split: null}, mock: true}
+  - {id: pages_beyond_the_document, answer: {action: split, pages: "7-8"}, expect: {split: null}, mock: true}

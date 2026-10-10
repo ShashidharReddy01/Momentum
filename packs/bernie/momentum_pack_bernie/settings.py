@@ -5,9 +5,16 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-from pydantic import Field
+from pydantic import BaseModel, Field
 
 from momentum.sdk import PackSettings
+
+
+class ApprovalTier(BaseModel):
+    """Invoices up to these amounts (per currency) go to this approver."""
+
+    up_to: dict[str, Decimal]
+    approver: str
 
 
 class BernieSettings(PackSettings):
@@ -19,6 +26,37 @@ class BernieSettings(PackSettings):
             "(default: workspace admins)"
         ),
         json_schema_extra={"ui": "people"},
+    )
+    approvers: list[str] = Field(
+        default_factory=list,
+        title="Approvers",
+        description=(
+            "Who approves invoices when no tier matches (default: the project owner, then admins)"
+        ),
+        json_schema_extra={"ui": "people"},
+    )
+    approval_tiers: list[ApprovalTier] = Field(
+        default_factory=list,
+        title="Approval tiers",
+        description=(
+            'In order, the first match wins: [{"up_to": {"USD": 1000}, "approver": "<user id>"}]'
+        ),
+        json_schema_extra={"ui": "json"},
+    )
+    investigate_budget_usd: Decimal = Field(
+        default=Decimal("0.50"),
+        ge=0,
+        title="Most to spend investigating one invoice",
+        description="The investigator stops when it reaches this (US dollars)",
+        json_schema_extra={"ui": "number"},
+    )
+    ask_expiry_days: float = Field(
+        default=3,
+        gt=0,
+        le=30,
+        title="Days to wait for an answer",
+        description="Then the invoice goes to review as extracted",
+        json_schema_extra={"ui": "number"},
     )
     auto_approve: bool = Field(
         default=False,

@@ -20,6 +20,8 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from momentum.agents.extensions import attach_file
 from momentum.core.db import UnitOfWork
 from momentum.domain.agents.models import AgentRunStep
+from momentum.domain.asks import service as asks
+from momentum.domain.asks.models import Ask
 from momentum.domain.attachments import service as attachments_service
 from momentum.domain.comments.models import Comment
 from momentum.domain.entities.models import Entity
@@ -28,6 +30,7 @@ from tests.ai_fixtures import World, world
 from tests.jobs_env import JobsEnv
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "packs" / "bernie" / "tests"))
+from momentum_pack_bernie import ask_gap
 from synth import build as B
 
 _ = world
@@ -107,11 +110,11 @@ async def test_one_invoice_becomes_one_checked_record(
     await env.install("bernie")
     await upload(env, world, "northwind.pdf", B.pdf(spec))
     await env.start(task=world.copy)
-    assert await env.drain() == ["succeeded"]
+    assert await env.drain() == ["succeeded", "waiting"]  # then the approval
     [r] = await records(env)
     same_as_truth(r, "northwind_simple")
     assert r.status == "ready" and r.type == "invoice" and r.task_id == world.copy.id
-    assert [c["id"] for c in r.checks if not c["passed"]] == []
+    assert [c["id"] for c in r.checks if not c["passed"] and c["severity"] != "info"] == []
     assert (
         r.provenance["stated_total"]["page"] == 1 and len(r.provenance["stated_total"]["bbox"]) == 4
     )
@@ -152,7 +155,12 @@ async def test_a_zip_becomes_one_child_and_one_record_per_invoice(
         )
         files = await attachments_service.list_for_task(s, world.ravi, world.copy.id)
     assert any("I read 3 invoices" in str(c.body) for c in comments)
-    assert sum(1 for f in files if f.source == "agent") == 3  # the unpacked invoices, attached
+    agent_files = sorted(f.filename for f in files if f.source == "agent")
+    assert sum(1 for f in agent_files if f.endswith(".pdf")) == 3  # the unpacked invoices
+    catalogue = [f.rsplit(".", 1)[1] for f in agent_files if f.startswith("invoices-")]
+    assert catalogue == ["csv", "xlsx"]
+    assert any("The catalogue (Excel and CSV" in str(c.body) for c in comments)
+    assert statuses.count("waiting") == 4  # the parent on its children, then 3 approvals
 
 
 async def test_factur_x_needs_no_model_call(
@@ -163,7 +171,7 @@ async def test_factur_x_needs_no_model_call(
     await env.install("bernie")
     await upload(env, world, "contoso.pdf", B.facturx_pdf(S["contoso_facturx"]))
     await env.start(task=world.copy)
-    assert await env.drain() == ["succeeded"]
+    assert await env.drain() == ["succeeded", "waiting"]  # then the approval
     [r] = await records(env)
     same_as_truth(r, "contoso_facturx")
     assert r.data["extraction"]["method"] == "einvoice" and r.status == "ready"
@@ -183,8 +191,13 @@ async def test_an_e_invoice_that_disagrees_with_its_page_is_flagged(
         env, world, "contoso.pdf", B.facturx_pdf(S["contoso_facturx"], xml_total=Decimal("9999.99"))
     )
     await env.start(task=world.copy)
+    assert await env.drain() == ["waiting"]  # the total doesn't add up: Bernie asks
+    async with env.uow.transaction() as s:
+        [ask] = (await s.execute(select(Ask).where(Ask.status == "open"))).scalars()
+        await asks.answer_ask(s, world.ravi, ask.id, {"action": ask_gap.REVIEW})
     await env.drain()
     [r] = await records(env)
+    assert r.status == "needs_review"
     mismatch = next(c for c in r.checks if c["id"] == "einvoice_mismatch")
     assert not mismatch["passed"] and "9999.99" in mismatch["detail"]
 
@@ -203,7 +216,7 @@ async def test_the_300_line_invoice_keeps_every_line(
     await env.install("bernie")
     await upload(env, world, "tailspin.pdf", B.pdf(spec))
     await env.start(task=world.copy)
-    assert await env.drain() == ["succeeded"]
+    assert await env.drain() == ["succeeded", "waiting"]  # then the approval
     [r] = await records(env)
     assert len(r.data["lines"]) == 300
     assert r.data["extraction"]["method"] == "chunked" and r.data["extraction"]["chunks"] == 5
@@ -221,7 +234,7 @@ async def test_a_scan_is_read_with_ocr_and_its_hostile_footer_is_flagged(
     await env.install("bernie")
     await upload(env, world, "scan.pdf", B.pdf(spec))
     await env.start(task=world.copy)
-    assert await env.drain() == ["succeeded"]
+    assert await env.drain() == ["succeeded", "waiting"]  # then the approval
     [r] = await records(env)
     same_as_truth(r, "woodgrove_scan")
     assert (

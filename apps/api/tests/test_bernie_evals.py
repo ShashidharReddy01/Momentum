@@ -13,13 +13,15 @@ from typing import Any
 
 import pytest
 import yaml
-from momentum_pack_bernie import quality
+from momentum_pack_bernie import ask_gap, quality
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from momentum.agents.extensions import attach_file
 from momentum.core.db import UnitOfWork
 from momentum.domain.agents.models import AgentRunStep
+from momentum.domain.asks import service as asks
+from momentum.domain.asks.models import Ask
 from momentum.domain.records.models import Record
 from tests.ai_fixtures import World, world
 from tests.jobs_env import JobsEnv
@@ -75,7 +77,15 @@ async def test_extract_case(
     async with env.uow.transaction() as s:
         await attach_file(s, world.ravi, env.settings, world.copy.id, name, data, mime)
     await env.start(task=world.copy)
-    assert await env.drain() == ["succeeded"]
+    statuses = await env.drain()
+    async with env.uow.transaction() as s:  # a total that doesn't add up: Bernie asks once
+        open_asks = list((await s.execute(select(Ask).where(Ask.status == "open"))).scalars())
+        for ask in open_asks:
+            await asks.answer_ask(s, world.ravi, ask.id, {"action": ask_gap.REVIEW})
+    if open_asks:
+        statuses = await env.drain()
+    assert statuses[0] == "succeeded"
+    assert statuses.count("waiting") <= 1  # the decision job waits for the approval
     async with env.uow.transaction() as s:
         [r] = list((await s.execute(select(Record))).scalars())
         model_calls = len(

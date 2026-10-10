@@ -28,11 +28,20 @@ def _dec(v: Any) -> Decimal | None:
         return None
 
 
+def tax_rate(data: dict[str, Any]) -> Decimal | None:
+    """The effective tax rate in percent (tax over the net amount), when both are printed."""
+    tax, net = _dec(data.get("tax_amount")), _dec(data.get("subtotal"))
+    if tax is None or not net:
+        return None
+    return (tax / net * 100).quantize(Decimal("0.01"))
+
+
 def vendor_profile(entity: dict[str, Any], records: list[dict[str, Any]]) -> dict[str, Any]:
     """From the vendor's approved invoices: how many, the usual currency, totals per currency
-    (median, p10, p90), the cadence in days and the last invoice date."""
+    (median, p10, p90), the usual tax rate, the cadence in days and the last invoice date."""
     by_cur: dict[str, list[Decimal]] = {}
     dates: list[date] = []
+    rates = sorted(r for r in (tax_rate(x) for x in records) if r is not None)
     for r in records:
         cur = str(r.get("currency") or "").upper()
         total = _dec(r.get("stated_total"))
@@ -58,6 +67,7 @@ def vendor_profile(entity: dict[str, Any], records: list[dict[str, Any]]) -> dic
         "invoices": len(records),
         "currency_usual": max(by_cur, key=lambda c: len(by_cur[c])) if by_cur else None,
         "totals": totals,
+        "tax_rate_usual": str(rates[len(rates) // 2]) if rates else None,
         "cadence_days": int(statistics.median(gaps)) if gaps else None,
         "last_invoice": dates[-1].isoformat() if dates else None,
     }

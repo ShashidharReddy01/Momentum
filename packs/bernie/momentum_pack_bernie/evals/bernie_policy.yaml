@@ -1,0 +1,21 @@
+# Bernie's policy (spec §8.4): `failing` lists the checks that failed (id:severity), `settings` and
+# `context` change the defaults (a small GBP invoice from a known vendor, read with 0.97
+# confidence, auto-approval off); `expect` is the decision, the rule that fired and the route.
+feature: bernie_policy
+threshold: 1.0
+cases:
+  - {id: default_is_a_person, expect: {decision: require_human, rule: default_human, route: approver}, mock: true}
+  - {id: auto_on_small_clean_known, settings: {auto_approve: true}, expect: {decision: allow, rule: auto_ok, route: null}, mock: true}
+  - {id: bank_change_holds_for_stewards, failing: ["bank_changed:block"], expect: {decision: hold, rule: block_bank_change, route: stewards}, mock: true}
+  - {id: bank_change_holds_even_with_auto, failing: ["bank_changed:block"], settings: {auto_approve: true}, expect: {decision: hold, rule: block_bank_change, route: stewards}, mock: true}
+  - {id: bank_change_beats_duplicate, failing: ["duplicate:block", "bank_changed:block"], expect: {decision: hold, rule: block_bank_change, route: stewards}, mock: true}
+  - {id: duplicate_holds_for_requester, failing: ["duplicate:block"], expect: {decision: hold, rule: duplicate, route: requester}, mock: true}
+  - {id: not_reconciled, failing: ["total:block"], settings: {auto_approve: true}, expect: {decision: require_human, rule: not_reconciled, route: requester}, mock: true}
+  - {id: new_vendor, context: {vendor_is_new: true}, settings: {auto_approve: true}, expect: {decision: require_human, rule: new_vendor, route: approver}, mock: true}
+  - {id: material_amount, context: {amount: "4000.00"}, settings: {auto_approve: true}, expect: {decision: require_human, rule: material, route: approver}, mock: true}
+  - {id: currency_without_a_limit, context: {currency: JPY}, settings: {auto_approve: true}, expect: {decision: require_human, rule: material, route: approver}, mock: true}
+  - {id: lower_limit_in_settings, context: {amount: "300.00"}, settings: {auto_approve: true, materiality: {GBP: "250"}}, expect: {decision: require_human, rule: material, route: approver}, mock: true}
+  - {id: low_confidence, context: {confidence: 0.6}, settings: {auto_approve: true}, expect: {decision: require_human, rule: low_confidence, route: approver}, mock: true}
+  - {id: amount_anomaly, failing: ["amount_anomaly:warn"], settings: {auto_approve: true}, expect: {decision: require_human, rule: anomaly, route: approver}, mock: true}
+  - {id: any_warning_needs_a_person, failing: ["currency_change:warn"], settings: {auto_approve: true}, expect: {decision: require_human, rule: warnings, route: approver}, mock: true}
+  - {id: info_alone_is_fine, failing: ["bank_new:info"], settings: {auto_approve: true}, expect: {decision: allow, rule: auto_ok, route: null}, mock: true}

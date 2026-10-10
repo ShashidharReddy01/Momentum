@@ -23,6 +23,10 @@ capabilities:
     examples: ["Process the attached invoices", "Extract this Bloomberg invoice"]
     typical_duration_s: 60
     manual_minutes_per_item: 12
+  - key: await_decision
+    title: Wait for a decision
+    description: Waits for an invoice's approval, or an answer about a hold, and records it on the invoice.
+    internal: true
 triggers:
   - { type: assigned }
   - { type: manual }

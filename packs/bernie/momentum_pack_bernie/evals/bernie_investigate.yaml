@@ -1,0 +1,81 @@
+# Bernie's investigator (spec §9.3.12): a synthetic invoice read wrongly (`broken`: vat_row,
+# dropped_line, doubled_line, misread_total), then a sequence of tool calls (`script`: in mock mode
+# the model's moves; the live run lets the model choose). `expect.clean`: the checks pass after
+# the last call; `expect.rejected`: a fix the code refuses (with this text). Placeholders: $total
+# (the printed total), $last_amount / $last_description (the last printed line), $appended (the
+# number of the line the broken read added).
+feature: bernie_investigate
+threshold: 1.0
+cases:
+  - id: vat_row_removed
+    spec: northwind_simple
+    broken: vat_row
+    script: [[rows, {page: 1}], [propose_fix, {changes: [{remove_line: $appended}]}]]
+    expect: {clean: true}
+    mock: true
+  - id: vat_row_with_an_invented_total_is_refused
+    spec: northwind_simple
+    broken: vat_row
+    script: [[propose_fix, {changes: [{field: stated_total, value: "1750.00"}]}]]
+    expect: {clean: false, rejected: "wasn't shown by any tool"}
+    mock: true
+  - id: dropped_line_added_back
+    spec: northwind_simple
+    broken: dropped_line
+    script: [[rows, {page: 1}], [propose_fix, {changes: [{add_line: {description: $last_description, amount: $last_amount}}]}]]
+    expect: {clean: true}
+    mock: true
+  - id: dropped_line_without_looking_is_refused
+    spec: northwind_simple
+    broken: dropped_line
+    script: [[propose_fix, {changes: [{add_line: {description: $last_description, amount: $last_amount}}]}]]
+    expect: {clean: false, rejected: "wasn't shown by any tool"}
+    mock: true
+  - id: misread_total_found_and_fixed
+    spec: northwind_simple
+    broken: misread_total
+    script: [[page_text, {page: 1}], [propose_fix, {changes: [{field: stated_total, value: $total}]}]]
+    expect: {clean: true}
+    mock: true
+  - id: misread_total_fixed_blind_is_refused
+    spec: northwind_simple
+    broken: misread_total
+    script: [[propose_fix, {changes: [{field: stated_total, value: $total}]}]]
+    expect: {clean: false, rejected: "wasn't shown by any tool"}
+    mock: true
+  - id: doubled_line_removed
+    spec: northwind_simple
+    broken: doubled_line
+    script: [[propose_fix, {changes: [{remove_line: $appended}]}]]
+    expect: {clean: true}
+    mock: true
+  - id: doubled_line_removed_wrapped_layout
+    spec: litware_wrapped
+    broken: doubled_line
+    script: [[rows, {page: 1}], [propose_fix, {changes: [{remove_line: $appended}]}]]
+    expect: {clean: true}
+    mock: true
+  - id: doubled_line_removed_qty1_layout
+    spec: adatum_qty1
+    broken: doubled_line
+    script: [[propose_fix, {changes: [{remove_line: $appended}]}]]
+    expect: {clean: true}
+    mock: true
+  - id: misread_total_qty1_layout
+    spec: adatum_qty1
+    broken: misread_total
+    script: [[rows, {page: 1}], [propose_fix, {changes: [{field: stated_total, value: $total}]}]]
+    expect: {clean: true}
+    mock: true
+  - id: no_such_line
+    spec: northwind_simple
+    broken: vat_row
+    script: [[propose_fix, {changes: [{remove_line: 9}]}]]
+    expect: {clean: false, rejected: "There's no line 9"}
+    mock: true
+  - id: only_invoice_fields_can_change
+    spec: northwind_simple
+    broken: vat_row
+    script: [[propose_fix, {changes: [{field: bank, value: "GB00"}]}]]
+    expect: {clean: false, rejected: "can't be changed here"}
+    mock: true
